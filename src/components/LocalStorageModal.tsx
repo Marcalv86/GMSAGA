@@ -47,7 +47,6 @@ interface LocalStorageModalProps {
   currentProject: Project | null;
   currentChats: Chat[];
   currentFiles: ProjectFile[];
-  onExportCurrentProject?: () => void;
   onImportCampaignFile?: (file: File) => Promise<void> | void;
 }
 
@@ -58,7 +57,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   currentProject,
   currentChats,
   currentFiles,
-  onExportCurrentProject,
   onImportCampaignFile
 }) => {
   const [activeTab, setActiveTab] = useState<'disk' | 'storage'>('disk');
@@ -154,7 +152,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
     }
   };
   const [storageStats, setStorageStats] = useState<{ usageMB: string; quotaMB: string; percent: number } | null>(null);
-  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   // Archivos de partida encontrados en la carpeta activa de disco
   const [diskFiles, setDiskFiles] = useState<DiskCampaignFile[]>([]);
@@ -331,13 +328,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
-          {successNotice && (
-            <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 dark:text-emerald-300 p-3 rounded-lg flex items-center gap-2 animate-[fadeIn_0.2s_ease]">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              <span>{successNotice}</span>
-            </div>
-          )}
-
           {/* TAB 1: DISK AUTO-BACKUP */}
           {activeTab === 'disk' && (
             <div className="space-y-4 font-lora">
@@ -679,74 +669,13 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                 </div>
               ) : (
                 <div className="p-3 bg-stone-100 dark:bg-stone-900/60 border border-stone-300 dark:border-stone-700 rounded text-[11px] text-[var(--text-secondary)]">
-                  Tu navegador actual no admite la API File System nativa. Puedes usar la pestaña <strong>Descargar Copia JSON</strong> para respaldar tus partidas en cualquier momento.
+                  Tu navegador actual no admite la API File System nativa para acceso a carpetas locales. Puedes utilizar las funciones de importación y gestión local para respaldar tus partidas.
                 </div>
               )}
             </div>
           )}
 
-          {/* TAB 2: EXPORTAR / DESCARGAR COPIAS JSON */}
-          {activeTab === 'export' && (
-            <div className="space-y-4 font-lora">
-              <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-[var(--text-primary)] space-y-1.5">
-                <div className="flex items-center gap-2 font-cinzel font-bold text-sm text-amber-800 dark:text-amber-300">
-                  <FileJson className="w-4 h-4" />
-                  <span>Descargar Copia de Respaldo (.JSON)</span>
-                </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed m-0">
-                  Descarga un archivo <code>.json</code> completo con todos los capítulos, memoria viva, personajes, mapas, imágenes e inventario del tomo actual. Puedes guardarlo en tu ordenador o transferirlo a cualquier otro dispositivo.
-                </p>
-              </div>
-
-              {currentProject ? (
-                <div className="p-4 rounded-xl border border-[var(--glass-border)] bg-[var(--glass)] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-cinzel text-[var(--text-secondary)] uppercase tracking-wider block">
-                        Tomo Activo Seleccionado
-                      </span>
-                      <h4 className="font-cinzel font-bold text-sm text-[var(--accent)] m-0">
-                        {currentProject.name}
-                      </h4>
-                    </div>
-                    <span className="text-[11px] font-cinzel text-[var(--text-secondary)]">
-                      {currentChats.length} capítulos · {currentFiles.length} archivos
-                    </span>
-                  </div>
-
-                  {onExportCurrentProject && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onExportCurrentProject();
-                        setSuccessNotice(`Copia de "${currentProject.name}" descargada correctamente.`);
-                        setTimeout(() => setSuccessNotice(null), 4000);
-                      }}
-                      className="w-full py-3 px-4 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 font-cinzel font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Descargar Copia de «{currentProject.name}» (.json)</span>
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <p className="text-xs text-[var(--text-secondary)] italic text-center py-4">
-                  No hay ningún tomo abierto actualmente para exportar.
-                </p>
-              )}
-
-              <div className="p-3 bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] border border-[var(--glass-border)] rounded-lg text-xs space-y-1">
-                <span className="font-cinzel font-bold text-[var(--text-primary)] block">
-                  ¿Cómo restaurar tu copia más tarde?
-                </span>
-                <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                  Para cargar o continuar una partida guardada en un archivo <code>.json</code>, utiliza el botón <strong>Importar</strong> en la cabecera superior del menú.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: STORAGE STATUS */}
+          {/* TAB 2: STORAGE STATUS */}
           {activeTab === 'storage' && (
             <div className="space-y-4 font-lora">
               <div className="grid grid-cols-2 gap-3">

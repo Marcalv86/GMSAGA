@@ -75,24 +75,16 @@ import {
   classifyFileAuto,
   getStoredApiKey,
   setStoredApiKey,
-  getStoredApiKeys,
   setStoredApiKeys,
   hasConfiguredApiKey,
   getStoredModel,
   setStoredModel,
-  getStoredBackgroundModel,
   setStoredBackgroundModel,
-  getStoredSafetyLevel,
   setStoredSafetyLevel,
-  getStoredThinkingLevel,
   setStoredThinkingLevel,
-  getStoredTemperature,
   setStoredTemperature,
-  getStoredTopP,
   setStoredTopP,
-  getStoredAutoFailover,
   setStoredAutoFailover,
-  getStoredKeyRotationMode,
   setStoredKeyRotationMode,
   getStoredMemorySyncGranularity,
   setStoredMemorySyncGranularity
@@ -1995,42 +1987,6 @@ export default function App() {
     }
   };
 
-  const handleExportJSON = () => {
-    if (!currentProject) return;
-    const apiKeys = getStoredApiKeys();
-    const fullData = {
-      ...currentProject,
-      chats: currentChats,
-      files: currentFiles,
-      apiKeys: apiKeys.length > 0 ? apiKeys : undefined,
-      keyRotationMode: getStoredKeyRotationMode(),
-      geminiSettings: {
-        model: getStoredModel(),
-        backgroundModel: getStoredBackgroundModel(),
-        safetyLevel: getStoredSafetyLevel(),
-        thinkingLevel: getStoredThinkingLevel(),
-        temperature: getStoredTemperature(),
-        topP: getStoredTopP(),
-        autoFailover: getStoredAutoFailover(),
-        memorySyncGranularity: getStoredMemorySyncGranularity()
-      },
-      // Sirve para decidir cuál es la copia buena cuando la misma campaña viaja
-      // entre el ordenador y el móvil y las dos han avanzado.
-      exportadaEl: new Date().toISOString()
-    };
-    // A Blob URL is used instead of a data: URI because campaigns with portraits
-    // and maps easily exceed the length a data: URI can carry.
-    const blob = new Blob([JSON.stringify(fullData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.href = url;
-    downloadAnchor.download = `${currentProject.name.replace(/\s+/g, '_')}_backup.json`;
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    URL.revokeObjectURL(url);
-  };
-
   const processImportFile = async (file: File) => {
     return new Promise<void>((resolve, reject) => {
       const fileReader = new FileReader();
@@ -2411,7 +2367,6 @@ export default function App() {
         currentProject={currentProject || null}
         currentChats={currentChats}
         currentFiles={currentFiles}
-        onExportCurrentProject={handleExportJSON}
         onImportCampaignFile={processImportFile}
       />
 
