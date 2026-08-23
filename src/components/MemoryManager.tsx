@@ -464,6 +464,7 @@ export const MemoryManager: React.FC<{
         const npcs = (mem.npcs || []).map(n => (n.id === id ? { ...n, portrait: imageContent } : n));
         return { ...mem, npcs };
       });
+      setSelectedNpcForDossier(prev => (prev && prev.id === id ? { ...prev, portrait: imageContent } : prev));
     } else if (type === 'location') {
       await onUpdateMemory(mem => {
         const locations = (mem.locations || []).map(l =>
@@ -471,6 +472,7 @@ export const MemoryManager: React.FC<{
         );
         return { ...mem, locations };
       });
+      setSelectedLocForDossier(prev => (prev && prev.id === id ? { ...prev, portrait: imageContent } : prev));
     }
     setTargetForPortraitPicker(null);
   };
@@ -1847,17 +1849,6 @@ export const MemoryManager: React.FC<{
         />
       )}
 
-      {/* Quick Portrait & Location/Map Linker Modal */}
-      {targetForPortraitPicker && (
-        <ImagePickerModal
-          target={targetForPortraitPicker}
-          allImageFiles={allImageFiles}
-          onSelectImage={handleAssignPortraitDirectly}
-          onUploadFile={onUploadEntityImage}
-          onClose={() => setTargetForPortraitPicker(null)}
-        />
-      )}
-
       {/* NPC Full Dossier Modal ("Página que se abre") */}
       {selectedNpcForDossier && (
         <NpcDossierModal
@@ -1901,6 +1892,17 @@ export const MemoryManager: React.FC<{
             });
           }}
           onClose={() => setSelectedLocForDossier(null)}
+        />
+      )}
+
+      {/* Quick Portrait & Location/Map Linker Modal */}
+      {targetForPortraitPicker && (
+        <ImagePickerModal
+          target={targetForPortraitPicker}
+          allImageFiles={allImageFiles}
+          onSelectImage={handleAssignPortraitDirectly}
+          onUploadFile={onUploadEntityImage}
+          onClose={() => setTargetForPortraitPicker(null)}
         />
       )}
 

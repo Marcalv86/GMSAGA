@@ -238,7 +238,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/65 flex items-center justify-center z-50 p-3 sm:p-4 backdrop-blur-2xs"
+      className="fixed inset-0 bg-black/65 flex items-center justify-center z-[70] p-3 sm:p-4 backdrop-blur-2xs"
       onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}
