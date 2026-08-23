@@ -2406,9 +2406,7 @@ export default function App() {
         currentProject={currentProject || null}
         currentChats={currentChats}
         currentFiles={currentFiles}
-        onImportCampaign={processImportFile}
         onExportCurrentProject={handleExportJSON}
-        onOpenImportModal={() => setIsImportCampaignModalOpen(true)}
       />
 
       <ImportCampaignModal
@@ -2454,6 +2452,14 @@ export default function App() {
           </h1>
           <div className="flex items-center gap-1.5">
             <button
+              onClick={() => setIsImportCampaignModalOpen(true)}
+              className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
+              title="Importar campaña desde PDF, Gemini, NotebookLM o JSON"
+            >
+              <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Importar</span>
+            </button>
+            <button
               onClick={() => setIsLocalStorageModalOpen(true)}
               className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
               title="Copias de Seguridad y Almacenamiento Local"
@@ -2475,24 +2481,13 @@ export default function App() {
         <div className="p-3 border-b border-[var(--glass-border)] flex flex-col gap-2">
           <div className="flex justify-between items-center text-xs font-cinzel font-bold text-[var(--text-secondary)]">
             <span>TOMO ACTIVO</span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setIsImportCampaignModalOpen(true)}
-                className="hover:text-[var(--accent)] cursor-pointer text-[11px] flex items-center gap-1 bg-transparent border-0 p-0 text-[var(--text-secondary)]"
-                title="Importar campaña desde PDF, Gemini, NotebookLM o JSON"
-              >
-                <Upload className="w-3 h-3" />
-                <span>Importar</span>
-              </button>
-              <button
-                onClick={handleCreateProject}
-                className="hover:text-[var(--accent)] cursor-pointer text-[11px] flex items-center gap-0.5"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Nuevo</span>
-              </button>
-            </div>
+            <button
+              onClick={handleCreateProject}
+              className="hover:text-[var(--accent)] cursor-pointer text-[11px] flex items-center gap-0.5"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Nuevo</span>
+            </button>
           </div>
 
           <div className="flex gap-1.5 items-center w-full min-w-0">

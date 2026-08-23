@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   HardDrive,
   Download,
-  Upload,
   FolderOpen,
   CheckCircle2,
   X,
@@ -43,9 +42,7 @@ interface LocalStorageModalProps {
   currentProject: Project | null;
   currentChats: Chat[];
   currentFiles: ProjectFile[];
-  onImportCampaign: (file: File) => Promise<void>;
   onExportCurrentProject?: () => void;
-  onOpenImportModal?: () => void;
 }
 
 export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
@@ -55,10 +52,9 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   currentProject,
   currentChats,
   currentFiles,
-  onImportCampaign,
-  onOpenImportModal
+  onExportCurrentProject
 }) => {
-  const [activeTab, setActiveTab] = useState<'backup' | 'disk' | 'storage'>('backup');
+  const [activeTab, setActiveTab] = useState<'disk' | 'export' | 'storage'>('disk');
   const [backupFolder, setBackupFolder] = useState<string | null>(null);
   const [backupNeedsPermission, setBackupNeedsPermission] = useState(false);
   const [isChoosingFolder, setIsChoosingFolder] = useState(false);
@@ -111,9 +107,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   const [diskFiles, setDiskFiles] = useState<DiskCampaignFile[]>([]);
   const [isLoadingDiskFiles, setIsLoadingDiskFiles] = useState(false);
   const [diskFilesPermissionNeeded, setDiskFilesPermissionNeeded] = useState(false);
-  const [importingFileName, setImportingFileName] = useState<string | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDiskFiles = useCallback(async () => {
     if (!isDiskBackupSupported()) return;
@@ -209,35 +202,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
     setDiskFiles([]);
   };
 
-  const handleImportDiskFile = async (diskFile: DiskCampaignFile) => {
-    setImportingFileName(diskFile.name);
-    setFolderErrorMsg(null);
-    try {
-      const file = await diskFile.getFile();
-      await onImportCampaign(file);
-      setSuccessNotice(`Campaña "${diskFile.name}" importada y cargada.`);
-      setTimeout(() => setSuccessNotice(null), 5000);
-    } catch (err: any) {
-      console.error('Error importando archivo de disco:', err);
-      setFolderErrorMsg(err?.message || `Error al importar "${diskFile.name}".`);
-    } finally {
-      setImportingFileName(null);
-    }
-  };
-
-  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      await onImportCampaign(file);
-      setSuccessNotice(`Archivo "${file.name}" importado correctamente.`);
-      setTimeout(() => setSuccessNotice(null), 5000);
-    } catch (err: any) {
-      console.error('Error importando:', err);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
   useEffect(() => {
     if (!isOpen) return;
 
@@ -265,15 +229,15 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         {/* Header */}
         <div className="p-4 border-b border-[var(--glass-border)] bg-[var(--glass)] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-              <HardDrive className="w-5 h-5" />
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <FolderSync className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-cinzel font-bold text-base md:text-lg text-[var(--accent)] m-0">
-                Almacenamiento y Copias Locales
+                Copias de Seguridad y Almacenamiento
               </h3>
               <p className="text-xs text-[var(--text-secondary)] m-0 font-lora">
-                100% privado en tu navegador, sin registros ni servidores externos
+                100% privado en tu ordenador, sin registros ni servidores externos
               </p>
             </div>
           </div>
@@ -289,17 +253,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         {/* Sub-Tabs */}
         <div className="flex border-b border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_40%,transparent)] px-4 pt-2 gap-2 text-xs font-cinzel font-bold">
           <button
-            onClick={() => setActiveTab('backup')}
-            className={`pb-2 px-3 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors ${
-              activeTab === 'backup'
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Importar Campañas (PDF / Chats)</span>
-          </button>
-          <button
             onClick={() => setActiveTab('disk')}
             className={`pb-2 px-3 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors ${
               activeTab === 'disk'
@@ -309,6 +262,17 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
           >
             <FolderSync className="w-3.5 h-3.5" />
             <span>Auto-Guardado en Disco</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('export')}
+            className={`pb-2 px-3 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors ${
+              activeTab === 'export'
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Descargar Copia JSON</span>
           </button>
           <button
             onClick={() => setActiveTab('storage')}
@@ -332,127 +296,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
             </div>
           )}
 
-          {/* TAB 1: IMPORTAR CAMPAÑAS */}
-          {activeTab === 'backup' && (
-            <div className="space-y-4 font-lora">
-              <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-[var(--text-primary)] space-y-1.5">
-                <div className="flex items-center gap-2 font-cinzel font-bold text-sm text-amber-800 dark:text-amber-300">
-                  <Upload className="w-4 h-4" />
-                  <span>Importador de Campañas, PDF y Conversaciones</span>
-                </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed m-0">
-                  Importa o continúa aventuras jugadas en otros chats (Gemini, ChatGPT, Claude, NotebookLM) o manuales en PDF. La IA estructurará automáticamente los capítulos, la memoria y las fichas de personajes.
-                </p>
-              </div>
-
-              {/* Botón Principal Destacado: Importador Inteligente */}
-              {onOpenImportModal && (
-                <div className="p-4 rounded-xl border-2 border-[var(--accent)]/40 bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface))] space-y-3 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center gap-1.5">
-                      <FolderSync className="w-4 h-4" />
-                      <span>Asistente de Importación Inteligente</span>
-                    </div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)] text-[var(--on-accent)]">
-                      Recomendado
-                    </span>
-                  </div>
-                  <p className="text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
-                    Sube documentos PDF, pega transcripciones de texto de chats previos o importa notas de Obsidian y NotebookLM.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onOpenImportModal();
-                    }}
-                    className="w-full py-3 px-4 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 font-cinzel font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
-                  >
-                    <FolderSync className="w-4 h-4" />
-                    <span>Abrir Importador de PDF, Gemini y NotebookLM</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Si hay una carpeta activa con archivos en disco, acceso directo de importación */}
-              {backupFolder && diskFiles.length > 0 && (
-                <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-lg space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="font-cinzel font-bold text-xs text-sky-900 dark:text-sky-300 flex items-center gap-1.5 truncate">
-                      <FolderSync className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Partidas en tu carpeta activa: <strong>{backupFolder}</strong></span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('disk')}
-                      className="text-[11px] text-[var(--accent)] font-cinzel font-bold hover:underline shrink-0 ml-2 cursor-pointer"
-                    >
-                      Ver todas ({diskFiles.length})
-                    </button>
-                  </div>
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                    {diskFiles.map(df => (
-                      <div
-                        key={df.name}
-                        className="flex items-center justify-between gap-2 p-2 rounded bg-[var(--surface)] text-xs border border-[var(--glass-border)] hover:border-[var(--accent)]/40 transition-colors"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-[var(--text-primary)] truncate text-[11px]">
-                            {df.name}
-                          </div>
-                          <div className="text-[10px] text-[var(--text-secondary)]">
-                            {formatFileSize(df.size)} · {new Date(df.lastModified).toLocaleDateString('es-ES')}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleImportDiskFile(df)}
-                          disabled={importingFileName !== null}
-                          className="px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel text-[10px] font-bold shrink-0 cursor-pointer hover:opacity-90 transition-opacity flex items-center gap-1 disabled:opacity-50"
-                        >
-                          {importingFileName === df.name ? (
-                            <>
-                              <span className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Cargando...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-2.5 h-2.5" />
-                              <span>Cargar</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Opción de Carga de archivo .JSON nativo */}
-              <div className="border border-[var(--glass-border)] bg-[var(--glass)] p-3.5 rounded-lg space-y-2">
-                <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                  ¿Tienes una copia previa descargada en <code>.JSON</code> nativo?
-                </p>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept=".json,.gmstudio.json,application/json,text/json,text/plain,*/*"
-                  onChange={handleFileSelected}
-                  className="hidden"
-                  id="local-storage-file-input"
-                />
-                <label
-                  htmlFor="local-storage-file-input"
-                  className="w-full py-2.5 px-3 rounded border border-dashed border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] font-cinzel font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors block text-center"
-                >
-                  <Upload className="w-3.5 h-3.5 inline mr-1" />
-                  <span>Cargar archivo .JSON de respaldo</span>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: DISK AUTO-BACKUP */}
+          {/* TAB 1: DISK AUTO-BACKUP */}
           {activeTab === 'disk' && (
             <div className="space-y-4 font-lora">
               <div className="bg-sky-500/10 border border-sky-500/20 p-3.5 rounded-lg space-y-1.5">
@@ -464,7 +308,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                   Si juegas en Chrome, Edge o navegadores compatibles con File System, puedes elegir una carpeta local en tu disco. Cada vez que el Narrador termine un turno, la campaña se guardará como archivo <code>.json</code> en esa carpeta de forma transparente.
                 </p>
                 <p className="text-[11px] text-sky-700 dark:text-sky-400 font-semibold m-0 pt-0.5">
-                  💡 Truco: Si seleccionas una carpeta de Google Drive, OneDrive o Dropbox en tu ordenador, tendrás sincronización automática entre dispositivos sin configurar ninguna API.
+                  💡 Truco: Si seleccionas una carpeta sincronizada con Google Drive, OneDrive o Dropbox en tu ordenador, tendrás sincronización automática entre dispositivos.
                 </p>
               </div>
 
@@ -491,7 +335,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                     <span>Aviso de marco embebido (iFrame)</span>
                   </div>
                   <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                    Las políticas de seguridad del navegador impiden que ventanas embebidas o vistas previas accedan directamente a las carpetas locales de tu ordenador. Para respaldar tu campaña aquí, usa la pestaña <strong>Copias JSON</strong> (Descargar Tomo) o abre la aplicación en una pestaña propia de tu navegador.
+                    Las políticas de seguridad del navegador impiden que ventanas embebidas o vistas previas accedan directamente a las carpetas locales de tu ordenador. Para respaldar tu campaña aquí, usa la pestaña <strong>Descargar Copia JSON</strong> o abre la aplicación en una pestaña propia de tu navegador.
                   </p>
                 </div>
               )}
@@ -573,7 +417,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                         </div>
                       )}
 
-                      {/* Lista de Partidas en la Carpeta Activa con botón de Importación directa */}
+                      {/* Lista de Partidas en la Carpeta Activa */}
                       <div className="p-3 rounded-lg border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] space-y-2.5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
@@ -617,7 +461,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                           </div>
                         ) : diskFiles.length === 0 ? (
                           <p className="text-[11px] text-[var(--text-secondary)] italic m-0 py-1">
-                            No se han detectado archivos <code>.json</code> de partidas en esta carpeta todavía. Se guardará uno aquí al jugar un turno.
+                            No se han detectado archivos <code>.json</code> de partidas en esta carpeta todavía. Se guardará uno aquí al jugar un turno o pulsar guardar.
                           </p>
                         ) : (
                           <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
@@ -647,25 +491,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                                     </span>
                                   </div>
                                 </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleImportDiskFile(df)}
-                                  disabled={importingFileName !== null}
-                                  className="py-1.5 px-3 rounded bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 font-cinzel font-bold text-[11px] flex items-center gap-1.5 cursor-pointer shrink-0 transition-opacity disabled:opacity-50 shadow-xs"
-                                >
-                                  {importingFileName === df.name ? (
-                                    <>
-                                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                      <span>Importando...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Upload className="w-3 h-3" />
-                                      <span>Importar Tomo</span>
-                                    </>
-                                  )}
-                                </button>
                               </div>
                             ))}
                           </div>
@@ -686,12 +511,72 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                 </div>
               ) : (
                 <div className="p-3 bg-stone-100 dark:bg-stone-900/60 border border-stone-300 dark:border-stone-700 rounded text-[11px] text-[var(--text-secondary)]">
-                  Tu navegador actual no admite la API File System nativa. Puedes usar los botones de <strong>Copias JSON</strong> para descargar tus partidas en cualquier momento.
+                  Tu navegador actual no admite la API File System nativa. Puedes usar la pestaña <strong>Descargar Copia JSON</strong> para respaldar tus partidas en cualquier momento.
                 </div>
               )}
             </div>
           )}
 
+          {/* TAB 2: EXPORTAR / DESCARGAR COPIAS JSON */}
+          {activeTab === 'export' && (
+            <div className="space-y-4 font-lora">
+              <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-[var(--text-primary)] space-y-1.5">
+                <div className="flex items-center gap-2 font-cinzel font-bold text-sm text-amber-800 dark:text-amber-300">
+                  <FileJson className="w-4 h-4" />
+                  <span>Descargar Copia de Respaldo (.JSON)</span>
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed m-0">
+                  Descarga un archivo <code>.json</code> completo con todos los capítulos, memoria viva, personajes, mapas, imágenes e inventario del tomo actual. Puedes guardarlo en tu ordenador o transferirlo a cualquier otro dispositivo.
+                </p>
+              </div>
+
+              {currentProject ? (
+                <div className="p-4 rounded-xl border border-[var(--glass-border)] bg-[var(--glass)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-cinzel text-[var(--text-secondary)] uppercase tracking-wider block">
+                        Tomo Activo Seleccionado
+                      </span>
+                      <h4 className="font-cinzel font-bold text-sm text-[var(--accent)] m-0">
+                        {currentProject.name}
+                      </h4>
+                    </div>
+                    <span className="text-[11px] font-cinzel text-[var(--text-secondary)]">
+                      {currentChats.length} capítulos · {currentFiles.length} archivos
+                    </span>
+                  </div>
+
+                  {onExportCurrentProject && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onExportCurrentProject();
+                        setSuccessNotice(`Copia de "${currentProject.name}" descargada correctamente.`);
+                        setTimeout(() => setSuccessNotice(null), 4000);
+                      }}
+                      className="w-full py-3 px-4 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 font-cinzel font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Descargar Copia de «{currentProject.name}» (.json)</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--text-secondary)] italic text-center py-4">
+                  No hay ningún tomo abierto actualmente para exportar.
+                </p>
+              )}
+
+              <div className="p-3 bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] border border-[var(--glass-border)] rounded-lg text-xs space-y-1">
+                <span className="font-cinzel font-bold text-[var(--text-primary)] block">
+                  ¿Cómo restaurar tu copia más tarde?
+                </span>
+                <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
+                  Para cargar o continuar una partida guardada en un archivo <code>.json</code>, utiliza el botón <strong>Importar</strong> en la cabecera superior del menú.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* TAB 3: STORAGE STATUS */}
           {activeTab === 'storage' && (
