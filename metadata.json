@@ -1,0 +1,6 @@
+{
+  "name": "GM Studio",
+  "description": "Estudio de narración y gestión de campañas de rol (D&D 5e) con IA, soporte para modelos Pro, memoria viva, almacenamiento local seguro en navegador/disco y fichas interactivas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

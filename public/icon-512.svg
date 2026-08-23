@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2d201c"/>
+      <stop offset="100%" stop-color="#140d0a"/>
+    </radialGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f3e098"/>
+      <stop offset="50%" stop-color="#c5a059"/>
+      <stop offset="100%" stop-color="#8a6322"/>
+    </linearGradient>
+    <linearGradient id="crimsonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b22222"/>
+      <stop offset="100%" stop-color="#8b0000"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="100" fill="url(#bgGrad)"/>
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#goldGrad)" stroke-width="8" stroke-dasharray="16 8"/>
+  <polygon points="256,70 410,160 410,350 256,440 102,350 102,160" fill="url(#crimsonGrad)" stroke="url(#goldGrad)" stroke-width="10"/>
+  <polygon points="256,110 375,180 375,330 256,400 137,330 137,180" fill="#2d201c" fill-opacity="0.5" stroke="url(#goldGrad)" stroke-width="4"/>
+  <line x1="256" y1="110" x2="256" y2="400" stroke="url(#goldGrad)" stroke-width="4" stroke-opacity="0.8"/>
+  <line x1="137" y1="180" x2="375" y2="330" stroke="url(#goldGrad)" stroke-width="4" stroke-opacity="0.8"/>
+  <line x1="375" y1="180" x2="137" y2="330" stroke="url(#goldGrad)" stroke-width="4" stroke-opacity="0.8"/>
+  <text x="256" y="280" font-family="'Cinzel', Georgia, serif" font-size="88" font-weight="bold" fill="url(#goldGrad)" text-anchor="middle" dominant-baseline="middle" letter-spacing="3">D20</text>
+</svg>

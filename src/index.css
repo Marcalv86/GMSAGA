@@ -1,0 +1,274 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-cinzel: 'Cinzel', serif;
+  --font-lora: 'Lora', serif;
+}
+
+:root {
+  --bg-color: #f4ecd8;
+  --sidebar-bg: #e8dcc4;
+  --accent: #8b0000;
+  --accent-hover: #b22222;
+  --text-primary: #2d201c;
+  --text-secondary: #5e473c;
+  --glass: rgba(139, 69, 19, 0.05);
+  --glass-border: rgba(139, 69, 19, 0.2);
+  --msg-user: #fdfaf3;
+  --user-border: rgba(139, 69, 19, 0.4);
+  --light-gold: #c5a059;
+  /* Superficie de tarjetas y campos, para que el tema pueda invertirla. */
+  --surface: #ffffff;
+  --surface-soft: #fdfaf3;
+  /* Color del texto que va ENCIMA del acento. Sobre el granate del tema claro es
+     blanco; sobre el dorado del tema noche tiene que ser tinta oscura. */
+  --on-accent: #ffffff;
+  color-scheme: light;
+}
+
+/*
+ * Tema nocturno. No es un negro plano: mantiene la idea de pergamino, pero a la
+ * luz de una vela — fondos de tinta cálida, texto hueso y un granate encendido
+ * para que el acento siga leyéndose sobre oscuro.
+ */
+html[data-theme='dark'] {
+  --bg-color: #16110f;
+  --sidebar-bg: #1e1714;
+  --accent: #e0b25c;
+  --accent-hover: #eec87e;
+  --text-primary: #ece2d0;
+  --text-secondary: #b3a48f;
+  --glass: rgba(220, 190, 150, 0.06);
+  --glass-border: rgba(220, 190, 150, 0.18);
+  --msg-user: #221a16;
+  --user-border: rgba(220, 190, 150, 0.28);
+  --light-gold: #e8c887;
+  --surface: #241c18;
+  --surface-soft: #1d1613;
+  --on-accent: #1a1310;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+body {
+  background-color: var(--bg-color);
+  background-image:
+    url('https://www.transparenttextures.com/patterns/papyrus-dark.png'),
+    radial-gradient(circle, transparent 20%, #e8dcc4 140%);
+  color: var(--text-primary);
+  font-family: 'Lora', serif;
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.markdown-body h1 {
+  margin: 25px 0 10px 0;
+  color: var(--accent);
+  font-family: 'Cinzel', serif;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.markdown-body h2 {
+  margin: 20px 0 10px 0;
+  color: var(--accent);
+  font-family: 'Cinzel', serif;
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.markdown-body h3 {
+  margin: 15px 0 5px 0;
+  color: var(--accent);
+  font-family: 'Cinzel', serif;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.markdown-body strong {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.markdown-body em {
+  font-style: italic;
+}
+
+.markdown-body ul {
+  list-style-type: square;
+  margin-left: 20px;
+}
+
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--glass-border);
+  margin: 20px 0;
+}
+
+.markdown-body p {
+  margin-bottom: 1.2em;
+}
+
+/* Tipografía de lectura editorial narrativa (móvil y escritorio) */
+.narrative-body {
+  font-family: 'Lora', Georgia, serif;
+  color: var(--text-primary);
+  font-size: 1.0625rem; /* ~17px */
+  line-height: 1.82;
+  letter-spacing: -0.01em;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+}
+
+html[data-theme='dark'] .narrative-body {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.narrative-body p {
+  margin-top: 0;
+  margin-bottom: 1.5em; /* Salto amplio y distinguible entre párrafos */
+}
+
+.narrative-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* Diálogos novelescos resaltados con sangría y borde tenue */
+.narrative-body p.narrative-dialogue {
+  color: var(--text-primary);
+  padding-left: 0.85rem;
+  border-left: 2.5px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 3.5%, transparent);
+  border-radius: 0 6px 6px 0;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  margin-bottom: 1.4em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+/* Nombres propios y palabras clave en negrita enriquecida */
+.narrative-body .narrative-strong,
+.narrative-body strong {
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.01em;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.06));
+}
+
+/* Pensamientos y susurros en cursiva refinada */
+.narrative-body .narrative-em,
+.narrative-body em {
+  font-style: italic;
+  color: color-mix(in srgb, var(--text-primary) 85%, var(--accent));
+  letter-spacing: 0.005em;
+}
+
+.narrative-body .narrative-quote,
+.narrative-body blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 0.6rem 1.1rem;
+  margin: 1.35em 0;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.narrative-body ul, .narrative-body ol {
+  margin-bottom: 1.25em;
+  padding-left: 1.5rem;
+}
+
+.narrative-body li {
+  margin-bottom: 0.5em;
+}
+
+.narrative-body hr {
+  border: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-border), var(--accent), var(--glass-border), transparent);
+  margin: 2rem 0;
+}
+
+@media (max-width: 640px) {
+  .narrative-body {
+    font-size: 1.05rem; /* ~16.8px */
+    line-height: 1.8;
+    letter-spacing: -0.012em;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+  }
+  .narrative-body p {
+    margin-bottom: 1.45em; /* Generoso espacio entre párrafos en móvil */
+  }
+  .narrative-body p.narrative-dialogue {
+    padding-left: 0.75rem;
+    margin-bottom: 1.35em;
+  }
+}
+
+@keyframes top-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(60%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.animate-top-progress {
+  animation: top-progress-indeterminate 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
