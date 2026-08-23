@@ -1,5 +1,17 @@
 import { Project, Chat, ProjectFile } from '../types';
 import { getDB } from './fileStorage';
+import {
+  getStoredApiKeys,
+  getStoredKeyRotationMode,
+  getStoredModel,
+  getStoredBackgroundModel,
+  getStoredSafetyLevel,
+  getStoredThinkingLevel,
+  getStoredTemperature,
+  getStoredTopP,
+  getStoredAutoFailover,
+  getStoredMemorySyncGranularity
+} from './geminiHelper';
 
 /**
  * Copia automática de la campaña a una carpeta real del disco.
@@ -169,7 +181,29 @@ export async function writeCampaignToDisk(
     const state = await (handle as any).queryPermission({ mode: 'readwrite' });
     if (state !== 'granted') return { written: false, reason: 'no-permission' };
 
-    const payload = JSON.stringify({ ...project, chats, files }, null, 2);
+    const apiKeys = getStoredApiKeys();
+    const payload = JSON.stringify(
+      {
+        ...project,
+        chats,
+        files,
+        apiKeys: apiKeys.length > 0 ? apiKeys : undefined,
+        keyRotationMode: getStoredKeyRotationMode(),
+        geminiSettings: {
+          model: getStoredModel(),
+          backgroundModel: getStoredBackgroundModel(),
+          safetyLevel: getStoredSafetyLevel(),
+          thinkingLevel: getStoredThinkingLevel(),
+          temperature: getStoredTemperature(),
+          topP: getStoredTopP(),
+          autoFailover: getStoredAutoFailover(),
+          memorySyncGranularity: getStoredMemorySyncGranularity()
+        },
+        exportadaEl: new Date().toISOString()
+      },
+      null,
+      2
+    );
     const fileName = `${safeName(project.name)}.gmstudio.json`;
 
     // createWritable() ya escribe a un fichero de intercambio y lo sustituye al

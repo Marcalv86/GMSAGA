@@ -75,10 +75,27 @@ import {
   classifyFileAuto,
   getStoredApiKey,
   setStoredApiKey,
+  getStoredApiKeys,
+  setStoredApiKeys,
   hasConfiguredApiKey,
   getStoredModel,
   setStoredModel,
-  getStoredMemorySyncGranularity
+  getStoredBackgroundModel,
+  setStoredBackgroundModel,
+  getStoredSafetyLevel,
+  setStoredSafetyLevel,
+  getStoredThinkingLevel,
+  setStoredThinkingLevel,
+  getStoredTemperature,
+  setStoredTemperature,
+  getStoredTopP,
+  setStoredTopP,
+  getStoredAutoFailover,
+  setStoredAutoFailover,
+  getStoredKeyRotationMode,
+  setStoredKeyRotationMode,
+  getStoredMemorySyncGranularity,
+  setStoredMemorySyncGranularity
 } from './utils/geminiHelper';
 import { applyInventoryReport, expireTemporaryItems } from './utils/inventoryParser';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
@@ -1975,10 +1992,23 @@ export default function App() {
 
   const handleExportJSON = () => {
     if (!currentProject) return;
+    const apiKeys = getStoredApiKeys();
     const fullData = {
       ...currentProject,
       chats: currentChats,
       files: currentFiles,
+      apiKeys: apiKeys.length > 0 ? apiKeys : undefined,
+      keyRotationMode: getStoredKeyRotationMode(),
+      geminiSettings: {
+        model: getStoredModel(),
+        backgroundModel: getStoredBackgroundModel(),
+        safetyLevel: getStoredSafetyLevel(),
+        thinkingLevel: getStoredThinkingLevel(),
+        temperature: getStoredTemperature(),
+        topP: getStoredTopP(),
+        autoFailover: getStoredAutoFailover(),
+        memorySyncGranularity: getStoredMemorySyncGranularity()
+      },
       // Sirve para decidir cuál es la copia buena cuando la misma campaña viaja
       // entre el ordenador y el móvil y las dos han avanzado.
       exportadaEl: new Date().toISOString()
@@ -2003,6 +2033,27 @@ export default function App() {
       fileReader.onload = async event => {
         try {
           const imported = JSON.parse(event.target?.result as string);
+
+          // Restauración automática de API Keys y configuración del motor de IA si vienen en el archivo
+          if (Array.isArray(imported.apiKeys) && imported.apiKeys.length > 0) {
+            setStoredApiKeys(imported.apiKeys);
+          } else if (typeof imported.apiKey === 'string' && imported.apiKey.trim()) {
+            setStoredApiKeys([imported.apiKey.trim()]);
+          }
+          if (imported.keyRotationMode) {
+            setStoredKeyRotationMode(imported.keyRotationMode);
+          }
+          const aiConfig = imported.geminiSettings || imported.settings;
+          if (aiConfig) {
+            if (aiConfig.model) setStoredModel(aiConfig.model);
+            if (aiConfig.backgroundModel) setStoredBackgroundModel(aiConfig.backgroundModel);
+            if (aiConfig.safetyLevel) setStoredSafetyLevel(aiConfig.safetyLevel);
+            if (aiConfig.thinkingLevel) setStoredThinkingLevel(aiConfig.thinkingLevel);
+            if (typeof aiConfig.temperature === 'number') setStoredTemperature(aiConfig.temperature);
+            if (typeof aiConfig.topP === 'number') setStoredTopP(aiConfig.topP);
+            if (typeof aiConfig.autoFailover === 'boolean') setStoredAutoFailover(aiConfig.autoFailover);
+            if (aiConfig.memorySyncGranularity) setStoredMemorySyncGranularity(aiConfig.memorySyncGranularity);
+          }
 
           // Soporte para copias completas de todas las campañas
           if (imported.version === 'gmstudio_v2' && Array.isArray(imported.projects)) {

@@ -29,6 +29,18 @@ import {
   requestPersistentStorage,
   getStorageEstimate
 } from '../utils/fileStorage';
+import {
+  getStoredApiKeys,
+  getStoredKeyRotationMode,
+  getStoredModel,
+  getStoredBackgroundModel,
+  getStoredSafetyLevel,
+  getStoredThinkingLevel,
+  getStoredTemperature,
+  getStoredTopP,
+  getStoredAutoFailover,
+  getStoredMemorySyncGranularity
+} from '../utils/geminiHelper';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -192,11 +204,24 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   const handleExportAll = () => {
     setIsExportingAll(true);
     try {
+      const apiKeys = getStoredApiKeys();
       const backupData = {
         version: 'gmstudio_v2',
         exportedAt: new Date().toISOString(),
         totalCampaigns: projects.length,
-        projects: projects
+        projects: projects,
+        apiKeys: apiKeys.length > 0 ? apiKeys : undefined,
+        keyRotationMode: getStoredKeyRotationMode(),
+        settings: {
+          model: getStoredModel(),
+          backgroundModel: getStoredBackgroundModel(),
+          safetyLevel: getStoredSafetyLevel(),
+          thinkingLevel: getStoredThinkingLevel(),
+          temperature: getStoredTemperature(),
+          topP: getStoredTopP(),
+          autoFailover: getStoredAutoFailover(),
+          memorySyncGranularity: getStoredMemorySyncGranularity()
+        }
       };
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -207,7 +232,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setSuccessNotice('Copia completa de todas tus campañas descargada con éxito.');
+      setSuccessNotice('Copia completa de todas tus campañas y configuración descargada con éxito.');
       setTimeout(() => setSuccessNotice(null), 5000);
     } finally {
       setIsExportingAll(false);
@@ -330,7 +355,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                   <span>Máxima privacidad y control total de tus partidas</span>
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed m-0">
-                  Tus partidas, diarios, personajes y mapas se guardan de forma instantánea en la base de datos interna de tu navegador (IndexedDB). Puedes descargar tus partidas en archivos JSON cuando quieras para guardarlas o moverlas a otro dispositivo.
+                  Tus partidas, diarios, personajes, mapas y <strong>claves API de Google AI Studio / rotación</strong> se guardan de forma instantánea en tu navegador. Al descargar tus copias JSON o activar el guardado en disco, tus claves y preferencias de IA van incluidas para que no tengas que volver a escribirlas al restaurar.
                 </p>
               </div>
 
