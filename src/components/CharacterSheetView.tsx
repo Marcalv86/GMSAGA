@@ -24,8 +24,7 @@ import {
   Compass,
   AlertTriangle,
   Languages,
-  Wrench,
-  ExternalLink
+  Wrench
 } from 'lucide-react';
 
 interface CharacterSheetViewProps {
@@ -1158,21 +1157,7 @@ export const CharacterSheetView: React.FC<CharacterSheetViewProps> = ({
               </div>
             </div>
 
-            <div className="p-3 border-t border-[var(--glass-border)] bg-[var(--sidebar-bg)] flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const term = (inspectItem.name || '').trim();
-                  const query = encodeURIComponent(`${term} dnd fantasy magic item weapon artifact prop concept art`);
-                  window.open(`https://www.pinterest.com/search/pins/?q=${query}`, '_blank', 'noopener,noreferrer');
-                }}
-                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-cinzel text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                title="Buscar arte e ilustraciones para este objeto en Pinterest"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>Buscar en Pinterest</span>
-              </button>
-
+            <div className="p-3 border-t border-[var(--glass-border)] bg-[var(--sidebar-bg)] flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setInspectItem(null)}

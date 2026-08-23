@@ -16,7 +16,6 @@ import {
   ChevronDown,
   ChevronUp,
   Crown,
-  Drama,
   Eye,
   EyeOff,
   Heart,
@@ -30,7 +29,6 @@ import {
   Shield,
   Sparkles,
   Trash2,
-  Upload,
   User
 } from 'lucide-react';
 
@@ -190,8 +188,6 @@ export const MemoryManager: React.FC<{
 
   // File input refs for direct entity image uploads
   const pcDirectFileInputRef = useRef<HTMLInputElement>(null);
-  const npcModalFileInputRef = useRef<HTMLInputElement>(null);
-  const locModalFileInputRef = useRef<HTMLInputElement>(null);
 
   // Story & Status Editing States
   const [isEditingStory, setIsEditingStory] = useState(false);
@@ -234,23 +230,16 @@ export const MemoryManager: React.FC<{
     });
   };
 
-  // NPC Form Modal state
-  const [editingNpc, setEditingNpc] = useState<NPC | null>(null);
   /**
    * Qué secretos ha decidido mirar la jugadora. Se olvida al salir de la vista a
    * propósito: destaparlo debe ser una decisión que se toma cada vez, no un
    * interruptor que se queda encendido y te va destripando la campaña.
    */
   const [vinculosDestapados, setVinculosDestapados] = useState<Set<string>>(new Set());
-  const [isNpcModalOpen, setIsNpcModalOpen] = useState(false);
 
   // Quest Form Modal state
   const [editingQuest, setEditingQuest] = useState<Quest | null>(null);
   const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
-
-  // Location Form Modal state
-  const [editingLoc, setEditingLoc] = useState<Location | null>(null);
-  const [isLocModalOpen, setIsLocModalOpen] = useState(false);
 
   // Confirmation state
   const [confirmModal, setConfirmModal] = useState<{
@@ -359,32 +348,6 @@ export const MemoryManager: React.FC<{
     }
     if (url) {
       await handleSavePcPortrait(url);
-    }
-    e.target.value = '';
-  };
-
-  const handleModalUploadForNpc = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editingNpc) return;
-    let url = '';
-    if (onUploadEntityImage) {
-      url = await onUploadEntityImage(file, 'portrait_npc');
-    }
-    if (url) {
-      setEditingNpc({ ...editingNpc, portrait: url });
-    }
-    e.target.value = '';
-  };
-
-  const handleModalUploadForLoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editingLoc) return;
-    let url = '';
-    if (onUploadEntityImage) {
-      url = await onUploadEntityImage(file, 'map');
-    }
-    if (url) {
-      setEditingLoc({ ...editingLoc, portrait: url });
     }
     e.target.value = '';
   };
@@ -501,9 +464,6 @@ export const MemoryManager: React.FC<{
         const npcs = (mem.npcs || []).map(n => (n.id === id ? { ...n, portrait: imageContent } : n));
         return { ...mem, npcs };
       });
-      if (editingNpc) {
-        setEditingNpc({ ...editingNpc, portrait: imageContent });
-      }
     } else if (type === 'location') {
       await onUpdateMemory(mem => {
         const locations = (mem.locations || []).map(l =>
@@ -511,28 +471,8 @@ export const MemoryManager: React.FC<{
         );
         return { ...mem, locations };
       });
-      if (editingLoc) {
-        setEditingLoc({ ...editingLoc, portrait: imageContent });
-      }
     }
     setTargetForPortraitPicker(null);
-  };
-
-  const handleSaveNpc = async (npc: NPC) => {
-    if (!npc.name.trim()) return;
-    await onUpdateMemory(mem => {
-      const existing = mem.npcs || [];
-      const index = existing.findIndex(n => n.id === npc.id);
-      if (index >= 0) {
-        const updated = [...existing];
-        updated[index] = npc;
-        return { ...mem, npcs: updated };
-      } else {
-        return { ...mem, npcs: [...existing, npc] };
-      }
-    });
-    setIsNpcModalOpen(false);
-    setEditingNpc(null);
   };
 
   const handleDeleteNpc = async (id: string, name: string) => {
@@ -608,23 +548,6 @@ export const MemoryManager: React.FC<{
   };
 
   // Location Handlers
-  const handleSaveLoc = async (loc: Location) => {
-    if (!loc.name.trim()) return;
-    await onUpdateMemory(mem => {
-      const existing = mem.locations || [];
-      const index = existing.findIndex(l => l.id === loc.id);
-      if (index >= 0) {
-        const updated = [...existing];
-        updated[index] = loc;
-        return { ...mem, locations: updated };
-      } else {
-        return { ...mem, locations: [...existing, loc] };
-      }
-    });
-    setIsLocModalOpen(false);
-    setEditingLoc(null);
-  };
-
   const handleDeleteLoc = async (id: string, name: string) => {
     setConfirmModal({
       isOpen: true,
@@ -1413,23 +1336,6 @@ export const MemoryManager: React.FC<{
                   <Trash2 className="w-3.5 h-3.5" /> Borrar Todos
                 </button>
               )}
-              <button
-                onClick={() => {
-                  setEditingNpc({
-                    id: 'npc_' + Date.now() + '_' + Math.random().toString(36).substring(7),
-                    name: '',
-                    relation: 'Neutral',
-                    status: 'Vivo',
-                    notes: '',
-                    description: '',
-                    portrait: ''
-                  });
-                  setIsNpcModalOpen(true);
-                }}
-                className="bg-[var(--accent)] text-[var(--on-accent)] px-3 py-1.5 rounded font-cinzel text-xs hover:bg-[var(--accent-hover)] transition-all cursor-pointer font-bold shadow-xs"
-              >
-                + Nuevo PNJ
-              </button>
             </div>
           </div>
 
@@ -1605,16 +1511,6 @@ export const MemoryManager: React.FC<{
 
                       <div className="flex gap-1 shrink-0">
                         <button
-                          onClick={() => {
-                            setEditingNpc(n);
-                            setIsNpcModalOpen(true);
-                          }}
-                          className="px-2 py-0.5 text-xs border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] rounded hover:bg-[var(--sidebar-bg)] font-cinzel cursor-pointer transition-all flex items-center gap-1"
-                          title="Editar datos"
-                        >
-                          <Pencil className="w-3 h-3" /> Editar
-                        </button>
-                        <button
                           onClick={() => handleDeleteNpc(n.id, n.name)}
                           className="px-2 py-0.5 text-xs text-red-700 hover:text-red-900 border border-red-200 dark:border-red-900/40 rounded hover:bg-red-50 dark:hover:bg-red-950 font-cinzel cursor-pointer transition-all flex items-center gap-1"
                           title="Borrar PNJ"
@@ -1628,8 +1524,7 @@ export const MemoryManager: React.FC<{
               })
             ) : (
               <div className="col-span-full text-[var(--text-secondary)] italic py-8 px-6 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] max-w-2xl mx-auto shadow-2xs leading-relaxed text-xs md:text-sm">
-                No hay PNJs registrados aún. Crea aliados, villanos o mentores con el botón "+ Nuevo PNJ" o
-                créalos desde la pestaña "Visual".
+                No hay PNJs registrados en la memoria activa. El Narrador los registrará conforme avance la aventura.
               </div>
             )}
           </div>
@@ -1657,21 +1552,6 @@ export const MemoryManager: React.FC<{
                   <Trash2 className="w-3.5 h-3.5" /> Borrar Todos
                 </button>
               )}
-              <button
-                onClick={() => {
-                  setEditingLoc({
-                    id: 'loc_' + Date.now() + '_' + Math.random().toString(36).substring(7),
-                    name: '',
-                    desc: '',
-                    notes: '',
-                    portrait: ''
-                  });
-                  setIsLocModalOpen(true);
-                }}
-                className="bg-[var(--accent)] text-[var(--on-accent)] px-3 py-1.5 rounded font-cinzel text-xs hover:bg-[var(--accent-hover)] transition-all cursor-pointer font-bold shadow-xs"
-              >
-                + Nuevo Lugar
-              </button>
             </div>
           </div>
 
@@ -1773,15 +1653,6 @@ export const MemoryManager: React.FC<{
 
                       <div className="flex gap-1.5 shrink-0">
                         <button
-                          onClick={() => {
-                            setEditingLoc(l);
-                            setIsLocModalOpen(true);
-                          }}
-                          className="px-2.5 py-1 text-xs border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] rounded hover:bg-[var(--sidebar-bg)] font-cinzel cursor-pointer transition-all flex items-center gap-1"
-                        >
-                          <Pencil className="w-3.5 h-3.5" /> Editar
-                        </button>
-                        <button
                           onClick={() => handleDeleteLoc(l.id, l.name)}
                           className="px-2.5 py-1 text-xs text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 font-cinzel cursor-pointer transition-all flex items-center gap-1"
                         >
@@ -1794,8 +1665,7 @@ export const MemoryManager: React.FC<{
               })
             ) : (
               <div className="col-span-full text-[var(--text-secondary)] italic py-8 px-6 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] max-w-2xl mx-auto shadow-2xs leading-relaxed text-xs md:text-sm">
-                No hay lugares registrados aún. Puedes añadir fortalezas, tabernas o reinos con el botón "+
-                Nuevo Lugar".
+                No hay lugares registrados en la memoria activa. El Narrador los registrará conforme descubras nuevas ubicaciones.
               </div>
             )}
           </div>
@@ -1977,391 +1847,6 @@ export const MemoryManager: React.FC<{
         />
       )}
 
-      {/* NPC Modal */}
-      {isNpcModalOpen && editingNpc && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <input
-            type="file"
-            ref={npcModalFileInputRef}
-            accept="image/*"
-            className="hidden"
-            onChange={handleModalUploadForNpc}
-          />
-          <div className="bg-[var(--bg-color)] p-6 rounded-lg shadow-2xl border border-[var(--glass-border)] w-[540px] max-w-full font-lora max-h-[90vh] flex flex-col">
-            <h4 className="font-cinzel text-xl text-[var(--accent)] mb-4 font-bold">
-              {editingNpc.name ? `Editar PNJ: ${editingNpc.name}` : 'Nuevo PNJ'}
-            </h4>
-            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-3.5 text-sm">
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Nombre
-                </label>
-                <input
-                  type="text"
-                  value={editingNpc.name}
-                  onChange={e => setEditingNpc({ ...editingNpc, name: e.target.value })}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)]"
-                  placeholder="Nombre del personaje"
-                />
-              </div>
-
-              {/* Portrait Selection & Direct Upload */}
-              <div className="bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] p-3 rounded-lg border border-[var(--user-border)]">
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-2">
-                  <Drama className="w-3.5 h-3.5" /> Retrato / Imagen del PNJ
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-full border-2 border-[var(--accent)] overflow-hidden bg-black/5 flex items-center justify-center shrink-0 shadow-xs">
-                    {editingNpc.portrait ? (
-                      <img
-                        src={editingNpc.portrait}
-                        alt="Retrato"
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <User className="w-3.5 h-3.5" />
-                    )}
-                  </div>
-                  <div className="flex-1 flex flex-col gap-1.5">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => npcModalFileInputRef.current?.click()}
-                        className="px-2.5 py-1 text-xs font-cinzel bg-amber-100 text-amber-900 border border-amber-300 rounded hover:bg-amber-200 transition-all font-bold cursor-pointer flex items-center gap-1"
-                      >
-                        <Upload className="w-3.5 h-3.5" /> Subir Imagen
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setTargetForPortraitPicker({
-                            type: 'npc',
-                            id: editingNpc.id,
-                            name: editingNpc.name || 'PNJ',
-                            desc: [
-                              editingNpc.characterSheet?.race,
-                              editingNpc.characterSheet?.class,
-                              editingNpc.characterSheet?.gender,
-                              editingNpc.characterSheet?.appearance,
-                              editingNpc.description,
-                              editingNpc.notes,
-                              editingNpc.relation
-                            ].filter(Boolean).join(' ')
-                          })
-                        }
-                        className="px-2.5 py-1 text-xs font-cinzel bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] rounded hover:bg-[var(--sidebar-bg)] transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <Image className="w-3.5 h-3.5" /> Galería
-                      </button>
-                      {editingNpc.portrait && (
-                        <button
-                          type="button"
-                          onClick={() => setEditingNpc({ ...editingNpc, portrait: '' })}
-                          className="px-2 py-1 text-[11px] font-cinzel text-red-600 hover:text-red-800 border border-red-200 rounded hover:bg-red-50 transition-all cursor-pointer"
-                        >
-                          Quitar
-                        </button>
-                      )}
-                    </div>
-                    {allImageFiles.length > 0 && (
-                      <select
-                        value={editingNpc.portrait || ''}
-                        onChange={e => setEditingNpc({ ...editingNpc, portrait: e.target.value })}
-                        className="w-full p-1.5 bg-[var(--surface)] border border-[var(--user-border)] rounded outline-none text-xs"
-                      >
-                        <option value="">-- O selecciona de la lista de archivos --</option>
-                        {allImageFiles.map(img => (
-                          <option key={img.id} value={img.content}>
-                            {img.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <div className="w-1/2">
-                  <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                    Relación y Vínculo
-                  </label>
-                  <select
-                    value={editingNpc.relation}
-                    onChange={e => setEditingNpc({ ...editingNpc, relation: e.target.value })}
-                    className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none text-xs font-cinzel"
-                  >
-                    <option value="❇️ Amistad / Aliado">❇️ Amistad / Aliado</option>
-                    <option value="⚔️ Rivalidad / Competidor">⚔️ Rivalidad / Competidor</option>
-                    <option value="💘 Romance / Interés Romántico">💘 Romance / Interés Romántico</option>
-                    <option value="💀 Enemistad / Antagonista">💀 Enemistad / Antagonista</option>
-                    <option value="🤝 Alianza / Pacto">🤝 Alianza / Pacto</option>
-                    <option value="🛡️ Mentor / Protector">🛡️ Mentor / Protector</option>
-                    <option value="⚖️ Neutral / Contacto">⚖️ Neutral / Contacto</option>
-                    <option value="Contratista">💼 Contratista</option>
-                  </select>
-                </div>
-                <div className="w-1/2">
-                  <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                    Estado
-                  </label>
-                  <select
-                    value={editingNpc.status || 'Vivo'}
-                    onChange={e => setEditingNpc({ ...editingNpc, status: e.target.value })}
-                    className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none text-xs font-cinzel"
-                  >
-                    <option value="Vivo">Vivo</option>
-                    <option value="Fallecido">Fallecido</option>
-                    <option value="Desaparecido">Desaparecido</option>
-                    <option value="Cautivo">Cautivo</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Alias / Nombre en Cubierto (si usa disfraz o apodo)
-                </label>
-                <input
-                  type="text"
-                  value={editingNpc.alias || ''}
-                  onChange={e => setEditingNpc({ ...editingNpc, alias: e.target.value })}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] text-xs"
-                  placeholder="p. ej. Oficial Corsario de la Capa de Terciopelo, J.B..."
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Apariencia Física Observable (Rostro, vestimenta, complexión)
-                </label>
-                <textarea
-                  value={editingNpc.appearance || ''}
-                  onChange={e => setEditingNpc({ ...editingNpc, appearance: e.target.value })}
-                  rows={2}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] text-xs resize-none"
-                  placeholder="Estatura, vestimenta, complexión y detalles físicos visibles para el jugador"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Rol / Comportamiento Visible
-                </label>
-                <input
-                  type="text"
-                  value={editingNpc.description || ''}
-                  onChange={e => setEditingNpc({ ...editingNpc, description: e.target.value })}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] text-xs"
-                  placeholder="Actitud en público, ocupación o primera impresión"
-                />
-              </div>
-
-              {/* Indicador de Parámetros Protegidos (Afinidad & Trama del Narrador) */}
-              {tieneAfinidadActiva(editingNpc) && (
-                <div className="bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-3 rounded-lg border border-[var(--accent)]/30 space-y-2.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-[var(--accent)]" />
-                      <span>Ejes de Afinidad (Progresión Orgánica del Narrador)</span>
-                    </label>
-                    <span className="text-[10px] text-[var(--text-secondary)] font-cinzel italic">No modificable manualmente</span>
-                  </div>
-
-                  <p className="text-[11px] text-[var(--text-secondary)] italic leading-relaxed m-0">
-                    Los parámetros psicológicos y de vínculo (ATR, VÍN, CON) evolucionan orgánicamente a través de tus decisiones de rol y encuentros con el Narrador.
-                  </p>
-
-                  <div className="grid grid-cols-3 gap-2 pt-1">
-                    <div className="p-2 rounded bg-[var(--surface)] border border-rose-500/20 text-center">
-                      <span className="text-[10px] font-cinzel font-bold text-rose-700 dark:text-rose-300 block">
-                        ATR: {editingNpc.atr ?? 0}/20
-                      </span>
-                      <span className="text-[9px] text-[var(--text-secondary)] block truncate">
-                        {getAtrInfo(editingNpc.atr).label}
-                      </span>
-                    </div>
-                    <div className="p-2 rounded bg-[var(--surface)] border border-teal-500/20 text-center">
-                      <span className="text-[10px] font-cinzel font-bold text-teal-700 dark:text-teal-300 block">
-                        VÍN: {editingNpc.vin ?? 0}/20
-                      </span>
-                      <span className="text-[9px] text-[var(--text-secondary)] block truncate">
-                        {getVinInfo(editingNpc.vin).label}
-                      </span>
-                    </div>
-                    <div className="p-2 rounded bg-[var(--surface)] border border-amber-500/20 text-center">
-                      <span className="text-[10px] font-cinzel font-bold text-amber-700 dark:text-amber-300 block">
-                        CON: {editingNpc.con ?? 0}/20
-                      </span>
-                      <span className="text-[9px] text-[var(--text-secondary)] block truncate">
-                        {getConInfo(editingNpc.con).label}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Notas Personales del Jugador (Anotaciones de campaña)
-                </label>
-                <textarea
-                  value={editingNpc.notes}
-                  onChange={e => setEditingNpc({ ...editingNpc, notes: e.target.value })}
-                  rows={3}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] resize-none text-xs"
-                  placeholder="Anotaciones personales, acuerdos, sospechas o datos que recuerdas de este personaje"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-[var(--glass-border)]">
-              <button
-                onClick={() => setIsNpcModalOpen(false)}
-                className="px-4 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => handleSaveNpc(editingNpc)}
-                disabled={!editingNpc.name.trim()}
-                className="px-4 py-1.5 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] disabled:opacity-50 font-bold cursor-pointer"
-              >
-                Guardar PNJ
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Location Modal */}
-      {isLocModalOpen && editingLoc && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <input
-            type="file"
-            ref={locModalFileInputRef}
-            accept="image/*"
-            className="hidden"
-            onChange={handleModalUploadForLoc}
-          />
-          <div className="bg-[var(--bg-color)] p-6 rounded-lg shadow-2xl border border-[var(--glass-border)] w-[540px] max-w-full font-lora max-h-[90vh] flex flex-col">
-            <h4 className="font-cinzel text-xl text-[var(--accent)] mb-4 font-bold">
-              {editingLoc.name ? `Editar Lugar: ${editingLoc.name}` : 'Nuevo Lugar'}
-            </h4>
-            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-3.5 text-sm">
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Nombre del Lugar
-                </label>
-                <input
-                  type="text"
-                  value={editingLoc.name}
-                  onChange={e => setEditingLoc({ ...editingLoc, name: e.target.value })}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)]"
-                  placeholder="Nombre del lugar"
-                />
-              </div>
-
-              {/* Location Image / Map Selection & Direct Upload */}
-              <div className="bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] p-3 rounded-lg border border-[var(--user-border)]">
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-2">
-                  <Map className="w-3.5 h-3.5" /> Mapa / Imagen del Lugar
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-lg border border-[var(--glass-border)] overflow-hidden bg-black/5 flex items-center justify-center shrink-0 shadow-xs">
-                    {editingLoc.portrait ? (
-                      <img
-                        src={editingLoc.portrait}
-                        alt="Mapa"
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <Castle className="w-3.5 h-3.5" />
-                    )}
-                  </div>
-                  <div className="flex-1 flex flex-col gap-1.5">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => locModalFileInputRef.current?.click()}
-                        className="px-2.5 py-1 text-xs font-cinzel bg-amber-100 text-amber-900 border border-amber-300 rounded hover:bg-amber-200 transition-all font-bold cursor-pointer flex items-center gap-1"
-                      >
-                        <Upload className="w-3.5 h-3.5" /> Subir Mapa
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setTargetForPortraitPicker({
-                            type: 'location',
-                            id: editingLoc.id,
-                            name: editingLoc.name || 'Lugar',
-                            desc: editingLoc.desc
-                          })
-                        }
-                        className="px-2.5 py-1 text-xs font-cinzel bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] rounded hover:bg-[var(--sidebar-bg)] transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <Image className="w-3.5 h-3.5" /> Galería
-                      </button>
-                      {editingLoc.portrait && (
-                        <button
-                          type="button"
-                          onClick={() => setEditingLoc({ ...editingLoc, portrait: '' })}
-                          className="px-2 py-1 text-[11px] font-cinzel text-red-600 hover:text-red-800 border border-red-200 rounded hover:bg-red-50 transition-all cursor-pointer"
-                        >
-                          Quitar
-                        </button>
-                      )}
-                    </div>
-                    {allImageFiles.length > 0 && (
-                      <select
-                        value={editingLoc.portrait || ''}
-                        onChange={e => setEditingLoc({ ...editingLoc, portrait: e.target.value })}
-                        className="w-full p-1.5 bg-[var(--surface)] border border-[var(--user-border)] rounded outline-none text-xs"
-                      >
-                        <option value="">-- O selecciona de la lista de archivos --</option>
-                        {allImageFiles.map(img => (
-                          <option key={img.id} value={img.content}>
-                            {img.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Descripción y Detalles
-                </label>
-                <textarea
-                  value={editingLoc.desc}
-                  onChange={e => setEditingLoc({ ...editingLoc, desc: e.target.value })}
-                  rows={4}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] resize-none"
-                  placeholder="Qué se ve, qué se oye y qué se respira al llegar guardada por centinelas de piedra..."
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-[var(--glass-border)]">
-              <button
-                onClick={() => setIsLocModalOpen(false)}
-                className="px-4 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => handleSaveLoc(editingLoc)}
-                disabled={!editingLoc.name.trim()}
-                className="px-4 py-1.5 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] disabled:opacity-50 font-bold cursor-pointer"
-              >
-                Guardar Lugar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Quick Portrait & Location/Map Linker Modal */}
       {targetForPortraitPicker && (
         <ImagePickerModal
@@ -2407,11 +1892,6 @@ export const MemoryManager: React.FC<{
         <LocationDossierModal
           location={selectedLocForDossier}
           allImageFiles={allImageFiles}
-          onEditLocation={loc => {
-            setSelectedLocForDossier(null);
-            setEditingLoc(loc);
-            setIsLocModalOpen(true);
-          }}
           onChangeMap={loc => {
             setTargetForPortraitPicker({
               type: 'location',

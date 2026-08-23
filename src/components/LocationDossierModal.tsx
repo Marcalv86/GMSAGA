@@ -4,7 +4,6 @@ import {
   X,
   Castle,
   MapPin,
-  Pencil,
   Camera,
   Eye
 } from 'lucide-react';
@@ -12,7 +11,6 @@ import {
 interface LocationDossierModalProps {
   location: Location;
   allImageFiles: ProjectFile[];
-  onEditLocation: (loc: Location) => void;
   onChangeMap: (loc: Location) => void;
   onClose: () => void;
 }
@@ -20,7 +18,6 @@ interface LocationDossierModalProps {
 export const LocationDossierModal: React.FC<LocationDossierModalProps> = ({
   location,
   allImageFiles,
-  onEditLocation,
   onChangeMap,
   onClose
 }) => {
@@ -142,25 +139,13 @@ export const LocationDossierModal: React.FC<LocationDossierModalProps> = ({
 
         {/* Footer */}
         <div className="bg-[var(--sidebar-bg)] p-3 sm:p-4 border-t border-[var(--user-border)] flex flex-wrap justify-between items-center gap-2">
-          <div className="flex gap-2">
-            <button
-              onClick={() => onChangeMap(location)}
-              className="px-3 py-1.5 text-xs font-cinzel text-[var(--text-primary)] border border-[var(--glass-border)] bg-[var(--surface)] rounded-lg hover:bg-[var(--sidebar-bg)] cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>{mapSrc ? 'Cambiar Mapa' : 'Asignar Mapa'}</span>
-            </button>
-            <button
-              onClick={() => {
-                onClose();
-                onEditLocation(location);
-              }}
-              className="px-3.5 py-1.5 text-xs font-cinzel text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg font-semibold cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              <span>Editar Lugar</span>
-            </button>
-          </div>
+          <button
+            onClick={() => onChangeMap(location)}
+            className="px-3.5 py-1.5 text-xs font-cinzel text-[var(--text-primary)] border border-[var(--glass-border)] bg-[var(--surface)] rounded-lg hover:bg-[var(--sidebar-bg)] cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>{mapSrc ? 'Cambiar Mapa' : 'Asignar Mapa'}</span>
+          </button>
 
           <button
             onClick={onClose}
