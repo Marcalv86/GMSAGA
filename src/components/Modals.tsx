@@ -154,7 +154,7 @@ export const ApiKeyModal: React.FC<{
 
   useEffect(() => {
     if (isOpen) {
-      setKeyInput(currentKey);
+      setKeyInput(currentKey || '');
       setApiKeysList(getStoredApiKeys());
       setKeyRotationMode(getStoredKeyRotationMode());
       setSelectedModel(currentModel || DEFAULT_MODEL_ID);
@@ -166,8 +166,6 @@ export const ApiKeyModal: React.FC<{
       setAutoFailover(getStoredAutoFailover());
       setAutoSyncMemory(getStoredAutoSyncMemory());
       setMemorySyncGranularity(getStoredMemorySyncGranularity());
-      // Se relee al abrir: el panel está montado desde el arranque, así que un
-      // valor calculado en el primer render se quedaría en cero para siempre.
       setUso(resumirUso());
     }
   }, [isOpen, currentKey, currentModel]);
@@ -177,12 +175,13 @@ export const ApiKeyModal: React.FC<{
     let updatedList = [...apiKeysList];
     if (primaryKey && !updatedList.includes(primaryKey)) {
       updatedList = [primaryKey, ...updatedList];
-    } else if (!primaryKey && updatedList.length > 0) {
-      // Si borró la principal pero hay más en el pool
+    } else if (!primaryKey) {
+      // Si el usuario borró conscientemente el campo de texto
+      updatedList = [];
     }
     setStoredApiKeys(updatedList);
     setStoredKeyRotationMode(keyRotationMode);
-    onSaveKey(updatedList[0] || '');
+    onSaveKey(primaryKey);
     onSaveModel(selectedModel);
     setStoredBackgroundModel(selectedBackgroundModel);
     setStoredSafetyLevel(safetyLevel);
@@ -911,16 +910,31 @@ export const ApiKeyModal: React.FC<{
                     placeholder="AIzaSy..."
                     value={keyInput}
                     onChange={e => setKeyInput(e.target.value)}
-                    className="w-full bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] border border-[var(--user-border)] p-2.5 pr-10 rounded font-mono text-sm outline-none focus:border-[var(--accent)] focus:bg-[var(--surface)] shadow-inner"
+                    className="w-full bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] border border-[var(--user-border)] p-2.5 pr-20 rounded font-mono text-sm outline-none focus:border-[var(--accent)] focus:bg-[var(--surface)] shadow-inner"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer px-1.5 py-0.5 rounded bg-black/5"
-                    title={showKey ? 'Ocultar' : 'Mostrar'}
-                  >
-                    {showKey ? 'Ocultar' : 'Ver'}
-                  </button>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {keyInput && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setKeyInput('');
+                          setApiKeysList([]);
+                        }}
+                        className="text-xs font-mono text-stone-400 hover:text-red-500 cursor-pointer px-1.5 py-0.5 rounded bg-black/5"
+                        title="Borrar clave por completo"
+                      >
+                        Borrar
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(!showKey)}
+                      className="text-xs font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer px-1.5 py-0.5 rounded bg-black/5"
+                      title={showKey ? 'Ocultar' : 'Mostrar'}
+                    >
+                      {showKey ? 'Ocultar' : 'Ver'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
