@@ -10,7 +10,10 @@ import {
   FileJson,
   ShieldCheck,
   RefreshCw,
-  FolderSync
+  FolderSync,
+  Upload,
+  AlertTriangle,
+  Save
 } from 'lucide-react';
 import { Project, Chat, ProjectFile } from '../types';
 import {
@@ -22,6 +25,8 @@ import {
   checkBackupPermission,
   writeCampaignToDisk,
   listCampaignFilesFromDisk,
+  deleteCampaignFileFromDisk,
+  getCampaignFileName,
   DiskCampaignFile
 } from '../utils/diskBackup';
 import {
@@ -43,6 +48,7 @@ interface LocalStorageModalProps {
   currentChats: Chat[];
   currentFiles: ProjectFile[];
   onExportCurrentProject?: () => void;
+  onImportCampaignFile?: (file: File) => Promise<void> | void;
 }
 
 export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
@@ -52,7 +58,8 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   currentProject,
   currentChats,
   currentFiles,
-  onExportCurrentProject
+  onExportCurrentProject,
+  onImportCampaignFile
 }) => {
   const [activeTab, setActiveTab] = useState<'disk' | 'export' | 'storage'>('disk');
   const [backupFolder, setBackupFolder] = useState<string | null>(null);
@@ -62,8 +69,12 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   const [folderErrorMsg, setFolderErrorMsg] = useState<string | null>(null);
   const [isPersistedStorage, setIsPersistedStorage] = useState(false);
   const [isSavingManual, setIsSavingManual] = useState(false);
+  const [fileToConfirmDelete, setFileToConfirmDelete] = useState<string | null>(null);
+  const [fileToConfirmRestore, setFileToConfirmRestore] = useState<DiskCampaignFile | null>(null);
+  const [isDeletingFile, setIsDeletingFile] = useState(false);
+  const [isOverwritingFile, setIsOverwritingFile] = useState<string | null>(null);
 
-  const handleManualSaveToDisk = async () => {
+  const handleManualSaveToDisk = async (customTargetFileName?: string) => {
     if (!currentProject) {
       setFolderErrorMsg('No hay ninguna campaña activa para guardar.');
       return;
@@ -83,9 +94,9 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         setBackupNeedsPermission(false);
       }
 
-      const saveRes = await writeCampaignToDisk(currentProject, currentChats, currentFiles);
+      const saveRes = await writeCampaignToDisk(currentProject, currentChats, currentFiles, customTargetFileName);
       if (saveRes.written) {
-        setFolderSuccessMsg(`¡Campaña guardada con éxito en la carpeta "${backupFolder || 'seleccionada'}"!`);
+        setFolderSuccessMsg(`¡Campaña guardada con éxito como «${saveRes.fileName || customTargetFileName || getCampaignFileName(currentProject.name)}»!`);
         setTimeout(() => setFolderSuccessMsg(null), 5000);
         void fetchDiskFiles();
       } else if (saveRes.reason === 'no-permission') {
@@ -95,9 +106,51 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         setFolderErrorMsg('No se pudo guardar la campaña en la carpeta.');
       }
     } catch (err: any) {
-      setFolderErrorMsg(err?.message || 'Error al guardar manualmente en carpeta.');
+      setFolderErrorMsg(err?.message || 'Error al guardar en carpeta.');
     } finally {
       setIsSavingManual(false);
+      setIsOverwritingFile(null);
+    }
+  };
+
+  const handleDeleteDiskFile = async (fileName: string) => {
+    setIsDeletingFile(true);
+    setFolderErrorMsg(null);
+    setFolderSuccessMsg(null);
+    try {
+      const res = await deleteCampaignFileFromDisk(fileName);
+      if (res.ok) {
+        setFolderSuccessMsg(`Archivo «${fileName}» eliminado correctamente de tu carpeta.`);
+        setTimeout(() => setFolderSuccessMsg(null), 4000);
+        setFileToConfirmDelete(null);
+        void fetchDiskFiles();
+      } else {
+        setFolderErrorMsg(res.error || 'No se pudo eliminar el archivo.');
+      }
+    } catch (err: any) {
+      setFolderErrorMsg(err?.message || 'Error al eliminar el archivo.');
+    } finally {
+      setIsDeletingFile(false);
+    }
+  };
+
+  const handleRestoreDiskFile = async (diskFile: DiskCampaignFile) => {
+    if (!onImportCampaignFile) {
+      setFolderErrorMsg('Función de importación no disponible.');
+      return;
+    }
+    setFolderErrorMsg(null);
+    try {
+      const file = await diskFile.getFile();
+      await onImportCampaignFile(file);
+      setFolderSuccessMsg(`¡Campaña «${diskFile.name}» cargada y restaurada con éxito!`);
+      setFileToConfirmRestore(null);
+      setTimeout(() => {
+        setFolderSuccessMsg(null);
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      setFolderErrorMsg(err?.message || 'Error al restaurar el archivo de partida.');
     }
   };
   const [storageStats, setStorageStats] = useState<{ usageMB: string; quotaMB: string; percent: number } | null>(null);
@@ -359,7 +412,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={handleManualSaveToDisk}
+                          onClick={() => handleManualSaveToDisk()}
                           disabled={isSavingManual || !currentProject}
                           className="py-2.5 px-4 rounded-lg font-cinzel font-bold text-xs bg-[color-mix(in_srgb,var(--accent)_15%,var(--surface))] border border-[var(--accent)] text-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_25%,var(--surface))] transition-all inline-flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
                         >
@@ -385,7 +438,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={handleManualSaveToDisk}
+                            onClick={() => handleManualSaveToDisk()}
                             disabled={isSavingManual || !currentProject}
                             className="py-1.5 px-3 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity shadow-xs disabled:opacity-50"
                             title="Guardar de inmediato el estado actual de la campaña en esta carpeta"
@@ -464,38 +517,164 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                             No se han detectado archivos <code>.json</code> de partidas en esta carpeta todavía. Se guardará uno aquí al jugar un turno o pulsar guardar.
                           </p>
                         ) : (
-                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                            {diskFiles.map(df => (
-                              <div
-                                key={df.name}
-                                className="p-2.5 rounded border border-[var(--glass-border)] bg-[var(--surface)] flex items-center justify-between gap-2 hover:border-[var(--accent)]/40 transition-colors"
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <FileJson className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
-                                    <span className="font-semibold text-xs text-[var(--text-primary)] truncate block">
-                                      {df.name}
-                                    </span>
+                          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                            {diskFiles.map(df => {
+                              const isCurrentCampaignFile =
+                                currentProject &&
+                                (df.name === getCampaignFileName(currentProject.name) ||
+                                  df.name.toLowerCase().includes(currentProject.name.toLowerCase().replace(/\s+/g, '-').slice(0, 15)));
+
+                              return (
+                                <div
+                                  key={df.name}
+                                  className={`p-2.5 rounded-lg border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                                    isCurrentCampaignFile
+                                      ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface))]'
+                                      : 'border-[var(--glass-border)] bg-[var(--surface)] hover:border-[var(--accent)]/40'
+                                  }`}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <FileJson className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                                      <span className="font-semibold text-xs text-[var(--text-primary)] break-all">
+                                        {df.name}
+                                      </span>
+                                      {isCurrentCampaignFile && (
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-cinzel font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                          Tomo Actual
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-[var(--text-secondary)] mt-1 flex items-center gap-2">
+                                      <span>{formatFileSize(df.size)}</span>
+                                      <span>•</span>
+                                      <span>
+                                        {new Date(df.lastModified).toLocaleDateString('es-ES', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </span>
+                                    </div>
                                   </div>
-                                  <div className="text-[10px] text-[var(--text-secondary)] mt-0.5 flex gap-2">
-                                    <span>{formatFileSize(df.size)}</span>
-                                    <span>•</span>
-                                    <span>
-                                      {new Date(df.lastModified).toLocaleDateString('es-ES', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })}
-                                    </span>
+
+                                  {/* Action Buttons for this file */}
+                                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                                    {onImportCampaignFile && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setFileToConfirmRestore(df)}
+                                        className="py-1 px-2 rounded bg-[color-mix(in_srgb,var(--accent)_12%,var(--surface))] hover:bg-[color-mix(in_srgb,var(--accent)_22%,var(--surface))] text-[var(--accent)] border border-[var(--accent)]/40 font-cinzel font-bold text-[10px] inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                        title={`Cargar y continuar jugando la partida de ${df.name}`}
+                                      >
+                                        <Upload className="w-3 h-3" />
+                                        <span>Cargar</span>
+                                      </button>
+                                    )}
+
+                                    {currentProject && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setIsOverwritingFile(df.name);
+                                          void handleManualSaveToDisk(df.name);
+                                        }}
+                                        disabled={isSavingManual && isOverwritingFile === df.name}
+                                        className="py-1 px-2 rounded bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] hover:bg-[var(--glass-border)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel font-semibold text-[10px] inline-flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                                        title={`Sobrescribir ${df.name} con el estado más reciente de la campaña activa (${currentProject.name})`}
+                                      >
+                                        <Save className={`w-3 h-3 ${isSavingManual && isOverwritingFile === df.name ? 'animate-spin' : ''}`} />
+                                        <span>
+                                          {isSavingManual && isOverwritingFile === df.name ? 'Guardando...' : 'Sobrescribir'}
+                                        </span>
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setFileToConfirmDelete(df.name)}
+                                      className="p-1.5 rounded text-red-600 dark:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors cursor-pointer"
+                                      title={`Eliminar ${df.name} definitivamente de la carpeta`}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
+
+                        <div className="pt-2 border-t border-[var(--glass-border)] text-[10px] text-[var(--text-secondary)] space-y-1">
+                          <p className="m-0 leading-relaxed">
+                            💡 <strong>Gestión de Copias y Nombres:</strong> Las partidas se guardan automáticamente con el nombre de tu campaña (ej. <code>{currentProject ? getCampaignFileName(currentProject.name) : 'Mi-Campana.gmstudio.json'}</code>). Si has cambiado el nombre de una partida o tienes archivos antiguos como <code>Nueva-Campana.gmstudio.json</code>, puedes eliminarlos con el botón de la papelera o pulsar <strong>Sobrescribir</strong> para reemplazarlos con la versión más moderna.
+                          </p>
+                        </div>
                       </div>
+
+                      {/* Confirmation Modal for Deleting File from Folder */}
+                      {fileToConfirmDelete && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg space-y-2 text-xs text-red-900 dark:text-red-300 animate-[fadeIn_0.15s_ease]">
+                          <div className="flex items-center gap-1.5 font-cinzel font-bold text-red-700 dark:text-red-400">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span>¿Eliminar archivo de la carpeta?</span>
+                          </div>
+                          <p className="text-[11px] m-0 leading-relaxed text-[var(--text-secondary)]">
+                            Se borrará permanentemente el archivo <strong>«{fileToConfirmDelete}»</strong> de tu carpeta de disco. Esta acción no se puede deshacer.
+                          </p>
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setFileToConfirmDelete(null)}
+                              disabled={isDeletingFile}
+                              className="py-1 px-3 rounded bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel text-[11px] cursor-pointer hover:bg-[var(--glass-border)] transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteDiskFile(fileToConfirmDelete)}
+                              disabled={isDeletingFile}
+                              className="py-1 px-3 rounded bg-red-600 hover:bg-red-700 text-white font-cinzel font-bold text-[11px] cursor-pointer transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>{isDeletingFile ? 'Borrando...' : 'Sí, Eliminar Archivo'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Confirmation Modal for Restoring/Loading File */}
+                      {fileToConfirmRestore && (
+                        <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-lg space-y-2 text-xs text-sky-900 dark:text-sky-300 animate-[fadeIn_0.15s_ease]">
+                          <div className="flex items-center gap-1.5 font-cinzel font-bold text-sky-700 dark:text-sky-400">
+                            <Upload className="w-4 h-4 shrink-0" />
+                            <span>¿Cargar y Restaurar Partida?</span>
+                          </div>
+                          <p className="text-[11px] m-0 leading-relaxed text-[var(--text-secondary)]">
+                            Se importará y cargará la partida desde <strong>«{fileToConfirmRestore.name}»</strong> ({formatFileSize(fileToConfirmRestore.size)}).
+                          </p>
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setFileToConfirmRestore(null)}
+                              className="py-1 px-3 rounded bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel text-[11px] cursor-pointer hover:bg-[var(--glass-border)] transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRestoreDiskFile(fileToConfirmRestore)}
+                              className="py-1 px-3 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold text-[11px] cursor-pointer hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Cargar Partida</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between pt-1">
                         <button

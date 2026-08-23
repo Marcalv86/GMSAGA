@@ -996,7 +996,12 @@ export default function App() {
     } finally {
       // La copia en disco es red de seguridad: si hay carpeta configurada en Copias, se sincroniza en segundo plano.
       if (currentProject) {
-        writeCampaignToDisk(currentProject, currentChats, currentFiles).catch(() => {});
+        const latestChats = getLocalChats(currentProject.id);
+        writeCampaignToDisk(
+          currentProject,
+          latestChats.length > 0 ? latestChats : currentChats,
+          currentFiles
+        ).catch(() => {});
       }
       generationAbortRef.current = null;
       setIsStreamingTurn(false);
@@ -2407,6 +2412,7 @@ export default function App() {
         currentChats={currentChats}
         currentFiles={currentFiles}
         onExportCurrentProject={handleExportJSON}
+        onImportCampaignFile={processImportFile}
       />
 
       <ImportCampaignModal

@@ -152,11 +152,22 @@ export async function checkBackupPermission(
   }
 }
 
+export function getCampaignFileName(projectName: string): string {
+  const clean = projectName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9-_ ]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .slice(0, 60);
+  return `${clean || 'campana'}.gmstudio.json`;
+}
+
 function safeName(value: string): string {
   return (
     value
       .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-zA-Z0-9-_ ]/g, '')
       .trim()
       .replace(/\s+/g, '-')
@@ -172,8 +183,9 @@ function safeName(value: string): string {
 export async function writeCampaignToDisk(
   project: Project,
   chats: Chat[],
-  files: ProjectFile[]
-): Promise<{ written: boolean; reason?: 'no-folder' | 'no-permission' | 'error' }> {
+  files: ProjectFile[],
+  targetFileName?: string
+): Promise<{ written: boolean; fileName?: string; reason?: 'no-folder' | 'no-permission' | 'error' }> {
   const handle = await readHandle();
   if (!handle) return { written: false, reason: 'no-folder' };
 
@@ -204,20 +216,49 @@ export async function writeCampaignToDisk(
       null,
       2
     );
-    const fileName = `${safeName(project.name)}.gmstudio.json`;
+    const fileName = targetFileName && targetFileName.trim() 
+      ? (targetFileName.endsWith('.json') ? targetFileName.trim() : `${targetFileName.trim()}.json`)
+      : `${safeName(project.name)}.gmstudio.json`;
 
     // createWritable() ya escribe a un fichero de intercambio y lo sustituye al
-    // cerrar, así que un corte a mitad no deja la copia truncada. No hace falta
-    // hacerlo a mano, y además en Android no hay renombrado atómico.
+    // cerrar, así que un corte a mitad no deja la copia truncada.
     const target = await handle.getFileHandle(fileName, { create: true });
     const writable = await target.createWritable();
     await writable.write(payload);
     await writable.close();
 
-    return { written: true };
+    return { written: true, fileName };
   } catch (err) {
     console.warn('No se pudo escribir la copia en disco:', err);
     return { written: false, reason: 'error' };
+  }
+}
+
+/**
+ * Elimina un archivo de partida específico directamente de la carpeta de disco.
+ */
+export async function deleteCampaignFileFromDisk(
+  fileName: string
+): Promise<{ ok: boolean; error?: string }> {
+  const handle = await readHandle();
+  if (!handle) return { ok: false, error: 'No hay carpeta vinculada.' };
+
+  try {
+    const state = await (handle as any).queryPermission({ mode: 'readwrite' });
+    if (state !== 'granted') {
+      const req = await (handle as any).requestPermission({ mode: 'readwrite' });
+      if (req !== 'granted') return { ok: false, error: 'Permiso de escritura no concedido.' };
+    }
+
+    if (typeof (handle as any).removeEntry === 'function') {
+      await (handle as any).removeEntry(fileName);
+      return { ok: true };
+    } else {
+      return { ok: false, error: 'Tu navegador no soporta la eliminación directa de archivos en disco.' };
+    }
+  } catch (err: any) {
+    console.warn('Error borrando archivo de disco:', err);
+    return { ok: false, error: err?.message || 'No se pudo eliminar el archivo de la carpeta.' };
   }
 }
 
