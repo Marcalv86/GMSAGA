@@ -78,6 +78,45 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   const [folderSuccessMsg, setFolderSuccessMsg] = useState<string | null>(null);
   const [folderErrorMsg, setFolderErrorMsg] = useState<string | null>(null);
   const [isPersistedStorage, setIsPersistedStorage] = useState(false);
+  const [isSavingManual, setIsSavingManual] = useState(false);
+
+  const handleManualSaveToDisk = async () => {
+    if (!currentProject) {
+      setFolderErrorMsg('No hay ninguna campaña activa para guardar.');
+      return;
+    }
+    setIsSavingManual(true);
+    setFolderErrorMsg(null);
+    setFolderSuccessMsg(null);
+    try {
+      if (!backupFolder) {
+        // Si aún no ha seleccionado carpeta, abrimos el selector primero
+        const res = await chooseBackupFolder();
+        if (!res.ok || !res.name) {
+          if (res.error) setFolderErrorMsg(res.error);
+          return;
+        }
+        setBackupFolder(res.name);
+        setBackupNeedsPermission(false);
+      }
+
+      const saveRes = await writeCampaignToDisk(currentProject, currentChats, currentFiles);
+      if (saveRes.written) {
+        setFolderSuccessMsg(`¡Campaña guardada con éxito en la carpeta "${backupFolder || 'seleccionada'}"!`);
+        setTimeout(() => setFolderSuccessMsg(null), 5000);
+        void fetchDiskFiles();
+      } else if (saveRes.reason === 'no-permission') {
+        setBackupNeedsPermission(true);
+        setFolderErrorMsg('El navegador requiere autorizar el permiso de escritura en la carpeta.');
+      } else {
+        setFolderErrorMsg('No se pudo guardar la campaña en la carpeta.');
+      }
+    } catch (err: any) {
+      setFolderErrorMsg(err?.message || 'Error al guardar manualmente en carpeta.');
+    } finally {
+      setIsSavingManual(false);
+    }
+  };
   const [storageStats, setStorageStats] = useState<{ usageMB: string; quotaMB: string; percent: number } | null>(null);
   const [isExportingAll, setIsExportingAll] = useState(false);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
@@ -551,18 +590,30 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
               {isDiskBackupSupported() ? (
                 <div className="border border-[var(--glass-border)] bg-[var(--glass)] p-4 rounded-lg space-y-3">
                   {!backupFolder ? (
-                    <div className="text-center py-3 space-y-2">
+                    <div className="text-center py-4 space-y-3">
                       <p className="text-xs text-[var(--text-secondary)] m-0">
-                        No hay ninguna carpeta de disco seleccionada actualmente.
+                        No hay ninguna carpeta de disco vinculada actualmente.
                       </p>
-                      <button
-                        onClick={handleChooseFolder}
-                        disabled={isChoosingFolder}
-                        className="py-2 px-4 rounded font-cinzel font-bold text-xs bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <FolderOpen className="w-3.5 h-3.5" />
-                        <span>Elegir Carpeta de Guardado</span>
-                      </button>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleChooseFolder}
+                          disabled={isChoosingFolder}
+                          className="py-2.5 px-4 rounded-lg font-cinzel font-bold text-xs bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 transition-opacity inline-flex items-center gap-2 cursor-pointer shadow-xs"
+                        >
+                          <FolderOpen className="w-4 h-4" />
+                          <span>Elegir Carpeta y Activar Auto-Guardado</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleManualSaveToDisk}
+                          disabled={isSavingManual || !currentProject}
+                          className="py-2.5 px-4 rounded-lg font-cinzel font-bold text-xs bg-[color-mix(in_srgb,var(--accent)_15%,var(--surface))] border border-[var(--accent)] text-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_25%,var(--surface))] transition-all inline-flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>{isSavingManual ? 'Guardando...' : 'Guardar Manualmente en Carpeta'}</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -578,7 +629,17 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleManualSaveToDisk}
+                            disabled={isSavingManual || !currentProject}
+                            className="py-1.5 px-3 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity shadow-xs disabled:opacity-50"
+                            title="Guardar de inmediato el estado actual de la campaña en esta carpeta"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>{isSavingManual ? 'Guardando...' : 'Guardar en Carpeta Ahora'}</span>
+                          </button>
                           <button
                             onClick={handleForgetFolder}
                             className="text-red-600 hover:text-red-800 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer shrink-0"
