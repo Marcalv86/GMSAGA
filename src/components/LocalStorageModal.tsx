@@ -61,7 +61,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   onExportCurrentProject,
   onImportCampaignFile
 }) => {
-  const [activeTab, setActiveTab] = useState<'disk' | 'export' | 'storage'>('disk');
+  const [activeTab, setActiveTab] = useState<'disk' | 'storage'>('disk');
   const [backupFolder, setBackupFolder] = useState<string | null>(null);
   const [backupNeedsPermission, setBackupNeedsPermission] = useState(false);
   const [isChoosingFolder, setIsChoosingFolder] = useState(false);
@@ -315,17 +315,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
           >
             <FolderSync className="w-3.5 h-3.5" />
             <span>Auto-Guardado en Disco</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('export')}
-            className={`pb-2 px-3 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors ${
-              activeTab === 'export'
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Descargar Copia JSON</span>
           </button>
           <button
             onClick={() => setActiveTab('storage')}
