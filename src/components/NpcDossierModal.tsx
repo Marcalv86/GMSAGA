@@ -8,7 +8,6 @@ import {
   Shield,
   Lock,
   Eye,
-  Pencil,
   Camera,
   Swords,
   Scroll,
@@ -22,7 +21,6 @@ interface NpcDossierModalProps {
   allImageFiles: ProjectFile[];
   vinculosDestapados: Set<string>;
   onToggleDestaparVinculo: (npcId: string) => void;
-  onEditNpc: (npc: NPC) => void;
   onChangePortrait: (npc: NPC) => void;
   onClose: () => void;
 }
@@ -32,7 +30,6 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
   allImageFiles,
   vinculosDestapados,
   onToggleDestaparVinculo,
-  onEditNpc,
   onChangePortrait,
   onClose
 }) => {
@@ -587,25 +584,13 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
 
         {/* Footer actions */}
         <div className="bg-[var(--sidebar-bg)] p-3 sm:p-4 border-t border-[var(--user-border)] flex flex-wrap justify-between items-center gap-2">
-          <div className="flex gap-2">
-            <button
-              onClick={() => onChangePortrait(npc)}
-              className="px-3 py-1.5 text-xs font-cinzel text-[var(--text-primary)] border border-[var(--glass-border)] bg-[var(--surface)] rounded-lg hover:bg-[var(--sidebar-bg)] cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Cambiar Retrato</span>
-            </button>
-            <button
-              onClick={() => {
-                onClose();
-                onEditNpc(npc);
-              }}
-              className="px-3.5 py-1.5 text-xs font-cinzel text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg font-semibold cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              <span>Editar Datos</span>
-            </button>
-          </div>
+          <button
+            onClick={() => onChangePortrait(npc)}
+            className="px-3.5 py-1.5 text-xs font-cinzel text-[var(--text-primary)] border border-[var(--glass-border)] bg-[var(--surface)] rounded-lg hover:bg-[var(--sidebar-bg)] cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>Cambiar Retrato</span>
+          </button>
 
           <button
             onClick={onClose}

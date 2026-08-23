@@ -2120,7 +2120,7 @@ export const MemoryManager: React.FC<{
               </div>
               <div>
                 <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Alias / Nombre en Cubierto (si usa disfraz o alias)
+                  Alias / Nombre en Cubierto (si usa disfraz o apodo)
                 </label>
                 <input
                   type="text"
@@ -2130,177 +2130,87 @@ export const MemoryManager: React.FC<{
                   placeholder="p. ej. Oficial Corsario de la Capa de Terciopelo, J.B..."
                 />
               </div>
+
               <div>
                 <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Apariencia Física (Rostro, vestimenta, rasgos visuales)
+                  Apariencia Física Observable (Rostro, vestimenta, complexión)
                 </label>
                 <textarea
                   value={editingNpc.appearance || ''}
                   onChange={e => setEditingNpc({ ...editingNpc, appearance: e.target.value })}
                   rows={2}
                   className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] text-xs resize-none"
-                  placeholder="Estatura, complexión, mirada, vestimenta y detalles físicos distintivos"
+                  placeholder="Estatura, vestimenta, complexión y detalles físicos visibles para el jugador"
                 />
               </div>
+
               <div>
                 <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Descripción / Rol en Escena
+                  Rol / Comportamiento Visible
                 </label>
                 <input
                   type="text"
                   value={editingNpc.description || ''}
                   onChange={e => setEditingNpc({ ...editingNpc, description: e.target.value })}
                   className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] text-xs"
-                  placeholder="Comportamiento, forma de hablar y actitud pública"
+                  placeholder="Actitud en público, ocupación o primera impresión"
                 />
               </div>
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Vínculo (Detalle o Grado)
-                </label>
-                <input
-                  type="text"
-                  value={editingNpc.vinculo || ''}
-                  onChange={e => setEditingNpc({ ...editingNpc, vinculo: e.target.value })}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] text-xs"
-                  placeholder="p. ej. Rivalidad de honor, Atracción correspondida, Camarada juramentado..."
-                />
-              </div>
-              {/* Ejes de Afinidad ATR / VÍN / CON */}
-              <div className="bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-3 rounded-lg border border-[var(--user-border)] space-y-3">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
-                    <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
-                    <span>Ejes de Afinidad del PNJ (Escala 0 al 20)</span>
-                  </label>
-                  <span className="text-[10px] text-[var(--text-secondary)] font-cinzel">0 min · 20 máx (1-5 rangos)</span>
-                </div>
 
-                {/* ATR Slider */}
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-cinzel font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-1">
-                      <Heart className="w-3 h-3 text-rose-500" /> ATR (Atracción / Química):
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-mono text-rose-600 dark:text-rose-400">
-                        {getAtrInfo(editingNpc.atr).corazones}/5 ❤️
+              {/* Indicador de Parámetros Protegidos (Afinidad & Trama del Narrador) */}
+              {tieneAfinidadActiva(editingNpc) && (
+                <div className="bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-3 rounded-lg border border-[var(--accent)]/30 space-y-2.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-[var(--accent)]" />
+                      <span>Ejes de Afinidad (Progresión Orgánica del Narrador)</span>
+                    </label>
+                    <span className="text-[10px] text-[var(--text-secondary)] font-cinzel italic">No modificable manualmente</span>
+                  </div>
+
+                  <p className="text-[11px] text-[var(--text-secondary)] italic leading-relaxed m-0">
+                    Los parámetros psicológicos y de vínculo (ATR, VÍN, CON) evolucionan orgánicamente a través de tus decisiones de rol y encuentros con el Narrador.
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    <div className="p-2 rounded bg-[var(--surface)] border border-rose-500/20 text-center">
+                      <span className="text-[10px] font-cinzel font-bold text-rose-700 dark:text-rose-300 block">
+                        ATR: {editingNpc.atr ?? 0}/20
                       </span>
-                      <span className="font-mono font-bold text-xs bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded border border-rose-500/30">
-                        {editingNpc.atr ?? 0} / 20
+                      <span className="text-[9px] text-[var(--text-secondary)] block truncate">
+                        {getAtrInfo(editingNpc.atr).label}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded bg-[var(--surface)] border border-teal-500/20 text-center">
+                      <span className="text-[10px] font-cinzel font-bold text-teal-700 dark:text-teal-300 block">
+                        VÍN: {editingNpc.vin ?? 0}/20
+                      </span>
+                      <span className="text-[9px] text-[var(--text-secondary)] block truncate">
+                        {getVinInfo(editingNpc.vin).label}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded bg-[var(--surface)] border border-amber-500/20 text-center">
+                      <span className="text-[10px] font-cinzel font-bold text-amber-700 dark:text-amber-300 block">
+                        CON: {editingNpc.con ?? 0}/20
+                      </span>
+                      <span className="text-[9px] text-[var(--text-secondary)] block truncate">
+                        {getConInfo(editingNpc.con).label}
                       </span>
                     </div>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="20"
-                    step="1"
-                    value={editingNpc.atr ?? 0}
-                    onChange={e => setEditingNpc({ ...editingNpc, atr: parseInt(e.target.value, 10) })}
-                    className="w-full accent-rose-500 cursor-pointer h-1.5 bg-black/20 rounded-lg"
-                  />
-                  <p className="text-[10px] text-[var(--text-secondary)] italic m-0">
-                    {getAtrInfo(editingNpc.atr).label}
-                  </p>
                 </div>
-
-                {/* VÍN Slider */}
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-cinzel font-semibold text-teal-700 dark:text-teal-300 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-teal-500" /> VÍN (Vínculo / Afecto):
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-mono text-teal-600 dark:text-teal-400">
-                        {getVinInfo(editingNpc.vin).estrellas}/5 ✨
-                      </span>
-                      <span className="font-mono font-bold text-xs bg-teal-500/15 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">
-                        {editingNpc.vin ?? 0} / 20
-                      </span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="20"
-                    step="1"
-                    value={editingNpc.vin ?? 0}
-                    onChange={e => setEditingNpc({ ...editingNpc, vin: parseInt(e.target.value, 10) })}
-                    className="w-full accent-teal-500 cursor-pointer h-1.5 bg-black/20 rounded-lg"
-                  />
-                  <p className="text-[10px] text-[var(--text-secondary)] italic m-0">
-                    {getVinInfo(editingNpc.vin).label}
-                  </p>
-                </div>
-
-                {/* CON Slider */}
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-cinzel font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                      <Shield className="w-3 h-3 text-amber-500" /> CON (Confianza / Secretos):
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400">
-                        {getConInfo(editingNpc.con).escudos}/5 🛡️
-                      </span>
-                      <span className="font-mono font-bold text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
-                        {editingNpc.con ?? 0} / 20
-                      </span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="20"
-                    step="1"
-                    value={editingNpc.con ?? 0}
-                    onChange={e => setEditingNpc({ ...editingNpc, con: parseInt(e.target.value, 10) })}
-                    className="w-full accent-amber-500 cursor-pointer h-1.5 bg-black/20 rounded-lg"
-                  />
-                  <p className="text-[10px] text-[var(--text-secondary)] italic m-0">
-                    {getConInfo(editingNpc.con).label}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                    Aparenta (Actitud visible)
-                  </label>
-                  <input
-                    type="text"
-                    value={editingNpc.aparenta || ''}
-                    onChange={e => setEditingNpc({ ...editingNpc, aparenta: e.target.value })}
-                    className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none text-xs"
-                    placeholder="Cómo trata al protagonista y qué deja ver..."
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                    Oculta (Secretos o intenciones)
-                  </label>
-                  <input
-                    type="text"
-                    value={editingNpc.oculta || ''}
-                    onChange={e => setEditingNpc({ ...editingNpc, oculta: e.target.value })}
-                    className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none text-xs"
-                    placeholder="Lo que calla o trama en la sombra..."
-                  />
-                </div>
-              </div>
+              )}
 
               <div>
                 <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Notas / Trasfondo / Secretos
+                  Notas Personales del Jugador (Anotaciones de campaña)
                 </label>
                 <textarea
                   value={editingNpc.notes}
                   onChange={e => setEditingNpc({ ...editingNpc, notes: e.target.value })}
                   rows={3}
                   className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] resize-none text-xs"
-                  placeholder="Qué sabe, qué quiere y qué rol desempeña en la trama"
+                  placeholder="Anotaciones personales, acuerdos, sospechas o datos que recuerdas de este personaje"
                 />
               </div>
             </div>
@@ -2472,11 +2382,6 @@ export const MemoryManager: React.FC<{
           onToggleDestaparVinculo={npcId =>
             setVinculosDestapados(prev => new Set(prev).add(npcId))
           }
-          onEditNpc={n => {
-            setSelectedNpcForDossier(null);
-            setEditingNpc(n);
-            setIsNpcModalOpen(true);
-          }}
           onChangePortrait={n => {
             setTargetForPortraitPicker({
               type: 'npc',
