@@ -29,18 +29,6 @@ import {
   requestPersistentStorage,
   getStorageEstimate
 } from '../utils/fileStorage';
-import {
-  getStoredApiKeys,
-  getStoredKeyRotationMode,
-  getStoredModel,
-  getStoredBackgroundModel,
-  getStoredSafetyLevel,
-  getStoredThinkingLevel,
-  getStoredTemperature,
-  getStoredTopP,
-  getStoredAutoFailover,
-  getStoredMemorySyncGranularity
-} from '../utils/geminiHelper';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -56,7 +44,7 @@ interface LocalStorageModalProps {
   currentChats: Chat[];
   currentFiles: ProjectFile[];
   onImportCampaign: (file: File) => Promise<void>;
-  onExportCurrentProject: () => void;
+  onExportCurrentProject?: () => void;
   onOpenImportModal?: () => void;
 }
 
@@ -68,7 +56,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   currentChats,
   currentFiles,
   onImportCampaign,
-  onExportCurrentProject,
   onOpenImportModal
 }) => {
   const [activeTab, setActiveTab] = useState<'backup' | 'disk' | 'storage'>('backup');
@@ -118,7 +105,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
     }
   };
   const [storageStats, setStorageStats] = useState<{ usageMB: string; quotaMB: string; percent: number } | null>(null);
-  const [isExportingAll, setIsExportingAll] = useState(false);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   // Archivos de partida encontrados en la carpeta activa de disco
@@ -239,45 +225,6 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
     }
   };
 
-
-  const handleExportAll = () => {
-    setIsExportingAll(true);
-    try {
-      const apiKeys = getStoredApiKeys();
-      const backupData = {
-        version: 'gmstudio_v2',
-        exportedAt: new Date().toISOString(),
-        totalCampaigns: projects.length,
-        projects: projects,
-        apiKeys: apiKeys.length > 0 ? apiKeys : undefined,
-        keyRotationMode: getStoredKeyRotationMode(),
-        settings: {
-          model: getStoredModel(),
-          backgroundModel: getStoredBackgroundModel(),
-          safetyLevel: getStoredSafetyLevel(),
-          thinkingLevel: getStoredThinkingLevel(),
-          temperature: getStoredTemperature(),
-          topP: getStoredTopP(),
-          autoFailover: getStoredAutoFailover(),
-          memorySyncGranularity: getStoredMemorySyncGranularity()
-        }
-      };
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `GMStudio_CopiaCompleta_${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setSuccessNotice('Copia completa de todas tus campañas y configuración descargada con éxito.');
-      setTimeout(() => setSuccessNotice(null), 5000);
-    } finally {
-      setIsExportingAll(false);
-    }
-  };
-
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -349,8 +296,8 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <FileJson className="w-3.5 h-3.5" />
-            <span>Copias JSON</span>
+            <Upload className="w-3.5 h-3.5" />
+            <span>Importar Campañas (PDF / Chats)</span>
           </button>
           <button
             onClick={() => setActiveTab('disk')}
@@ -385,160 +332,122 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
             </div>
           )}
 
-          {/* TAB 1: BACKUP & RESTORE JSON */}
+          {/* TAB 1: IMPORTAR CAMPAÑAS */}
           {activeTab === 'backup' && (
             <div className="space-y-4 font-lora">
-              <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-lg text-[var(--text-primary)] space-y-1.5">
-                <div className="flex items-center gap-2 font-cinzel font-bold text-xs text-amber-800 dark:text-amber-300">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Máxima privacidad y control total de tus partidas</span>
+              <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-[var(--text-primary)] space-y-1.5">
+                <div className="flex items-center gap-2 font-cinzel font-bold text-sm text-amber-800 dark:text-amber-300">
+                  <Upload className="w-4 h-4" />
+                  <span>Importador de Campañas, PDF y Conversaciones</span>
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed m-0">
-                  Tus partidas, diarios, personajes, mapas y <strong>claves API de Google AI Studio / rotación</strong> se guardan de forma instantánea en tu navegador. Al descargar tus copias JSON o activar el guardado en disco, tus claves y preferencias de IA van incluidas para que no tengas que volver a escribirlas al restaurar.
+                  Importa o continúa aventuras jugadas en otros chats (Gemini, ChatGPT, Claude, NotebookLM) o manuales en PDF. La IA estructurará automáticamente los capítulos, la memoria y las fichas de personajes.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                {/* Export Current Project */}
-                <div className="border border-[var(--glass-border)] bg-[var(--glass)] p-3.5 rounded-lg flex flex-col justify-between gap-3">
-                  <div>
-                    <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                      <Download className="w-4 h-4" />
-                      <span>Guardar Tomo Activo</span>
+              {/* Botón Principal Destacado: Importador Inteligente */}
+              {onOpenImportModal && (
+                <div className="p-4 rounded-xl border-2 border-[var(--accent)]/40 bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface))] space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center gap-1.5">
+                      <FolderSync className="w-4 h-4" />
+                      <span>Asistente de Importación Inteligente</span>
                     </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                      Descarga el tomo actual con todos sus capítulos, oráculos, notas y memoria.
-                    </p>
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)] text-[var(--on-accent)]">
+                      Recomendado
+                    </span>
                   </div>
-                  <button
-                    onClick={onExportCurrentProject}
-                    disabled={!currentProject}
-                    className="w-full py-2 px-3 rounded font-cinzel font-bold text-xs bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Descargar {currentProject ? `«${currentProject.name}»` : 'Tomo'}</span>
-                  </button>
-                </div>
-
-                {/* Export All Campaigns */}
-                <div className="border border-[var(--glass-border)] bg-[var(--glass)] p-3.5 rounded-lg flex flex-col justify-between gap-3">
-                  <div>
-                    <div className="font-cinzel font-bold text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 mb-1">
-                      <Database className="w-4 h-4" />
-                      <span>Copia Global ({projects.length} Tomos)</span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                      Descarga un único archivo con absolutamente todas las campañas y contenidos.
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleExportAll}
-                    disabled={projects.length === 0 || isExportingAll}
-                    className="w-full py-2 px-3 rounded font-cinzel font-bold text-xs bg-emerald-700 hover:bg-emerald-800 text-white transition-colors flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Exportar Todo el Almacén</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Import Section */}
-              <div className="border border-[var(--glass-border)] bg-[var(--glass)] p-3.5 rounded-lg space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center gap-1.5">
-                    <Upload className="w-4 h-4" />
-                    <span>Importar Campaña o Datos Externos</span>
-                  </div>
-                </div>
-
-                {/* Si hay una carpeta activa con archivos en disco, acceso directo de importación */}
-                {backupFolder && diskFiles.length > 0 && (
-                  <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-lg space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="font-cinzel font-bold text-xs text-sky-900 dark:text-sky-300 flex items-center gap-1.5 truncate">
-                        <FolderSync className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">Partidas en carpeta activa: <strong>{backupFolder}</strong></span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('disk')}
-                        className="text-[11px] text-[var(--accent)] font-cinzel font-bold hover:underline shrink-0 ml-2 cursor-pointer"
-                      >
-                        Ver todas ({diskFiles.length})
-                      </button>
-                    </div>
-                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                      {diskFiles.map(df => (
-                        <div
-                          key={df.name}
-                          className="flex items-center justify-between gap-2 p-2 rounded bg-[var(--surface)] text-xs border border-[var(--glass-border)] hover:border-[var(--accent)]/40 transition-colors"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-[var(--text-primary)] truncate text-[11px]">
-                              {df.name}
-                            </div>
-                            <div className="text-[10px] text-[var(--text-secondary)]">
-                              {formatFileSize(df.size)} · {new Date(df.lastModified).toLocaleDateString('es-ES')}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleImportDiskFile(df)}
-                            disabled={importingFileName !== null}
-                            className="px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel text-[10px] font-bold shrink-0 cursor-pointer hover:opacity-90 transition-opacity flex items-center gap-1 disabled:opacity-50"
-                          >
-                            {importingFileName === df.name ? (
-                              <>
-                                <span className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                <span>Cargando...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-2.5 h-2.5" />
-                                <span>Cargar</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {onOpenImportModal && (
+                  <p className="text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                    Sube documentos PDF, pega transcripciones de texto de chats previos o importa notas de Obsidian y NotebookLM.
+                  </p>
                   <button
                     type="button"
                     onClick={() => {
                       onClose();
                       onOpenImportModal();
                     }}
-                    className="w-full py-2.5 px-3 rounded-lg bg-[color-mix(in_srgb,var(--accent)_12%,var(--surface))] border border-[var(--accent)]/50 hover:bg-[color-mix(in_srgb,var(--accent)_20%,var(--surface))] text-[var(--accent)] font-cinzel font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs"
+                    className="w-full py-3 px-4 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 font-cinzel font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
                   >
                     <FolderSync className="w-4 h-4" />
-                    <span>Importar de Gemini, NotebookLM o PDF (Recomendado)</span>
+                    <span>Abrir Importador de PDF, Gemini y NotebookLM</span>
                   </button>
-                )}
-
-                <div className="pt-1 border-t border-[var(--user-border)]/40">
-                  <p className="text-[11px] text-[var(--text-secondary)] m-0 mb-1.5 leading-relaxed">
-                    O restaura un archivo <code>.JSON</code> nativo exportado previamente desde GM Studio:
-                  </p>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept=".json,.gmstudio.json,application/json,text/json,text/plain,*/*"
-                    onChange={handleFileSelected}
-                    className="hidden"
-                    id="local-storage-file-input"
-                  />
-                  <label
-                    htmlFor="local-storage-file-input"
-                    className="w-full py-2 px-3 rounded border border-dashed border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] font-cinzel font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors block text-center"
-                  >
-                    <Upload className="w-3.5 h-3.5 inline mr-1" />
-                    <span>Seleccionar archivo .JSON nativo</span>
-                  </label>
                 </div>
+              )}
+
+              {/* Si hay una carpeta activa con archivos en disco, acceso directo de importación */}
+              {backupFolder && diskFiles.length > 0 && (
+                <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-cinzel font-bold text-xs text-sky-900 dark:text-sky-300 flex items-center gap-1.5 truncate">
+                      <FolderSync className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Partidas en tu carpeta activa: <strong>{backupFolder}</strong></span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('disk')}
+                      className="text-[11px] text-[var(--accent)] font-cinzel font-bold hover:underline shrink-0 ml-2 cursor-pointer"
+                    >
+                      Ver todas ({diskFiles.length})
+                    </button>
+                  </div>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {diskFiles.map(df => (
+                      <div
+                        key={df.name}
+                        className="flex items-center justify-between gap-2 p-2 rounded bg-[var(--surface)] text-xs border border-[var(--glass-border)] hover:border-[var(--accent)]/40 transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-[var(--text-primary)] truncate text-[11px]">
+                            {df.name}
+                          </div>
+                          <div className="text-[10px] text-[var(--text-secondary)]">
+                            {formatFileSize(df.size)} · {new Date(df.lastModified).toLocaleDateString('es-ES')}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleImportDiskFile(df)}
+                          disabled={importingFileName !== null}
+                          className="px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel text-[10px] font-bold shrink-0 cursor-pointer hover:opacity-90 transition-opacity flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {importingFileName === df.name ? (
+                            <>
+                              <span className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Cargando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-2.5 h-2.5" />
+                              <span>Cargar</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Opción de Carga de archivo .JSON nativo */}
+              <div className="border border-[var(--glass-border)] bg-[var(--glass)] p-3.5 rounded-lg space-y-2">
+                <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
+                  ¿Tienes una copia previa descargada en <code>.JSON</code> nativo?
+                </p>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".json,.gmstudio.json,application/json,text/json,text/plain,*/*"
+                  onChange={handleFileSelected}
+                  className="hidden"
+                  id="local-storage-file-input"
+                />
+                <label
+                  htmlFor="local-storage-file-input"
+                  className="w-full py-2.5 px-3 rounded border border-dashed border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] font-cinzel font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors block text-center"
+                >
+                  <Upload className="w-3.5 h-3.5 inline mr-1" />
+                  <span>Cargar archivo .JSON de respaldo</span>
+                </label>
               </div>
             </div>
           )}
