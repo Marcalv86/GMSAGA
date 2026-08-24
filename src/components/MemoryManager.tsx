@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import { Project, NPC, Quest, Location, ProjectFile, PlayerCharacter } from '../types';
 import { classifyFileAuto } from '../utils/geminiHelper';
 import { obtenerInfoRelacion } from '../utils/campaignCalendar';
+import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { CharacterSheetView } from './CharacterSheetView';
 import { CharacterEditModal } from './CharacterEditModal';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
@@ -18,6 +19,7 @@ import {
   Crown,
   Eye,
   EyeOff,
+  GitMerge,
   Heart,
   Image,
   Lock,
@@ -502,6 +504,29 @@ export const MemoryManager: React.FC<{
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
+  };
+
+  const handleDeduplicateNpcs = async () => {
+    if (!memory.npcs || memory.npcs.length <= 1) return;
+    const antes = memory.npcs.length;
+    const limpios = deduplicarListaNpcs(memory.npcs);
+    const fusionados = antes - limpios.length;
+    if (fusionados > 0) {
+      await onUpdateMemory(mem => ({ ...mem, npcs: limpios }));
+      setConfirmModal({
+        isOpen: true,
+        title: 'Fusión de Duplicados Completada',
+        message: `¡Se han fusionado con éxito ${fusionados} registro(s) de personajes duplicados, preservando sus retratos, vínculos, notas y fichas!`,
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      });
+    } else {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Sin Duplicados',
+        message: 'No se detectaron personajes duplicados en la lista. Todos los registros son únicos.',
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      });
+    }
   };
 
   // Quest Handlers
@@ -1320,6 +1345,15 @@ export const MemoryManager: React.FC<{
               </span>
             </div>
             <div className="flex gap-2 flex-wrap items-center">
+              {memory.npcs && memory.npcs.length > 1 && (
+                <button
+                  onClick={handleDeduplicateNpcs}
+                  className="px-2.5 py-1 text-xs font-cinzel bg-indigo-50 text-indigo-900 border border-indigo-200 rounded hover:bg-indigo-100 transition-all cursor-pointer font-semibold flex items-center gap-1 shadow-xs"
+                  title="Detectar y fusionar personajes duplicados conservando sus datos completos"
+                >
+                  <GitMerge className="w-3.5 h-3.5 text-indigo-700" /> Fusionar Duplicados
+                </button>
+              )}
               {onAutoClassifyAll && (
                 <button
                   onClick={onAutoClassifyAll}

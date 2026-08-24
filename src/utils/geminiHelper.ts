@@ -41,6 +41,7 @@ import {
   VinculoLeido,
   HiloLeido
 } from './campaignCalendar';
+import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 
 // In-app API key & model management (stored locally in the user's browser)
 export interface AIModelOption {
@@ -1692,6 +1693,21 @@ function mergeEntities<T extends { id: string; portrait?: string; markers?: unkn
   const consumed = new Set<string>();
 
   const findFuzzy = (item: T): T | undefined => {
+    // Si estamos comparando nombres de PNJs, usar coincidenNombresNpc
+    if (labelKey === 'name') {
+      const npcMatch = existing.find(
+        prev =>
+          !consumed.has(prev.id) &&
+          coincidenNombresNpc(
+            labelOf(prev),
+            labelOf(item),
+            { alias: (prev as any).alias, trueIdentity: (prev as any).trueIdentity },
+            { alias: (item as any).alias, trueIdentity: (item as any).trueIdentity }
+          )
+      );
+      if (npcMatch) return npcMatch;
+    }
+
     const labelTokens = tokenise(labelOf(item));
     const detailTokens = detailOf ? tokenise(detailOf(item)) : new Set<string>();
     let best: T | undefined;
@@ -1715,24 +1731,31 @@ function mergeEntities<T extends { id: string; portrait?: string; markers?: unkn
     const prev = byId.get(item.id) ?? byLabel.get(norm(labelOf(item))) ?? findFuzzy(item);
     if (prev && !consumed.has(prev.id)) {
       consumed.add(prev.id);
-      updates.set(prev.id, {
-        ...prev,
-        ...item,
-        id: prev.id,
-        // El título es de quien lo escribió: si la usuaria renombró una trama, una
-        // sincronización no debe devolverle el nombre que le puso el modelo.
-        [labelKey]: labelOf(prev) || labelOf(item),
-        // Campos que solo viven aquí y que el modelo nunca devuelve.
-        portrait: item.portrait || prev.portrait,
-        ...(prev.markers !== undefined && (item as T).markers === undefined ? { markers: prev.markers } : {})
-      } as T);
+      if (labelKey === 'name' && ('relation' in (prev as any) || 'relation' in (item as any))) {
+        // Es un PNJ: usar fusión inteligente de campos de PNJ
+        const mergedNpc = fusionarDosNpcs(prev as unknown as NPC, item as unknown as Partial<NPC>);
+        updates.set(prev.id, mergedNpc as unknown as T);
+      } else {
+        updates.set(prev.id, {
+          ...prev,
+          ...item,
+          id: prev.id,
+          [labelKey]: labelOf(prev) || labelOf(item),
+          portrait: item.portrait || prev.portrait,
+          ...(prev.markers !== undefined && (item as T).markers === undefined ? { markers: prev.markers } : {})
+        } as T);
+      }
     } else if (!prev) {
       additions.push(item);
     }
   }
 
   // Se respeta el orden previo; lo que el modelo no mencionó se conserva.
-  return [...existing.map(prev => updates.get(prev.id) ?? prev), ...additions];
+  const combined = [...existing.map(prev => updates.get(prev.id) ?? prev), ...additions];
+  if (labelKey === 'name' && combined.length > 0 && 'relation' in (combined[0] as any)) {
+    return deduplicarListaNpcs(combined as unknown as NPC[]) as unknown as T[];
+  }
+  return combined;
 }
 
 /**

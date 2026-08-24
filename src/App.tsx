@@ -104,6 +104,7 @@ import {
   obtenerInfoRelacion
 } from './utils/campaignCalendar';
 import { actualizarAfinidadNpc } from './utils/affinityProgression';
+import { coincidenNombresNpc, deduplicarListaNpcs } from './utils/npcMatcher';
 
 const ViewLoader = () => (
   <div className="flex-1 flex items-center justify-center p-10 text-[var(--text-secondary)] font-cinzel text-sm italic gap-2">
@@ -342,6 +343,22 @@ export default function App() {
               }
             };
           }
+
+          // Auto-deduplicación higiénica de PNJs (ej: fusionar "Jarlaxle" y "Jarlaxle Baenre" existentes)
+          if (p.memory?.npcs && p.memory.npcs.length > 1) {
+            const limpios = deduplicarListaNpcs(p.memory.npcs);
+            if (limpios.length !== p.memory.npcs.length) {
+              modified = true;
+              return {
+                ...p,
+                memory: {
+                  ...p.memory,
+                  npcs: limpios
+                }
+              };
+            }
+          }
+
           return p;
         });
 
@@ -634,13 +651,11 @@ export default function App() {
       ? diaActual
       : currentChats.reduce((a, c) => a + (c.messages || []).length, 0);
 
-    const igual = (a: string, b: string) =>
-      a.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim() ===
-      b.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-
     const npcs = (mem.npcs || []).map(n => {
       let cambiado = n;
-      const presenteHoy = t.presentes.some(nombre => igual(nombre, n.name));
+      const presenteHoy = t.presentes.some(nombre =>
+        coincidenNombresNpc(nombre, n.name, undefined, { alias: n.alias, trueIdentity: n.trueIdentity })
+      );
       const dias = presenteHoy
         ? [...new Set([...(n.diasVistos || []), marca])]
         : (n.diasVistos || []);
@@ -653,22 +668,31 @@ export default function App() {
         };
       }
 
-      const v = t.vinculos.find(x => igual(x.nombre, n.name));
+      const v = t.vinculos.find(x =>
+        coincidenNombresNpc(x.nombre, n.name, undefined, { alias: n.alias, trueIdentity: n.trueIdentity })
+      );
       if (v) {
         let newRelation = cambiado.relation;
         if (v.vinculo) {
           const relInfo = obtenerInfoRelacion(v.vinculo);
           // Si la relación actual es genérica o vacía, adoptar la inferida del vínculo
-          if (!newRelation || /aliado|neutral|desconocido|contacto/i.test(newRelation)) {
+          if (!newRelation || /aliado|neutral|desconocido|contacto|conocido/i.test(newRelation)) {
             newRelation = `${relInfo.icono} ${relInfo.label}`;
           }
         }
+
+        // Si el nombre reportado es más completo/específico (ej: "Jarlaxle Baenre" vs "Jarlaxle"), actualizarlo
+        const nombreMasCompleto =
+          v.nombre && v.nombre.length > cambiado.name.length && coincidenNombresNpc(v.nombre, cambiado.name)
+            ? v.nombre
+            : cambiado.name;
 
         // Lógica de progresión escalonada (1-20 / 5 corazones) con límite diario de subidas
         const afinidadActualizada = actualizarAfinidadNpc(cambiado, v, dias, marca);
 
         cambiado = {
           ...cambiado,
+          name: nombreMasCompleto,
           relation: newRelation,
           aparenta: v.aparenta ?? cambiado.aparenta,
           oculta: v.oculta ?? cambiado.oculta,
@@ -686,7 +710,11 @@ export default function App() {
     // Si hay un vínculo nuevo para un PNJ que aún no figuraba en la lista, registrarlo automáticamente
     const nuevosNpcs: NPC[] = [];
     t.vinculos.forEach(v => {
-      if (v.nombre && !npcs.some(n => igual(n.name, v.nombre)) && !nuevosNpcs.some(n => igual(n.name, v.nombre))) {
+      if (
+        v.nombre &&
+        !npcs.some(n => coincidenNombresNpc(n.name, v.nombre, { alias: n.alias, trueIdentity: n.trueIdentity })) &&
+        !nuevosNpcs.some(n => coincidenNombresNpc(n.name, v.nombre))
+      ) {
         const relInfo = obtenerInfoRelacion(v.vinculo || '');
         const atrInicial = v.atr !== undefined ? Math.max(0, Math.min(20, Math.round(v.atr))) : undefined;
         const vinInicial = v.vin !== undefined ? Math.max(0, Math.min(20, Math.round(v.vin))) : undefined;
@@ -716,7 +744,8 @@ export default function App() {
       }
     });
 
-    return { ...mem, npcs: [...npcs, ...nuevosNpcs] };
+    const npcsDeduplicados = deduplicarListaNpcs([...npcs, ...nuevosNpcs]);
+    return { ...mem, npcs: npcsDeduplicados };
   };
 
   const handleUpdateProjectField = async (

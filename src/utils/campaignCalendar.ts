@@ -1,4 +1,5 @@
 import { CalendarConfig, CampaignDate, ScheduledThread } from '../types';
+import { coincidenNombresNpc } from './npcMatcher';
 
 /**
  * El tiempo de la campaña.
@@ -761,10 +762,13 @@ export function leerVinculos(texto: string): VinculoLeido[] {
       const nombre = (partes.shift() || '').trim();
       if (!nombre) continue;
 
-      let existing = out.find(item => sinTildes(item.nombre) === sinTildes(nombre));
+      let existing = out.find(item => coincidenNombresNpc(item.nombre, nombre));
       if (!existing) {
         existing = { nombre };
         out.push(existing);
+      } else if (nombre.length > existing.nombre.length) {
+        // Conservar el nombre más completo si llega uno con apellido
+        existing.nombre = nombre;
       }
 
       for (const parte of partes) {
@@ -790,10 +794,12 @@ export function leerVinculos(texto: string): VinculoLeido[] {
     const conNum = parseInt(im[4], 10);
     if (!nombre) continue;
 
-    let existing = out.find(item => sinTildes(item.nombre) === sinTildes(nombre));
+    let existing = out.find(item => coincidenNombresNpc(item.nombre, nombre));
     if (!existing) {
       existing = { nombre };
       out.push(existing);
+    } else if (nombre.length > existing.nombre.length) {
+      existing.nombre = nombre;
     }
     if (!isNaN(atrNum)) existing.atr = Math.max(0, Math.min(20, atrNum));
     if (!isNaN(vinNum)) existing.vin = Math.max(0, Math.min(20, vinNum));
