@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import {
   BookOpen,
+  CalendarDays,
   Check,
-  Compass,
   FolderSync,
   Menu,
   Moon,
@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Save,
   Scroll,
-  ScrollText,
   Sliders,
   Smartphone,
   Sparkles,
@@ -45,7 +44,7 @@ import {
 } from "./components/Modals";
 
 import { MemoryManager } from "./components/MemoryManager";
-import { StatusView } from "./components/StatusView";
+
 import { FilesView } from "./components/FilesView";
 import { InstructionsView } from "./components/InstructionsView";
 import { NovelReaderView } from "./components/NovelReaderView";
@@ -123,6 +122,7 @@ import {
   desdeDiaAbsoluto,
   fechaCompleta,
   fechaLegible,
+  fechaCompacta,
   obtenerInfoRelacion,
 } from "./utils/campaignCalendar";
 import { actualizarAfinidadNpc } from "./utils/affinityProgression";
@@ -146,13 +146,7 @@ export default function App() {
   const [currentFiles, setCurrentFiles] = useState<ProjectFile[]>([]);
 
   const [activeTab, setActiveTab] = useState<
-    | "chat"
-    | "novel"
-    | "instructions"
-    | "files"
-    | "status"
-    | "memory"
-    | "calendar"
+    "chat" | "novel" | "instructions" | "files" | "diary" | "calendar"
   >("chat");
   const [inputText, setInputText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -2617,7 +2611,10 @@ export default function App() {
   const llevaElTiempo =
     Boolean(currentProject?.currentDate) &&
     calendarioValido(currentProject?.calendar);
-  const fechaBoton = "Diario";
+  const fechaBoton =
+    llevaElTiempo && currentProject?.calendar && currentProject.currentDate
+      ? fechaCompacta(currentProject.calendar, currentProject.currentDate)
+      : "Tiempo";
   const tituloFecha =
     llevaElTiempo && currentProject?.calendar && currentProject.currentDate
       ? fechaCompleta(currentProject.calendar, currentProject.currentDate)
@@ -2786,14 +2783,24 @@ export default function App() {
         } fixed md:relative inset-y-0 left-0 z-40 md:z-30 transition-all duration-300 ease-in-out bg-[var(--sidebar-bg)] border-r border-[var(--glass-border)] flex flex-col shrink-0 overflow-hidden shadow-2xl md:shadow-lg`}
       >
         {/* Sidebar Header */}
-        <div className="p-3 border-b border-[var(--glass-border)] flex justify-between items-center bg-[var(--glass)]">
-          <h1 className="font-cinzel text-lg md:text-xl text-[var(--accent)] font-bold tracking-wider m-0">
-            GM STUDIO
-          </h1>
-          <div className="flex items-center gap-1 sm:gap-1.5">
+        <div className="p-3 border-b border-[var(--glass-border)] flex flex-col gap-3 bg-[var(--glass)]">
+          <div className="flex justify-between items-center">
+            <h1 className="font-cinzel text-lg md:text-xl text-[var(--accent)] font-bold tracking-wider m-0">
+              GM STUDIO
+            </h1>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="md:hidden text-base text-[var(--text-secondary)] hover:text-[var(--accent)] p-1 cursor-pointer"
+              title="Cerrar menú"
+              aria-label="Cerrar menú"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 justify-between w-full">
             <button
               onClick={handleManualSaveCampaign}
-              className={`text-xs font-cinzel transition-all cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border ${
+              className={`flex-1 justify-center text-xs font-cinzel transition-all cursor-pointer px-1.5 py-1.5 flex items-center gap-1.5 rounded border ${
                 isManuallySaved
                   ? "bg-emerald-600 text-white border-emerald-500 shadow-xs"
                   : "text-[var(--accent)] hover:underline border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
@@ -2812,7 +2819,7 @@ export default function App() {
             </button>
             <button
               onClick={() => setIsImportCampaignModalOpen(true)}
-              className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
+              className="flex-1 justify-center text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-1.5 py-1.5 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
               title="Importar campaña desde PDF, Gemini, NotebookLM o JSON"
               aria-label="Importar campaña"
             >
@@ -2821,20 +2828,12 @@ export default function App() {
             </button>
             <button
               onClick={() => setIsLocalStorageModalOpen(true)}
-              className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
+              className="flex-1 justify-center text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-1.5 py-1.5 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
               title="Copias de Seguridad y Almacenamiento Local"
               aria-label="Copias de seguridad"
             >
               <FolderSync className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span className="hidden sm:inline">Copias</span>
-            </button>
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="md:hidden text-base text-[var(--text-secondary)] hover:text-[var(--accent)] p-1 cursor-pointer"
-              title="Cerrar menú"
-              aria-label="Cerrar menú"
-            >
-              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -3070,12 +3069,11 @@ export default function App() {
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
               { id: "chat", label: "Crónica", icon: Swords },
-              { id: "status", label: "Estado", icon: Compass },
-              { id: "memory", label: "Fichas", icon: ScrollText },
+              { id: "diary", label: "Diario", icon: BookOpen },
               {
                 id: "calendar",
                 label: fechaBoton,
-                icon: BookOpen,
+                icon: CalendarDays,
                 title: tituloFecha,
               },
             ].map((tab) => {
@@ -3216,32 +3214,12 @@ export default function App() {
             />
           )}
 
-          {activeTab === "status" && currentProject && (
-            <StatusView
+          {activeTab === "diary" && currentProject && (
+            <MemoryManager
               project={currentProject}
               files={currentFiles}
               chats={currentChats}
-              onUpdate={handleUpdateProjectField}
-              onUpdateMemory={handleUpdateMemory}
-              onTriggerAIUpdate={handleTriggerAISyncMemory}
-              isGenerating={isBackgroundSyncingMemory || isGenerating}
-              hasChats={currentChats.some((c) =>
-                (c.messages || []).some(
-                  (m) =>
-                    m.content &&
-                    m.content.trim().length > 0 &&
-                    m.content !== "Pensando..." &&
-                    m.content !== "Tirando dados...",
-                ),
-              )}
-            />
-          )}
-
-          {activeTab === "memory" && currentProject && (
-            <MemoryManager
-              secciones={["character", "npcs", "locs", "visual", "quests"]}
-              project={currentProject}
-              files={currentFiles}
+              onUpdateProject={handleUpdateProjectField}
               onUpdateMemory={handleUpdateMemory}
               onTriggerAIUpdate={handleTriggerAISyncMemory}
               onAnalyzeImageFile={handleAnalyzeImageFile}

@@ -16,6 +16,8 @@ import { CharacterEditModal } from "./CharacterEditModal";
 import { ImagePickerModal, ImagePickerTarget } from "./ImagePickerModal";
 import { NpcDossierModal } from "./NpcDossierModal";
 import { LocationDossierModal } from "./LocationDossierModal";
+import { StatusView } from "./StatusView";
+import { Chat } from "../types";
 
 import {
   BookOpen,
@@ -183,6 +185,10 @@ export const MemoryManager: React.FC<{
   hasChats: boolean;
   /** Qué secciones mostrar. Sin esto, se muestran todas. */
   secciones?: SeccionMemoria[];
+  chats?: Chat[];
+  onUpdateProject?: (
+    fields: Partial<Project> | ((prev: Project) => Partial<Project>),
+  ) => Promise<void> | void;
 }> = ({
   project,
   files,
@@ -197,6 +203,8 @@ export const MemoryManager: React.FC<{
   isGenerating,
   hasChats,
   secciones,
+  chats,
+  onUpdateProject,
 }) => {
   /**
    * Qué secciones se muestran. Sirve para partir esta vista en dos: las fichas
@@ -236,9 +244,6 @@ export const MemoryManager: React.FC<{
   // Story & Status Editing States
   const [isEditingStory, setIsEditingStory] = useState(false);
   const [storyDraft, setStoryDraft] = useState("");
-
-  const [isEditingStatus, setIsEditingStatus] = useState(false);
-  const [statusDraft, setStatusDraft] = useState("");
 
   // Visual Analysis Editing Modal State
   const [editingVisualFile, setEditingVisualFile] =
@@ -357,7 +362,6 @@ export const MemoryManager: React.FC<{
 
   useEffect(() => {
     setStoryDraft(project.memory?.story || "");
-    setStatusDraft(project.memory?.current_status || "");
     setLocalNotes(project.memory?.manual_notes || "");
   }, [project.id, project.memory]);
 
@@ -437,27 +441,6 @@ export const MemoryManager: React.FC<{
   };
 
   // Status Handlers
-  const handleSaveStatus = async () => {
-    await onUpdateMemory((mem) => ({
-      ...mem,
-      current_status: statusDraft.trim(),
-    }));
-    setIsEditingStatus(false);
-  };
-
-  const handleClearStatus = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: "Borrar Estado Actual",
-      message: "¿Deseas vaciar el estado actual de la compañía?",
-      onConfirm: async () => {
-        setStatusDraft("");
-        await onUpdateMemory((mem) => ({ ...mem, current_status: "" }));
-        setIsEditingStatus(false);
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-      },
-    });
-  };
 
   // Notes Handlers
   const handleNotesChange = (val: string) => {
@@ -697,7 +680,6 @@ export const MemoryManager: React.FC<{
           visual_memory: [],
         }));
         setStoryDraft("");
-        setStatusDraft("");
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
       },
     });
@@ -1045,72 +1027,18 @@ export const MemoryManager: React.FC<{
       )}
 
       {/* Tab: Status (Estado Actual) */}
-      {activeTab === "status" && (
+      {activeTab === "status" && chats && onUpdateProject && (
         <div className="flex flex-col gap-3">
-          <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
-            <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
-              Situación actual (dónde están, qué peligros enfrentan, con qué
-              recursos):
-            </span>
-            <div className="flex gap-2">
-              {!isEditingStatus ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setStatusDraft(memory.current_status || "");
-                      setIsEditingStatus(true);
-                    }}
-                    className="px-3 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] transition-all cursor-pointer"
-                  >
-                    <Pencil className="w-3.5 h-3.5" /> Editar Estado
-                  </button>
-                  {memory.current_status && (
-                    <button
-                      onClick={handleClearStatus}
-                      className="px-2.5 py-1 text-xs font-cinzel text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 transition-all cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Vaciar
-                    </button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={handleSaveStatus}
-                    className="px-3 py-1 text-xs font-cinzel bg-emerald-700 text-white rounded hover:bg-emerald-800 transition-all cursor-pointer font-bold"
-                  >
-                    <Save className="w-3.5 h-3.5" /> Guardar
-                  </button>
-                  <button
-                    onClick={() => setIsEditingStatus(false)}
-                    className="px-3 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] transition-all cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {isEditingStatus ? (
-            <textarea
-              value={statusDraft}
-              onChange={(e) => setStatusDraft(e.target.value)}
-              placeholder="Describe el estado de ánimo, heridas, ubicación actual o tensión del grupo..."
-              className="w-full h-[300px] bg-[var(--surface)] border-2 border-[var(--accent)] p-4 rounded-lg text-base font-lora outline-none leading-relaxed shadow-inner"
-            />
-          ) : (
-            <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-6 rounded-lg shadow-sm text-base md:text-lg leading-relaxed markdown-body min-h-[140px]">
-              {memory.current_status ? (
-                <ReactMarkdown>{memory.current_status}</ReactMarkdown>
-              ) : (
-                <span className="text-[var(--text-secondary)] italic">
-                  No hay estado actual registrado. Haz clic en "Editar
-                  Estado"para definirlo libremente.
-                </span>
-              )}
-            </div>
-          )}
+          <StatusView
+            project={project}
+            files={files}
+            chats={chats}
+            onUpdate={onUpdateProject}
+            onUpdateMemory={onUpdateMemory}
+            onTriggerAIUpdate={onTriggerAIUpdate}
+            isGenerating={isGenerating}
+            hasChats={hasChats}
+          />
         </div>
       )}
 
