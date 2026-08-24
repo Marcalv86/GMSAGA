@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import {
   BookOpen,
+  Compass,
   FolderSync,
   Menu,
   Moon,
@@ -34,6 +35,7 @@ import { CombatHud } from './components/CombatHud';
 import { Modals, PromptConfig, ConfirmConfig, AlertConfig, ApiKeyModal } from './components/Modals';
 
 import { MemoryManager } from './components/MemoryManager';
+import { StatusView } from './components/StatusView';
 import { FilesView } from './components/FilesView';
 import { InstructionsView } from './components/InstructionsView';
 import { NovelReaderView } from './components/NovelReaderView';
@@ -124,7 +126,7 @@ export default function App() {
   const [currentFiles, setCurrentFiles] = useState<ProjectFile[]>([]);
 
   const [activeTab, setActiveTab] = useState<
-    'chat' | 'novel' | 'instructions' | 'files' | 'memory' | 'calendar'
+    'chat' | 'novel' | 'instructions' | 'files' | 'status' | 'memory' | 'calendar'
   >('chat');
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -2680,6 +2682,7 @@ export default function App() {
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
               { id: 'chat', label: 'Crónica', icon: Swords },
+              { id: 'status', label: 'Estado', icon: Compass },
               { id: 'memory', label: 'Fichas', icon: ScrollText },
               {
                 id: 'calendar',
@@ -2779,6 +2782,27 @@ export default function App() {
               currentChatId={currentChatId}
               onSelectChat={id => setCurrentChatId(id)}
               onBackToChat={() => setActiveTab('chat')}
+            />
+          )}
+
+          {activeTab === 'status' && currentProject && (
+            <StatusView
+              project={currentProject}
+              files={currentFiles}
+              chats={currentChats}
+              onUpdate={handleUpdateProjectField}
+              onUpdateMemory={handleUpdateMemory}
+              onTriggerAIUpdate={handleTriggerAISyncMemory}
+              isGenerating={isGenerating}
+              hasChats={currentChats.some(c =>
+                (c.messages || []).some(
+                  m =>
+                    m.content &&
+                    m.content.trim().length > 0 &&
+                    m.content !== 'Pensando...' &&
+                    m.content !== 'Tirando dados...'
+                )
+              )}
             />
           )}
 

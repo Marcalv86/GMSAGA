@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
+import React, { useState } from 'react';
 import {
   Project,
   CalendarConfig,
@@ -54,7 +53,6 @@ import {
   PartyPopper,
   Pencil,
   Plus,
-  RefreshCw,
   RotateCcw,
   Save,
   Search,
@@ -90,10 +88,10 @@ export const CalendarView: React.FC<{
   files = [],
   chats = [],
   onUpdate,
-  onUpdateMemory,
-  onTriggerAIUpdate,
-  isGenerating = false,
-  hasChats = false
+  onUpdateMemory: _onUpdateMemory,
+  onTriggerAIUpdate: _onTriggerAIUpdate,
+  isGenerating: _isGenerating = false,
+  hasChats: _hasChats = false
 }) => {
   const cal = project.calendar;
   const fecha = project.currentDate;
@@ -132,40 +130,11 @@ export const CalendarView: React.FC<{
     hito: string;
   }>({ summary: '', lugar: '', clima: '', hito: '' });
 
-  // Estado para editar estado actual o notas en el día actual
-  const [editandoEstado, setEditandoEstado] = useState(false);
-  const [draftEstado, setDraftEstado] = useState(project.memory?.current_status || '');
-  const [editandoNotas, setEditandoNotas] = useState(false);
-  const [draftNotas, setDraftNotas] = useState(project.memory?.manual_notes || '');
-  const [mostrarNotasNarrador, setMostrarNotasNarrador] = useState(false);
   const [studioModal, setStudioModal] = useState<{
     isOpen: boolean;
     tab?: 'image' | 'video' | 'music' | 'diary';
     sceneText: string;
   } | null>(null);
-
-  useEffect(() => {
-    setDraftEstado(project.memory?.current_status || '');
-  }, [project.memory?.current_status]);
-
-  useEffect(() => {
-    setDraftNotas(project.memory?.manual_notes || '');
-  }, [project.memory?.manual_notes]);
-
-  const estadoTextAreaRef = useRef<HTMLTextAreaElement | null>(null);
-  const notasTextAreaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  useEffect(() => {
-    if (editandoEstado && estadoTextAreaRef.current) {
-      estadoTextAreaRef.current.focus();
-    }
-  }, [editandoEstado]);
-
-  useEffect(() => {
-    if (editandoNotas && notasTextAreaRef.current) {
-      notasTextAreaRef.current.focus();
-    }
-  }, [editandoNotas]);
 
   // Diálogo de confirmación para borrados
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -515,66 +484,6 @@ export const CalendarView: React.FC<{
     setNuevaEntradaClima('');
     setNuevaEntradaHito('');
     setCreandoEntrada(false);
-  };
-
-  // Guardar estado actual
-  const guardarEstadoActual = async () => {
-    if (onUpdateMemory) {
-      await onUpdateMemory(mem => ({
-        ...mem,
-        current_status: draftEstado.trim()
-      }));
-    }
-    setEditandoEstado(false);
-  };
-
-  const vaciarEstadoActual = async () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Vaciar estado actual',
-      message: '¿Seguro que deseas eliminar el estado actual registrado?',
-      onConfirm: async () => {
-        setDraftEstado('');
-        if (onUpdateMemory) {
-          await onUpdateMemory(mem => ({
-            ...mem,
-            current_status: ''
-          }));
-        }
-        setEditandoEstado(false);
-        setConfirmDialog(null);
-      }
-    });
-  };
-
-  // Guardar notas manuales
-  const guardarNotasManuales = async () => {
-    if (onUpdateMemory) {
-      await onUpdateMemory(mem => ({
-        ...mem,
-        manual_notes: draftNotas.trim()
-      }));
-    }
-    setEditandoNotas(false);
-  };
-
-  const vaciarNotasManuales = async () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Vaciar notas de la campaña',
-      message: '¿Seguro que deseas borrar las notas manuales?',
-      onConfirm: async () => {
-        setDraftNotas('');
-        if (onUpdateMemory) {
-          await onUpdateMemory(mem => ({
-            ...mem,
-            manual_notes: ''
-          }));
-        }
-        setEditandoNotas(false);
-        setConfirmDialog(null);
-      }
-    });
   };
 
   // ------------------------------------------------------------ rejilla mensual
@@ -1585,226 +1494,6 @@ export const CalendarView: React.FC<{
                   </div>
                 )}
               </div>
-
-              {/* SECCIÓN DEL DÍA ACTUAL: ESTADO ACTUAL Y NOTAS DE CAMPAÑA (DENTRO DEL DÍA) */}
-              {esHoyActivo && (
-                <div className="pt-5 border-t border-[var(--glass-border)] space-y-4">
-                  {/* Estado actual del grupo / personaje */}
-                  <div className="p-3.5 rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)]/40 space-y-2">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <span className="font-cinzel font-bold text-sm text-[var(--accent)] flex items-center gap-1.5">
-                          <NotebookPen className="w-4 h-4" /> Estado actual de la partida
-                        </span>
-                        <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-0.5">
-                          Dónde están ahora mismo, qué peligros inmediatos enfrentan y con qué recursos cuentan.
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {onTriggerAIUpdate && (
-                          <button
-                            onClick={onTriggerAIUpdate}
-                            disabled={isGenerating || !hasChats}
-                            title={
-                              !hasChats
-                                ? 'Requiere al menos un mensaje en los capítulos jugados'
-                                : 'Sincronizar estado y memoria viva analizando las sesiones jugadas'
-                            }
-                            className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40 cursor-pointer"
-                          >
-                            {isGenerating ? (
-                              <RefreshCw className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <Sparkles className="w-3 h-3 text-amber-500" />
-                            )}
-                            Sincronizar con IA
-                          </button>
-                        )}
-                        {!editandoEstado && (
-                          <>
-                            <button
-                              onClick={() => setEditandoEstado(true)}
-                              className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer"
-                              title="Editar estado actual"
-                            >
-                              <Pencil className="w-3 h-3" /> Editar
-                            </button>
-                            {project.memory?.current_status && (
-                              <button
-                                onClick={vaciarEstadoActual}
-                                className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel text-red-500 hover:border-red-500 cursor-pointer"
-                                title="Vaciar estado"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {editandoEstado ? (
-                      <div className="flex flex-col gap-2 mt-2">
-                        <textarea
-                          ref={estadoTextAreaRef}
-                          value={draftEstado}
-                          onChange={e => setDraftEstado(e.target.value)}
-                          rows={4}
-                          placeholder="Ubicación, heridas, tensión del grupo, recursos disponibles..."
-                          className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] focus:border-[var(--accent)] p-2.5 rounded-lg text-sm font-lora outline-none leading-relaxed resize-y"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => {
-                              setDraftEstado(project.memory?.current_status || '');
-                              setEditandoEstado(false);
-                            }}
-                            className="px-2.5 py-1 rounded border border-[var(--user-border)] text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            onClick={guardarEstadoActual}
-                            className="px-3 py-1 rounded bg-[var(--accent)] text-xs font-cinzel font-bold text-[var(--on-accent)] hover:bg-[var(--accent-hover)] cursor-pointer flex items-center gap-1"
-                          >
-                            <Save className="w-3 h-3" /> Guardar
-                          </button>
-                        </div>
-                      </div>
-                    ) : project.memory?.current_status ? (
-                      <div
-                        className="markdown-body text-sm leading-relaxed mt-2 cursor-text"
-                        onClick={() => setEditandoEstado(true)}
-                      >
-                        <ReactMarkdown>{project.memory.current_status}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p
-                        className="text-xs text-[var(--text-secondary)] italic mt-2 cursor-text m-0"
-                        onClick={() => setEditandoEstado(true)}
-                      >
-                        No hay estado actual registrado. Pulsa «Editar» o «Sincronizar con IA» para completarlo.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Notas manuales de campaña */}
-                  <div className="p-3.5 rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)]/40 space-y-2">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <span className="font-cinzel font-bold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
-                          <Pencil className="w-3.5 h-3.5 text-[var(--accent)]" /> Notas y secretos de la campaña
-                        </span>
-                        <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-0.5">
-                          Reglas de casa, secretos del máster y revelaciones futuras que el Narrador respetará estrictamente.
-                        </p>
-                      </div>
-
-                      {!editandoNotas && (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {project.memory?.manual_notes && (
-                            <button
-                              onClick={() => setMostrarNotasNarrador(!mostrarNotasNarrador)}
-                              className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer"
-                              title={mostrarNotasNarrador ? 'Ocultar notas para evitar spoilers' : 'Mostrar notas secretas (Modo Narrador)'}
-                            >
-                              {mostrarNotasNarrador ? (
-                                <>
-                                  <EyeOff className="w-3 h-3" /> Ocultar notas
-                                </>
-                              ) : (
-                                <>
-                                  <Eye className="w-3 h-3" /> Mostrar notas
-                                </>
-                              )}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              setMostrarNotasNarrador(true);
-                              setEditandoNotas(true);
-                            }}
-                            className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer"
-                          >
-                            <Pencil className="w-3 h-3" /> Editar
-                          </button>
-                          {project.memory?.manual_notes && (
-                            <button
-                              onClick={vaciarNotasManuales}
-                              className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel text-red-500 hover:border-red-500 cursor-pointer"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {editandoNotas ? (
-                      <div className="flex flex-col gap-2 mt-2">
-                        <textarea
-                          ref={notasTextAreaRef}
-                          value={draftNotas}
-                          onChange={e => setDraftNotas(e.target.value)}
-                          rows={4}
-                          placeholder="Secretos, revelaciones futuras, giros o notas..."
-                          className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] focus:border-[var(--accent)] p-2.5 rounded-lg text-sm font-lora outline-none leading-relaxed resize-y"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => {
-                              setDraftNotas(project.memory?.manual_notes || '');
-                              setEditandoNotas(false);
-                            }}
-                            className="px-2.5 py-1 rounded border border-[var(--user-border)] text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            onClick={guardarNotasManuales}
-                            className="px-3 py-1 rounded bg-[var(--accent)] text-xs font-cinzel font-bold text-[var(--on-accent)] hover:bg-[var(--accent-hover)] cursor-pointer flex items-center gap-1"
-                          >
-                            <Save className="w-3 h-3" /> Guardar
-                          </button>
-                        </div>
-                      </div>
-                    ) : project.memory?.manual_notes ? (
-                      mostrarNotasNarrador ? (
-                        <div
-                          className="markdown-body text-sm leading-relaxed mt-2 cursor-text p-2.5 rounded-lg bg-[var(--bg-color)]/60 border border-[var(--user-border)]"
-                          onClick={() => setEditandoNotas(true)}
-                        >
-                          <ReactMarkdown>{project.memory.manual_notes}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <div
-                          onClick={() => setMostrarNotasNarrador(true)}
-                          className="p-3 rounded-lg border border-dashed border-[var(--glass-border)] bg-[var(--surface-soft)]/20 hover:border-[var(--accent)] text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5 py-3.5 group"
-                        >
-                          <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] group-hover:text-[var(--accent)] font-medium">
-                            <EyeOff className="w-3.5 h-3.5" />
-                            <span>Notas y secretos ocultos (Modo Narrador)</span>
-                          </div>
-                          <p className="text-[11px] text-[var(--text-secondary)] m-0 opacity-80">
-                            Ocultos para evitar spoilers durante la sesión. Haz clic para revelar.
-                          </p>
-                        </div>
-                      )
-                    ) : (
-                      <p
-                        className="text-xs text-[var(--text-secondary)] italic mt-2 cursor-text m-0"
-                        onClick={() => {
-                          setMostrarNotasNarrador(true);
-                          setEditandoNotas(true);
-                        }}
-                      >
-                        Sin notas por ahora. Pulsa para añadir secretos o directrices.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
