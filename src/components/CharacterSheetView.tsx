@@ -35,6 +35,8 @@ import {
   AlertTriangle,
   Languages,
   Wrench,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 interface CharacterSheetViewProps {
@@ -50,6 +52,8 @@ interface CharacterSheetViewProps {
 export const CharacterSheetView: React.FC<CharacterSheetViewProps> = ({
   character: rawCharacter,
   onOpenPortraitPicker,
+  onClearCharacter,
+  onOpenEditModal,
 }) => {
   const character = useMemo(
     () => ensureValidPlayerCharacter(rawCharacter),
@@ -414,8 +418,30 @@ export const CharacterSheetView: React.FC<CharacterSheetViewProps> = ({
   return (
     <div className="space-y-6 animate-[fadeIn_0.2s_ease]">
       {/* HERO / STAT CARD */}
-      <div className="relative rounded-3xl overflow-hidden border-2 border-amber-500/40 bg-gradient-to-b from-amber-950/40 via-stone-900/90 to-black/95 text-amber-100 p-6 md:p-8 shadow-xl">
-        <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+      <div className="relative rounded-3xl overflow-hidden border-2 border-amber-500/40 bg-gradient-to-b from-amber-950/40 via-stone-900/90 to-black/95 text-amber-100 p-6 md:p-8 shadow-xl group/hero">
+        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover/hero:opacity-100 transition-opacity z-10">
+          {onOpenEditModal && (
+            <button
+              type="button"
+              onClick={onOpenEditModal}
+              className="p-1.5 rounded-md bg-black/60 border border-amber-500/50 text-amber-300/80 hover:text-amber-100 hover:border-amber-400 hover:bg-amber-500/20 transition-all cursor-pointer shadow-lg backdrop-blur-sm"
+              title="Editar Ficha Manualmente"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
+          {onClearCharacter && (
+            <button
+              type="button"
+              onClick={onClearCharacter}
+              className="p-1.5 rounded-md bg-black/60 border border-red-500/50 text-red-400 hover:text-red-200 hover:border-red-400 hover:bg-red-500/20 transition-all cursor-pointer shadow-lg backdrop-blur-sm"
+              title="Vaciar Ficha del Personaje"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-6 relative z-0">
           {/* Character Portrait */}
           <div className="relative shrink-0 group">
             <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden border-2 border-amber-400/80 shadow-lg bg-black/60 flex items-center justify-center relative">
@@ -454,7 +480,7 @@ export const CharacterSheetView: React.FC<CharacterSheetViewProps> = ({
           {/* Character Identity */}
           <div className="flex-1 text-center md:text-left space-y-2">
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
-              <h1 className="font-cinzel text-3xl sm:text-4xl font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-100 to-amber-300 m-0">
+              <h1 className="font-cinzel text-3xl sm:text-4xl font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-100 to-amber-300 m-0 break-words line-clamp-3">
                 {character.name || "Protagonista"}
               </h1>
               {character.level && (
