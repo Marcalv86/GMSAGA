@@ -47,7 +47,6 @@ import {
   Settings,
   Shield,
   ShieldAlert,
-  Cpu,
   X,
   Zap,
   Plus,
@@ -462,50 +461,10 @@ export const ApiKeyModal: React.FC<{
                 })}
               </div>
 
-              <div className="pt-2 border-t border-[var(--glass-border)] space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="font-cinzel font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-                    <Cpu className="w-3.5 h-3.5 text-[var(--accent)]" />
-                    Modelo Secundario (Agente y Segundo Plano):
-                  </label>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] font-mono text-[var(--accent)]">
-                    {selectedBackgroundModel}
-                  </span>
-                </div>
-                <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                  Se encarga de las tareas autónomas de agente: sincronización incremental de memoria, extracción automática de PNJs, destilado de tablas y actualización en segundo plano. Puedes usar un modelo ultrarrápido y económico (como <em>Gemini 2.5 Flash</em>) o el mismo que el de narración.
-                </p>
-
-                <select
-                  value={selectedBackgroundModel}
-                  onChange={e => setSelectedBackgroundModel(e.target.value)}
-                  className="w-full bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] border border-[var(--user-border)] p-2 rounded font-cinzel text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--accent)] cursor-pointer"
-                >
-                  <optgroup label="Modelos Recomendados">
-                    {AVAILABLE_MODELS.map(m => (
-                      <option key={`bg-${m.id}`} value={m.id}>
-                        {m.name} ({m.id}) — {m.badge}
-                      </option>
-                    ))}
-                  </optgroup>
-                  {modelosDeLaClave && modelosDeLaClave.length > 0 && (
-                    <optgroup label="Modelos detectados en tu API Key">
-                      {modelosDeLaClave
-                        .filter(mk => !AVAILABLE_MODELS.some(am => am.id === mk.id))
-                        .map(mk => (
-                          <option key={`bg-key-${mk.id}`} value={mk.id}>
-                            {mk.nombre} ({mk.id})
-                          </option>
-                        ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-
               {/* Custom Model input */}
               <div className="bg-[var(--glass)] p-2.5 rounded-lg border border-[var(--glass-border)]">
                 <label className="text-[11px] font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  <Pencil className="w-3.5 h-3.5" /> O introduce un identificador personalizado:
+                  <Pencil className="w-3.5 h-3.5" /> O introduce un identificador personalizado para el Narrador:
                 </label>
                 <input
                   type="text"
