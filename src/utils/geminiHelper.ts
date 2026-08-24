@@ -927,18 +927,16 @@ export async function generateStoryTurnStream({
       const keyNumDisplay = origKeyIdx >= 0 ? origKeyIdx + 1 : keyIndex + 1;
       const keyLabel = totalKeys > 1 ? ` (Clave ${keyNumDisplay}/${totalKeys})` : '';
 
-      // Retry once for the base model or fallbacks if transient
-      const maxRetriesForModel = isFallback ? 1 : 2;
+      // Si es la clave principal y no hay texto previo, intentamos 1 vez y si falla por cuota rotamos de inmediato a la siguiente clave
+      const maxRetriesForModel = isFallback ? 1 : 1;
 
       for (let retry = 0; retry < maxRetriesForModel && !success; retry++) {
-        fullText = '';
+        let streamReceivedText = false;
         try {
           if (isFallback) {
             setLoadingText(
               `Google saturado en el modelo anterior. Continuando narración con ${modelDisplayName}${keyLabel}...`
             );
-          } else if (retry > 0) {
-            setLoadingText(`Reintentando conexión con ${modelDisplayName} (${retry + 1}/${maxRetriesForModel})${keyLabel}...`);
           } else {
             setLoadingText(`El Narrador está hilvanando los hilos del destino${keyLabel}...`);
           }
@@ -981,13 +979,17 @@ export async function generateStoryTurnStream({
 
           for await (const chunk of responseStream) {
             if (signal?.aborted) break;
-            fullText += chunk.text ?? '';
+            const textPart = chunk.text ?? '';
+            if (textPart) {
+              streamReceivedText = true;
+              fullText += textPart;
+              onChunk(fullText);
+            }
             if ((chunk as any).usageMetadata) uso = (chunk as any).usageMetadata;
-            onChunk(fullText);
 
-            // Throttle writes during streaming to 1.5s to prevent quota burnout
+            // Guardado intermedio cada 1.5s
             const now = Date.now();
-            if (now - lastSaveTime > 1500) {
+            if (now - lastSaveTime > 1500 && fullText.length > 0) {
               lastSaveTime = now;
               await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, undefined, onInventoryReported);
             }
@@ -1009,26 +1011,36 @@ export async function generateStoryTurnStream({
             );
           }
 
-          // Final complete save
-          await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, onTimeReported, onInventoryReported, true);
+          // Guardado final completo
+          if (fullText.trim().length > 0) {
+            await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, onTimeReported, onInventoryReported, true);
+          }
           success = true;
-          break; // Exit retry loop on success
+          break; // Salir del bucle si fue exitoso
         } catch (e: any) {
           if (signal?.aborted || e?.name === 'AbortError') {
+            if (fullText.trim().length > 0) {
+              await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, onTimeReported, onInventoryReported, true);
+            }
             success = true;
             return;
           }
           lastError = e;
-          console.warn(`Error en modelo ${currentModel} (clave ${keyNumDisplay}, intento ${retry + 1}):`, e);
+          console.warn(`Error en modelo ${currentModel} (clave ${keyNumDisplay}):`, e);
 
           const msg = String(e?.message || '');
+          const isRateLimit = /429|RESOURCE_EXHAUSTED|quota|rate/i.test(msg);
+          const isOverloaded = /503|UNAVAILABLE|overloaded|alta demanda|try again later|500|502|504/i.test(msg);
           const streamCortado =
-            /incomplete json|unexpected end|network|failed to fetch|load failed|terminated|aborted/i.test(msg);
+            streamReceivedText ||
+            /incomplete json|unexpected end|network|failed to fetch|load failed|terminated|aborted|stream|closed|econnreset|fetch/i.test(msg);
 
-          if (streamCortado && fullText.trim().length > 40) {
+          // Si el streaming ya había entregado una respuesta sustancial y la conexión se interrumpió a mitad,
+          // preservamos TODO lo que el modelo ya había narrado en lugar de borrarlo y reintentar desde cero.
+          if (fullText.trim().length > 30) {
             await saveStreamedMessage(
               currentChat,
-              `${fullText.trim()}\n\n*(La conexión se cortó aquí. Pulsa «Continuar Narración» para retomar la escena.)*`,
+              fullText.trim(),
               onSaveMessage,
               onStateReported,
               onTimeReported,
@@ -1039,26 +1051,20 @@ export async function generateStoryTurnStream({
             return;
           }
 
-          const isRateLimit = /429|RESOURCE_EXHAUSTED/i.test(msg);
-          const isOverloaded = /503|UNAVAILABLE|overloaded|alta demanda|try again later/i.test(msg);
-          const isTransient = isRateLimit || isOverloaded || streamCortado;
-
+          // Si no había texto escrito aún y es límite de cuota (429), enfriar clave y pasar de inmediato a la siguiente clave
           if (isRateLimit) {
             markKeyCooldown(currentApiKey, 60000);
             if (keyIndex < apiKeys.length - 1) {
               setLoadingText(`Límite de cuota en Clave ${keyNumDisplay}. Rotando a la siguiente clave para ${modelDisplayName}...`);
-              break; // saltar inmediatamente a la siguiente clave para el mismo modelo
+              break; // saltar inmediatamente a la siguiente clave
             }
           }
 
-          if (isTransient) {
-            if (retry < maxRetriesForModel - 1) {
-              await new Promise(resolve => setTimeout(resolve, 800 * (retry + 1)));
-              continue;
-            }
-            // Si se agotaron los reintentos en esta clave, pasar a la siguiente clave del pool
+          if (isOverloaded || streamCortado) {
             if (keyIndex < apiKeys.length - 1) {
-              break;
+              setLoadingText(`Reintentando con la siguiente clave (${keyIndex + 2}/${totalKeys}) para ${modelDisplayName}...`);
+              await new Promise(resolve => setTimeout(resolve, 300));
+              break; // pasar a la siguiente clave del pool
             }
             // Si se agotaron todas las claves en este modelo, pasar al siguiente modelo de respaldo
             if (modelIndex < failoverChain.length - 1) {
