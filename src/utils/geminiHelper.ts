@@ -65,16 +65,28 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     desc: 'Alta velocidad, capacidad multimodal y cuota amplia.'
   },
   {
+    id: 'gemini-2.5-flash-lite',
+    name: 'Gemini 2.5 Flash Lite',
+    badge: 'Ultra Ligero · Ahorro de cuota',
+    desc: 'Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para sesiones largas.'
+  },
+  {
+    id: 'gemini-2.0-flash',
+    name: 'Gemini 2.0 Flash',
+    badge: 'Estándar Universal',
+    desc: 'Máxima compatibilidad global en todas las cuentas y regiones de Google AI Studio.'
+  },
+  {
     id: 'gemini-2.5-pro',
     name: 'Gemini 2.5 Pro',
     badge: 'Máxima Inteligencia · Prosa rica',
     desc: 'El modelo superior para razonamiento profundo, prosa literaria exquisita y coherencia impecable en tramas complejas.'
   },
   {
-    id: 'gemini-2.5-flash-lite',
-    name: 'Gemini 2.5 Flash Lite',
-    badge: 'Ultra Ligero · Ahorro de cuota',
-    desc: 'Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para sesiones largas.'
+    id: 'gemini-1.5-flash',
+    name: 'Gemini 1.5 Flash',
+    badge: 'Alta Compatibilidad',
+    desc: 'Modelo clásico de gran velocidad y soporte en cualquier clave de API.'
   }
 ];
 
@@ -83,7 +95,7 @@ export function esModeloAbierto(modelId: string): boolean {
 }
 
 export const DEFAULT_MODEL_ID = 'gemini-3.7-flash';
-export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.7-flash';
+export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-2.5-flash';
 export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-2.5-flash-lite';
 
 export function getStoredAutoFailover(): boolean {
@@ -96,19 +108,25 @@ export function setStoredAutoFailover(enabled: boolean): void {
 
 /**
  * Cadena de modelos de respaldo en cascada ante saturación o fallos de servidores de Google.
- * Si el modelo principal está ocupado (503/429), la app salta automáticamente al siguiente
- * de forma transparente para que la partida nunca se detenga.
+ * Si el modelo principal está ocupado (503/429) o no disponible en la clave (404), la app
+ * salta automáticamente al siguiente de forma transparente para que la partida nunca se detenga.
  */
 export function getModelFailoverChain(initialModel: string): string[] {
-  if (!getStoredAutoFailover()) {
-    return [initialModel];
-  }
   const standardFallbacks = [
-    'gemini-2.5-flash',
     'gemini-3.7-flash',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash',
     'gemini-2.5-pro',
-    'gemini-2.5-flash-lite'
+    'gemini-1.5-pro'
   ];
+  if (!getStoredAutoFailover()) {
+    // Si el failover está desactivado pero el modelo inicial no existe,
+    // garantizamos al menos probar los estándar para no cortar la partida.
+    return [initialModel, ...standardFallbacks.filter(m => m !== initialModel)];
+  }
   const chain: string[] = [initialModel];
   for (const m of standardFallbacks) {
     if (!chain.includes(m)) {
@@ -1208,8 +1226,10 @@ export async function generateContentWithFailover({
       const ai = getAIClient(currentKey || undefined);
       try {
         const abierto = esModeloAbierto(model);
-        const cleanedConfig = {
+        const supportsThinking = model.includes('3.7') || model.includes('3.1') || model.includes('gemini-3');
+        const cleanedConfig: any = {
           ...config,
+          thinkingConfig: supportsThinking && !abierto ? config.thinkingConfig : undefined,
           ...(abierto
             ? {
                 safetySettings: undefined,
@@ -1221,19 +1241,34 @@ export async function generateContentWithFailover({
         };
 
         // Timeout de 35s por modelo para evitar bloqueos infinitos
-        const res = await Promise.race([
-          ai.models.generateContent({
-            model,
-            contents,
-            config: cleanedConfig
-          }),
-          new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error(`Tiempo de espera agotado (35s) en modelo ${model}`)),
-              35000
+        let res: any;
+        try {
+          res = await Promise.race([
+            ai.models.generateContent({
+              model,
+              contents,
+              config: cleanedConfig
+            }),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`Tiempo de espera agotado (35s) en modelo ${model}`)),
+                35000
+              )
             )
-          )
-        ]);
+          ]);
+        } catch (firstErr: any) {
+          const errMsg = String(firstErr?.message || '').toLowerCase();
+          // Si falló por responseMimeType no soportado, reintentar en este mismo modelo sin responseMimeType
+          if (cleanedConfig.responseMimeType && (errMsg.includes('not supported') || errMsg.includes('invalid') || errMsg.includes('responsemimetype'))) {
+            res = await ai.models.generateContent({
+              model,
+              contents,
+              config: { ...cleanedConfig, responseMimeType: undefined }
+            });
+          } else {
+            throw firstErr;
+          }
+        }
         return res;
       } catch (err: any) {
         lastError = err;

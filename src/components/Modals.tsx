@@ -675,14 +675,24 @@ export const ApiKeyModal: React.FC<{
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[
                     {
+                      id: 'gemini-2.5-flash',
+                      name: 'Gemini 2.5 Flash',
+                      desc: 'Equilibrado y muy rápido (Recomendado)'
+                    },
+                    {
                       id: 'gemini-2.5-flash-lite',
                       name: 'Gemini 2.5 Flash Lite',
                       desc: 'Ultra rápido y consumo mínimo de cuota'
                     },
                     {
-                      id: 'gemini-2.5-flash',
-                      name: 'Gemini 2.5 Flash',
-                      desc: 'Equilibrado y muy rápido (Recomendado)'
+                      id: 'gemini-2.0-flash',
+                      name: 'Gemini 2.0 Flash',
+                      desc: 'Estándar Universal de alta compatibilidad'
+                    },
+                    {
+                      id: 'gemini-3.7-flash',
+                      name: 'Gemini 3.7 Flash',
+                      desc: 'Híbrido de razonamiento'
                     },
                     {
                       id: 'gemini-2.5-pro',
@@ -690,9 +700,9 @@ export const ApiKeyModal: React.FC<{
                       desc: 'Máxima precisión deductiva'
                     },
                     {
-                      id: 'gemini-3.7-flash',
-                      name: 'Gemini 3.7 Flash',
-                      desc: 'Híbrido de razonamiento'
+                      id: 'gemini-1.5-flash',
+                      name: 'Gemini 1.5 Flash',
+                      desc: 'Clásico compatible'
                     }
                   ].map(bgm => {
                     const isBgSelected = selectedBackgroundModel === bgm.id;
