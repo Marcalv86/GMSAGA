@@ -9,7 +9,13 @@ import {
   DEFAULT_DISEASE_CUSTOM_RULES,
   GRIMDARK_SURVIVAL_DISEASE_RULES
 } from '../utils/defaultDirectives';
-import { analyzeNarrativeStyleFromDocument, describeApiError } from '../utils/geminiHelper';
+import {
+  analyzeNarrativeStyleFromDocument,
+  describeApiError,
+  getStoredSafetyLevel,
+  setStoredSafetyLevel,
+  SafetyThreshold
+} from '../utils/geminiHelper';
 
 import {
   Activity,
@@ -18,17 +24,16 @@ import {
   ChevronUp,
   Dices,
   Flame,
-  Heart,
   HeartPulse,
   Hourglass,
   Info,
   Lock,
-  Package,
   PenTool,
   RefreshCw,
   Save,
   Scroll,
   Settings,
+  Shield,
   ShieldAlert,
   ShieldCheck,
   Sliders,
@@ -47,6 +52,7 @@ export const InstructionsView: React.FC<{
   const [instructions, setInstructions] = useState(project.instructions || '');
   const [system, setSystem] = useState(project.system || '');
   const [style, setStyle] = useState(project.style || '');
+  const [safetyLevel, setSafetyLevel] = useState<SafetyThreshold>(() => getStoredSafetyLevel());
   const [diseaseSystem, setDiseaseSystem] = useState<DiseaseRuleSystem>(
     project.diseaseConfig?.system || 'dnd5e_2024'
   );
@@ -95,6 +101,7 @@ export const InstructionsView: React.FC<{
     setInstructions(project.instructions || '');
     setSystem(project.system || '');
     setStyle(project.style || '');
+    setSafetyLevel(getStoredSafetyLevel());
     setDiseaseSystem(project.diseaseConfig?.system || 'dnd5e_2024');
     setAutoPenalties(
       project.diseaseConfig?.autoPenalties !== undefined ? project.diseaseConfig.autoPenalties : true
@@ -103,6 +110,11 @@ export const InstructionsView: React.FC<{
     setCustomDiseaseRules(project.diseaseConfig?.customRules || DEFAULT_DISEASE_CUSTOM_RULES);
     setSaveStatus('saved');
   }, [project.id]);
+
+  const handleSafetyChange = (newLevel: SafetyThreshold) => {
+    setSafetyLevel(newLevel);
+    setStoredSafetyLevel(newLevel);
+  };
 
   const saveChanges = async (
     newInst?: string,
@@ -279,7 +291,96 @@ export const InstructionsView: React.FC<{
 
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-[5%] py-4 md:py-8 font-lora">
-      {/* SECCIÓN PROTEGIDA: PROTOCOLOS DEL NÚCLEO Y DE LA INTERFAZ */}
+      {/* SECCIÓN: SEGURIDAD DE CONTENIDO Y FILTROS (NSFW / DARK FANTASY) */}
+      <div className="bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.25)] rounded-lg p-4 md:p-6 shadow-sm mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-md bg-rose-900/20 text-rose-700 shrink-0">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-cinzel text-base md:text-lg m-0 text-[var(--accent)] flex items-center gap-2">
+                Filtros de Contenido y Modo Adulto (NSFW / Dark Fantasy)
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
+                Controla el nivel de censura de la API de Gemini para permitir romance explícito, violencia cruda y temas maduros.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap">
+            <span className={`text-[11px] font-cinzel font-bold px-2 py-0.5 rounded border ${
+              safetyLevel === 'BLOCK_NONE' 
+                ? 'bg-rose-100 text-rose-900 border-rose-300' 
+                : 'bg-amber-100 text-amber-900 border-amber-300'
+            }`}>
+              {safetyLevel === 'BLOCK_NONE'
+                ? 'Sin Filtros (18+ / NSFW Libre)'
+                : safetyLevel === 'BLOCK_ONLY_HIGH'
+                ? 'Filtro Permisivo'
+                : 'Filtro Estándar'}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button
+            type="button"
+            onClick={() => handleSafetyChange('BLOCK_NONE')}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              safetyLevel === 'BLOCK_NONE'
+                ? 'bg-rose-900/15 border-rose-600/70 shadow-xs ring-1 ring-rose-500'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-rose-700 flex items-center justify-between mb-1">
+              <span>Sin Filtros (BLOCK_NONE)</span>
+              {safetyLevel === 'BLOCK_NONE' && <Check className="w-3.5 h-3.5 text-rose-700" />}
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Sin censura de seguridad: permite combate visceral, lenguaje adulto, romance maduro y ambientaciones oscuras.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSafetyChange('BLOCK_ONLY_HIGH')}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              safetyLevel === 'BLOCK_ONLY_HIGH'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>Solo Bloquear Extremo</span>
+              {safetyLevel === 'BLOCK_ONLY_HIGH' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Filtro suave: permite la mayoría de escenas adultas bloqueando únicamente contenido de riesgo extremo.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSafetyChange('BLOCK_MEDIUM_AND_ABOVE')}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              safetyLevel === 'BLOCK_MEDIUM_AND_ABOVE'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>Moderado / Estándar</span>
+              {safetyLevel === 'BLOCK_MEDIUM_AND_ABOVE' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Protección habitual de Google AI Studio para historias aptas para todas las edades.
+            </p>
+          </button>
+        </div>
+      </div>
+
+      {/* SECCIÓN PROTEGIDA: PROTOCOLOS DEL MOTOR INYECTADOS */}
       <div className="bg-amber-950/10 border border-amber-800/30 rounded-lg p-4 mb-6 shadow-xs">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="flex items-start gap-2.5">
@@ -290,14 +391,14 @@ export const InstructionsView: React.FC<{
               <div className="flex items-center gap-2">
                 <h4 className="font-cinzel text-sm md:text-base font-bold text-[var(--accent)] m-0 flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-amber-600" />
-                  Protocolos del Núcleo y de la Interfaz (Protegidos / Inmutables)
+                  Protocolos del Sistema de Juego (Inyectados al Narrador)
                 </h4>
                 <span className="bg-emerald-100 text-emerald-800 text-[10px] font-cinzel font-bold px-2 py-0.5 rounded-full border border-emerald-300">
                   Siempre Activo
                 </span>
               </div>
               <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed max-w-3xl">
-                Las directivas técnicas de la aplicación (ejes de afinidad <strong>ATR: 14 | VÍN: 5 | CON: 2</strong>, tiradas interactivas de dados, actualización de inventario, sincronización de PG/CA, calendario y agenda) están blindadas e integradas por el sistema. <strong>Puedes editar, añadir o borrar con total libertad las directivas narrativas de abajo</strong> sin preocuparte por romper el funcionamiento de la interfaz.
+                Las directivas de juego (tiradas interactivas de dados y afinidad de PNJs) se integran automáticamente en el prompt del GM sin consumir cuota extra. <strong>Las directivas personalizables de abajo definen el lore y estilo que prefieras.</strong>
               </p>
             </div>
           </div>
@@ -308,14 +409,14 @@ export const InstructionsView: React.FC<{
             className="text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--accent-hover)] px-2.5 py-1.5 rounded bg-[var(--sidebar-bg)] border border-[var(--user-border)] flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
           >
             <Info className="w-3.5 h-3.5" />
-            {showProtocolsDetail ? 'Ocultar detalles de sintaxis' : 'Ver etiquetas del motor'}
+            {showProtocolsDetail ? 'Ocultar detalles' : 'Ver etiquetas'}
             {showProtocolsDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         </div>
 
         {/* Acordeón con la guía de sintaxis del motor */}
         {showProtocolsDetail && (
-          <div className="mt-4 pt-3 border-t border-amber-800/20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 animate-[fadeIn_0.2s_ease]">
+          <div className="mt-4 pt-3 border-t border-amber-800/20 grid grid-cols-1 md:grid-cols-2 gap-3 animate-[fadeIn_0.2s_ease]">
             <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
               <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
                 <UserCheck className="w-3.5 h-3.5" /> Vínculos y Afinidad de PNJs
@@ -324,7 +425,7 @@ export const InstructionsView: React.FC<{
                 [VÍNCULO: Kieron | grado: ...] / [PRESENTES: ...]
               </code>
               <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Sincroniza silenciosamente la afinidad en el HUD y la lista de personajes sin ensuciar el relato del chat.
+                Registra silenciosamente la afinidad de acompañantes sin ensuciar la narrativa.
               </p>
             </div>
 
@@ -337,54 +438,6 @@ export const InstructionsView: React.FC<{
               </code>
               <p className="text-[11px] text-[var(--text-secondary)] m-0">
                 Genera el panel interactivo de tirada de dados para el jugador.
-              </p>
-            </div>
-
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <Package className="w-3.5 h-3.5" /> Inventario y Monedas
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                [INVENTARIO: +1 Capa élfica, -15 PO]
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Sincroniza automáticamente la bolsa y monedas de la ficha.
-              </p>
-            </div>
-
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <Heart className="w-3.5 h-3.5" /> Estado de Salud y PG
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                [ESTADO: PG 24/38 | CA 16 | condiciones: ...]
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Actualiza los puntos de golpe y estados temporales.
-              </p>
-            </div>
-
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <Hourglass className="w-3.5 h-3.5" /> Tiempo y Calendario
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                [TIEMPO: +4h] / [HILO: ... | vence en 10d]
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Avanza los relojes del mundo y el calendario de la campaña.
-              </p>
-            </div>
-
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <Scroll className="w-3.5 h-3.5" /> Diario y Agenda del Héroe
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                [AGENDA: resumen en 1ª persona | lugar: ...]
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Registra la crónica en la pestaña de Cronología / Agenda.
               </p>
             </div>
           </div>

@@ -71,9 +71,6 @@ import {
   extractNpcFromDocument,
   describeApiError,
   destilarTablaOraculo,
-  looksLikePlayerSheet,
-  looksLikeCompanionSheet,
-  looksLikeNpcSheet,
   classifyFileAuto,
   getStoredApiKey,
   setStoredApiKey,
@@ -1162,7 +1159,6 @@ export default function App() {
 
     try {
       const newFilesList: ProjectFile[] = [];
-      const imagesToAnalyze: { file: ProjectFile; dataUrl: string }[] = [];
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -1224,88 +1220,16 @@ export default function App() {
         newFile.category = classifyFileAuto(newFile, currentProject?.memory);
 
         newFilesList.push(newFile);
-
-        if (isImage && contentUrlOrText) {
-          imagesToAnalyze.push({ file: newFile, dataUrl: contentUrlOrText });
-        }
       }
 
       let updated = [...currentFiles, ...newFilesList];
       setCurrentFiles(updated);
       await saveFilesToDB(currentPId, updated);
 
-      // Perform background image recognition if there are images, storing directly in Memory & File
-      if (imagesToAnalyze.length > 0 && hasConfiguredApiKey()) {
-        (async () => {
-          const newVisualMemories: VisualMemoryItem[] = [];
-          for (let imgIdx = 0; imgIdx < imagesToAnalyze.length; imgIdx++) {
-            const item = imagesToAnalyze[imgIdx];
-            try {
-              const analysis = await analyzeUploadedImage(item.file, item.dataUrl);
-              if (analysis) {
-                const refreshedFiles = await loadFilesFromDB(currentPId);
-                const fileUpdated = refreshedFiles.map(f => (f.id === item.file.id ? { ...f, analysis } : f));
-                setCurrentFiles(fileUpdated);
-                await saveFilesToDB(currentPId, fileUpdated);
-
-                newVisualMemories.push({
-                  id: 'vmem_' + item.file.id,
-                  fileId: item.file.id,
-                  fileName: item.file.name,
-                  thumbnail: item.dataUrl,
-                  analysis
-                });
-              }
-            } catch (analysisErr) {
-              console.error('Error in background image analysis:', analysisErr);
-            }
-          }
-
-          if (newVisualMemories.length > 0) {
-            await handleUpdateMemory(mem => {
-              const existingVisual = mem.visual_memory || [];
-              const merged = [
-                ...existingVisual.filter(ev => !newVisualMemories.some(nvm => nvm.fileId === ev.fileId)),
-                ...newVisualMemories
-              ];
-              return { ...mem, visual_memory: merged };
-            });
-          }
-        })();
-      }
-
-      // Si entre lo subido hay una ficha del protagonista, registrarla en segundo plano
-      let autoSheetMsg = '';
-      const sheetFile = updated.find(f => newFilesList.some(nf => nf.id === f.id) && looksLikePlayerSheet(f));
-
-      if (sheetFile && hasConfiguredApiKey()) {
-        const existingPc = currentProject?.memory?.player_character;
-        if (!existingPc?.name) {
-          // Extraer en segundo plano inmediatamente sin congelar la app
-          void handleExtractPlayerCharacter(sheetFile);
-          autoSheetMsg = ` He detectado la ficha del protagonista ("${sheetFile.name}") y la estoy extrayendo en segundo plano. ¡Ya puedes empezar a jugar!`;
-        } else {
-          autoSheetMsg = ` He detectado lo que parece una ficha ("${sheetFile.name}"). Ya tienes a "${existingPc.name}" como protagonista; puedes actualizar la ficha desde la pestaña Fichas si lo deseas.`;
-        }
-      }
-
-      // Detect companion or NPC sheet uploaded
-      const companionFile = updated.find(f => newFilesList.some(nf => nf.id === f.id) && looksLikeCompanionSheet(f));
-      const npcSheetFile = updated.find(f => newFilesList.some(nf => nf.id === f.id) && looksLikeNpcSheet(f));
-
-      if (companionFile && hasConfiguredApiKey()) {
-        autoSheetMsg += ` He detectado la ficha de un compañero ("${companionFile.name}"). Puedes extraerla desde la pestaña Archivos o Memoria.`;
-      }
-      if (npcSheetFile && hasConfiguredApiKey()) {
-        autoSheetMsg += ` He detectado la ficha de un PNJ ("${npcSheetFile.name}"). Puedes registrarlo desde la pestaña Archivos o Memoria.`;
-      }
-
       setAlertConfig({
         isOpen: true,
         title: 'Archivos Guardados',
-        message: `Se han añadido ${newFilesList.length} documento(s) a la Base de Conocimiento.${
-          imagesToAnalyze.length > 0 ? ` ${imagesToAnalyze.length} imagen(es) se están analizando en segundo plano.` : ''
-        }${autoSheetMsg}`
+        message: `Se han añadido ${newFilesList.length} documento(s) a los Archivos del Tomo.`
       });
     } catch (error) {
       console.error('Error handling files upload:', error);
