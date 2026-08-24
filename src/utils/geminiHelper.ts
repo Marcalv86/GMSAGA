@@ -53,10 +53,16 @@ export interface AIModelOption {
 
 export const AVAILABLE_MODELS: AIModelOption[] = [
   {
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    badge: 'Recomendado · Híbrido y Rápido',
+    desc: 'Modelo insignia con razonamiento adaptativo, narración fluida y detección precisa de mecánicas de rol.'
+  },
+  {
     id: 'gemini-2.5-flash',
     name: 'Gemini 2.5 Flash',
-    badge: 'Recomendado · Rápido y fluido',
-    desc: 'El modelo insignia de Google AI Studio: máxima velocidad, capacidad multimodal y cuota amplia.'
+    badge: 'Rápido y fluido',
+    desc: 'Alta velocidad, capacidad multimodal y cuota amplia.'
   },
   {
     id: 'gemini-2.5-pro',
@@ -69,12 +75,6 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     name: 'Gemini 2.5 Flash Lite',
     badge: 'Ultra Ligero · Ahorro de cuota',
     desc: 'Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para sesiones largas.'
-  },
-  {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
-    badge: 'Híbrido · Razonamiento',
-    desc: 'Modelo con capacidad de pensamiento y razonamiento dinámico para situaciones tácticas complejas.'
   }
 ];
 
@@ -82,8 +82,8 @@ export function esModeloAbierto(modelId: string): boolean {
   return /^gemma/i.test(modelId.trim());
 }
 
-export const DEFAULT_MODEL_ID = 'gemini-2.5-flash';
-export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-2.5-flash';
+export const DEFAULT_MODEL_ID = 'gemini-3.7-flash';
+export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.7-flash';
 export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-2.5-flash-lite';
 
 export function getStoredAutoFailover(): boolean {
@@ -189,9 +189,7 @@ export function getStoredThinkingLevel(): ThinkingLevelSetting {
   if (local && ['AUTO', 'HIGH', 'LOW', 'MINIMAL'].includes(local)) {
     return local as ThinkingLevelSetting;
   }
-  // Por defecto en LOW (1024 tokens) para evitar que la cuota gratuita de AI Studio
-  // se consuma con miles de tokens de pensamiento invisibles por turno.
-  return 'LOW';
+  return 'AUTO';
 }
 
 export function setStoredThinkingLevel(level: ThinkingLevelSetting): void {
@@ -753,15 +751,8 @@ ${memoryContext}
 
 ${calendarioSection}
 
-### DADOS YA TIRADOS PARA ESTE TURNO (USO EXCLUSIVO DEL DIRECTOR DE JUEGO)
-Estos números están tirados de verdad, no los inventes tú. Son ÚNICAMENTE para tus
-propias tiradas ocultas: sigilo de un enemigo, iniciativa de los PNJs, daño, tablas
-aleatorias, intenciones que el jugador no debe conocer.
-PROHIBIDO usarlos para resolver una acción del protagonista: esas tiradas las tira
-el jugador y solo él. Úsalos EN ORDEN y descarta los que no gastes.
-- d20: ${dicePool.d20.join(', ')}
-- d100: ${dicePool.d100.join(', ')}
-- d6: ${dicePool.d6.join(', ')}
+### RESERVA DE DADOS DEL DIRECTOR DE JUEGO (USO EXCLUSIVO DEL NARRADOR)
+Al final de la entrada del turno se adjunta la reserva de dados reales tirados para tus acciones ocultas de PNJ, daño, tablas aleatorias y tiradas enfrentadas. Son de uso exclusivo para el Narrador (NUNCA para las acciones del protagonista). Úsalos en orden y descarta los que no gastes.
 
 [DIRECTIVAS DE RESPUESTA CRÍTICAS]:
 0. [BLINDAJE DE TONO, CERO MORALISMOS Y FIDELIDAD AL LORE CANÓNICO (MARCO ADULTO / GRIMDARK)]:
@@ -785,13 +776,23 @@ el jugador y solo él. Úsalos EN ORDEN y descarta los que no gastes.
 3. Si la Memoria indica que un personaje está herido, cansado o en una situación específica, refléjalo en la narrativa.
 4. Si el jugador menciona o enlaza una canción o video (YouTube / Spotify), utiliza el contenido de la letra/música para enriquecer la escena.
 5. [TIRADAS Y SALVACIONES DEL PROTAGONISTA EN EL ROLEO - OBLIGATORIO]:
-   Las tiradas de habilidad y las **Tiradas de Salvación corren dentro del roleo**. Cuando una acción tenga resultado incierto (atacar, trepar, mentir/engañar/ocultar información a un PNJ perspicaz, forzar, registrar) o cuando el personaje enfrente un peligro súbito, trampa, veneno, derrumbe o hechizo que exija resistencia, NO decidas tú el resultado ni lo narres de antemano. Describe el momento hasta el instante justo anterior al impacto o desenlace, detente ahí y pide la tirada o salvación en una línea propia con este formato exacto:
-   [Petición de Tirada: Habilidad o Salvación de Característica | CD número]
-   (Ejemplos: [Petición de Tirada: Engaño | CD 15], [Petición de Tirada: Perspicacia | CD 14], [Petición de Tirada: Salvación de Destreza | CD 14], [Petición de Tirada: Salvación de Constitución | CD 15], [Petición de Tirada: Atletismo | CD 12]).
-   - **Tiradas Sociales Obligatorias (Engaño vs Perspicacia):** Si el jugador miente, disimula, inventa una excusa, cuenta una verdad a medias o intenta ocultar algo a un PNJ perspicaz o astuto (como Jarlaxle o espías), DEBES solicitar la tirada de Engaño al jugador ([Petición de Tirada: Engaño | CD XX]) o realizar la tirada de Perspicacia del PNJ de forma visible usando tus dados. Queda PROHIBIDO que el PNJ se crea la mentira de forma automática sin tirada.
-   Puedes pedir varias en el mismo turno si la situación lo requiere. Después de pedirla, **no sigas narrando**: espera a que el jugador te dé el resultado en su siguiente mensaje y resuélvelo entonces. No inventes su resultado, no supongas que ha tenido éxito ni que ha fallado, y no uses los dados de la sección anterior para él.
-   Caso obligatorio: cuando estalle un combate o una emboscada, describe el detonante y pide la iniciativa antes de narrar el primer intercambio de golpes → [Petición de Tirada: Iniciativa]. No resuelvas tú el primer asalto.
-   El jugador te responderá con el dado en bruto, así: [Tirada de Percepción: d20 natural = 12 | CD 15] o [Tirada de Salvación de Constitución: d20 natural = 14 | CD 15]. Ese número es el dado SIN modificar: aplícale tú el modificador y competencia que corresponda según la ficha viva del protagonista, di en voz alta la suma resultante y compárala con la CD antes de narrar el desenlace. Un 1 natural y un 20 natural son pifia y crítico.
+   Las tiradas de habilidad y las **Tiradas de Salvación corren dentro del roleo**.
+   A) DETECCIÓN Y RESOLUCIÓN INMEDIATA DE TIRADAS ENVIADAS POR EL JUGADOR:
+      - Si el mensaje del jugador contiene una tirada o resultado de dados (ejemplo «[Tirada de Sigilo: d20 natural = 16 | CD 14]», «[Tirada de Salvación de Destreza: d20 natural = 18]», «[Tirada d20: 15]» o una indicación de resultado en texto):
+        1. RECONÓCELA AL INSTANTE: Toma el dado natural enviado por el jugador.
+        2. Aplícale tú el modificador de característica y bonificador de competencia correspondiente según la ficha viva del protagonista (${pc?.name || 'el protagonista'}).
+        3. Expresa en el relato la suma y el cotejo contra la dificultad (ej: «16 natural + 3 de Destreza = 19 frente a CD 14: Éxito rotundo»).
+        4. Narra el desenlace de la acción de inmediato con todas sus consecuencias.
+        5. Queda TERMINANTEMENTE PROHIBIDO volver a pedir la misma tirada o ignorar el resultado enviado por el jugador.
+        6. Un 20 natural es Éxito Crítico; un 1 natural es Fallo Crítico / Pifia.
+   B) PETICIÓN DE TIRADA (CUANDO EL RESULTADO ES INCIERTO O HAY PELIGRO):
+      - Cuando una acción del protagonista tenga resultado incierto (atacar, trepar, mentir/engañar/ocultar información a un PNJ perspicaz, forzar cerraduras, sigilo, investigar) o cuando el personaje enfrente un peligro súbito, trampa, veneno o hechizo que exija resistencia, NO decidas tú el resultado ni lo narres de antemano.
+      - Describe el momento hasta el instante justo anterior al impacto o desenlace, detente ahí y pide la tirada o salvación en una línea propia con este formato exacto:
+        [Petición de Tirada: Habilidad o Salvación de Característica | CD número]
+        (Ejemplos: [Petición de Tirada: Engaño | CD 15], [Petición de Tirada: Perspicacia | CD 14], [Petición de Tirada: Salvación de Destreza | CD 14], [Petición de Tirada: Salvación de Constitución | CD 15], [Petición de Tirada: Atletismo | CD 12], [Petición de Tirada: Iniciativa]).
+      - **Tiradas Sociales Obligatorias (Engaño vs Perspicacia):** Si el jugador miente o disimula ante un PNJ perspicaz o astuto, solicita la tirada de Engaño al jugador ([Petición de Tirada: Engaño | CD XX]) o tira Perspicacia para el PNJ con tus dados de Narrador.
+      - Puedes pedir varias si la situación lo requiere. Después de pedirla, **no sigas narrando**: espera a que el jugador responda en su siguiente mensaje y resuélvelo entonces.
+      - Caso obligatorio: cuando estalle un combate o una emboscada, describe el detonante y pide la iniciativa antes de narrar el primer intercambio de golpes → [Petición de Tirada: Iniciativa].
 6. Si has pedido una tirada, la narración acaba en la petición: no añadas < ¿Qué haces? > ni sigas la escena (los registros internos del punto 7 sí van siempre, al final del todo). Si NO has pedido ninguna tirada, termina con < ¿Qué haces? > sin proponer opciones, para dar libertad total al jugador.
 7. [REGISTROS INTERNOS - OBLIGATORIOS]: después de la narración, y en este orden, añade las siguientes líneas. Son registros de la aplicación: no los comentes, no los expliques y no los menciones dentro del relato. El jugador no los ve.
    [PRESENTES: nombres separados por comas] — quién ha estado en escena de forma reconocible, con nombre propio. No incluyas figurantes sin nombre («un marinero», «la multitud»). Sirve para saber quién vuelve: alguien que reaparece deja de ser un extra y se le abre una ficha de vínculo con el protagonista.
@@ -853,10 +854,13 @@ ${tiempoDirectiva}   [ESTADO: PG actuales/máximos | CA valor | condiciones: lis
     }
   }
 
+  const diceContext = `\n\n[Dados pre-tirados del Director para acciones ocultas/PNJ en este turno: d20: ${dicePool.d20.join(', ')} | d100: ${dicePool.d100.join(', ')} | d6: ${dicePool.d6.join(', ')}]`;
+  const finalUserPayload = userText + diceContext;
+
   if (lastRole === 'user') {
-    contents[contents.length - 1].parts.push({ text: '\n\n' + userText });
+    contents[contents.length - 1].parts.push({ text: '\n\n' + finalUserPayload });
   } else {
-    contents.push({ role: 'user', parts: [{ text: userText }] });
+    contents.push({ role: 'user', parts: [{ text: finalUserPayload }] });
   }
 
   return { sys, contents };

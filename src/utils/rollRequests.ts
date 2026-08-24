@@ -16,14 +16,14 @@ export interface RollRequest {
 }
 
 /**
- * Acepta variantes con y sin tilde, con «CD», «DC» o «Dificultad», y con el
- * separador en `|` o en `,`, porque los modelos no son notarios.
+ * Acepta variantes con y sin tilde, con «CD», «DC» o «Dificultad», con «|», «-», «,» o entre paréntesis,
+ * con 'Petición de Tirada', 'Petición de Salvación' o 'Tirada requerida'.
  */
 const ROLL_REQUEST_RE =
-  /\[\s*petici[oó]n\s+de\s+tirada\s*:\s*([^\]|,]+?)\s*(?:[|,]\s*(?:cd|dc|dificultad)\s*:?\s*(\d{1,2})\s*)?\]/gi;
+  /(?:\*{1,2})?\[\s*(?:petici[oó]n\s+de\s+(?:tirada|salvaci[oó]n)|tirada\s+requerida)\s*:\s*([^\]|,\-(]+?)(?:\s*(?:[|,:\-]|(?:con\s+)?\(?)\s*(?:cd|dc|dificultad)?\s*[:=]?\s*(\d{1,3})\)?)?\s*\](?:\*{1,2})?/gi;
 
 export function parseRollRequests(text: string): RollRequest[] {
-  if (!text || !text.toLowerCase().includes('tirada')) return [];
+  if (!text || (!text.toLowerCase().includes('tirada') && !text.toLowerCase().includes('salvaci'))) return [];
   const out: RollRequest[] = [];
   const seen = new Set<string>();
   ROLL_REQUEST_RE.lastIndex = 0;
