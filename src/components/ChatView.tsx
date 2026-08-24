@@ -1129,11 +1129,11 @@ export const ChatView: React.FC<{
           )}
 
           {/* Barra de dados con estilizado temático por dado */}
-          <div className="flex gap-1 sm:gap-1.5 md:gap-2 justify-center items-center flex-wrap">
+          <div className="w-full flex gap-1 sm:gap-1.5 md:gap-2 items-center justify-start sm:justify-center overflow-x-auto no-scrollbar scrollbar-none py-0.5 px-0.5">
             {hasOracle && (
               <button
                 onClick={() => setOraculoAbierto(v => !v)}
-                className={`rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-semibold border transition-all shadow-sm cursor-pointer flex items-center gap-1.5 ${
+                className={`shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-semibold border transition-all shadow-xs cursor-pointer flex items-center gap-1.5 ${
                   oraculoAbierto
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/30'
                     : 'bg-[var(--msg-user)] text-indigo-700 dark:text-indigo-300 border-indigo-300/40 hover:border-indigo-400 hover:bg-indigo-500/15 hover:scale-105 active:scale-95'
@@ -1192,7 +1192,7 @@ export const ChatView: React.FC<{
               <button
                 key={d.sides}
                 onClick={() => handleDieClick(d.sides)}
-                className={`rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer hover:scale-105 active:scale-95 ${d.theme}`}
+                className={`shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer hover:scale-105 active:scale-95 ${d.theme}`}
                 title={`Tirar dado de ${d.sides} caras y añadir al mensaje`}
                 aria-label={d.label}
               >
@@ -1201,7 +1201,7 @@ export const ChatView: React.FC<{
             ))}
 
             {/* Separador de herramientas creativas */}
-            <span className="hidden sm:inline border-r border-[var(--glass-border)] h-5 my-auto mx-1" />
+            <span className="hidden sm:inline border-r border-[var(--glass-border)] h-5 my-auto mx-1 shrink-0" />
 
             {/* Botón de Música & Bardo */}
             <button
@@ -1209,7 +1209,7 @@ export const ChatView: React.FC<{
                 const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
                 setStudioModal({ isOpen: true, tab: 'music', sceneText: lastModelMsg });
               }}
-              className="rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-purple-700/60 dark:border-purple-400/60 bg-purple-100/90 dark:bg-purple-950/50 text-purple-950 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-purple-700/60 dark:border-purple-400/60 bg-purple-100/90 dark:bg-purple-950/50 text-purple-950 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
               title="Música ambiental, sintetizador de laúd/taberna, canciones de YouTube y Spotify"
               aria-label="Bardo & Música"
             >
@@ -1222,25 +1222,11 @@ export const ChatView: React.FC<{
                 const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
                 setStudioModal({ isOpen: true, tab: 'image', sceneText: lastModelMsg });
               }}
-              className="rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-amber-700/60 dark:border-amber-400/60 bg-amber-100/90 dark:bg-amber-950/50 text-amber-950 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-amber-700/60 dark:border-amber-400/60 bg-amber-100/90 dark:bg-amber-950/50 text-amber-950 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
               title="Taller multimedia: Generar ilustraciones de escenas, retratos de personajes y videos cinemáticos a partir de la escena"
               aria-label="Taller Creativo"
             >
               <Wand2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Taller Creativo</span>
-            </button>
-
-            {/* Botón de Acceso Rápido a Emojis */}
-            <button
-              onClick={() => setIsEmojiPickerOpen(prev => !prev)}
-              className={`rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer flex items-center gap-1.5 hover:scale-105 active:scale-95 ${
-                isEmojiPickerOpen
-                  ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-xs'
-                  : 'border-yellow-700/60 dark:border-yellow-400/60 bg-yellow-100/90 dark:bg-yellow-950/50 text-yellow-950 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-900/60'
-              }`}
-              title="Ventana rápida de emojis de rol, expresiones, combate y símbolos"
-              aria-label="Emojis rápidos"
-            >
-              <Smile className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Emojis</span>
             </button>
           </div>
         </div>
