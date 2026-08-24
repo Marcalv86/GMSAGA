@@ -1,7 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Project } from '../types';
-import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from '../utils/defaultDirectives';
-import { analyzeNarrativeStyleFromDocument, describeApiError } from '../utils/geminiHelper';
+import React, { useState, useEffect, useRef } from "react";
+import { Project } from "../types";
+import {
+  DEFAULT_DM_INSTRUCTIONS,
+  DEFAULT_SYSTEM,
+  DEFAULT_STYLE,
+} from "../utils/defaultDirectives";
+import {
+  analyzeNarrativeStyleFromDocument,
+  describeApiError,
+} from "../utils/geminiHelper";
 
 import {
   Check,
@@ -23,27 +30,37 @@ import {
   Swords,
   Upload,
   UserCheck,
-  X
-} from 'lucide-react';
+  X,
+} from "lucide-react";
 
 export const InstructionsView: React.FC<{
   project: Project;
-  onUpdate: (fields: Partial<Pick<Project, 'instructions' | 'system' | 'style'>>) => Promise<void>;
+  onUpdate: (
+    fields: Partial<Pick<Project, "instructions" | "system" | "style">>,
+  ) => Promise<void>;
   onRequestConfirm?: (message: string, onConfirm: () => void) => void;
 }> = ({ project, onUpdate, onRequestConfirm }) => {
-  const [instructions, setInstructions] = useState(project.instructions || '');
-  const [system, setSystem] = useState(project.system || '');
-  const [style, setStyle] = useState(project.style || '');
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [instructions, setInstructions] = useState(project.instructions || "");
+  const [system, setSystem] = useState(project.system || "");
+  const [style, setStyle] = useState(project.style || "");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">(
+    "saved",
+  );
   const [showProtocolsDetail, setShowProtocolsDetail] = useState(false);
 
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
-  const [analyzingMessage, setAnalyzingMessage] = useState('');
-  const [styleSuccessNotice, setStyleSuccessNotice] = useState<string | null>(null);
+  const [analyzingMessage, setAnalyzingMessage] = useState("");
+  const [styleSuccessNotice, setStyleSuccessNotice] = useState<string | null>(
+    null,
+  );
   const styleFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingRef = useRef<{ instructions: string; system: string; style: string } | null>(null);
+  const pendingRef = useRef<{
+    instructions: string;
+    system: string;
+    style: string;
+  } | null>(null);
 
   useEffect(() => {
     return () => {
@@ -60,36 +77,44 @@ export const InstructionsView: React.FC<{
   }, [onUpdate]);
 
   useEffect(() => {
-    setInstructions(project.instructions || '');
-    setSystem(project.system || '');
-    setStyle(project.style || '');
-    setSaveStatus('saved');
+    setInstructions(project.instructions || "");
+    setSystem(project.system || "");
+    setStyle(project.style || "");
+    setSaveStatus("saved");
   }, [project.id]);
 
-  const saveChanges = async (newInst?: string, newSys?: string, newSty?: string) => {
+  const saveChanges = async (
+    newInst?: string,
+    newSys?: string,
+    newSty?: string,
+  ) => {
     const payload = {
       instructions: newInst !== undefined ? newInst : instructions,
       system: newSys !== undefined ? newSys : system,
-      style: newSty !== undefined ? newSty : style
+      style: newSty !== undefined ? newSty : style,
     };
 
-    setSaveStatus('saving');
+    setSaveStatus("saving");
     try {
       await onUpdate(payload);
       pendingRef.current = null;
-      setSaveStatus('saved');
+      setSaveStatus("saved");
     } catch (e) {
-      console.error('Error saving instructions:', e);
-      setSaveStatus('unsaved');
+      console.error("Error saving instructions:", e);
+      setSaveStatus("unsaved");
     }
   };
 
-  const scheduleDebouncedSave = (newInst?: string, newSys?: string, newSty?: string) => {
-    setSaveStatus('unsaved');
+  const scheduleDebouncedSave = (
+    newInst?: string,
+    newSys?: string,
+    newSty?: string,
+  ) => {
+    setSaveStatus("unsaved");
     pendingRef.current = {
       instructions: newInst !== undefined ? newInst : instructions,
       system: newSys !== undefined ? newSys : system,
-      style: newSty !== undefined ? newSty : style
+      style: newSty !== undefined ? newSty : style,
     };
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -100,7 +125,8 @@ export const InstructionsView: React.FC<{
   };
 
   const handleRestoreMasterInstructions = () => {
-    const message = '¿Deseas restaurar las directivas narrativas y de lore por defecto para este Tomo?';
+    const message =
+      "¿Deseas restaurar las directivas narrativas y de lore por defecto para este Tomo?";
     const executeRestore = async () => {
       setInstructions(DEFAULT_DM_INSTRUCTIONS);
       setSystem(DEFAULT_SYSTEM);
@@ -115,55 +141,70 @@ export const InstructionsView: React.FC<{
     }
   };
 
-  const handleStyleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStyleFileSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsAnalyzingStyle(true);
-    setAnalyzingMessage(`Extrayendo texto y analizando la pluma de "${file.name}"...`);
+    setAnalyzingMessage(
+      `Extrayendo texto y analizando la pluma de "${file.name}"...`,
+    );
     setStyleSuccessNotice(null);
 
     try {
-      let fileText = '';
+      let fileText = "";
       if (
-        file.type.startsWith('text/') ||
-        file.name.endsWith('.txt') ||
-        file.name.endsWith('.md') ||
-        file.name.endsWith('.markdown') ||
-        file.name.endsWith('.json')
+        file.type.startsWith("text/") ||
+        file.name.endsWith(".txt") ||
+        file.name.endsWith(".md") ||
+        file.name.endsWith(".markdown") ||
+        file.name.endsWith(".json")
       ) {
         fileText = await file.text();
       } else {
         const reader = new FileReader();
         fileText = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve((reader.result as string) || '');
+          reader.onload = () => resolve((reader.result as string) || "");
           reader.onerror = reject;
           reader.readAsText(file);
         });
       }
 
       if (!fileText || fileText.trim().length < 50) {
-        throw new Error('El archivo no contiene suficiente texto legible para analizar el estilo.');
+        throw new Error(
+          "El archivo no contiene suficiente texto legible para analizar el estilo.",
+        );
       }
 
-      setAnalyzingMessage(`Gemini está destilando la voz, ritmo y vocabulario de "${file.name}"...`);
-      const analyzedDirective = await analyzeNarrativeStyleFromDocument(fileText, file.name);
+      setAnalyzingMessage(
+        `Gemini está destilando la voz, ritmo y vocabulario de "${file.name}"...`,
+      );
+      const analyzedDirective = await analyzeNarrativeStyleFromDocument(
+        fileText,
+        file.name,
+      );
 
       if (!analyzedDirective || analyzedDirective.trim().length === 0) {
-        throw new Error('No se pudo generar la directiva de estilo del documento.');
+        throw new Error(
+          "No se pudo generar la directiva de estilo del documento.",
+        );
       }
 
       setStyle(analyzedDirective);
       await saveChanges(undefined, undefined, analyzedDirective);
-      setStyleSuccessNotice(`Estilo extraído con éxito desde "${file.name}" y guardado en Directivas.`);
+      setStyleSuccessNotice(
+        `Estilo extraído con éxito desde "${file.name}" y guardado en Directivas.`,
+      );
     } catch (err: any) {
-      console.error('Error analyzing style document:', err);
+      console.error("Error analyzing style document:", err);
       alert(`No se pudo aprender el estilo: ${describeApiError(err)}`);
     } finally {
       setIsAnalyzingStyle(false);
-      setAnalyzingMessage('');
+      setAnalyzingMessage("");
       if (styleFileInputRef.current) {
-        styleFileInputRef.current.value = '';
+        styleFileInputRef.current.value = "";
       }
     }
   };
@@ -181,14 +222,24 @@ export const InstructionsView: React.FC<{
               <div className="flex items-center gap-2">
                 <h4 className="font-cinzel text-sm md:text-base font-bold text-[var(--accent)] m-0 flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-amber-600" />
-                  Protocolos del Núcleo y de la Interfaz (Protegidos / Inmutables)
+                  Protocolos del Núcleo y de la Interfaz (Protegidos /
+                  Inmutables)
                 </h4>
                 <span className="bg-emerald-100 text-emerald-800 text-[10px] font-cinzel font-bold px-2 py-0.5 rounded-full border border-emerald-300">
                   Siempre Activo
                 </span>
               </div>
               <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed max-w-3xl">
-                Las directivas técnicas de la aplicación (ejes de afinidad <strong>ATR: 14 | VÍN: 5 | CON: 2</strong>, tiradas interactivas de dados, actualización de inventario, sincronización de PG/CA, calendario y agenda) están blindadas e integradas por el sistema. <strong>Puedes editar, añadir o borrar con total libertad las directivas narrativas de abajo</strong> sin preocuparte por romper el funcionamiento de la interfaz.
+                Las directivas técnicas de la aplicación (ejes de afinidad{" "}
+                <strong>ATR: 14 | VÍN: 5 | CON: 2</strong>, tiradas interactivas
+                de dados, actualización de inventario, sincronización de PG/CA,
+                calendario y agenda) están blindadas e integradas por el
+                sistema.{" "}
+                <strong>
+                  Puedes editar, añadir o borrar con total libertad las
+                  directivas narrativas de abajo
+                </strong>{" "}
+                sin preocuparte por romper el funcionamiento de la interfaz.
               </p>
             </div>
           </div>
@@ -199,8 +250,14 @@ export const InstructionsView: React.FC<{
             className="text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--accent-hover)] px-2.5 py-1.5 rounded bg-[var(--sidebar-bg)] border border-[var(--user-border)] flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
           >
             <Info className="w-3.5 h-3.5" />
-            {showProtocolsDetail ? 'Ocultar detalles de sintaxis' : 'Ver etiquetas del motor'}
-            {showProtocolsDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            {showProtocolsDetail
+              ? "Ocultar detalles de sintaxis"
+              : "Ver etiquetas del motor"}
+            {showProtocolsDetail ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
           </button>
         </div>
 
@@ -209,13 +266,15 @@ export const InstructionsView: React.FC<{
           <div className="mt-4 pt-3 border-t border-amber-800/20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 animate-[fadeIn_0.2s_ease]">
             <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
               <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <UserCheck className="w-3.5 h-3.5" /> Vínculos y Afinidad de PNJs
+                <UserCheck className="w-3.5 h-3.5" /> Vínculos y Afinidad de
+                PNJs
               </div>
               <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
                 [VÍNCULO: Kieron | grado: ...] / [PRESENTES: ...]
               </code>
               <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Sincroniza silenciosamente la afinidad en el HUD y la lista de personajes sin ensuciar el relato del chat.
+                Sincroniza silenciosamente la afinidad en el HUD y la lista de
+                personajes sin ensuciar el relato del chat.
               </p>
             </div>
 
@@ -287,23 +346,27 @@ export const InstructionsView: React.FC<{
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <div>
             <h3 className="font-cinzel text-lg md:text-xl m-0 text-[var(--accent)] flex items-center gap-2">
-              <Scroll className="w-5 h-5" /> Directivas de Campaña (Personalizables)
+              <Scroll className="w-5 h-5" /> Directivas de Campaña
+              (Personalizables)
             </h3>
             <div className="text-xs text-[var(--text-secondary)] mt-0.5">
-              {saveStatus === 'saved' && (
+              {saveStatus === "saved" && (
                 <span className="inline-flex items-center gap-1.5 text-green-700 font-semibold">
                   <Check className="w-3.5 h-3.5" />
                   Guardado en el Tomo
                 </span>
               )}
-              {saveStatus === 'saving' && (
+              {saveStatus === "saving" && (
                 <span className="inline-flex items-center gap-1.5 text-amber-700 font-semibold animate-pulse">
                   <Hourglass className="w-3.5 h-3.5" />
                   Guardando cambios...
                 </span>
               )}
-              {saveStatus === 'unsaved' && (
-                <span className="text-[var(--accent)] font-semibold"> Cambios pendientes...</span>
+              {saveStatus === "unsaved" && (
+                <span className="text-[var(--accent)] font-semibold">
+                  {" "}
+                  Cambios pendientes...
+                </span>
               )}
             </div>
           </div>
@@ -311,7 +374,7 @@ export const InstructionsView: React.FC<{
           <div className="flex items-center gap-2">
             <button
               onClick={() => saveChanges()}
-              disabled={saveStatus === 'saved'}
+              disabled={saveStatus === "saved"}
               className="bg-[var(--accent)] text-[var(--on-accent)] rounded px-3 py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent-hover)] transition-all shadow-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
               title="Guardar cambios manualmente"
             >
@@ -322,7 +385,8 @@ export const InstructionsView: React.FC<{
               className="bg-[var(--msg-user)] text-[var(--accent)] border border-[var(--user-border)] rounded px-3 py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
               title="Restaurar las directivas y reglas por defecto de la campaña"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Restaurar directivas por defecto
+              <RefreshCw className="w-3.5 h-3.5" /> Restaurar directivas por
+              defecto
             </button>
           </div>
         </div>
@@ -352,7 +416,7 @@ export const InstructionsView: React.FC<{
             </div>
             <textarea
               value={instructions}
-              onChange={e => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setInstructions(val);
                 scheduleDebouncedSave(val, undefined, undefined);
@@ -368,7 +432,7 @@ export const InstructionsView: React.FC<{
             </div>
             <textarea
               value={system}
-              onChange={e => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setSystem(val);
                 scheduleDebouncedSave(undefined, val, undefined);
@@ -417,13 +481,15 @@ export const InstructionsView: React.FC<{
             {isAnalyzingStyle && (
               <div className="mb-2 p-2 bg-amber-50/80 border border-amber-300 rounded text-xs text-amber-900 font-cinzel flex items-center gap-2 animate-pulse">
                 <div className="w-3.5 h-3.5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
-                <span className="truncate">{analyzingMessage || 'Analizando estilo literario...'}</span>
+                <span className="truncate">
+                  {analyzingMessage || "Analizando estilo literario..."}
+                </span>
               </div>
             )}
 
             <textarea
               value={style}
-              onChange={e => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setStyle(val);
                 scheduleDebouncedSave(undefined, undefined, val);

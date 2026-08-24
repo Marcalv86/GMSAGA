@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Smartphone,
   Sparkles,
@@ -12,12 +12,12 @@ import {
   Dices,
   Code2,
   Share2,
-  PlusSquare
-} from 'lucide-react';
+  PlusSquare,
+} from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
 export const InstallAppModal: React.FC<{
@@ -30,7 +30,7 @@ export const InstallAppModal: React.FC<{
   const [isIOS, setIsIOS] = useState(false);
   const [installSuccess, setInstallSuccess] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const currentUrl = typeof window !== "undefined" ? window.location.href : "";
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(currentUrl);
@@ -41,7 +41,7 @@ export const InstallAppModal: React.FC<{
   useEffect(() => {
     // Check if running as installed PWA
     const checkStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
     setIsStandalone(checkStandalone);
 
@@ -56,12 +56,12 @@ export const InstallAppModal: React.FC<{
       try {
         await deferredPrompt.prompt();
         const choiceResult = await deferredPrompt.userChoice;
-        if (choiceResult.outcome === 'accepted') {
+        if (choiceResult.outcome === "accepted") {
           setInstallSuccess(true);
           if (onInstalled) onInstalled();
         }
       } catch (err) {
-        console.error('Error durante la instalación:', err);
+        console.error("Error durante la instalación:", err);
       }
     }
   };
@@ -69,12 +69,12 @@ export const InstallAppModal: React.FC<{
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -82,7 +82,7 @@ export const InstallAppModal: React.FC<{
   return (
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-lora"
-      onClick={e => {
+      onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
@@ -96,7 +96,8 @@ export const InstallAppModal: React.FC<{
                 Instalar GM Studio en tu Dispositivo
               </h3>
               <p className="text-[11px] text-[#f4ecd8]/80 font-sans m-0">
-                Acceso directo nativo, pantalla completa y respuesta ultrarrápida
+                Acceso directo nativo, pantalla completa y respuesta
+                ultrarrápida
               </p>
             </div>
           </div>
@@ -114,19 +115,23 @@ export const InstallAppModal: React.FC<{
           {isStandalone ? (
             <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-4 text-center flex flex-col items-center gap-2 text-emerald-900">
               <Sparkles className="w-7 h-7 text-emerald-600" />
-              <h4 className="font-cinzel font-bold text-base m-0">¡Ya estás usando la App instalada!</h4>
+              <h4 className="font-cinzel font-bold text-base m-0">
+                ¡Ya estás usando la App instalada!
+              </h4>
               <p className="text-xs text-emerald-800 m-0">
-                GM Studio ya está funcionando en modo nativo en este dispositivo con memoria persistente y
-                pantalla completa.
+                GM Studio ya está funcionando en modo nativo en este dispositivo
+                con memoria persistente y pantalla completa.
               </p>
             </div>
           ) : installSuccess ? (
             <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-4 text-center flex flex-col items-center gap-2 text-emerald-900">
               <Check className="w-7 h-7 text-emerald-600" />
-              <h4 className="font-cinzel font-bold text-base m-0">¡Instalación Iniciada!</h4>
+              <h4 className="font-cinzel font-bold text-base m-0">
+                ¡Instalación Iniciada!
+              </h4>
               <p className="text-xs text-emerald-800 m-0">
-                La aplicación se ha añadido a la pantalla de inicio o al cajón de aplicaciones de tu
-                dispositivo.
+                La aplicación se ha añadido a la pantalla de inicio o al cajón
+                de aplicaciones de tu dispositivo.
               </p>
             </div>
           ) : (
@@ -142,8 +147,8 @@ export const InstallAppModal: React.FC<{
                       Instalación Rápida con 1 Clic
                     </h4>
                     <p className="text-xs text-[var(--text-secondary)] mt-1">
-                      Compatible con teléfonos, tablets (Android / iPad) y ordenadores (Windows / Mac /
-                      Linux).
+                      Compatible con teléfonos, tablets (Android / iPad) y
+                      ordenadores (Windows / Mac / Linux).
                     </p>
                   </div>
                   <button
@@ -165,21 +170,24 @@ export const InstallAppModal: React.FC<{
                   </div>
                   <ol className="text-xs text-[var(--text-primary)] space-y-2 list-decimal list-inside bg-amber-50/60 p-3 rounded border border-amber-200/60">
                     <li>
-                      Toca el botón <strong>Compartir</strong>{' '}
-                      <Share2 className="w-3.5 h-3.5 inline mx-1 text-sky-600" /> en la barra inferior de
-                      Safari.
+                      Toca el botón <strong>Compartir</strong>{" "}
+                      <Share2 className="w-3.5 h-3.5 inline mx-1 text-sky-600" />{" "}
+                      en la barra inferior de Safari.
                     </li>
                     <li>
-                      Desplázate hacia abajo y selecciona <strong>"Añadir a la pantalla de inicio"</strong>{' '}
-                      <PlusSquare className="w-3.5 h-3.5 inline mx-1 text-sky-600" />.
+                      Desplázate hacia abajo y selecciona{" "}
+                      <strong>"Añadir a la pantalla de inicio"</strong>{" "}
+                      <PlusSquare className="w-3.5 h-3.5 inline mx-1 text-sky-600" />
+                      .
                     </li>
                     <li>
-                      Pulsa <strong>"Añadir"</strong> en la esquina superior derecha.
+                      Pulsa <strong>"Añadir"</strong> en la esquina superior
+                      derecha.
                     </li>
                   </ol>
                   <p className="text-[11px] text-[var(--text-secondary)] italic m-0">
-                    ¡Listo! Podrás abrir GM Studio como una app independiente a pantalla completa desde tu
-                    pantalla de inicio.
+                    ¡Listo! Podrás abrir GM Studio como una app independiente a
+                    pantalla completa desde tu pantalla de inicio.
                   </p>
                 </div>
               )}
@@ -193,15 +201,18 @@ export const InstallAppModal: React.FC<{
                   </div>
                   <ol className="text-xs text-[var(--text-primary)] space-y-2 list-decimal list-inside bg-amber-50/60 p-3 rounded border border-amber-200/60">
                     <li>
-                      Abre el <strong>Menú del navegador (⋮ o tres puntos)</strong> en la esquina superior
-                      derecha.
+                      Abre el{" "}
+                      <strong>Menú del navegador (⋮ o tres puntos)</strong> en
+                      la esquina superior derecha.
                     </li>
                     <li>
-                      Haz clic o toca en <strong>"Instalar GM Studio..."</strong> o{' '}
+                      Haz clic o toca en{" "}
+                      <strong>"Instalar GM Studio..."</strong> o{" "}
                       <strong>"Añadir a pantalla principal"</strong>.
                     </li>
                     <li>
-                      Confirma la instalación para crear el acceso directo en el escritorio o en tus apps.
+                      Confirma la instalación para crear el acceso directo en el
+                      escritorio o en tus apps.
                     </li>
                   </ol>
                 </div>
@@ -220,7 +231,8 @@ export const InstallAppModal: React.FC<{
                 </div>
 
                 <p className="text-xs text-[var(--text-secondary)] m-0">
-                  Copia este enlace o ábrelo en tu teléfono para jugar o instalar la app:
+                  Copia este enlace o ábrelo en tu teléfono para jugar o
+                  instalar la app:
                 </p>
 
                 <div className="flex items-center gap-2">
@@ -261,10 +273,11 @@ export const InstallAppModal: React.FC<{
                     </div>
                     <div className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
                       <strong className="flex items-center gap-1 text-[var(--accent)]">
-                        <QrCode className="w-3.5 h-3.5 inline" /> ¿Estás en el ordenador?
+                        <QrCode className="w-3.5 h-3.5 inline" /> ¿Estás en el
+                        ordenador?
                       </strong>
-                      Apunta la cámara de tu móvil a este código QR para abrir el juego al instante en tu
-                      teléfono o tablet.
+                      Apunta la cámara de tu móvil a este código QR para abrir
+                      el juego al instante en tu teléfono o tablet.
                     </div>
                   </div>
                 )}
@@ -277,7 +290,8 @@ export const InstallAppModal: React.FC<{
                   <span>Código Abierto & Despliegue en GitHub</span>
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
-                  Para clonar o instalar el repositorio en tu propio GitHub y ejecutarlo en local:
+                  Para clonar o instalar el repositorio en tu propio GitHub y
+                  ejecutarlo en local:
                 </p>
                 <div className="bg-[#2d201c] text-[#f4ecd8] p-2.5 rounded font-mono text-[11px] select-all overflow-x-auto">
                   git clone &lt;tu-repositorio&gt;

@@ -9,62 +9,70 @@
  * agenda, hilos, presentes, vínculos, afinidad, etc.) y cabeceras de metadatos ASCII
  * para que el chat muestre exclusivamente prosa narrativa limpia y novelesca.
  */
-export function stripInternalTagsAndHeaders(raw: string | undefined | null): string {
-  if (!raw) return '';
+export function stripInternalTagsAndHeaders(
+  raw: string | undefined | null,
+): string {
+  if (!raw) return "";
 
   let text = raw;
 
   // 1. Eliminar bloques de código que solo contenían cabeceras de metadatos (ej: ```text 📅 ... 👤 Nivel ... ```)
-  text = text.replace(/```(?:text|md|markdown)?\s*[\r\n]*(?:📅|👤|🌟|⚜️|🖤)[^`]*?```/gi, '');
+  text = text.replace(
+    /```(?:text|md|markdown)?\s*[\r\n]*(?:📅|👤|🌟|⚜️|🖤)[^`]*?```/gi,
+    "",
+  );
 
   // 2. Eliminar etiquetas de sincronización entre corchetes [TAG: ...]
   text = text
-    .replace(/\[\s*ESTADO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*TIEMPO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*AGENDA\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*HILO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*PRESENTES\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*V[IÍ]NCULO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*AFINIDAD\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*CHAPTER\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*Pregunta\s+de\s+Mesa\s*:[^\]]*\]/gi, '');
+    .replace(/\[\s*ESTADO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*TIEMPO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*AGENDA\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*HILO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*PRESENTES\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*V[IÍ]NCULO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*AFINIDAD\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*CHAPTER\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*Pregunta\s+de\s+Mesa\s*:[^\]]*\]/gi, "");
 
   // 3. Eliminar cabeceras de fecha / estadísticas / renombre / afinidad fuera del HUD
   text = text
-    .replace(/^[ \t]*📅[^\n\r]*[|⏳][^\n\r]*$/gim, '')
-    .replace(/^[ \t]*👤\s*Nivel:[^\n\r]*$/gim, '')
-    .replace(/^[ \t]*🌟\s*Hito:[^\n\r]*$/gim, '')
-    .replace(/^[ \t]*⚜️\s*Renombre:[^\n\r]*$/gim, '')
-    .replace(/^[ \t]*(?:🖤|♥|❤️|🤍|💔|❤️‍🔥)[^\n\r]*?[-—]\s*ATR:[^\n\r]*$/gim, '')
+    .replace(/^[ \t]*📅[^\n\r]*[|⏳][^\n\r]*$/gim, "")
+    .replace(/^[ \t]*👤\s*Nivel:[^\n\r]*$/gim, "")
+    .replace(/^[ \t]*🌟\s*Hito:[^\n\r]*$/gim, "")
+    .replace(/^[ \t]*⚜️\s*Renombre:[^\n\r]*$/gim, "")
+    .replace(/^[ \t]*(?:🖤|♥|❤️|🤍|💔|❤️‍🔥)[^\n\r]*?[-—]\s*ATR:[^\n\r]*$/gim, "")
     // Variaciones combinadas en una sola línea
-    .replace(/^[ \t]*👤\s*Nivel:[^|\n\r]+\|\s*🌟\s*Hito:[^\n\r]*$/gim, '');
+    .replace(/^[ \t]*👤\s*Nivel:[^|\n\r]+\|\s*🌟\s*Hito:[^\n\r]*$/gim, "");
 
   // 4. Limpieza de saltos y espacios residuales
   text = text
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 
   return text;
 }
 
 export function formatNarrativeText(raw: string | undefined | null): string {
-  if (!raw) return '';
+  if (!raw) return "";
 
   const cleaned = stripInternalTagsAndHeaders(raw);
-  if (!cleaned) return '';
+  if (!cleaned) return "";
 
   // 1. Limpiar signos de puntuación con espacios previos anómalos (ej: "palabra . Siguiente" -> "palabra. Siguiente")
   let text = cleaned
-    .replace(/\s+([.,!?;:…»”"'])/g, '$1')
-    .replace(/([¿¡])\s+/g, '$1')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n');
+    .replace(/\s+([.,!?;:…»”"'])/g, "$1")
+    .replace(/([¿¡])\s+/g, "$1")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
 
   // 2. Normalizar guiones de diálogo para que empiecen en nueva línea
-  text = text.replace(/([.!?…»”"'])\s*([—–]\s*[A-ZÁÉÍÓÚÑa-záéíóúñ¿¡])/g, '$1\n\n$2');
-  text = text.replace(/\n\s*([—–]\s*)/g, '\n\n$1');
+  text = text.replace(
+    /([.!?…»”"'])\s*([—–]\s*[A-ZÁÉÍÓÚÑa-záéíóúñ¿¡])/g,
+    "$1\n\n$2",
+  );
+  text = text.replace(/\n\s*([—–]\s*)/g, "\n\n$1");
 
   // 3. Separar por párrafos preexistentes (si ya hay \n\n)
   const rawParagraphs = text.split(/\n\s*\n/);
@@ -75,8 +83,11 @@ export function formatNarrativeText(raw: string | undefined | null): string {
     if (!trimmed) continue;
 
     // Si el párrafo ya tiene saltos simples (\n), convertirlos a dobles si separan oraciones completas
-    if (trimmed.includes('\n')) {
-      const subLines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
+    if (trimmed.includes("\n")) {
+      const subLines = trimmed
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
       for (const line of subLines) {
         processLongBlock(line, formattedParagraphs);
       }
@@ -85,7 +96,7 @@ export function formatNarrativeText(raw: string | undefined | null): string {
     }
   }
 
-  return formattedParagraphs.join('\n\n');
+  return formattedParagraphs.join("\n\n");
 }
 
 /**
@@ -118,7 +129,7 @@ function processLongBlock(block: string, outputList: string[]): void {
     const remainder = block.slice(lastIndex).trim();
     if (remainder) {
       if (sentences.length > 0) {
-        sentences[sentences.length - 1] += ' ' + remainder;
+        sentences[sentences.length - 1] += " " + remainder;
       } else {
         sentences.push(remainder);
       }
@@ -141,7 +152,7 @@ function processLongBlock(block: string, outputList: string[]): void {
 
     // Si la oración es un diálogo y ya tenemos texto previo, cerrar el párrafo previo y empezar uno nuevo
     if (isDialogue && currentGroup.length > 0) {
-      outputList.push(currentGroup.join(' '));
+      outputList.push(currentGroup.join(" "));
       currentGroup = [s];
       currentLength = s.length;
       continue;
@@ -155,12 +166,16 @@ function processLongBlock(block: string, outputList: string[]): void {
     if (!isLastSentence) {
       const remainingSentences = sentences.length - (i + 1);
       // Evitar dejar una sola oración huérfana al final si podemos incluirla
-      if (currentGroup.length >= 2 && currentLength >= 220 && remainingSentences >= 2) {
-        outputList.push(currentGroup.join(' '));
+      if (
+        currentGroup.length >= 2 &&
+        currentLength >= 220 &&
+        remainingSentences >= 2
+      ) {
+        outputList.push(currentGroup.join(" "));
         currentGroup = [];
         currentLength = 0;
       } else if (currentGroup.length >= 3 && currentLength >= 280) {
-        outputList.push(currentGroup.join(' '));
+        outputList.push(currentGroup.join(" "));
         currentGroup = [];
         currentLength = 0;
       }
@@ -168,6 +183,6 @@ function processLongBlock(block: string, outputList: string[]): void {
   }
 
   if (currentGroup.length > 0) {
-    outputList.push(currentGroup.join(' '));
+    outputList.push(currentGroup.join(" "));
   }
 }

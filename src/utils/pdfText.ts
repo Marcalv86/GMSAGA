@@ -7,17 +7,21 @@
  * dependency loaded on demand, so it works offline and never blocks first paint.
  */
 export async function extractPdfText(data: ArrayBuffer): Promise<string> {
-  const pdfjs = await import('pdfjs-dist');
-  const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
+  const pdfjs = await import("pdfjs-dist");
+  const workerSrc = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url"))
+    .default;
   pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
   const pdf = await pdfjs.getDocument({ data }).promise;
-  let text = '';
+  let text = "";
   try {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const content = await page.getTextContent();
-      text += content.items.map((item: any) => ('str' in item ? item.str : '')).join(' ') + '\n';
+      text +=
+        content.items
+          .map((item: any) => ("str" in item ? item.str : ""))
+          .join(" ") + "\n";
     }
   } finally {
     await pdf.cleanup();

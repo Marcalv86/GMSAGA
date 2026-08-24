@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 export const YouTubePreview: React.FC<{ content: string }> = ({ content }) => {
   const urlRegex =
@@ -7,7 +7,7 @@ export const YouTubePreview: React.FC<{ content: string }> = ({ content }) => {
   if (!matches || matches.length === 0) return null;
 
   // Unique video IDs
-  const uniqueVideoIds = Array.from(new Set(matches.map(m => m[1])));
+  const uniqueVideoIds = Array.from(new Set(matches.map((m) => m[1])));
 
   return (
     <div className="flex flex-col gap-3 mt-3">

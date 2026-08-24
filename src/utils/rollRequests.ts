@@ -23,21 +23,26 @@ const ROLL_REQUEST_RE =
   /(?:\*{1,2})?\[\s*(?:petici[oó]n\s+de\s+(?:tirada|salvaci[oó]n)|tirada\s+requerida)\s*:\s*([^\]|,\-(]+?)(?:\s*(?:[|,:\-]|(?:con\s+)?\(?)\s*(?:cd|dc|dificultad)?\s*[:=]?\s*(\d{1,3})\)?)?\s*\](?:\*{1,2})?/gi;
 
 export function parseRollRequests(text: string): RollRequest[] {
-  if (!text || (!text.toLowerCase().includes('tirada') && !text.toLowerCase().includes('salvaci'))) return [];
+  if (
+    !text ||
+    (!text.toLowerCase().includes("tirada") &&
+      !text.toLowerCase().includes("salvaci"))
+  )
+    return [];
   const out: RollRequest[] = [];
   const seen = new Set<string>();
   ROLL_REQUEST_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = ROLL_REQUEST_RE.exec(text)) !== null) {
-    const skill = (match[1] || '').trim();
+    const skill = (match[1] || "").trim();
     if (!skill) continue;
-    const key = `${skill.toLowerCase()}|${match[2] || ''}`;
+    const key = `${skill.toLowerCase()}|${match[2] || ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({
       skill,
       dc: match[2] ? Number(match[2]) : undefined,
-      raw: match[0]
+      raw: match[0],
     });
   }
   return out;
@@ -48,10 +53,10 @@ export function stripRollRequests(text: string): string {
   if (!text) return text;
   ROLL_REQUEST_RE.lastIndex = 0;
   return text
-    .replace(ROLL_REQUEST_RE, '')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(ROLL_REQUEST_RE, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -61,20 +66,20 @@ export function stripRollRequests(text: string): string {
  * al pintar sale gratis y evita que se cuele cualquier etiqueta en mitad del relato.
  */
 export function stripStateTag(text: string): string {
-  if (!text) return '';
+  if (!text) return "";
   return text
-    .replace(/\[\s*ESTADO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*TIEMPO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*AGENDA\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*HILO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*PRESENTES\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*V[IÍ]NCULO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*AFINIDAD\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*CHAPTER\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*Pregunta\s+de\s+Mesa\s*:[^\]]*\]/gi, '')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\[\s*ESTADO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*TIEMPO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*AGENDA\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*HILO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*PRESENTES\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*V[IÍ]NCULO\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*AFINIDAD\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*CHAPTER\s*:[^\]]*\]/gi, "")
+    .replace(/\[\s*Pregunta\s+de\s+Mesa\s*:[^\]]*\]/gi, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -96,6 +101,6 @@ export function rollDie(sides: number): number {
  * ventaja o una condición encima.
  */
 export function formatRollResult(req: RollRequest, natural: number): string {
-  const dc = req.dc ? ` | CD ${req.dc}` : '';
+  const dc = req.dc ? ` | CD ${req.dc}` : "";
   return `[Tirada de ${req.skill}: d20 natural = ${natural}${dc}]`;
 }

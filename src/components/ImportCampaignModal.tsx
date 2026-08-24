@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from "react";
 import {
   FileText,
   Upload,
@@ -13,21 +13,24 @@ import {
   Compass,
   FileCode,
   RefreshCw,
-  FolderPlus
-} from 'lucide-react';
-import { Project } from '../types';
+  FolderPlus,
+} from "lucide-react";
+import { Project } from "../types";
 import {
   readRawFileText,
   importCampaignWithGemini,
-  ExtractedCampaignResult
-} from '../utils/campaignImporter';
-import { hasConfiguredApiKey } from '../utils/geminiHelper';
+  ExtractedCampaignResult,
+} from "../utils/campaignImporter";
+import { hasConfiguredApiKey } from "../utils/geminiHelper";
 
 interface ImportCampaignModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentProject: Project | null;
-  onConfirmImport: (extracted: ExtractedCampaignResult, mode: 'new' | 'merge') => Promise<void>;
+  onConfirmImport: (
+    extracted: ExtractedCampaignResult,
+    mode: "new" | "merge",
+  ) => Promise<void>;
   onImportNativeFile?: (file: File) => Promise<void>;
 }
 
@@ -36,33 +39,34 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
   onClose,
   currentProject,
   onConfirmImport,
-  onImportNativeFile
+  onImportNativeFile,
 }) => {
-  const [tab, setTab] = useState<'upload' | 'paste'>('upload');
-  const [pastedText, setPastedText] = useState('');
-  const [pastedTitle, setPastedTitle] = useState('');
+  const [tab, setTab] = useState<"upload" | "paste">("upload");
+  const [pastedText, setPastedText] = useState("");
+  const [pastedTitle, setPastedTitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStep, setProcessStep] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [extractedResult, setExtractedResult] = useState<ExtractedCampaignResult | null>(null);
+  const [extractedResult, setExtractedResult] =
+    useState<ExtractedCampaignResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Edit fields in preview
-  const [previewTitle, setPreviewTitle] = useState('');
-  const [previewCharName, setPreviewCharName] = useState('');
-  const [previewCharClass, setPreviewCharClass] = useState('');
+  const [previewTitle, setPreviewTitle] = useState("");
+  const [previewCharName, setPreviewCharName] = useState("");
+  const [previewCharClass, setPreviewCharClass] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -70,25 +74,28 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
   const handleProcessFile = async (file: File) => {
     setIsProcessing(true);
     setErrorMessage(null);
-    setProcessStep('Leyendo archivo y comprobando formato...');
+    setProcessStep("Leyendo archivo y comprobando formato...");
 
     try {
       const { text, isPdf, isJson } = await readRawFileText(file);
       if (!text || text.trim().length < 15) {
         throw new Error(
           isPdf
-            ? 'No se pudo extraer texto del PDF (puede estar escaneado o protegido).'
-            : 'El archivo está vacío o no contiene texto legible.'
+            ? "No se pudo extraer texto del PDF (puede estar escaneado o protegido)."
+            : "El archivo está vacío o no contiene texto legible.",
         );
       }
 
       // Comprobación inteligente de copia nativa de GM Studio
-      if (isJson || file.name.toLowerCase().endsWith('.json')) {
+      if (isJson || file.name.toLowerCase().endsWith(".json")) {
         try {
           const parsed = JSON.parse(text);
           if (
-            (parsed.name && (parsed.chats || parsed.memory || parsed.instructions !== undefined)) ||
-            (parsed.version === 'gmstudio_v2' && Array.isArray(parsed.projects))
+            (parsed.name &&
+              (parsed.chats ||
+                parsed.memory ||
+                parsed.instructions !== undefined)) ||
+            (parsed.version === "gmstudio_v2" && Array.isArray(parsed.projects))
           ) {
             if (onImportNativeFile) {
               await onImportNativeFile(file);
@@ -101,11 +108,11 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
         }
       }
 
-      setProcessStep('Extrayendo texto del documento...');
-      await runExtraction(text, file.name.replace(/\.[^/.]+$/, ''));
+      setProcessStep("Extrayendo texto del documento...");
+      await runExtraction(text, file.name.replace(/\.[^/.]+$/, ""));
     } catch (err: any) {
-      console.error('Error procesando archivo:', err);
-      setErrorMessage(err?.message || 'Error al procesar el archivo.');
+      console.error("Error procesando archivo:", err);
+      setErrorMessage(err?.message || "Error al procesar el archivo.");
     } finally {
       setIsProcessing(false);
       setProcessStep(null);
@@ -114,19 +121,21 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
 
   const handleProcessPastedText = async () => {
     if (!pastedText.trim() || pastedText.trim().length < 20) {
-      setErrorMessage('Por favor, pega el texto de tu chat o cuaderno de NotebookLM.');
+      setErrorMessage(
+        "Por favor, pega el texto de tu chat o cuaderno de NotebookLM.",
+      );
       return;
     }
 
     setIsProcessing(true);
     setErrorMessage(null);
-    setProcessStep('Procesando texto ingresado...');
+    setProcessStep("Procesando texto ingresado...");
 
     try {
       await runExtraction(pastedText, pastedTitle.trim() || undefined);
     } catch (err: any) {
-      console.error('Error procesando texto pegado:', err);
-      setErrorMessage(err?.message || 'Error al procesar el texto.');
+      console.error("Error procesando texto pegado:", err);
+      setErrorMessage(err?.message || "Error al procesar el texto.");
     } finally {
       setIsProcessing(false);
       setProcessStep(null);
@@ -136,19 +145,25 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
   const runExtraction = async (rawText: string, preferredTitle?: string) => {
     if (!hasConfiguredApiKey()) {
       throw new Error(
-        'Para importar y reconstruir la campaña debes configurar tu clave de API de Gemini en Ajustes de Motor (icono de deslizadores).'
+        "Para importar y reconstruir la campaña debes configurar tu clave de API de Gemini en Ajustes de Motor (icono de deslizadores).",
       );
     }
-    setProcessStep('Gemini IA analizando capítulos, protagonistas, PNJs, afinidad y misiones...');
+    setProcessStep(
+      "Gemini IA analizando capítulos, protagonistas, PNJs, afinidad y misiones...",
+    );
     const result = await importCampaignWithGemini(rawText, preferredTitle);
 
     setExtractedResult(result);
     setPreviewTitle(result.project.name);
-    setPreviewCharName(result.project.memory.player_character?.name || 'Protagonista');
-    setPreviewCharClass(result.project.memory.player_character?.class || 'Aventurero');
+    setPreviewCharName(
+      result.project.memory.player_character?.name || "Protagonista",
+    );
+    setPreviewCharClass(
+      result.project.memory.player_character?.class || "Aventurero",
+    );
   };
 
-  const handleConfirm = async (mode: 'new' | 'merge') => {
+  const handleConfirm = async (mode: "new" | "merge") => {
     if (!extractedResult) return;
     setIsSaving(true);
     try {
@@ -161,22 +176,28 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
           player_character: extractedResult.project.memory.player_character
             ? {
                 ...extractedResult.project.memory.player_character,
-                name: previewCharName.trim() || extractedResult.project.memory.player_character.name,
-                class: previewCharClass.trim() || extractedResult.project.memory.player_character.class
+                name:
+                  previewCharName.trim() ||
+                  extractedResult.project.memory.player_character.name,
+                class:
+                  previewCharClass.trim() ||
+                  extractedResult.project.memory.player_character.class,
               }
-            : undefined
-        }
+            : undefined,
+        },
       };
 
       const finalResult: ExtractedCampaignResult = {
         ...extractedResult,
-        project: updatedProject
+        project: updatedProject,
       };
 
       await onConfirmImport(finalResult, mode);
       onClose();
     } catch (err: any) {
-      setErrorMessage(err?.message || 'No se pudo guardar la campaña importada.');
+      setErrorMessage(
+        err?.message || "No se pudo guardar la campaña importada.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -185,7 +206,7 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
   return (
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[110] p-3 md:p-4 overflow-y-auto animate-[fadeIn_0.15s_ease]"
-      onClick={e => {
+      onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
@@ -204,7 +225,8 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                 </span>
               </h2>
               <p className="text-xs text-[var(--text-secondary)] m-0 font-lora">
-                Convierte PDFs de chats, cuadernos de NotebookLM o transcripciones en un Tomo vivo con ficha, PNJs y capítulos.
+                Convierte PDFs de chats, cuadernos de NotebookLM o
+                transcripciones en un Tomo vivo con ficha, PNJs y capítulos.
               </p>
             </div>
           </div>
@@ -223,7 +245,9 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
             <div className="p-3 bg-rose-500/15 border border-rose-500/30 rounded-lg flex items-start gap-2.5 text-xs text-rose-800 dark:text-rose-300">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
               <div className="flex-1">
-                <p className="font-bold font-cinzel m-0">Error en la importación</p>
+                <p className="font-bold font-cinzel m-0">
+                  Error en la importación
+                </p>
                 <p className="m-0 mt-0.5 leading-relaxed">{errorMessage}</p>
               </div>
             </div>
@@ -234,22 +258,22 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
               {/* Tabs: Subir Archivo vs Pegar Texto */}
               <div className="flex border-b border-[var(--user-border)] gap-2">
                 <button
-                  onClick={() => setTab('upload')}
+                  onClick={() => setTab("upload")}
                   className={`pb-2 px-3 text-xs font-cinzel font-bold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
-                    tab === 'upload'
-                      ? 'border-[var(--accent)] text-[var(--accent)]'
-                      : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    tab === "upload"
+                      ? "border-[var(--accent)] text-[var(--accent)]"
+                      : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
                   <span>Subir PDF / Documento</span>
                 </button>
                 <button
-                  onClick={() => setTab('paste')}
+                  onClick={() => setTab("paste")}
                   className={`pb-2 px-3 text-xs font-cinzel font-bold flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
-                    tab === 'paste'
-                      ? 'border-[var(--accent)] text-[var(--accent)]'
-                      : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    tab === "paste"
+                      ? "border-[var(--accent)] text-[var(--accent)]"
+                      : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                   }`}
                 >
                   <FileCode className="w-3.5 h-3.5" />
@@ -257,11 +281,11 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                 </button>
               </div>
 
-              {tab === 'upload' ? (
+              {tab === "upload" ? (
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => {
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
                     e.preventDefault();
                     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
                       void handleProcessFile(e.dataTransfer.files[0]);
@@ -277,26 +301,37 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                       Haz clic o arrastra aquí tu archivo
                     </p>
                     <p className="text-xs text-[var(--text-secondary)] m-0 mt-1 font-lora">
-                      Soporta PDFs descargados de <strong>Gemini</strong>, cuadernos de <strong>NotebookLM</strong>, archivos <strong>.MD</strong>, <strong>.TXT</strong> o <strong>.JSON</strong>.
+                      Soporta PDFs descargados de <strong>Gemini</strong>,
+                      cuadernos de <strong>NotebookLM</strong>, archivos{" "}
+                      <strong>.MD</strong>, <strong>.TXT</strong> o{" "}
+                      <strong>.JSON</strong>.
                     </p>
                   </div>
                   <input
                     type="file"
                     ref={fileInputRef}
                     accept=".pdf,.txt,.md,.markdown,.json,.gmstudio.json,application/json,application/pdf,text/*,*/*"
-                    onChange={e => {
+                    onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
                         void handleProcessFile(e.target.files[0]);
                       }
-                      e.target.value = '';
+                      e.target.value = "";
                     }}
                     className="hidden"
                   />
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-[10px] text-[var(--text-secondary)] font-mono">
-                    <span className="px-2 py-0.5 bg-[var(--surface)] border border-[var(--user-border)] rounded">.PDF</span>
-                    <span className="px-2 py-0.5 bg-[var(--surface)] border border-[var(--user-border)] rounded">.MD / Markdown</span>
-                    <span className="px-2 py-0.5 bg-[var(--surface)] border border-[var(--user-border)] rounded">.TXT</span>
-                    <span className="px-2 py-0.5 bg-[var(--surface)] border border-[var(--user-border)] rounded">.JSON</span>
+                    <span className="px-2 py-0.5 bg-[var(--surface)] border border-[var(--user-border)] rounded">
+                      .PDF
+                    </span>
+                    <span className="px-2 py-0.5 bg-[var(--surface)] border border-[var(--user-border)] rounded">
+                      .MD / Markdown
+                    </span>
+                    <span className="px-2 py-0.5 bg-[var(--surface)] border border-[var(--user-border)] rounded">
+                      .TXT
+                    </span>
+                    <span className="px-2 py-0.5 bg-[var(--surface)] border border-[var(--user-border)] rounded">
+                      .JSON
+                    </span>
                   </div>
                 </div>
               ) : (
@@ -308,7 +343,7 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                     <input
                       type="text"
                       value={pastedTitle}
-                      onChange={e => setPastedTitle(e.target.value)}
+                      onChange={(e) => setPastedTitle(e.target.value)}
                       placeholder="p. ej. Las Crónicas de Luskan, El Pozo de la Ruina..."
                       className="w-full p-2.5 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded-lg text-xs font-cinzel outline-none focus:border-[var(--accent)]"
                     />
@@ -319,7 +354,7 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                     </label>
                     <textarea
                       value={pastedText}
-                      onChange={e => setPastedText(e.target.value)}
+                      onChange={(e) => setPastedText(e.target.value)}
                       rows={10}
                       placeholder="Pega aquí la transcripción completa de tu partida de Gemini, notas de sesión, guía de estudio de NotebookLM o historia..."
                       className="w-full p-3 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded-lg text-xs font-mono outline-none focus:border-[var(--accent)] resize-y leading-relaxed"
@@ -350,7 +385,8 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                         Campaña Reconstruida con Éxito
                       </h3>
                       <p className="text-[11px] text-[var(--text-secondary)] m-0 font-lora">
-                        Revisa los datos extraídos antes de incorporar el Tomo a tu biblioteca.
+                        Revisa los datos extraídos antes de incorporar el Tomo a
+                        tu biblioteca.
                       </p>
                     </div>
                   </div>
@@ -372,7 +408,7 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                     <input
                       type="text"
                       value={previewTitle}
-                      onChange={e => setPreviewTitle(e.target.value)}
+                      onChange={(e) => setPreviewTitle(e.target.value)}
                       className="w-full p-2 bg-[var(--surface)] border border-[var(--accent)]/40 rounded text-xs font-cinzel font-bold text-[var(--accent)] outline-none"
                     />
                   </div>
@@ -385,14 +421,14 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                       <input
                         type="text"
                         value={previewCharName}
-                        onChange={e => setPreviewCharName(e.target.value)}
+                        onChange={(e) => setPreviewCharName(e.target.value)}
                         placeholder="Nombre"
                         className="w-1/2 p-2 bg-[var(--surface)] border border-[var(--accent)]/40 rounded text-xs font-cinzel font-semibold outline-none"
                       />
                       <input
                         type="text"
                         value={previewCharClass}
-                        onChange={e => setPreviewCharClass(e.target.value)}
+                        onChange={(e) => setPreviewCharClass(e.target.value)}
                         placeholder="Clase"
                         className="w-1/2 p-2 bg-[var(--surface)] border border-[var(--accent)]/40 rounded text-xs font-cinzel outline-none"
                       />
@@ -447,10 +483,11 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                 {extractedResult.project.memory.npcs.length > 0 && (
                   <div className="space-y-1.5 pt-1">
                     <label className="text-[11px] font-cinzel font-bold text-[var(--text-secondary)] uppercase tracking-wider block">
-                      Personajes Clave Detectados ({extractedResult.project.memory.npcs.length})
+                      Personajes Clave Detectados (
+                      {extractedResult.project.memory.npcs.length})
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
-                      {extractedResult.project.memory.npcs.map(npc => (
+                      {extractedResult.project.memory.npcs.map((npc) => (
                         <div
                           key={npc.id}
                           className="p-2 bg-[var(--surface)] border border-[var(--user-border)] rounded-lg text-xs flex flex-col justify-between gap-1"
@@ -460,19 +497,33 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                               {npc.name}
                             </span>
                             <span className="text-[10px] text-[var(--text-secondary)] font-lora italic shrink-0">
-                              {npc.relation || 'PNJ'}
+                              {npc.relation || "PNJ"}
                             </span>
                           </div>
-                          {(npc.atr !== undefined || npc.vin !== undefined || npc.con !== undefined) && (
+                          {(npc.atr !== undefined ||
+                            npc.vin !== undefined ||
+                            npc.con !== undefined) && (
                             <div className="flex items-center gap-2 text-[9px] font-mono font-bold pt-1 border-t border-[var(--user-border)]/50">
-                              <span className="text-rose-600 dark:text-rose-400 flex items-center gap-0.5" title="Atracción">
-                                <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" /> ATR: {npc.atr ?? 0}/20
+                              <span
+                                className="text-rose-600 dark:text-rose-400 flex items-center gap-0.5"
+                                title="Atracción"
+                              >
+                                <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />{" "}
+                                ATR: {npc.atr ?? 0}/20
                               </span>
-                              <span className="text-teal-600 dark:text-teal-400 flex items-center gap-0.5" title="Vínculo">
-                                <Sparkles className="w-2.5 h-2.5 text-teal-500" /> VÍN: {npc.vin ?? 0}/20
+                              <span
+                                className="text-teal-600 dark:text-teal-400 flex items-center gap-0.5"
+                                title="Vínculo"
+                              >
+                                <Sparkles className="w-2.5 h-2.5 text-teal-500" />{" "}
+                                VÍN: {npc.vin ?? 0}/20
                               </span>
-                              <span className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5" title="Confianza">
-                                <Shield className="w-2.5 h-2.5 text-amber-500" /> CON: {npc.con ?? 0}/20
+                              <span
+                                className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5"
+                                title="Confianza"
+                              >
+                                <Shield className="w-2.5 h-2.5 text-amber-500" />{" "}
+                                CON: {npc.con ?? 0}/20
                               </span>
                             </div>
                           )}
@@ -508,7 +559,7 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                 {currentProject && (
                   <button
                     type="button"
-                    onClick={() => handleConfirm('merge')}
+                    onClick={() => handleConfirm("merge")}
                     disabled={isSaving}
                     className="px-4 py-2.5 bg-[color-mix(in_srgb,var(--accent)_15%,var(--surface))] text-[var(--accent)] border border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_25%,var(--surface))] rounded-lg font-cinzel font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
                   >
@@ -519,7 +570,7 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => handleConfirm('new')}
+                  onClick={() => handleConfirm("new")}
                   disabled={isSaving}
                   className="px-5 py-2.5 bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 rounded-lg font-cinzel font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
                 >
@@ -535,10 +586,11 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
             <div className="p-8 text-center space-y-3 bg-[var(--surface)] rounded-xl border border-[var(--accent)]/40 shadow-inner">
               <div className="w-8 h-8 border-3 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto" />
               <p className="font-cinzel text-sm font-bold text-[var(--accent)] m-0">
-                {processStep || 'Procesando campaña...'}
+                {processStep || "Procesando campaña..."}
               </p>
               <p className="text-xs text-[var(--text-secondary)] font-lora m-0 max-w-md mx-auto">
-                Extrayendo estructura narrativa, personajes, trasfondo y diálogos para dejarlos listos en tu biblioteca.
+                Extrayendo estructura narrativa, personajes, trasfondo y
+                diálogos para dejarlos listos en tu biblioteca.
               </p>
             </div>
           )}

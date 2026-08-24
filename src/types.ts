@@ -61,7 +61,8 @@ export interface TimelineEntry {
   /** Minutos desde medianoche, para saber a qué hora ocurrió. */
   minute?: number;
   /** Categoría especial de la entrada (noticia del mundo, rumor, inconsciencia, etc.) */
-  tipo?: 'acontecimiento' | 'noticia' | 'rumor' | 'inconsciencia' | 'salto_temporal';
+  tipo?:
+    "acontecimiento" | "noticia" | "rumor" | "inconsciencia" | "salto_temporal";
   /** Si representa o abarca un salto temporal de múltiples días */
   timeSkipDays?: number;
 }
@@ -76,9 +77,9 @@ export interface ScheduledThread {
   dueDate: string;
   /** Si es secreto, la jugadora ve que hay algo en marcha pero no el qué. */
   hidden: boolean;
-  status: 'pending' | 'fired' | 'cancelled';
+  status: "pending" | "fired" | "cancelled";
   /** De dónde salió: el Narrador o la jugadora. */
-  origin?: 'narrador' | 'jugadora';
+  origin?: "narrador" | "jugadora";
 }
 
 export interface CombatStatus {
@@ -109,14 +110,29 @@ export interface VisualMemoryItem {
 export interface InventoryItem {
   id: string;
   name: string;
-  category?: 'weapon' | 'armor' | 'potion' | 'scroll' | 'magic' | 'equipment' | 'treasure' | 'other';
+  category?:
+    | "weapon"
+    | "armor"
+    | "potion"
+    | "scroll"
+    | "magic"
+    | "equipment"
+    | "treasure"
+    | "other";
   quantity: number;
   weight?: number; // lbs
   equipped?: boolean;
   attuned?: boolean;
   description?: string;
   damageOrAc?: string; // e.g. "1d8+3 cortante" or "+2 CA"
-  rarity?: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact' | string;
+  rarity?:
+    | "common"
+    | "uncommon"
+    | "rare"
+    | "very_rare"
+    | "legendary"
+    | "artifact"
+    | string;
   cost?: string;
   expiresInMinutes?: number;
   durationNote?: string;
@@ -141,7 +157,7 @@ export interface PlayerCurrencies {
 
 export interface PlayerDeathSaves {
   successes: number; // 0-3
-  failures: number;  // 0-3
+  failures: number; // 0-3
 }
 
 export interface CharacterSpell {
@@ -160,27 +176,28 @@ export interface CharacterSpell {
 
 export interface CharacterAction {
   name: string;
-  type?: 'attack' | 'action' | 'bonus' | 'reaction' | 'legendary' | 'special';
+  type?: "attack" | "action" | "bonus" | "reaction" | "legendary" | "special";
   damageOrEffect?: string;
   description: string;
 }
 
 export interface CharacterTrait {
   name: string;
-  type?: 'feature' | 'feat' | 'race' | 'class' | 'background' | 'other';
+  type?: "feature" | "feat" | "race" | "class" | "background" | "other";
   source?: string; // ej: "Dote: Afortunado", "Druida: Forma Salvaje"
   description: string;
   uses?: {
     max: number;
     current: number;
-    recovery?: 'short_rest' | 'long_rest' | 'dawn';
+    recovery?: "short_rest" | "long_rest" | "dawn";
   };
 }
 
 export interface PlayerCharacter {
   id?: string;
   name: string;
-  characterType?: 'pc' | 'companion' | 'familiar' | 'mount' | 'sidekick' | 'npc';
+  characterType?:
+    "pc" | "companion" | "familiar" | "mount" | "sidekick" | "npc";
   companionType?: string; // 'Familiar' | 'Montura' | 'Compañero Animal' | 'Invocación' | 'Aliado'
   ownerName?: string;
   race?: string;
@@ -315,21 +332,21 @@ export interface MapMarker {
 }
 
 export type FileCategory =
-  | 'map'
-  | 'portrait_pj'
-  | 'sheet_pj'
-  | 'sheet_companion'
-  | 'sheet_npc'
-  | 'portrait_companion'
-  | 'portrait_npc'
-  | 'scene'
-  | 'document'
-  | 'style_sample'
-  | 'oracle'
-  | 'roster'
-  | 'index'
-  | 'audio'
-  | 'other';
+  | "map"
+  | "portrait_pj"
+  | "sheet_pj"
+  | "sheet_companion"
+  | "sheet_npc"
+  | "portrait_companion"
+  | "portrait_npc"
+  | "scene"
+  | "document"
+  | "style_sample"
+  | "oracle"
+  | "roster"
+  | "index"
+  | "audio"
+  | "other";
 
 export interface ProjectFile {
   id: string;
@@ -360,7 +377,7 @@ export interface Chat {
 }
 
 export interface Message {
-  role: 'user' | 'model';
+  role: "user" | "model";
   content: string;
   timestamp?: string;
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from "react";
 import {
   BookOpen,
   Check,
@@ -20,8 +20,8 @@ import {
   Trash2,
   TriangleAlert,
   Upload,
-  X
-} from 'lucide-react';
+  X,
+} from "lucide-react";
 import {
   Project,
   Chat,
@@ -31,25 +31,31 @@ import {
   MapMarker,
   VisualMemoryItem,
   NPC,
-  ScheduledThread
-} from './types';
-import { ChatView } from './components/ChatView';
-import { ContextUsageWidget } from './components/ContextUsageWidget';
-import { CombatHud } from './components/CombatHud';
-import { Modals, PromptConfig, ConfirmConfig, AlertConfig, ApiKeyModal } from './components/Modals';
+  ScheduledThread,
+} from "./types";
+import { ChatView } from "./components/ChatView";
+import { ContextUsageWidget } from "./components/ContextUsageWidget";
+import { CombatHud } from "./components/CombatHud";
+import {
+  Modals,
+  PromptConfig,
+  ConfirmConfig,
+  AlertConfig,
+  ApiKeyModal,
+} from "./components/Modals";
 
-import { MemoryManager } from './components/MemoryManager';
-import { StatusView } from './components/StatusView';
-import { FilesView } from './components/FilesView';
-import { InstructionsView } from './components/InstructionsView';
-import { NovelReaderView } from './components/NovelReaderView';
-import { MapViewer } from './components/MapViewer';
-import { CalendarView } from './components/CalendarView';
-import { InstallAppModal } from './components/InstallAppModal';
-import { LocalStorageModal } from './components/LocalStorageModal';
-import { ImportCampaignModal } from './components/ImportCampaignModal';
-import { ExtractedCampaignResult } from './utils/campaignImporter';
-import { writeCampaignToDisk } from './utils/diskBackup';
+import { MemoryManager } from "./components/MemoryManager";
+import { StatusView } from "./components/StatusView";
+import { FilesView } from "./components/FilesView";
+import { InstructionsView } from "./components/InstructionsView";
+import { NovelReaderView } from "./components/NovelReaderView";
+import { MapViewer } from "./components/MapViewer";
+import { CalendarView } from "./components/CalendarView";
+import { InstallAppModal } from "./components/InstallAppModal";
+import { LocalStorageModal } from "./components/LocalStorageModal";
+import { ImportCampaignModal } from "./components/ImportCampaignModal";
+import { ExtractedCampaignResult } from "./utils/campaignImporter";
+import { writeCampaignToDisk } from "./utils/diskBackup";
 import {
   saveFilesToDB,
   loadFilesFromDB,
@@ -62,8 +68,8 @@ import {
   sanitizeProjectsForLocalStorage,
   optimizeImageFile,
   requestPersistentStorage,
-  getStorageEstimate
-} from './utils/fileStorage';
+  getStorageEstimate,
+} from "./utils/fileStorage";
 import {
   generateStoryTurnStream,
   TiempoReportado,
@@ -92,12 +98,23 @@ import {
   setStoredTopP,
   setStoredAutoFailover,
   setStoredKeyRotationMode,
-  setStoredMemorySyncGranularity
-} from './utils/geminiHelper';
-import { applyInventoryReport, expireTemporaryItems } from './utils/inventoryParser';
-import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
-import { RollRequest, rollDie, formatRollResult } from './utils/rollRequests';
-import { Probabilidad, formatoConsulta, formatoSignificado, nuevaConsulta } from './utils/oracle';
+} from "./utils/geminiHelper";
+import {
+  applyInventoryReport,
+  expireTemporaryItems,
+} from "./utils/inventoryParser";
+import {
+  DEFAULT_DM_INSTRUCTIONS,
+  DEFAULT_SYSTEM,
+  DEFAULT_STYLE,
+} from "./utils/defaultDirectives";
+import { RollRequest, rollDie, formatRollResult } from "./utils/rollRequests";
+import {
+  Probabilidad,
+  formatoConsulta,
+  formatoSignificado,
+  nuevaConsulta,
+} from "./utils/oracle";
 import {
   aDiaAbsoluto,
   avanzar,
@@ -106,10 +123,10 @@ import {
   desdeDiaAbsoluto,
   fechaCompleta,
   fechaLegible,
-  obtenerInfoRelacion
-} from './utils/campaignCalendar';
-import { actualizarAfinidadNpc } from './utils/affinityProgression';
-import { coincidenNombresNpc, deduplicarListaNpcs } from './utils/npcMatcher';
+  obtenerInfoRelacion,
+} from "./utils/campaignCalendar";
+import { actualizarAfinidadNpc } from "./utils/affinityProgression";
+import { coincidenNombresNpc, deduplicarListaNpcs } from "./utils/npcMatcher";
 
 const ViewLoader = () => (
   <div className="flex-1 flex items-center justify-center p-10 text-[var(--text-secondary)] font-cinzel text-sm italic gap-2">
@@ -118,8 +135,8 @@ const ViewLoader = () => (
   </div>
 );
 
-const LOCAL_PROJECTS_KEY = 'gmstudio_local_projects';
-const LOCAL_CHATS_PREFIX = 'gmstudio_local_chats_';
+const LOCAL_PROJECTS_KEY = "gmstudio_local_projects";
+const LOCAL_CHATS_PREFIX = "gmstudio_local_chats_";
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -129,9 +146,15 @@ export default function App() {
   const [currentFiles, setCurrentFiles] = useState<ProjectFile[]>([]);
 
   const [activeTab, setActiveTab] = useState<
-    'chat' | 'novel' | 'instructions' | 'files' | 'status' | 'memory' | 'calendar'
-  >('chat');
-  const [inputText, setInputText] = useState('');
+    | "chat"
+    | "novel"
+    | "instructions"
+    | "files"
+    | "status"
+    | "memory"
+    | "calendar"
+  >("chat");
+  const [inputText, setInputText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   // Controlador de la generación en curso, para poder detenerla desde la interfaz.
   const generationAbortRef = useRef<AbortController | null>(null);
@@ -140,37 +163,44 @@ export default function App() {
   // sincronización de memoria, exportar a PDF).
   const [isStreamingTurn, setIsStreamingTurn] = useState(false);
   // Indicador sutil de sincronización de memoria en segundo plano sin congelar la app
-  const [isBackgroundSyncingMemory, setIsBackgroundSyncingMemory] = useState(false);
+  const [isBackgroundSyncingMemory, setIsBackgroundSyncingMemory] =
+    useState(false);
   // IDs de archivos que están siendo procesados / extraídos en segundo plano
   const [extractingFileIds, setExtractingFileIds] = useState<string[]>([]);
 
   // Tema. Se aplica en <html> para que las variables de color valgan para todo.
-  const [theme, setTheme] = useState<'light' | 'dark'>(
-    () => (localStorage.getItem('gmstudio_theme') as 'light' | 'dark') || 'light'
+  const [theme, setTheme] = useState<"light" | "dark">(
+    () =>
+      (localStorage.getItem("gmstudio_theme") as "light" | "dark") || "light",
   );
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem('gmstudio_theme', theme);
+    localStorage.setItem("gmstudio_theme", theme);
   }, [theme]);
-  const [loadingText, setLoadingText] = useState('');
+  const [loadingText, setLoadingText] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [selectedMapFile, setSelectedMapFile] = useState<ProjectFile | null>(null);
+  const [selectedMapFile, setSelectedMapFile] = useState<ProjectFile | null>(
+    null,
+  );
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   // Modals state
   const [promptConfig, setPromptConfig] = useState<PromptConfig | null>(null);
-  const [confirmConfig, setConfirmConfig] = useState<ConfirmConfig | null>(null);
+  const [confirmConfig, setConfirmConfig] = useState<ConfirmConfig | null>(
+    null,
+  );
   const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null);
-  const [promptValue, setPromptValue] = useState('');
+  const [promptValue, setPromptValue] = useState("");
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isLocalStorageModalOpen, setIsLocalStorageModalOpen] = useState(false);
-  const [isImportCampaignModalOpen, setIsImportCampaignModalOpen] = useState(false);
+  const [isImportCampaignModalOpen, setIsImportCampaignModalOpen] =
+    useState(false);
   const [topProgress, setTopProgress] = useState<{
     active: boolean;
     percent?: number;
     label?: string;
-    type?: 'upload' | 'sync' | 'analysis' | 'general';
+    type?: "upload" | "sync" | "analysis" | "general";
   }>({ active: false });
 
   // Protección del almacenamiento: sin esto el navegador puede borrar la campaña
@@ -188,17 +218,20 @@ export default function App() {
         await saveFilesToDB(currentPId, currentFiles);
       }
       if (currentProject) {
-        await writeCampaignToDisk(currentProject, currentChats, currentFiles).catch(() => {});
+        await writeCampaignToDisk(
+          currentProject,
+          currentChats,
+          currentFiles,
+        ).catch(() => {});
       }
       setIsManuallySaved(true);
       setTimeout(() => {
         setIsManuallySaved(false);
       }, 2500);
     } catch (e) {
-      console.error('Error al guardar manualmente la campaña:', e);
+      console.error("Error al guardar manualmente la campaña:", e);
     }
   };
-
 
   useEffect(() => {
     let cancelled = false;
@@ -207,14 +240,15 @@ export default function App() {
       const estimate = await getStorageEstimate();
       if (cancelled) return;
 
-      const nearlyFull = estimate && estimate.quota > 0 && estimate.usage / estimate.quota > 0.8;
+      const nearlyFull =
+        estimate && estimate.quota > 0 && estimate.usage / estimate.quota > 0.8;
       if (nearlyFull) {
         setStorageWarning(
-          'Te queda poco espacio de almacenamiento en el navegador. Exporta la campaña a JSON desde el menú lateral antes de seguir subiendo imágenes.'
+          "Te queda poco espacio de almacenamiento en el navegador. Exporta la campaña a JSON desde el menú lateral antes de seguir subiendo imágenes.",
         );
       } else if (supported && !persisted) {
         setStorageWarning(
-          'El navegador no ha garantizado el almacenamiento de esta app, así que podría borrar la campaña si se queda sin espacio. Instálala como aplicación, o exporta tu campaña a JSON de vez en cuando.'
+          "El navegador no ha garantizado el almacenamiento de esta app, así que podría borrar la campaña si se queda sin espacio. Instálala como aplicación, o exporta tu campaña a JSON de vez en cuando.",
         );
       }
     })();
@@ -226,7 +260,7 @@ export default function App() {
   // PWA Install Event Listener & Responsive Initializer
   useEffect(() => {
     // Auto-close sidebar on mobile initially
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }
 
@@ -235,9 +269,9 @@ export default function App() {
       setDeferredPrompt(e);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
     };
   }, []);
 
@@ -253,8 +287,8 @@ export default function App() {
 
   const saveLocalProjects = (projs: Project[]) => {
     // 1. Always save full project data (including all fields) to IndexedDB
-    saveProjectsToDB(projs).catch(err =>
-      console.error('No se pudieron guardar los tomos en IndexedDB:', err)
+    saveProjectsToDB(projs).catch((err) =>
+      console.error("No se pudieron guardar los tomos en IndexedDB:", err),
     );
 
     // 2. Save lightweight sanitized version to localStorage
@@ -262,7 +296,10 @@ export default function App() {
       const sanitized = sanitizeProjectsForLocalStorage(projs);
       localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(sanitized));
     } catch (e) {
-      console.warn('LocalStorage quota warning (saved safely in IndexedDB):', e);
+      console.warn(
+        "LocalStorage quota warning (saved safely in IndexedDB):",
+        e,
+      );
       // In case of quota limit, purge any obsolete cache keys
       cleanupLocalStorageQuota();
     }
@@ -279,15 +316,18 @@ export default function App() {
 
   const saveLocalChats = (pId: string, chs: Chat[]) => {
     // 1. Save to IndexedDB
-    saveChatsToDB(pId, chs).catch(err =>
-      console.error('No se pudieron guardar los capítulos en IndexedDB:', err)
+    saveChatsToDB(pId, chs).catch((err) =>
+      console.error("No se pudieron guardar los capítulos en IndexedDB:", err),
     );
 
     // 2. Save to localStorage
     try {
       localStorage.setItem(`${LOCAL_CHATS_PREFIX}${pId}`, JSON.stringify(chs));
     } catch (e) {
-      console.warn('LocalStorage quota warning for chats (saved in IndexedDB):', e);
+      console.warn(
+        "LocalStorage quota warning for chats (saved in IndexedDB):",
+        e,
+      );
       cleanupLocalStorageQuota();
     }
   };
@@ -299,74 +339,91 @@ export default function App() {
     const initProjects = async () => {
       // Try loading from IndexedDB first
       let dbProjects = await loadProjectsFromDB();
-      let projs = dbProjects && dbProjects.length > 0 ? dbProjects : getLocalProjects();
+      let projs =
+        dbProjects && dbProjects.length > 0 ? dbProjects : getLocalProjects();
 
       if (!projs || projs.length === 0) {
-        const defaultProjId = 'tomo_' + Date.now();
+        const defaultProjId = "tomo_" + Date.now();
         const starterProject: Project = {
           id: defaultProjId,
-          name: 'Nueva Campaña',
+          name: "Nueva Campaña",
           instructions: DEFAULT_DM_INSTRUCTIONS,
           system: DEFAULT_SYSTEM,
           style: DEFAULT_STYLE,
           memory: {
-            story: '',
+            story: "",
             quests: [],
             npcs: [],
             locations: [],
-            current_status: '',
-            manual_notes: ''
+            current_status: "",
+            manual_notes: "",
           },
           chats: [],
-          files: []
+          files: [],
         };
 
         projs = [starterProject];
         saveLocalProjects(projs);
 
-        const defaultChatId = 'cap_' + Date.now();
+        const defaultChatId = "cap_" + Date.now();
         const starterChat: Chat = {
           id: defaultChatId,
-          name: 'Capítulo I: El Comienzo',
-          messages: []
+          name: "Capítulo I: El Comienzo",
+          messages: [],
         };
         saveLocalChats(defaultProjId, [starterChat]);
       } else {
         // Sanitize legacy starter placeholder content if detected from previous versions
         let modified = false;
-        projs = projs.map(p => {
+        projs = projs.map((p) => {
           const hasLegacyDummy =
-            p.name === 'Crónica del Destino' ||
-            p.memory?.npcs?.some(n => n.name === 'Eldrin el Sabio') ||
-            p.memory?.locations?.some(l => l.name === 'La Posada del Cuervo Gris') ||
-            p.memory?.quests?.some(q => q.title === 'El Misterio del Tomo Ancestral');
+            p.name === "Crónica del Destino" ||
+            p.memory?.npcs?.some((n) => n.name === "Eldrin el Sabio") ||
+            p.memory?.locations?.some(
+              (l) => l.name === "La Posada del Cuervo Gris",
+            ) ||
+            p.memory?.quests?.some(
+              (q) => q.title === "El Misterio del Tomo Ancestral",
+            );
 
           if (hasLegacyDummy) {
             modified = true;
             // Clean legacy dummy chats for this project as well
             const existingChats = getLocalChats(p.id);
-            const cleanedChats = existingChats.map(c => ({
+            const cleanedChats = existingChats.map((c) => ({
               ...c,
               messages: c.messages.filter(
-                m => !m.content.includes('Posada del Cuervo Gris') && !m.content.includes('Eldrin el Sabio')
-              )
+                (m) =>
+                  !m.content.includes("Posada del Cuervo Gris") &&
+                  !m.content.includes("Eldrin el Sabio"),
+              ),
             }));
             saveLocalChats(p.id, cleanedChats);
 
             return {
               ...p,
-              name: p.name === 'Crónica del Destino' ? 'Nueva Campaña' : p.name,
+              name: p.name === "Crónica del Destino" ? "Nueva Campaña" : p.name,
               memory: {
                 ...p.memory,
-                story: p.memory?.story?.includes('Posada del Cuervo Gris') ? '' : p.memory?.story || '',
-                current_status: p.memory?.current_status?.includes('Posada')
-                  ? ''
-                  : p.memory?.current_status || '',
-                quests: (p.memory?.quests || []).filter(q => q.title !== 'El Misterio del Tomo Ancestral'),
-                npcs: (p.memory?.npcs || []).filter(n => n.name !== 'Eldrin el Sabio'),
-                locations: (p.memory?.locations || []).filter(l => l.name !== 'La Posada del Cuervo Gris'),
-                manual_notes: p.memory?.manual_notes?.includes('Posada') ? '' : p.memory?.manual_notes || ''
-              }
+                story: p.memory?.story?.includes("Posada del Cuervo Gris")
+                  ? ""
+                  : p.memory?.story || "",
+                current_status: p.memory?.current_status?.includes("Posada")
+                  ? ""
+                  : p.memory?.current_status || "",
+                quests: (p.memory?.quests || []).filter(
+                  (q) => q.title !== "El Misterio del Tomo Ancestral",
+                ),
+                npcs: (p.memory?.npcs || []).filter(
+                  (n) => n.name !== "Eldrin el Sabio",
+                ),
+                locations: (p.memory?.locations || []).filter(
+                  (l) => l.name !== "La Posada del Cuervo Gris",
+                ),
+                manual_notes: p.memory?.manual_notes?.includes("Posada")
+                  ? ""
+                  : p.memory?.manual_notes || "",
+              },
             };
           }
 
@@ -379,8 +436,8 @@ export default function App() {
                 ...p,
                 memory: {
                   ...p.memory,
-                  npcs: limpios
-                }
+                  npcs: limpios,
+                },
               };
             }
           }
@@ -413,16 +470,17 @@ export default function App() {
     let isCancelled = false;
     const fetchChats = async () => {
       const dbChats = await loadChatsFromDB(currentPId);
-      let chs = dbChats && dbChats.length > 0 ? dbChats : getLocalChats(currentPId);
+      let chs =
+        dbChats && dbChats.length > 0 ? dbChats : getLocalChats(currentPId);
 
       if (chs.length === 0) {
-        const defaultChatId = 'cap_' + Date.now();
+        const defaultChatId = "cap_" + Date.now();
         chs = [
           {
             id: defaultChatId,
-            name: 'Capítulo I: El Comienzo',
-            messages: []
-          }
+            name: "Capítulo I: El Comienzo",
+            messages: [],
+          },
         ];
         saveLocalChats(currentPId, chs);
       }
@@ -430,7 +488,10 @@ export default function App() {
       if (!isCancelled) {
         chs.sort((a, b) => a.id.localeCompare(b.id));
         setCurrentChats(chs);
-        if (chs.length > 0 && (!currentChatId || !chs.some(c => c.id === currentChatId))) {
+        if (
+          chs.length > 0 &&
+          (!currentChatId || !chs.some((c) => c.id === currentChatId))
+        ) {
           setCurrentChatId(chs[0].id);
         }
       }
@@ -449,7 +510,7 @@ export default function App() {
       return;
     }
     let isCancelled = false;
-    loadFilesFromDB(currentPId).then(fls => {
+    loadFilesFromDB(currentPId).then((fls) => {
       if (!isCancelled) {
         setCurrentFiles(fls);
       }
@@ -459,27 +520,27 @@ export default function App() {
     };
   }, [currentPId]);
 
-  const currentProject = projects.find(p => p.id === currentPId);
-  const currentChat = currentChats.find(c => c.id === currentChatId);
+  const currentProject = projects.find((p) => p.id === currentPId);
+  const currentChat = currentChats.find((c) => c.id === currentChatId);
 
   // Sync selectedMapFile with live data
   useEffect(() => {
     if (selectedMapFile) {
-      const updated = currentFiles.find(f => f.id === selectedMapFile.id);
+      const updated = currentFiles.find((f) => f.id === selectedMapFile.id);
       if (updated) setSelectedMapFile(updated);
     }
   }, [currentFiles]);
 
   // Project Management
   const handleCreateProject = () => {
-    setPromptValue('');
+    setPromptValue("");
     setPromptConfig({
       isOpen: true,
-      title: 'Nuevo Tomo / Campaña',
-      defaultValue: '',
-      onConfirm: name => {
+      title: "Nuevo Tomo / Campaña",
+      defaultValue: "",
+      onConfirm: (name) => {
         if (!name.trim()) return;
-        const newProjId = 'tomo_' + Date.now();
+        const newProjId = "tomo_" + Date.now();
         const newProj: Project = {
           id: newProjId,
           name: name.trim(),
@@ -487,40 +548,41 @@ export default function App() {
           system: DEFAULT_SYSTEM,
           style: DEFAULT_STYLE,
           memory: {
-            story: '',
+            story: "",
             quests: [],
             npcs: [],
             locations: [],
-            current_status: '',
-            manual_notes: ''
+            current_status: "",
+            manual_notes: "",
           },
           chats: [],
-          files: []
+          files: [],
         };
 
         const updated = [...projects, newProj];
         setProjects(updated);
         saveLocalProjects(updated);
 
-        const firstChatId = 'cap_' + Date.now();
+        const firstChatId = "cap_" + Date.now();
         const firstChat: Chat = {
           id: firstChatId,
-          name: 'Capítulo I: El Comienzo',
-          messages: []
+          name: "Capítulo I: El Comienzo",
+          messages: [],
         };
         saveLocalChats(newProjId, [firstChat]);
         setCurrentPId(newProjId);
         setCurrentChatId(firstChatId);
-      }
+      },
     });
   };
 
   const handleDeleteProject = (projectId: string) => {
     setConfirmConfig({
       isOpen: true,
-      message: '¿Estás seguro de que deseas eliminar este Tomo y todos sus capítulos y archivos?',
+      message:
+        "¿Estás seguro de que deseas eliminar este Tomo y todos sus capítulos y archivos?",
       onConfirm: async () => {
-        const remaining = projects.filter(p => p.id !== projectId);
+        const remaining = projects.filter((p) => p.id !== projectId);
         setProjects(remaining);
         saveLocalProjects(remaining);
         localStorage.removeItem(`${LOCAL_CHATS_PREFIX}${projectId}`);
@@ -534,7 +596,7 @@ export default function App() {
             setCurrentChatId(null);
           }
         }
-      }
+      },
     });
   };
 
@@ -550,9 +612,12 @@ export default function App() {
   // por parámetro a través de dos capas.
   const reporteActual = useRef<TiempoReportado | null>(null);
 
-  const handleTimeReported = async (t: TiempoReportado, msgInfo?: { msgId?: string; msgIndex?: number }) => {
+  const handleTimeReported = async (
+    t: TiempoReportado,
+    msgInfo?: { msgId?: string; msgIndex?: number },
+  ) => {
     reporteActual.current = t;
-    await handleUpdateProjectField(p => {
+    await handleUpdateProjectField((p) => {
       const cal = p.calendar;
       const fecha = p.currentDate;
 
@@ -561,13 +626,16 @@ export default function App() {
       if (!calendarioValido(cal) || !fecha) {
         let mem = conVinculos(p, 0);
         if (t.minutos > 0 && mem?.player_character?.inventory?.length) {
-          const { updatedInventory } = expireTemporaryItems(mem.player_character.inventory, t.minutos);
+          const { updatedInventory } = expireTemporaryItems(
+            mem.player_character.inventory,
+            t.minutos,
+          );
           mem = {
             ...mem,
             player_character: {
               ...mem.player_character,
-              inventory: updatedInventory
-            }
+              inventory: updatedInventory,
+            },
           };
         }
         return { memory: mem };
@@ -575,11 +643,14 @@ export default function App() {
 
       const hoyAbs = aDiaAbsoluto(cal, fecha);
 
-      let threads: ScheduledThread[] = (p.threads || []).map(h =>
-        h.status === 'pending' && h.dueAbsDay <= hoyAbs ? { ...h, status: 'fired' as const } : h
+      let threads: ScheduledThread[] = (p.threads || []).map((h) =>
+        h.status === "pending" && h.dueAbsDay <= hoyAbs
+          ? { ...h, status: "fired" as const }
+          : h,
       );
 
-      const nuevaFecha = t.minutos > 0 ? avanzar(cal, fecha, { minutos: t.minutos }) : fecha;
+      const nuevaFecha =
+        t.minutos > 0 ? avanzar(cal, fecha, { minutos: t.minutos }) : fecha;
       const nuevoAbs = aDiaAbsoluto(cal, nuevaFecha);
       const diasDeDiferencia = nuevoAbs - hoyAbs;
 
@@ -595,10 +666,10 @@ export default function App() {
               dueAbsDay: vence,
               dueDate: fechaLegible(cal, desdeDiaAbsoluto(cal, vence)),
               hidden: h.hidden,
-              status: 'pending' as const,
-              origin: 'narrador' as const
+              status: "pending" as const,
+              origin: "narrador" as const,
             };
-          })
+          }),
         ];
       }
 
@@ -613,8 +684,8 @@ export default function App() {
             entryAbsDay === hoyAbs
               ? fecha
               : entryAbsDay === nuevoAbs
-              ? nuevaFecha
-              : desdeDiaAbsoluto(cal, entryAbsDay);
+                ? nuevaFecha
+                : desdeDiaAbsoluto(cal, entryAbsDay);
 
           return {
             id: `dia_${entryAbsDay}_${i}_${Math.random().toString(36).slice(2, 7)}`,
@@ -629,20 +700,23 @@ export default function App() {
             timeSkipDays: diasDeDiferencia >= 2 ? diasDeDiferencia : undefined,
             chatId: currentChatId || undefined,
             msgId: msgInfo?.msgId,
-            msgIndex: msgInfo?.msgIndex
+            msgIndex: msgInfo?.msgIndex,
           };
-        })
+        }),
       ].slice(-500);
 
       let mem = conVinculos(p, hoyAbs);
       if (t.minutos > 0 && mem?.player_character?.inventory?.length) {
-        const { updatedInventory } = expireTemporaryItems(mem.player_character.inventory, t.minutos);
+        const { updatedInventory } = expireTemporaryItems(
+          mem.player_character.inventory,
+          t.minutos,
+        );
         mem = {
           ...mem,
           player_character: {
             ...mem.player_character,
-            inventory: updatedInventory
-          }
+            inventory: updatedInventory,
+          },
         };
       }
 
@@ -658,17 +732,17 @@ export default function App() {
    * le ha visto y al tercero deja de ser un extra. Es lo que separa al tabernero
    * de turno de alguien con quien te tomas una copa cada tarde.
    */
-  const conVinculos = (p: Project, diaActual: number): Project['memory'] => {
+  const conVinculos = (p: Project, diaActual: number): Project["memory"] => {
     const t = reporteActual.current;
     if (!t || (!t.presentes.length && !t.vinculos.length)) return p.memory;
 
     const mem = p.memory || {
-      story: '',
+      story: "",
       quests: [],
       npcs: [],
       locations: [],
-      current_status: '',
-      manual_notes: ''
+      current_status: "",
+      manual_notes: "",
     };
 
     // Sin calendario no hay días, así que se cuenta por escenas narradas: da la
@@ -677,44 +751,60 @@ export default function App() {
       ? diaActual
       : currentChats.reduce((a, c) => a + (c.messages || []).length, 0);
 
-    const npcs = (mem.npcs || []).map(n => {
+    const npcs = (mem.npcs || []).map((n) => {
       let cambiado = n;
-      const presenteHoy = t.presentes.some(nombre =>
-        coincidenNombresNpc(nombre, n.name, undefined, { alias: n.alias, trueIdentity: n.trueIdentity })
+      const presenteHoy = t.presentes.some((nombre) =>
+        coincidenNombresNpc(nombre, n.name, undefined, {
+          alias: n.alias,
+          trueIdentity: n.trueIdentity,
+        }),
       );
       const dias = presenteHoy
         ? [...new Set([...(n.diasVistos || []), marca])]
-        : (n.diasVistos || []);
+        : n.diasVistos || [];
 
       if (presenteHoy) {
         cambiado = {
           ...cambiado,
           diasVistos: dias.slice(-40),
-          recurrente: n.recurrente || dias.length >= DIAS_PARA_SER_RECURRENTE
+          recurrente: n.recurrente || dias.length >= DIAS_PARA_SER_RECURRENTE,
         };
       }
 
-      const v = t.vinculos.find(x =>
-        coincidenNombresNpc(x.nombre, n.name, undefined, { alias: n.alias, trueIdentity: n.trueIdentity })
+      const v = t.vinculos.find((x) =>
+        coincidenNombresNpc(x.nombre, n.name, undefined, {
+          alias: n.alias,
+          trueIdentity: n.trueIdentity,
+        }),
       );
       if (v) {
         let newRelation = cambiado.relation;
         if (v.vinculo) {
           const relInfo = obtenerInfoRelacion(v.vinculo);
           // Si la relación actual es genérica o vacía, adoptar la inferida del vínculo
-          if (!newRelation || /aliado|neutral|desconocido|contacto|conocido/i.test(newRelation)) {
+          if (
+            !newRelation ||
+            /aliado|neutral|desconocido|contacto|conocido/i.test(newRelation)
+          ) {
             newRelation = `${relInfo.icono} ${relInfo.label}`;
           }
         }
 
         // Si el nombre reportado es más completo/específico (ej: "Jarlaxle Baenre" vs "Jarlaxle"), actualizarlo
         const nombreMasCompleto =
-          v.nombre && v.nombre.length > cambiado.name.length && coincidenNombresNpc(v.nombre, cambiado.name)
+          v.nombre &&
+          v.nombre.length > cambiado.name.length &&
+          coincidenNombresNpc(v.nombre, cambiado.name)
             ? v.nombre
             : cambiado.name;
 
         // Lógica de progresión escalonada (1-20 / 5 corazones) con límite diario de subidas
-        const afinidadActualizada = actualizarAfinidadNpc(cambiado, v, dias, marca);
+        const afinidadActualizada = actualizarAfinidadNpc(
+          cambiado,
+          v,
+          dias,
+          marca,
+        );
 
         cambiado = {
           ...cambiado,
@@ -726,7 +816,7 @@ export default function App() {
           ...afinidadActualizada,
           // Que el Narrador se moleste en escribir un vínculo ya dice que este
           // personaje cuenta, aunque la cuenta de días aún no haya llegado.
-          recurrente: true
+          recurrente: true,
         };
       }
 
@@ -735,24 +825,40 @@ export default function App() {
 
     // Si hay un vínculo nuevo para un PNJ que aún no figuraba en la lista, registrarlo automáticamente
     const nuevosNpcs: NPC[] = [];
-    t.vinculos.forEach(v => {
+    t.vinculos.forEach((v) => {
       if (
         v.nombre &&
-        !npcs.some(n => coincidenNombresNpc(n.name, v.nombre, { alias: n.alias, trueIdentity: n.trueIdentity })) &&
-        !nuevosNpcs.some(n => coincidenNombresNpc(n.name, v.nombre))
+        !npcs.some((n) =>
+          coincidenNombresNpc(n.name, v.nombre, {
+            alias: n.alias,
+            trueIdentity: n.trueIdentity,
+          }),
+        ) &&
+        !nuevosNpcs.some((n) => coincidenNombresNpc(n.name, v.nombre))
       ) {
-        const relInfo = obtenerInfoRelacion(v.vinculo || '');
-        const atrInicial = v.atr !== undefined ? Math.max(0, Math.min(20, Math.round(v.atr))) : undefined;
-        const vinInicial = v.vin !== undefined ? Math.max(0, Math.min(20, Math.round(v.vin))) : undefined;
-        const conInicial = v.con !== undefined ? Math.max(0, Math.min(20, Math.round(v.con))) : undefined;
+        const relInfo = obtenerInfoRelacion(v.vinculo || "");
+        const atrInicial =
+          v.atr !== undefined
+            ? Math.max(0, Math.min(20, Math.round(v.atr)))
+            : undefined;
+        const vinInicial =
+          v.vin !== undefined
+            ? Math.max(0, Math.min(20, Math.round(v.vin)))
+            : undefined;
+        const conInicial =
+          v.con !== undefined
+            ? Math.max(0, Math.min(20, Math.round(v.con)))
+            : undefined;
 
         nuevosNpcs.push({
           id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           name: v.nombre,
           relation: `${relInfo.icono} ${relInfo.label}`,
-          status: 'Vivo',
+          status: "Vivo",
           description: v.aparenta ? `Aparenta: ${v.aparenta}` : undefined,
-          notes: v.oculta ? `Oculta: ${v.oculta}` : 'Vínculo establecido durante la narración.',
+          notes: v.oculta
+            ? `Oculta: ${v.oculta}`
+            : "Vínculo establecido durante la narración.",
           aparenta: v.aparenta,
           oculta: v.oculta,
           vinculo: v.vinculo,
@@ -762,10 +868,10 @@ export default function App() {
           ultimoDiaSubida: {
             atr: atrInicial !== undefined ? marca : undefined,
             vin: vinInicial !== undefined ? marca : undefined,
-            con: conInicial !== undefined ? marca : undefined
+            con: conInicial !== undefined ? marca : undefined,
           },
           recurrente: true,
-          diasVistos: [marca]
+          diasVistos: [marca],
         });
       }
     });
@@ -775,83 +881,93 @@ export default function App() {
   };
 
   const handleUpdateProjectField = async (
-    fields: Partial<Project> | ((prev: Project) => Partial<Project>)
+    fields: Partial<Project> | ((prev: Project) => Partial<Project>),
   ) => {
     if (!currentPId) return;
-    setProjects(prev => {
-      const updated = prev.map(p =>
-        p.id === currentPId ? { ...p, ...(typeof fields === 'function' ? fields(p) : fields) } : p
+    setProjects((prev) => {
+      const updated = prev.map((p) =>
+        p.id === currentPId
+          ? { ...p, ...(typeof fields === "function" ? fields(p) : fields) }
+          : p,
       );
       saveLocalProjects(updated);
       return updated;
     });
   };
 
-  const handleUpdateMemory = async (updater: (prev: Project['memory']) => Project['memory']) => {
+  const handleUpdateMemory = async (
+    updater: (prev: Project["memory"]) => Project["memory"],
+  ) => {
     if (!currentProject || !currentPId) return;
-    await handleUpdateProjectField(p => ({
+    await handleUpdateProjectField((p) => ({
       memory: updater(
         p.memory || {
-          story: '',
+          story: "",
           quests: [],
           npcs: [],
           locations: [],
-          current_status: '',
-          manual_notes: ''
-        }
-      )
+          current_status: "",
+          manual_notes: "",
+        },
+      ),
     }));
   };
 
   // Chapter / Chat Management
   const handleCreateChat = () => {
     if (!currentPId) return;
-    const newChatId = 'cap_' + Date.now();
+    const newChatId = "cap_" + Date.now();
     const newChat: Chat = {
       id: newChatId,
       name: `Capítulo ${currentChats.length + 1}`,
-      messages: []
+      messages: [],
     };
 
     const updated = [...currentChats, newChat];
     setCurrentChats(updated);
     saveLocalChats(currentPId, updated);
     setCurrentChatId(newChatId);
-    setActiveTab('chat');
+    setActiveTab("chat");
   };
 
   const handleDeleteChat = (chatId: string) => {
     if (!currentPId) return;
     setConfirmConfig({
       isOpen: true,
-      message: '¿Estás seguro de que quieres borrar este capítulo?',
+      message: "¿Estás seguro de que quieres borrar este capítulo?",
       onConfirm: async () => {
-        const remaining = currentChats.filter(c => c.id !== chatId);
+        const remaining = currentChats.filter((c) => c.id !== chatId);
         setCurrentChats(remaining);
         saveLocalChats(currentPId, remaining);
 
         // Limpiar también las entradas de la agenda/cronología asociadas a esta sesión
-        await handleUpdateProjectField(p => ({
-          timeline: (p.timeline || []).filter(t => t.chatId !== chatId)
+        await handleUpdateProjectField((p) => ({
+          timeline: (p.timeline || []).filter((t) => t.chatId !== chatId),
         }));
 
         if (currentChatId === chatId) {
           setCurrentChatId(remaining.length > 0 ? remaining[0].id : null);
         }
-      }
+      },
     });
   };
 
   // Messaging & Turn Generation
   const handleSendMessage = async () => {
-    if (!inputText.trim() || !currentPId || !currentChatId || isGenerating) return;
+    if (!inputText.trim() || !currentPId || !currentChatId || isGenerating)
+      return;
     const text = inputText.trim();
-    setInputText('');
+    setInputText("");
 
     if (currentChat) {
-      const updatedMessages = [...currentChat.messages, { role: 'user' as const, content: text }];
+      const updatedMessages = [
+        ...currentChat.messages,
+        { role: "user" as const, content: text },
+      ];
       const updatedChat = { ...currentChat, messages: updatedMessages };
-      const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));
+      const chs = currentChats.map((c) =>
+        c.id === currentChatId ? updatedChat : c,
+      );
       setCurrentChats(chs);
       saveLocalChats(currentPId, chs);
       await triggerAIGeneration(text, updatedMessages);
@@ -861,7 +977,7 @@ export default function App() {
   };
 
   const appendToInput = (fragment: string) => {
-    setInputText(prev => {
+    setInputText((prev) => {
       const clean = prev.trim();
       return clean ? `${clean} ${fragment} ` : `${fragment} `;
     });
@@ -891,7 +1007,10 @@ export default function App() {
     appendToInput(formatoSignificado());
   };
 
-  const triggerAIGeneration = async (userPrompt: string, baseMessages?: Message[]) => {
+  const triggerAIGeneration = async (
+    userPrompt: string,
+    baseMessages?: Message[],
+  ) => {
     if (!currentProject || !currentChatId) return;
 
     if (!hasConfiguredApiKey()) {
@@ -901,18 +1020,23 @@ export default function App() {
 
     setIsGenerating(true);
     setIsStreamingTurn(true);
-    setLoadingText('Consultando los archivos del tomo y tejiendo la trama...');
+    setLoadingText("Consultando los archivos del tomo y tejiendo la trama...");
 
     try {
-      const targetChat = currentChats.find(c => c.id === currentChatId);
+      const targetChat = currentChats.find((c) => c.id === currentChatId);
       if (!targetChat) return;
 
       const currentList = baseMessages || targetChat.messages;
       const placeholderChat = {
         ...targetChat,
-        messages: [...currentList, { role: 'model' as const, content: 'Tirando dados...' }]
+        messages: [
+          ...currentList,
+          { role: "model" as const, content: "Tirando dados..." },
+        ],
       };
-      const chs = currentChats.map(c => (c.id === currentChatId ? placeholderChat : c));
+      const chs = currentChats.map((c) =>
+        c.id === currentChatId ? placeholderChat : c,
+      );
       setCurrentChats(chs);
       saveLocalChats(currentProject.id, chs);
 
@@ -927,26 +1051,31 @@ export default function App() {
         userText: userPrompt,
         signal: controller.signal,
         // El estado del protagonista lo lleva el Narrador, no el jugador.
-        onStateReported: state => {
-          void handleUpdateMemory(mem => ({
+        onStateReported: (state) => {
+          void handleUpdateMemory((mem) => ({
             ...mem,
             player_character: {
-              ...(mem.player_character || { name: 'Protagonista' }),
+              ...(mem.player_character || { name: "Protagonista" }),
               ...(state.hp !== undefined ? { hp: state.hp } : {}),
               ...(state.maxHp !== undefined ? { maxHp: state.maxHp } : {}),
               ...(state.ac !== undefined ? { ac: state.ac } : {}),
-              ...(state.conditions !== undefined ? { conditions: state.conditions } : {})
-            }
+              ...(state.conditions !== undefined
+                ? { conditions: state.conditions }
+                : {}),
+            },
           }));
         },
         // El inventario y dinero los administra exclusivamente el Narrador a través del roleplay.
-        onInventoryReported: invReport => {
-          void handleUpdateMemory(mem => ({
+        onInventoryReported: (invReport) => {
+          void handleUpdateMemory((mem) => ({
             ...mem,
-            player_character: applyInventoryReport(mem?.player_character || { name: 'Protagonista' }, invReport)
+            player_character: applyInventoryReport(
+              mem?.player_character || { name: "Protagonista" },
+              invReport,
+            ),
           }));
         },
-        onTimeReported: t => {
+        onTimeReported: (t) => {
           const modelMsgIdx = currentList.length; // index of the model message being added
           void handleTimeReported(t, { msgIndex: modelMsgIdx });
         },
@@ -954,49 +1083,57 @@ export default function App() {
         // que hace que la narración se escriba ante ti en vez de aparecer a saltos.
         // El guardado en disco sigue limitado dentro de geminiHelper.
         onChunk: (fullText: string) => {
-          setCurrentChats(prev =>
-            prev.map(c => {
+          setCurrentChats((prev) =>
+            prev.map((c) => {
               if (c.id !== currentChatId) return c;
               const msgs = [...c.messages];
               const last = msgs[msgs.length - 1];
-              if (last && last.role === 'model') {
+              if (last && last.role === "model") {
                 msgs[msgs.length - 1] = { ...last, content: fullText };
               } else {
-                msgs.push({ role: 'model', content: fullText });
+                msgs.push({ role: "model", content: fullText });
               }
               return { ...c, messages: msgs };
-            })
+            }),
           );
         },
         setLoadingText,
         onSaveMessage: (updatedChat: Chat) => {
-          setCurrentChats(prev => {
-            const updatedChs = prev.map(c => (c.id === currentChatId ? updatedChat : c));
+          setCurrentChats((prev) => {
+            const updatedChs = prev.map((c) =>
+              c.id === currentChatId ? updatedChat : c,
+            );
             saveLocalChats(currentProject.id, updatedChs);
             return updatedChs;
           });
-        }
+        },
       });
     } catch (error: any) {
-      console.error('Error generating AI story:', error);
+      console.error("Error generating AI story:", error);
       // Limpiar el mensaje de placeholder "Tirando dados..." si falló la llamada
-      setCurrentChats(prev =>
-        prev.map(c => {
+      setCurrentChats((prev) =>
+        prev.map((c) => {
           if (c.id !== currentChatId) return c;
           const msgs = [...c.messages];
-          if (msgs.length > 0 && msgs[msgs.length - 1].content === 'Tirando dados...') {
+          if (
+            msgs.length > 0 &&
+            msgs[msgs.length - 1].content === "Tirando dados..."
+          ) {
             msgs.pop();
           }
           return { ...c, messages: msgs };
-        })
+        }),
       );
-      if (error?.message?.includes('GEMINI_API_KEY') || error?.message?.includes('API key')) {
+      if (
+        error?.message?.includes("GEMINI_API_KEY") ||
+        error?.message?.includes("API key")
+      ) {
         setIsApiKeyModalOpen(true);
       } else {
         setAlertConfig({
           isOpen: true,
-          title: 'Aviso del Narrador',
-          message: describeApiError(error)
+          title: "Aviso del Narrador",
+          message: describeApiError(error),
         });
       }
     } finally {
@@ -1006,43 +1143,48 @@ export default function App() {
         writeCampaignToDisk(
           currentProject,
           latestChats.length > 0 ? latestChats : currentChats,
-          currentFiles
+          currentFiles,
         ).catch(() => {});
       }
       generationAbortRef.current = null;
       setIsStreamingTurn(false);
       setIsGenerating(false);
-      setLoadingText('');
+      setLoadingText("");
     }
   };
 
   const handleStopGeneration = () => {
     generationAbortRef.current?.abort();
     generationAbortRef.current = null;
-    setLoadingText('Deteniendo al Narrador...');
+    setLoadingText("Deteniendo al Narrador...");
   };
 
   const handleEditChatMessage = async (index: number, newContent: string) => {
     if (!currentPId || !currentChatId || !currentChat) return;
     const updatedMessages = currentChat.messages.map((m, i) =>
-      i === index ? { ...m, content: newContent } : m
+      i === index ? { ...m, content: newContent } : m,
     );
     const updatedChat = { ...currentChat, messages: updatedMessages };
-    const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));
+    const chs = currentChats.map((c) =>
+      c.id === currentChatId ? updatedChat : c,
+    );
     setCurrentChats(chs);
     saveLocalChats(currentPId, chs);
   };
 
-  const handleRegenerateChatMessage = async (index: number, updatedUserPrompt?: string) => {
+  const handleRegenerateChatMessage = async (
+    index: number,
+    updatedUserPrompt?: string,
+  ) => {
     if (!currentPId || !currentChatId || !currentChat || isGenerating) return;
 
     const targetMsg = currentChat.messages[index];
     if (!targetMsg) return;
 
     // Sincronizar diario/timeline eliminando entradas asociadas a los mensajes truncados
-    await handleUpdateProjectField(p => {
+    await handleUpdateProjectField((p) => {
       if (!p.timeline || p.timeline.length === 0) return {};
-      const updatedTimeline = p.timeline.filter(e => {
+      const updatedTimeline = p.timeline.filter((e) => {
         if (e.chatId !== currentChatId) return true;
         if (e.msgIndex !== undefined && e.msgIndex >= index) return false;
         return true;
@@ -1050,27 +1192,39 @@ export default function App() {
       return { timeline: updatedTimeline };
     });
 
-    if (targetMsg.role === 'model') {
+    if (targetMsg.role === "model") {
       // 1. Truncate from this model message
       const priorMessages = currentChat.messages.slice(0, index);
       // Find previous user prompt
-      const lastUserMsg = [...priorMessages].reverse().find(m => m.role === 'user');
-      const promptToUse = lastUserMsg ? lastUserMsg.content : 'Continúa con el relato de la escena.';
+      const lastUserMsg = [...priorMessages]
+        .reverse()
+        .find((m) => m.role === "user");
+      const promptToUse = lastUserMsg
+        ? lastUserMsg.content
+        : "Continúa con el relato de la escena.";
 
       const updatedChat = { ...currentChat, messages: priorMessages };
-      const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));
+      const chs = currentChats.map((c) =>
+        c.id === currentChatId ? updatedChat : c,
+      );
       setCurrentChats(chs);
       saveLocalChats(currentPId, chs);
 
       await triggerAIGeneration(promptToUse, priorMessages);
     } else {
       // 2. User message regeneration
-      const promptToUse = updatedUserPrompt !== undefined ? updatedUserPrompt : targetMsg.content;
+      const promptToUse =
+        updatedUserPrompt !== undefined ? updatedUserPrompt : targetMsg.content;
       const priorMessages = currentChat.messages.slice(0, index);
-      const updatedUserMsgList: Message[] = [...priorMessages, { role: 'user', content: promptToUse }];
+      const updatedUserMsgList: Message[] = [
+        ...priorMessages,
+        { role: "user", content: promptToUse },
+      ];
 
       const updatedChat = { ...currentChat, messages: updatedUserMsgList };
-      const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));
+      const chs = currentChats.map((c) =>
+        c.id === currentChatId ? updatedChat : c,
+      );
       setCurrentChats(chs);
       saveLocalChats(currentPId, chs);
 
@@ -1082,17 +1236,22 @@ export default function App() {
     if (!currentPId || !currentChatId || !currentChat || isGenerating) return;
 
     let baseMessages = currentChat.messages;
-    if (fromIndex !== undefined && fromIndex < currentChat.messages.length - 1) {
+    if (
+      fromIndex !== undefined &&
+      fromIndex < currentChat.messages.length - 1
+    ) {
       baseMessages = currentChat.messages.slice(0, fromIndex + 1);
       const updatedChat = { ...currentChat, messages: baseMessages };
-      const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));
+      const chs = currentChats.map((c) =>
+        c.id === currentChatId ? updatedChat : c,
+      );
       setCurrentChats(chs);
       saveLocalChats(currentPId, chs);
 
       // Sincronizar diario/timeline si se retrocede a un punto previo
-      await handleUpdateProjectField(p => {
+      await handleUpdateProjectField((p) => {
         if (!p.timeline || p.timeline.length === 0) return {};
-        const updatedTimeline = p.timeline.filter(e => {
+        const updatedTimeline = p.timeline.filter((e) => {
           if (e.chatId !== currentChatId) return true;
           if (e.msgIndex !== undefined && e.msgIndex > fromIndex) return false;
           return true;
@@ -1102,11 +1261,14 @@ export default function App() {
     }
 
     const continuePrompt =
-      '[Continúa la narración de forma fluida, profundizando en la escena, las reacciones del entorno y las consecuencias de lo ocurrido.]';
+      "[Continúa la narración de forma fluida, profundizando en la escena, las reacciones del entorno y las consecuencias de lo ocurrido.]";
     await triggerAIGeneration(continuePrompt, baseMessages);
   };
 
-  const handleDeleteChatMessage = async (index: number, deleteSubsequent: boolean) => {
+  const handleDeleteChatMessage = async (
+    index: number,
+    deleteSubsequent: boolean,
+  ) => {
     if (!currentPId || !currentChatId || !currentChat) return;
 
     let updatedMessages: Message[];
@@ -1119,15 +1281,17 @@ export default function App() {
     }
 
     const updatedChat = { ...currentChat, messages: updatedMessages };
-    const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));
+    const chs = currentChats.map((c) =>
+      c.id === currentChatId ? updatedChat : c,
+    );
     setCurrentChats(chs);
     saveLocalChats(currentPId, chs);
 
     // Sincronización quirúrgica del diario y cronología (timeline)
-    await handleUpdateProjectField(p => {
+    await handleUpdateProjectField((p) => {
       if (!p.timeline || p.timeline.length === 0) return {};
       const updatedTimeline = p.timeline
-        .filter(entry => {
+        .filter((entry) => {
           if (entry.chatId !== currentChatId) return true;
           if (entry.msgIndex === undefined) {
             // Si no tiene msgIndex explícito, solo se descarta si borramos todos los mensajes del chat
@@ -1139,9 +1303,14 @@ export default function App() {
             return entry.msgIndex !== index;
           }
         })
-        .map(entry => {
+        .map((entry) => {
           // Reindexar msgIndex si se borró un único mensaje previo
-          if (entry.chatId === currentChatId && entry.msgIndex !== undefined && !deleteSubsequent && entry.msgIndex > index) {
+          if (
+            entry.chatId === currentChatId &&
+            entry.msgIndex !== undefined &&
+            !deleteSubsequent &&
+            entry.msgIndex > index
+          ) {
             return { ...entry, msgIndex: entry.msgIndex - 1 };
           }
           return entry;
@@ -1159,8 +1328,8 @@ export default function App() {
     setTopProgress({
       active: true,
       percent: 5,
-      label: `Cargando ${files.length} archivo${files.length > 1 ? 's' : ''}...`,
-      type: 'upload'
+      label: `Cargando ${files.length} archivo${files.length > 1 ? "s" : ""}...`,
+      type: "upload",
     });
 
     try {
@@ -1170,40 +1339,49 @@ export default function App() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const stepPercent = Math.round(5 + (i / files.length) * 50);
-        setLoadingText(`Procesando archivo ${i + 1} de ${files.length}: ${file.name}...`);
+        setLoadingText(
+          `Procesando archivo ${i + 1} de ${files.length}: ${file.name}...`,
+        );
         setTopProgress({
           active: true,
           percent: stepPercent,
           label: `Leyendo ${i + 1}/${files.length}: ${file.name}`,
-          type: 'upload'
+          type: "upload",
         });
 
-        let text = '';
-        const isImage = file.type.startsWith('image/');
-        const isAudio = file.type.startsWith('audio/');
-        let contentUrlOrText = '';
+        let text = "";
+        const isImage = file.type.startsWith("image/");
+        const isAudio = file.type.startsWith("audio/");
+        let contentUrlOrText = "";
 
         if (isImage) {
           contentUrlOrText = await optimizeImageFile(file);
         } else if (isAudio) {
           const reader = new FileReader();
-          contentUrlOrText = await new Promise<string>(resolve => {
+          contentUrlOrText = await new Promise<string>((resolve) => {
             reader.onload = () => resolve(reader.result as string);
             // Without an error handler a failed read leaves the promise pending
             // forever and the upload spinner never goes away.
             reader.onerror = () => {
-              console.error('No se pudo leer el audio:', file.name, reader.error);
-              resolve('');
+              console.error(
+                "No se pudo leer el audio:",
+                file.name,
+                reader.error,
+              );
+              resolve("");
             };
             reader.readAsDataURL(file);
           });
-        } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        } else if (
+          file.type === "application/pdf" ||
+          file.name.toLowerCase().endsWith(".pdf")
+        ) {
           try {
-            const { extractPdfText } = await import('./utils/pdfText');
+            const { extractPdfText } = await import("./utils/pdfText");
             text = await extractPdfText(await file.arrayBuffer());
           } catch (err) {
-            console.error('Error reading PDF:', err);
-            text = await file.text().catch(() => '');
+            console.error("Error reading PDF:", err);
+            text = await file.text().catch(() => "");
           }
           contentUrlOrText = text;
         } else {
@@ -1211,16 +1389,20 @@ export default function App() {
         }
 
         const newFile: ProjectFile = {
-          id: 'file_' + Date.now() + '_' + Math.random().toString(36).substring(7),
+          id:
+            "file_" +
+            Date.now() +
+            "_" +
+            Math.random().toString(36).substring(7),
           name: file.name,
-          type: file.type || 'application/octet-stream',
+          type: file.type || "application/octet-stream",
           content: contentUrlOrText,
           mime: file.type,
-          category: 'other',
+          category: "other",
           isImage,
           isAudio,
           length: isImage || isAudio ? file.size : contentUrlOrText.length,
-          markers: []
+          markers: [],
         };
 
         // Auto classify immediately using memory context
@@ -1244,32 +1426,40 @@ export default function App() {
           for (let imgIdx = 0; imgIdx < imagesToAnalyze.length; imgIdx++) {
             const item = imagesToAnalyze[imgIdx];
             try {
-              const analysis = await analyzeUploadedImage(item.file, item.dataUrl);
+              const analysis = await analyzeUploadedImage(
+                item.file,
+                item.dataUrl,
+              );
               if (analysis) {
                 const refreshedFiles = await loadFilesFromDB(currentPId);
-                const fileUpdated = refreshedFiles.map(f => (f.id === item.file.id ? { ...f, analysis } : f));
+                const fileUpdated = refreshedFiles.map((f) =>
+                  f.id === item.file.id ? { ...f, analysis } : f,
+                );
                 setCurrentFiles(fileUpdated);
                 await saveFilesToDB(currentPId, fileUpdated);
 
                 newVisualMemories.push({
-                  id: 'vmem_' + item.file.id,
+                  id: "vmem_" + item.file.id,
                   fileId: item.file.id,
                   fileName: item.file.name,
                   thumbnail: item.dataUrl,
-                  analysis
+                  analysis,
                 });
               }
             } catch (analysisErr) {
-              console.error('Error in background image analysis:', analysisErr);
+              console.error("Error in background image analysis:", analysisErr);
             }
           }
 
           if (newVisualMemories.length > 0) {
-            await handleUpdateMemory(mem => {
+            await handleUpdateMemory((mem) => {
               const existingVisual = mem.visual_memory || [];
               const merged = [
-                ...existingVisual.filter(ev => !newVisualMemories.some(nvm => nvm.fileId === ev.fileId)),
-                ...newVisualMemories
+                ...existingVisual.filter(
+                  (ev) =>
+                    !newVisualMemories.some((nvm) => nvm.fileId === ev.fileId),
+                ),
+                ...newVisualMemories,
               ];
               return { ...mem, visual_memory: merged };
             });
@@ -1278,8 +1468,11 @@ export default function App() {
       }
 
       // Si entre lo subido hay una ficha del protagonista, registrarla en segundo plano
-      let autoSheetMsg = '';
-      const sheetFile = updated.find(f => newFilesList.some(nf => nf.id === f.id) && looksLikePlayerSheet(f));
+      let autoSheetMsg = "";
+      const sheetFile = updated.find(
+        (f) =>
+          newFilesList.some((nf) => nf.id === f.id) && looksLikePlayerSheet(f),
+      );
 
       if (sheetFile && hasConfiguredApiKey()) {
         const existingPc = currentProject?.memory?.player_character;
@@ -1293,8 +1486,15 @@ export default function App() {
       }
 
       // Detect companion or NPC sheet uploaded
-      const companionFile = updated.find(f => newFilesList.some(nf => nf.id === f.id) && looksLikeCompanionSheet(f));
-      const npcSheetFile = updated.find(f => newFilesList.some(nf => nf.id === f.id) && looksLikeNpcSheet(f));
+      const companionFile = updated.find(
+        (f) =>
+          newFilesList.some((nf) => nf.id === f.id) &&
+          looksLikeCompanionSheet(f),
+      );
+      const npcSheetFile = updated.find(
+        (f) =>
+          newFilesList.some((nf) => nf.id === f.id) && looksLikeNpcSheet(f),
+      );
 
       if (companionFile && hasConfiguredApiKey()) {
         autoSheetMsg += ` He detectado la ficha de un compañero ("${companionFile.name}"). Puedes extraerla desde la pestaña Archivos o Memoria.`;
@@ -1305,17 +1505,23 @@ export default function App() {
 
       setAlertConfig({
         isOpen: true,
-        title: 'Archivos Guardados',
+        title: "Archivos Guardados",
         message: `Se han añadido ${newFilesList.length} documento(s) a la Base de Conocimiento.${
-          imagesToAnalyze.length > 0 ? ` ${imagesToAnalyze.length} imagen(es) se están analizando en segundo plano.` : ''
-        }${autoSheetMsg}`
+          imagesToAnalyze.length > 0
+            ? ` ${imagesToAnalyze.length} imagen(es) se están analizando en segundo plano.`
+            : ""
+        }${autoSheetMsg}`,
       });
     } catch (error) {
-      console.error('Error handling files upload:', error);
-      setAlertConfig({ isOpen: true, title: 'Error', message: 'Hubo un problema al procesar los archivos.' });
+      console.error("Error handling files upload:", error);
+      setAlertConfig({
+        isOpen: true,
+        title: "Error",
+        message: "Hubo un problema al procesar los archivos.",
+      });
     } finally {
       setIsGenerating(false);
-      setLoadingText('');
+      setLoadingText("");
       setTopProgress({ active: false });
     }
   };
@@ -1328,34 +1534,36 @@ export default function App() {
     }
     if (extractingFileIds.includes(file.id)) return;
 
-    setExtractingFileIds(prev => [...prev, file.id]);
+    setExtractingFileIds((prev) => [...prev, file.id]);
     setTopProgress({
       active: true,
       label: `Analizando visualmente "${file.name}" en 2º plano...`,
-      type: 'analysis'
+      type: "analysis",
     });
     try {
       const analysis = await analyzeUploadedImage(file, file.content);
       if (analysis) {
         const refreshedFiles = await loadFilesFromDB(currentPId);
-        const updated = refreshedFiles.map(f => (f.id === file.id ? { ...f, analysis } : f));
+        const updated = refreshedFiles.map((f) =>
+          f.id === file.id ? { ...f, analysis } : f,
+        );
         setCurrentFiles(updated);
         await saveFilesToDB(currentPId, updated);
 
         const visualItem: VisualMemoryItem = {
-          id: 'vmem_' + file.id,
+          id: "vmem_" + file.id,
           fileId: file.id,
           fileName: file.name,
           thumbnail: file.content,
-          analysis
+          analysis,
         };
 
         if (currentProject) {
           const existingVisual = currentProject.memory?.visual_memory || [];
-          const filtered = existingVisual.filter(v => v.fileId !== file.id);
-          await handleUpdateMemory(mem => ({
+          const filtered = existingVisual.filter((v) => v.fileId !== file.id);
+          await handleUpdateMemory((mem) => ({
             ...mem,
-            visual_memory: [...filtered, visualItem]
+            visual_memory: [...filtered, visualItem],
           }));
         }
 
@@ -1363,64 +1571,74 @@ export default function App() {
           active: true,
           percent: 100,
           label: `Análisis visual de "${file.name}" guardado`,
-          type: 'analysis'
+          type: "analysis",
         });
         setTimeout(() => {
-          setTopProgress(p => (p.label?.includes(file.name) ? { active: false } : p));
+          setTopProgress((p) =>
+            p.label?.includes(file.name) ? { active: false } : p,
+          );
         }, 3500);
       }
     } catch (err: any) {
-      console.error('Error analyzing image file:', err);
+      console.error("Error analyzing image file:", err);
       setTopProgress({
         active: true,
-        label: `Error análisis visual: ${err.message || 'Fallo de procesamiento'}`,
-        type: 'analysis'
+        label: `Error análisis visual: ${err.message || "Fallo de procesamiento"}`,
+        type: "analysis",
       });
       setTimeout(() => {
-        setTopProgress(p => (p.label?.includes('Error análisis') ? { active: false } : p));
+        setTopProgress((p) =>
+          p.label?.includes("Error análisis") ? { active: false } : p,
+        );
       }, 4000);
     } finally {
-      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
+      setExtractingFileIds((prev) => prev.filter((id) => id !== file.id));
     }
   };
 
   const handleUpdateFileAnalysis = async (fileId: string, analysis: string) => {
     if (!currentPId) return;
-    const updated = currentFiles.map(f => (f.id === fileId ? { ...f, analysis } : f));
+    const updated = currentFiles.map((f) =>
+      f.id === fileId ? { ...f, analysis } : f,
+    );
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
 
     // El registro visual es para imágenes. Un documento cuyo análisis es su
     // destilado no pinta nada ahí: acabaría viajando dos veces, una en su propia
     // sección y otra dentro de la memoria, y con el doble de coste.
-    const targetFile = currentFiles.find(f => f.id === fileId);
+    const targetFile = currentFiles.find((f) => f.id === fileId);
     if (currentProject && targetFile && targetFile.isImage) {
       const existingVisual = currentProject.memory?.visual_memory || [];
-      const filtered = existingVisual.filter(v => v.fileId !== fileId);
+      const filtered = existingVisual.filter((v) => v.fileId !== fileId);
       const visualItem: VisualMemoryItem = {
-        id: 'vmem_' + fileId,
+        id: "vmem_" + fileId,
         fileId: fileId,
         fileName: targetFile.name,
         thumbnail: targetFile.content,
-        analysis
+        analysis,
       };
-      await handleUpdateMemory(mem => ({
+      await handleUpdateMemory((mem) => ({
         ...mem,
-        visual_memory: [...filtered, visualItem]
+        visual_memory: [...filtered, visualItem],
       }));
     }
   };
 
   const handleDeleteFileAnalysis = async (fileId: string) => {
     if (!currentPId) return;
-    const updated = currentFiles.map(f => (f.id === fileId ? { ...f, analysis: undefined } : f));
+    const updated = currentFiles.map((f) =>
+      f.id === fileId ? { ...f, analysis: undefined } : f,
+    );
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
 
     if (currentProject) {
-      await handleUpdateMemory(mem => ({
+      await handleUpdateMemory((mem) => ({
         ...mem,
-        visual_memory: (mem.visual_memory || []).filter(v => v.fileId !== fileId)
+        visual_memory: (mem.visual_memory || []).filter(
+          (v) => v.fileId !== fileId,
+        ),
       }));
     }
   };
@@ -1431,37 +1649,51 @@ export default function App() {
       isOpen: true,
       message: `¿Eliminar "${file.name}"de la base de conocimiento?`,
       onConfirm: async () => {
-        const updated = currentFiles.filter(f => f.id !== file.id);
+        const updated = currentFiles.filter((f) => f.id !== file.id);
         setCurrentFiles(updated);
         await saveFilesToDB(currentPId, updated);
 
         if (file.isImage && currentProject) {
-          await handleUpdateMemory(mem => ({
+          await handleUpdateMemory((mem) => ({
             ...mem,
-            visual_memory: (mem.visual_memory || []).filter(v => v.fileId !== file.id)
+            visual_memory: (mem.visual_memory || []).filter(
+              (v) => v.fileId !== file.id,
+            ),
           }));
         }
-      }
+      },
     });
   };
 
-  const handleUpdateMapMarkers = async (fileId: string, markers: MapMarker[]) => {
+  const handleUpdateMapMarkers = async (
+    fileId: string,
+    markers: MapMarker[],
+  ) => {
     if (!currentPId) return;
-    const updated = currentFiles.map(f => (f.id === fileId ? { ...f, markers } : f));
+    const updated = currentFiles.map((f) =>
+      f.id === fileId ? { ...f, markers } : f,
+    );
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
   };
 
-  const handleUpdateFileCategory = async (fileId: string, category: FileCategory) => {
+  const handleUpdateFileCategory = async (
+    fileId: string,
+    category: FileCategory,
+  ) => {
     if (!currentPId) return;
-    const updated = currentFiles.map(f => (f.id === fileId ? { ...f, category } : f));
+    const updated = currentFiles.map((f) =>
+      f.id === fileId ? { ...f, category } : f,
+    );
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
   };
 
   const handleToggleOnDemand = async (fileId: string, onDemand: boolean) => {
     if (!currentPId) return;
-    const updated = currentFiles.map(f => (f.id === fileId ? { ...f, onDemand } : f));
+    const updated = currentFiles.map((f) =>
+      f.id === fileId ? { ...f, onDemand } : f,
+    );
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
   };
@@ -1475,34 +1707,36 @@ export default function App() {
     if (!currentPId) return;
     if (extractingFileIds.includes(file.id)) return;
 
-    setExtractingFileIds(prev => [...prev, file.id]);
+    setExtractingFileIds((prev) => [...prev, file.id]);
     setTopProgress({
       active: true,
       label: `Destilando tablas de oráculo desde "${file.name}" en 2º plano...`,
-      type: 'general'
+      type: "general",
     });
     try {
       const destilado = await destilarTablaOraculo(file);
       const refreshedFiles = await loadFilesFromDB(currentPId);
-      const updated = refreshedFiles.map(f => (f.id === file.id ? { ...f, analysis: destilado } : f));
+      const updated = refreshedFiles.map((f) =>
+        f.id === file.id ? { ...f, analysis: destilado } : f,
+      );
       setCurrentFiles(updated);
       await saveFilesToDB(currentPId, updated);
 
-      const antes = (file.content || '').length;
+      const antes = (file.content || "").length;
       const ahora = destilado.length;
       setAlertConfig({
         isOpen: true,
-        title: 'Tabla destilada con éxito',
-        message: `De ${antes.toLocaleString('es-ES')} caracteres a ${ahora.toLocaleString('es-ES')}: un ${Math.round((1 - ahora / Math.max(1, antes)) * 100)}% menos en cada turno.\n\nEs lo que viajará al Narrador a partir de ahora. Puedes comprobarla o editarla en cualquier momento desde Archivos.`
+        title: "Tabla destilada con éxito",
+        message: `De ${antes.toLocaleString("es-ES")} caracteres a ${ahora.toLocaleString("es-ES")}: un ${Math.round((1 - ahora / Math.max(1, antes)) * 100)}% menos en cada turno.\n\nEs lo que viajará al Narrador a partir de ahora. Puedes comprobarla o editarla en cualquier momento desde Archivos.`,
       });
     } catch (err) {
       setAlertConfig({
         isOpen: true,
-        title: 'No se ha podido destilar',
-        message: describeApiError(err)
+        title: "No se ha podido destilar",
+        message: describeApiError(err),
       });
     } finally {
-      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
+      setExtractingFileIds((prev) => prev.filter((id) => id !== file.id));
       setTopProgress({ active: false });
     }
   };
@@ -1511,13 +1745,13 @@ export default function App() {
     if (!currentProject || !currentPId) return;
     setTopProgress({
       active: true,
-      label: 'Reclasificando archivos y sincronizando memoria en 2º plano...',
-      type: 'sync'
+      label: "Reclasificando archivos y sincronizando memoria en 2º plano...",
+      type: "sync",
     });
     try {
       let filesModified = false;
       const refreshedFiles = await loadFilesFromDB(currentPId);
-      const updatedFiles = refreshedFiles.map(file => {
+      const updatedFiles = refreshedFiles.map((file) => {
         const autoCat = classifyFileAuto(file, currentProject.memory);
         if (autoCat !== file.category) {
           filesModified = true;
@@ -1537,15 +1771,17 @@ export default function App() {
       const currentLocs = currentProject.memory?.locations || [];
       let updatedPc = currentProject.memory?.player_character;
 
-      const pcNameClean = (updatedPc?.name || '').trim().toLowerCase();
+      const pcNameClean = (updatedPc?.name || "").trim().toLowerCase();
 
       if (updatedPc && !updatedPc.portrait) {
-        const matchingPcFile = updatedFiles.find(f => {
+        const matchingPcFile = updatedFiles.find((f) => {
           if (!f.isImage || !f.content) return false;
-          const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
+          const cleanName = f.name.replace(/\.[^/.]+$/, "").toLowerCase();
           return (
-            f.category === 'portrait_pj' ||
-            (pcNameClean.length > 2 && (cleanName.includes(pcNameClean) || pcNameClean.includes(cleanName)))
+            f.category === "portrait_pj" ||
+            (pcNameClean.length > 2 &&
+              (cleanName.includes(pcNameClean) ||
+                pcNameClean.includes(cleanName)))
           );
         });
         if (matchingPcFile) {
@@ -1555,10 +1791,17 @@ export default function App() {
       }
 
       const updatedNpcs = currentNpcs
-        .filter(npc => {
+        .filter((npc) => {
           const npcNameClean = npc.name.trim().toLowerCase();
           if (
-            ['protagonista', 'jugador', 'el jugador', 'personaje jugador', 'oc', 'pj'].includes(npcNameClean)
+            [
+              "protagonista",
+              "jugador",
+              "el jugador",
+              "personaje jugador",
+              "oc",
+              "pj",
+            ].includes(npcNameClean)
           )
             return false;
           if (
@@ -1569,15 +1812,16 @@ export default function App() {
             return false;
           return true;
         })
-        .map(npc => {
+        .map((npc) => {
           if (npc.portrait) return npc;
-          const matchingFile = updatedFiles.find(f => {
+          const matchingFile = updatedFiles.find((f) => {
             if (!f.isImage || !f.content) return false;
-            const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
+            const cleanName = f.name.replace(/\.[^/.]+$/, "").toLowerCase();
             const cleanNpcName = npc.name.toLowerCase().trim();
             return (
               cleanNpcName.length > 2 &&
-              (cleanName.includes(cleanNpcName) || cleanNpcName.includes(cleanName))
+              (cleanName.includes(cleanNpcName) ||
+                cleanNpcName.includes(cleanName))
             );
           });
           if (matchingFile) {
@@ -1587,14 +1831,16 @@ export default function App() {
           return npc;
         });
 
-      const updatedLocs = currentLocs.map(loc => {
+      const updatedLocs = currentLocs.map((loc) => {
         if (loc.portrait) return loc;
-        const matchingFile = updatedFiles.find(f => {
+        const matchingFile = updatedFiles.find((f) => {
           if (!f.isImage || !f.content) return false;
-          const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
+          const cleanName = f.name.replace(/\.[^/.]+$/, "").toLowerCase();
           const cleanLocName = loc.name.toLowerCase().trim();
           return (
-            cleanLocName.length > 2 && (cleanName.includes(cleanLocName) || cleanLocName.includes(cleanName))
+            cleanLocName.length > 2 &&
+            (cleanName.includes(cleanLocName) ||
+              cleanLocName.includes(cleanName))
           );
         });
         if (matchingFile) {
@@ -1605,25 +1851,25 @@ export default function App() {
       });
 
       if (memoryModified) {
-        await handleUpdateMemory(mem => ({
+        await handleUpdateMemory((mem) => ({
           ...mem,
           player_character: updatedPc,
           npcs: updatedNpcs,
-          locations: updatedLocs
+          locations: updatedLocs,
         }));
       }
 
       setAlertConfig({
         isOpen: true,
-        title: 'Sincronización Completada',
-        message: `Se han clasificado los archivos y sincronizado retratos con la Memoria de la campaña.`
+        title: "Sincronización Completada",
+        message: `Se han clasificado los archivos y sincronizado retratos con la Memoria de la campaña.`,
       });
     } catch (err) {
-      console.error('Error during auto-classification:', err);
+      console.error("Error during auto-classification:", err);
       setAlertConfig({
         isOpen: true,
-        title: 'Error',
-        message: 'Ocurrió un error al reclasificar los archivos.'
+        title: "Error",
+        message: "Ocurrió un error al reclasificar los archivos.",
       });
     } finally {
       setTopProgress({ active: false });
@@ -1632,71 +1878,72 @@ export default function App() {
 
   const handleUsePortraitAsPc = async (file: ProjectFile) => {
     if (!currentProject || !currentPId) return;
-    await handleUpdateMemory(mem => ({
+    await handleUpdateMemory((mem) => ({
       ...mem,
       player_character: {
-        ...(mem.player_character || { name: 'Protagonista' }),
-        portrait: file.content
-      }
+        ...(mem.player_character || { name: "Protagonista" }),
+        portrait: file.content,
+      },
     }));
     setAlertConfig({
       isOpen: true,
-      title: 'Retrato asignado',
-      message: `"${file.name}" es ahora el retrato del protagonista.`
+      title: "Retrato asignado",
+      message: `"${file.name}" es ahora el retrato del protagonista.`,
     });
   };
 
   const handleCreateNpcFromImage = async (file: ProjectFile) => {
     if (!currentProject || !currentPId) return;
     const rawName = file.name
-      .replace(/\.[^/.]+$/, '')
-      .replace(/[_-]/g, ' ')
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[_-]/g, " ")
       .trim();
     const formattedName = rawName
-      .split(' ')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
 
     const newNpc: NPC = {
-      id: 'npc_' + Date.now(),
+      id: "npc_" + Date.now(),
       name: formattedName,
-      relation: 'Neutral',
-      status: 'Vivo',
-      description: file.analysis ? file.analysis.slice(0, 180) + '...' : '',
+      relation: "Neutral",
+      status: "Vivo",
+      description: file.analysis ? file.analysis.slice(0, 180) + "..." : "",
       notes: file.analysis
         ? `Detectado a partir de ${file.name}.\n${file.analysis}`
         : `Creado desde imagen ${file.name}`,
-      portrait: file.content
+      portrait: file.content,
     };
 
-    await handleUpdateMemory(mem => ({
+    await handleUpdateMemory((mem) => ({
       ...mem,
-      npcs: [...(mem.npcs || []), newNpc]
+      npcs: [...(mem.npcs || []), newNpc],
     }));
 
     setAlertConfig({
       isOpen: true,
-      title: 'PNJ Creado en Memoria',
-      message: `Se ha creado el personaje "${formattedName}"con su retrato vinculado automáticamente en la pestaña de PNJs de la Memoria.`
+      title: "PNJ Creado en Memoria",
+      message: `Se ha creado el personaje "${formattedName}"con su retrato vinculado automáticamente en la pestaña de PNJs de la Memoria.`,
     });
   };
 
   const handleUploadEntityImage = async (
     file: File,
-    category: FileCategory = 'portrait_npc'
+    category: FileCategory = "portrait_npc",
   ): Promise<string> => {
-    if (!currentPId) return '';
+    if (!currentPId) return "";
     try {
       const contentUrl = await optimizeImageFile(file);
       const newFile: ProjectFile = {
-        id: 'file_' + Date.now() + '_' + Math.random().toString(36).substring(7),
+        id:
+          "file_" + Date.now() + "_" + Math.random().toString(36).substring(7),
         name: file.name,
         type: file.type,
         mime: file.type,
         category,
         content: contentUrl,
         isImage: true,
-        length: file.size
+        length: file.size,
       };
       const updatedFiles = [...currentFiles, newFile];
       setCurrentFiles(updatedFiles);
@@ -1705,23 +1952,25 @@ export default function App() {
       // Background AI visual analysis if API key is configured
       if (hasConfiguredApiKey()) {
         analyzeUploadedImage(newFile, contentUrl)
-          .then(async analysis => {
+          .then(async (analysis) => {
             if (analysis) {
               const fileWithAnalysis = { ...newFile, analysis };
-              const refreshed = (await loadFilesFromDB(currentPId)).map(f =>
-                f.id === newFile.id ? fileWithAnalysis : f
+              const refreshed = (await loadFilesFromDB(currentPId)).map((f) =>
+                f.id === newFile.id ? fileWithAnalysis : f,
               );
               setCurrentFiles(refreshed);
               await saveFilesToDB(currentPId, refreshed);
             }
           })
-          .catch(err => console.error('Error in background entity image analysis:', err));
+          .catch((err) =>
+            console.error("Error in background entity image analysis:", err),
+          );
       }
 
       return contentUrl;
     } catch (err) {
-      console.error('Error uploading entity image:', err);
-      return '';
+      console.error("Error uploading entity image:", err);
+      return "";
     }
   };
 
@@ -1729,24 +1978,26 @@ export default function App() {
     if (!currentProject || !currentPId) return;
     if (extractingFileIds.includes(file.id)) return;
 
-    setExtractingFileIds(prev => [...prev, file.id]);
+    setExtractingFileIds((prev) => [...prev, file.id]);
     setTopProgress({
       active: true,
       label: `Extrayendo ficha de protagonista (${file.name}) en 2º plano...`,
-      type: 'sync'
+      type: "sync",
     });
     try {
       const pc = await extractPlayerCharacterFromDocument(file);
 
       // Search for any matching image in files as portrait
       const refreshedFiles = await loadFilesFromDB(currentPId);
-      const matchingPortrait = refreshedFiles.find(f => {
+      const matchingPortrait = refreshedFiles.find((f) => {
         if (!f.isImage || !f.content) return false;
-        const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
+        const cleanName = f.name.replace(/\.[^/.]+$/, "").toLowerCase();
         const cleanPcName = pc.name.toLowerCase().trim();
         return (
-          f.category === 'portrait_pj' ||
-          (cleanPcName.length > 2 && (cleanName.includes(cleanPcName) || cleanPcName.includes(cleanName)))
+          f.category === "portrait_pj" ||
+          (cleanPcName.length > 2 &&
+            (cleanName.includes(cleanPcName) ||
+              cleanPcName.includes(cleanName)))
         );
       });
 
@@ -1755,38 +2006,42 @@ export default function App() {
       }
 
       // Update file category to sheet_pj
-      await handleUpdateFileCategory(file.id, 'sheet_pj');
+      await handleUpdateFileCategory(file.id, "sheet_pj");
 
       // Update memory
-      await handleUpdateMemory(mem => ({
+      await handleUpdateMemory((mem) => ({
         ...mem,
         player_character: {
           ...pc,
-          portrait: pc.portrait || mem.player_character?.portrait
-        }
+          portrait: pc.portrait || mem.player_character?.portrait,
+        },
       }));
 
       setTopProgress({
         active: true,
         percent: 100,
         label: `Ficha de "${pc.name}" registrada con éxito`,
-        type: 'sync'
+        type: "sync",
       });
       setTimeout(() => {
-        setTopProgress(p => (p.label?.includes(pc.name) ? { active: false } : p));
+        setTopProgress((p) =>
+          p.label?.includes(pc.name) ? { active: false } : p,
+        );
       }, 4000);
     } catch (error) {
-      console.error('Error extracting player character:', error);
+      console.error("Error extracting player character:", error);
       setTopProgress({
         active: true,
         label: `Error al leer la ficha de "${file.name}"`,
-        type: 'sync'
+        type: "sync",
       });
       setTimeout(() => {
-        setTopProgress(p => (p.label?.includes('Error al leer') ? { active: false } : p));
+        setTopProgress((p) =>
+          p.label?.includes("Error al leer") ? { active: false } : p,
+        );
       }, 4000);
     } finally {
-      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
+      setExtractingFileIds((prev) => prev.filter((id) => id !== file.id));
     }
   };
 
@@ -1794,24 +2049,26 @@ export default function App() {
     if (!currentProject || !currentPId) return;
     if (extractingFileIds.includes(file.id)) return;
 
-    setExtractingFileIds(prev => [...prev, file.id]);
+    setExtractingFileIds((prev) => [...prev, file.id]);
     setTopProgress({
       active: true,
       label: `Extrayendo ficha de compañero (${file.name}) en 2º plano...`,
-      type: 'sync'
+      type: "sync",
     });
     try {
       const companion = await extractCompanionFromDocument(file);
 
       // Search for any matching image in files as portrait
       const refreshedFiles = await loadFilesFromDB(currentPId);
-      const matchingPortrait = refreshedFiles.find(f => {
+      const matchingPortrait = refreshedFiles.find((f) => {
         if (!f.isImage || !f.content) return false;
-        const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
+        const cleanName = f.name.replace(/\.[^/.]+$/, "").toLowerCase();
         const cleanCompName = companion.name.toLowerCase().trim();
         return (
-          f.category === 'portrait_npc' ||
-          (cleanCompName.length > 2 && (cleanName.includes(cleanCompName) || cleanCompName.includes(cleanName)))
+          f.category === "portrait_npc" ||
+          (cleanCompName.length > 2 &&
+            (cleanName.includes(cleanCompName) ||
+              cleanCompName.includes(cleanName)))
         );
       });
 
@@ -1819,14 +2076,16 @@ export default function App() {
         companion.portrait = matchingPortrait.content;
       }
 
-      await handleUpdateFileCategory(file.id, 'sheet_companion');
+      await handleUpdateFileCategory(file.id, "sheet_companion");
 
-      await handleUpdateMemory(mem => {
+      await handleUpdateMemory((mem) => {
         const existing = mem.companions || [];
-        const filtered = existing.filter(c => c.name.toLowerCase() !== companion.name.toLowerCase());
+        const filtered = existing.filter(
+          (c) => c.name.toLowerCase() !== companion.name.toLowerCase(),
+        );
         return {
           ...mem,
-          companions: [...filtered, companion]
+          companions: [...filtered, companion],
         };
       });
 
@@ -1834,23 +2093,27 @@ export default function App() {
         active: true,
         percent: 100,
         label: `Compañero "${companion.name}" registrado con éxito`,
-        type: 'sync'
+        type: "sync",
       });
       setTimeout(() => {
-        setTopProgress(p => (p.label?.includes(companion.name) ? { active: false } : p));
+        setTopProgress((p) =>
+          p.label?.includes(companion.name) ? { active: false } : p,
+        );
       }, 4000);
     } catch (error) {
-      console.error('Error extracting companion:', error);
+      console.error("Error extracting companion:", error);
       setTopProgress({
         active: true,
         label: `Error al leer la ficha de compañero de "${file.name}"`,
-        type: 'sync'
+        type: "sync",
       });
       setTimeout(() => {
-        setTopProgress(p => (p.label?.includes('Error al leer') ? { active: false } : p));
+        setTopProgress((p) =>
+          p.label?.includes("Error al leer") ? { active: false } : p,
+        );
       }, 4000);
     } finally {
-      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
+      setExtractingFileIds((prev) => prev.filter((id) => id !== file.id));
     }
   };
 
@@ -1858,23 +2121,25 @@ export default function App() {
     if (!currentProject || !currentPId) return;
     if (extractingFileIds.includes(file.id)) return;
 
-    setExtractingFileIds(prev => [...prev, file.id]);
+    setExtractingFileIds((prev) => [...prev, file.id]);
     setTopProgress({
       active: true,
       label: `Extrayendo ficha de PNJ (${file.name}) en 2º plano...`,
-      type: 'sync'
+      type: "sync",
     });
     try {
       const npc = await extractNpcFromDocument(file);
 
       const refreshedFiles = await loadFilesFromDB(currentPId);
-      const matchingPortrait = refreshedFiles.find(f => {
+      const matchingPortrait = refreshedFiles.find((f) => {
         if (!f.isImage || !f.content) return false;
-        const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
+        const cleanName = f.name.replace(/\.[^/.]+$/, "").toLowerCase();
         const cleanNpcName = npc.name.toLowerCase().trim();
         return (
-          f.category === 'portrait_npc' ||
-          (cleanNpcName.length > 2 && (cleanName.includes(cleanNpcName) || cleanNpcName.includes(cleanName)))
+          f.category === "portrait_npc" ||
+          (cleanNpcName.length > 2 &&
+            (cleanName.includes(cleanNpcName) ||
+              cleanNpcName.includes(cleanName)))
         );
       });
 
@@ -1882,14 +2147,16 @@ export default function App() {
         npc.portrait = matchingPortrait.content;
       }
 
-      await handleUpdateFileCategory(file.id, 'sheet_npc');
+      await handleUpdateFileCategory(file.id, "sheet_npc");
 
-      await handleUpdateMemory(mem => {
+      await handleUpdateMemory((mem) => {
         const existing = mem.npcs || [];
-        const filtered = existing.filter(n => n.name.toLowerCase() !== npc.name.toLowerCase());
+        const filtered = existing.filter(
+          (n) => n.name.toLowerCase() !== npc.name.toLowerCase(),
+        );
         return {
           ...mem,
-          npcs: [...filtered, npc]
+          npcs: [...filtered, npc],
         };
       });
 
@@ -1897,23 +2164,27 @@ export default function App() {
         active: true,
         percent: 100,
         label: `PNJ "${npc.name}" registrado con éxito`,
-        type: 'sync'
+        type: "sync",
       });
       setTimeout(() => {
-        setTopProgress(p => (p.label?.includes(npc.name) ? { active: false } : p));
+        setTopProgress((p) =>
+          p.label?.includes(npc.name) ? { active: false } : p,
+        );
       }, 4000);
     } catch (error) {
-      console.error('Error extracting NPC:', error);
+      console.error("Error extracting NPC:", error);
       setTopProgress({
         active: true,
         label: `Error al leer la ficha de PNJ de "${file.name}"`,
-        type: 'sync'
+        type: "sync",
       });
       setTimeout(() => {
-        setTopProgress(p => (p.label?.includes('Error al leer') ? { active: false } : p));
+        setTopProgress((p) =>
+          p.label?.includes("Error al leer") ? { active: false } : p,
+        );
       }, 4000);
     } finally {
-      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
+      setExtractingFileIds((prev) => prev.filter((id) => id !== file.id));
     }
   };
 
@@ -1926,22 +2197,22 @@ export default function App() {
       return;
     }
 
-    const hasAnyMessages = currentChats.some(c =>
+    const hasAnyMessages = currentChats.some((c) =>
       (c.messages || []).some(
-        m =>
+        (m) =>
           m.content &&
           m.content.trim().length > 0 &&
-          m.content !== 'Pensando...' &&
-          m.content !== 'Tirando dados...'
-      )
+          m.content !== "Pensando..." &&
+          m.content !== "Tirando dados...",
+      ),
     );
 
     if (!hasAnyMessages) {
       setAlertConfig({
         isOpen: true,
-        title: 'Crónica Vacía',
+        title: "Crónica Vacía",
         message:
-          'Aún no hay mensajes ni eventos registrados en la crónica. Juega al menos un turno o introduce la primera escena para que el Narrador pueda analizar y sincronizar la memoria viva.'
+          "Aún no hay mensajes ni eventos registrados en la crónica. Juega al menos un turno o introduce la primera escena para que el Narrador pueda analizar y sincronizar la memoria viva.",
       });
       return;
     }
@@ -1949,46 +2220,57 @@ export default function App() {
     setIsBackgroundSyncingMemory(true);
     setTopProgress({
       active: true,
-      label: 'Sincronizando memoria viva, fichas y cronología...',
-      type: 'sync'
+      label: "Sincronizando memoria viva, fichas y cronología...",
+      type: "sync",
     });
     try {
       const isCalValido = calendarioValido(currentProject.calendar);
-      
+
       const [updatedMem, calRes] = await Promise.all([
         syncMemoryFromChats(currentProject, currentChats),
-        isCalValido ? resincronizarCronologiaDesdeChat({ project: currentProject, chats: currentChats }) : Promise.resolve(null)
+        isCalValido
+          ? resincronizarCronologiaDesdeChat({
+              project: currentProject,
+              chats: currentChats,
+            })
+          : Promise.resolve(null),
       ]);
 
-      await handleUpdateMemory(prev => ({
+      await handleUpdateMemory((prev) => ({
         ...prev,
-        ...updatedMem
+        ...updatedMem,
       }));
 
       if (calRes) {
         await handleUpdateProjectField({
           timeline: calRes.timeline,
           currentDate: calRes.currentDate,
-          threads: calRes.threads
+          threads: calRes.threads,
         });
       }
 
       setAlertConfig({
         isOpen: true,
-        title: 'Sincronización Completada',
+        title: "Sincronización Completada",
         message:
-          'La memoria viva (estado, tramas, fichas, PNJs) y la cronología se han sincronizado con éxito a partir de tus partidas.'
+          "La memoria viva (estado, tramas, fichas, PNJs) y la cronología se han sincronizado con éxito a partir de tus partidas.",
       });
     } catch (error: any) {
-      console.error('Error syncing project:', error);
-      const errMsg = error?.message || 'No se pudo sincronizar la partida. Inténtalo de nuevo.';
-      if (errMsg.includes('GEMINI_API_KEY') || errMsg.includes('API key') || errMsg.includes('clave')) {
+      console.error("Error syncing project:", error);
+      const errMsg =
+        error?.message ||
+        "No se pudo sincronizar la partida. Inténtalo de nuevo.";
+      if (
+        errMsg.includes("GEMINI_API_KEY") ||
+        errMsg.includes("API key") ||
+        errMsg.includes("clave")
+      ) {
         setIsApiKeyModalOpen(true);
       }
       setAlertConfig({
         isOpen: true,
-        title: 'Error de Sincronización',
-        message: errMsg
+        title: "Error de Sincronización",
+        message: errMsg,
       });
     } finally {
       setIsBackgroundSyncingMemory(false);
@@ -2000,33 +2282,36 @@ export default function App() {
     if (!currentProject || !currentChat) return;
     setIsGenerating(true);
     try {
-      const { exportChronicleToPDF } = await import('./utils/pdfExport');
+      const { exportChronicleToPDF } = await import("./utils/pdfExport");
       await exportChronicleToPDF(currentProject, currentChat, setLoadingText);
     } catch (error: any) {
-      console.error('Error exporting PDF:', error);
+      console.error("Error exporting PDF:", error);
       setAlertConfig({
         isOpen: true,
-        title: 'Error de Exportación',
-        message: error?.message || 'No se pudo exportar el tomo.'
+        title: "Error de Exportación",
+        message: error?.message || "No se pudo exportar el tomo.",
       });
     } finally {
       setIsGenerating(false);
-      setLoadingText('');
+      setLoadingText("");
     }
   };
 
   const processImportFile = async (file: File) => {
     return new Promise<void>((resolve, reject) => {
       const fileReader = new FileReader();
-      fileReader.readAsText(file, 'UTF-8');
-      fileReader.onload = async event => {
+      fileReader.readAsText(file, "UTF-8");
+      fileReader.onload = async (event) => {
         try {
           const imported = JSON.parse(event.target?.result as string);
 
           // Restauración automática de API Keys y configuración del motor de IA si vienen en el archivo
           if (Array.isArray(imported.apiKeys) && imported.apiKeys.length > 0) {
             setStoredApiKeys(imported.apiKeys);
-          } else if (typeof imported.apiKey === 'string' && imported.apiKey.trim()) {
+          } else if (
+            typeof imported.apiKey === "string" &&
+            imported.apiKey.trim()
+          ) {
             setStoredApiKeys([imported.apiKey.trim()]);
           }
           if (imported.keyRotationMode) {
@@ -2035,23 +2320,31 @@ export default function App() {
           const aiConfig = imported.geminiSettings || imported.settings;
           if (aiConfig) {
             if (aiConfig.model) setStoredModel(aiConfig.model);
-            if (aiConfig.backgroundModel) setStoredBackgroundModel(aiConfig.backgroundModel);
-            if (aiConfig.safetyLevel) setStoredSafetyLevel(aiConfig.safetyLevel);
-            if (aiConfig.thinkingLevel) setStoredThinkingLevel(aiConfig.thinkingLevel);
-            if (typeof aiConfig.temperature === 'number') setStoredTemperature(aiConfig.temperature);
-            if (typeof aiConfig.topP === 'number') setStoredTopP(aiConfig.topP);
-            if (typeof aiConfig.autoFailover === 'boolean') setStoredAutoFailover(aiConfig.autoFailover);
-            if (aiConfig.memorySyncGranularity) setStoredMemorySyncGranularity(aiConfig.memorySyncGranularity);
+            if (aiConfig.backgroundModel)
+              setStoredBackgroundModel(aiConfig.backgroundModel);
+            if (aiConfig.safetyLevel)
+              setStoredSafetyLevel(aiConfig.safetyLevel);
+            if (aiConfig.thinkingLevel)
+              setStoredThinkingLevel(aiConfig.thinkingLevel);
+            if (typeof aiConfig.temperature === "number")
+              setStoredTemperature(aiConfig.temperature);
+            if (typeof aiConfig.topP === "number") setStoredTopP(aiConfig.topP);
+            if (typeof aiConfig.autoFailover === "boolean")
+              setStoredAutoFailover(aiConfig.autoFailover);
+            if (aiConfig.memorySyncGranularity) aiConfig.memorySyncGranularity;
           }
 
           // Soporte para copias completas de todas las campañas
-          if (imported.version === 'gmstudio_v2' && Array.isArray(imported.projects)) {
+          if (
+            imported.version === "gmstudio_v2" &&
+            Array.isArray(imported.projects)
+          ) {
             const allProjects: Project[] = imported.projects;
             if (allProjects.length === 0) {
               setAlertConfig({
                 isOpen: true,
-                title: 'Copia Vacía',
-                message: 'El archivo de copia no contiene campañas guardadas.'
+                title: "Copia Vacía",
+                message: "El archivo de copia no contiene campañas guardadas.",
               });
               resolve();
               return;
@@ -2072,8 +2365,8 @@ export default function App() {
             }
             setAlertConfig({
               isOpen: true,
-              title: 'Copia Global Restaurada',
-              message: `Se han importado y restaurado con éxito ${allProjects.length} campaña(s) en tu almacenamiento local.`
+              title: "Copia Global Restaurada",
+              message: `Se han importado y restaurado con éxito ${allProjects.length} campaña(s) en tu almacenamiento local.`,
             });
             resolve();
             return;
@@ -2082,9 +2375,9 @@ export default function App() {
           if (!imported.name) {
             setAlertConfig({
               isOpen: true,
-              title: 'Archivo no reconocido',
+              title: "Archivo no reconocido",
               message:
-                'El archivo se ha leído pero no contiene una campaña de GM Studio (falta el campo "name").'
+                'El archivo se ha leído pero no contiene una campaña de GM Studio (falta el campo "name").',
             });
             resolve();
             return;
@@ -2092,89 +2385,124 @@ export default function App() {
 
           const chatsImportados: Chat[] = Array.isArray(imported.chats)
             ? imported.chats.map((ch: any, i: number) => ({
-                id: ch.id || `cap_${i}_${Math.random().toString(36).substring(7)}`,
-                name: ch.name || 'Capítulo',
+                id:
+                  ch.id ||
+                  `cap_${i}_${Math.random().toString(36).substring(7)}`,
+                name: ch.name || "Capítulo",
                 messages: ch.messages || [],
-                autoTitled: ch.autoTitled
+                autoTitled: ch.autoTitled,
               }))
-            : [{ id: 'cap_inicial', name: 'Capítulo I: El Comienzo', messages: [] }];
+            : [
+                {
+                  id: "cap_inicial",
+                  name: "Capítulo I: El Comienzo",
+                  messages: [],
+                },
+              ];
 
-          const archivosImportados: ProjectFile[] = Array.isArray(imported.files) ? imported.files : [];
+          const archivosImportados: ProjectFile[] = Array.isArray(
+            imported.files,
+          )
+            ? imported.files
+            : [];
 
           const camposDeLaCampana = (id: string, nombre: string): Project => ({
             ...(imported as Project),
             id,
             name: nombre,
             memory: imported.memory || {
-              story: '',
+              story: "",
               quests: [],
               npcs: [],
               locations: [],
-              current_status: '',
-              manual_notes: ''
+              current_status: "",
+              manual_notes: "",
             },
             chats: [],
-            files: []
+            files: [],
           });
 
           const guardar = async (proj: Project, reemplazando: boolean) => {
             const updated = reemplazando
-              ? projects.map(p => (p.id === proj.id ? proj : p))
+              ? projects.map((p) => (p.id === proj.id ? proj : p))
               : [...projects, proj];
             setProjects(updated);
             saveLocalProjects(updated);
             saveLocalChats(proj.id, chatsImportados);
-            if (archivosImportados.length) await saveFilesToDB(proj.id, archivosImportados);
+            if (archivosImportados.length)
+              await saveFilesToDB(proj.id, archivosImportados);
             setCurrentPId(proj.id);
 
-            const mensajes = chatsImportados.reduce((a, c) => a + (c.messages || []).length, 0);
+            const mensajes = chatsImportados.reduce(
+              (a, c) => a + (c.messages || []).length,
+              0,
+            );
             setAlertConfig({
               isOpen: true,
-              title: reemplazando ? 'Campaña reemplazada' : 'Campaña importada',
+              title: reemplazando ? "Campaña reemplazada" : "Campaña importada",
               message: `${proj.name}\n${chatsImportados.length} capítulos · ${mensajes} mensajes${
-                imported.calendar ? '\nCalendario, agenda e hilos incluidos.' : ''
-              }`
+                imported.calendar
+                  ? "\nCalendario, agenda e hilos incluidos."
+                  : ""
+              }`,
             });
             resolve();
           };
 
           const limpiar = (n: string) =>
             n
-              .replace(/\s*\(Importado\)\s*$/i, '')
+              .replace(/\s*\(Importado\)\s*$/i, "")
               .trim()
               .toLowerCase();
-          const gemela = projects.find(p => limpiar(p.name) === limpiar(imported.name));
+          const gemela = projects.find(
+            (p) => limpiar(p.name) === limpiar(imported.name),
+          );
 
           if (!gemela) {
-            await guardar(camposDeLaCampana('tomo_' + Date.now(), imported.name), false);
+            await guardar(
+              camposDeLaCampana("tomo_" + Date.now(), imported.name),
+              false,
+            );
             return;
           }
 
-          const mensajesAqui = getLocalChats(gemela.id).reduce((a, c) => a + (c.messages || []).length, 0);
-          const mensajesFuera = chatsImportados.reduce((a, c) => a + (c.messages || []).length, 0);
+          const mensajesAqui = getLocalChats(gemela.id).reduce(
+            (a, c) => a + (c.messages || []).length,
+            0,
+          );
+          const mensajesFuera = chatsImportados.reduce(
+            (a, c) => a + (c.messages || []).length,
+            0,
+          );
           const cuando = imported.exportadaEl
-            ? new Date(imported.exportadaEl).toLocaleString('es-ES')
-            : 'fecha desconocida';
+            ? new Date(imported.exportadaEl).toLocaleString("es-ES")
+            : "fecha desconocida";
 
           setConfirmConfig({
             isOpen: true,
             danger: false,
-            confirmLabel: 'Reemplazar la mía',
-            cancelLabel: 'Guardar las dos',
+            confirmLabel: "Reemplazar la mía",
+            cancelLabel: "Guardar las dos",
             message: `Ya tienes una campaña llamada «${gemela.name}».\n\nLa de aquí: ${mensajesAqui} mensajes.\nLa del archivo: ${mensajesFuera} mensajes (exportada el ${cuando}).\n\nReemplazar borra la de aquí y se queda con la del archivo. Guardar las dos deja una copia aparte, sin tocar nada.`,
             onConfirm: () => {
               void guardar(camposDeLaCampana(gemela.id, gemela.name), true);
             },
             onCancel: () => {
-              void guardar(camposDeLaCampana('tomo_' + Date.now(), imported.name + ' (Importado)'), false);
-            }
+              void guardar(
+                camposDeLaCampana(
+                  "tomo_" + Date.now(),
+                  imported.name + " (Importado)",
+                ),
+                false,
+              );
+            },
           });
         } catch (err) {
-          console.error('Error importing JSON:', err);
+          console.error("Error importing JSON:", err);
           setAlertConfig({
             isOpen: true,
-            title: 'Error de Importación',
-            message: 'El archivo JSON no tiene un formato válido.'
+            title: "Error de Importación",
+            message: "El archivo JSON no tiene un formato válido.",
           });
           reject(err);
         }
@@ -2182,12 +2510,15 @@ export default function App() {
     });
   };
 
-  const handleConfirmImportCampaign = async (extracted: ExtractedCampaignResult, mode: 'new' | 'merge') => {
+  const handleConfirmImportCampaign = async (
+    extracted: ExtractedCampaignResult,
+    mode: "new" | "merge",
+  ) => {
     const { project: importedProject, chats: importedChats } = extracted;
 
-    if (mode === 'merge' && currentProject) {
+    if (mode === "merge" && currentProject) {
       // 1. Fusionar Capítulos
-      const existingChatIds = new Set(currentChats.map(c => c.id));
+      const existingChatIds = new Set(currentChats.map((c) => c.id));
       const mergedChats = [...currentChats];
       for (const ch of importedChats) {
         if (!existingChatIds.has(ch.id)) {
@@ -2196,7 +2527,9 @@ export default function App() {
       }
 
       // 2. Fusionar PNJs respetando afinidad (ATR, VÍN, CON)
-      const existingNpcNames = new Set(currentProject.memory.npcs.map(n => n.name.toLowerCase().trim()));
+      const existingNpcNames = new Set(
+        currentProject.memory.npcs.map((n) => n.name.toLowerCase().trim()),
+      );
       const mergedNpcs = [...currentProject.memory.npcs];
       for (const npc of importedProject.memory.npcs) {
         if (!existingNpcNames.has(npc.name.toLowerCase().trim())) {
@@ -2205,7 +2538,9 @@ export default function App() {
       }
 
       // 3. Fusionar Quests & Locations
-      const existingQuestTitles = new Set(currentProject.memory.quests.map(q => q.title.toLowerCase().trim()));
+      const existingQuestTitles = new Set(
+        currentProject.memory.quests.map((q) => q.title.toLowerCase().trim()),
+      );
       const mergedQuests = [...currentProject.memory.quests];
       for (const q of importedProject.memory.quests) {
         if (!existingQuestTitles.has(q.title.toLowerCase().trim())) {
@@ -2213,7 +2548,9 @@ export default function App() {
         }
       }
 
-      const existingLocNames = new Set(currentProject.memory.locations.map(l => l.name.toLowerCase().trim()));
+      const existingLocNames = new Set(
+        currentProject.memory.locations.map((l) => l.name.toLowerCase().trim()),
+      );
       const mergedLocs = [...currentProject.memory.locations];
       for (const loc of importedProject.memory.locations) {
         if (!existingLocNames.has(loc.name.toLowerCase().trim())) {
@@ -2231,11 +2568,15 @@ export default function App() {
           story: currentProject.memory.story
             ? `${currentProject.memory.story}\n\n[Continuación de material importado]:\n${importedProject.memory.story}`
             : importedProject.memory.story,
-          player_character: currentProject.memory.player_character || importedProject.memory.player_character
-        }
+          player_character:
+            currentProject.memory.player_character ||
+            importedProject.memory.player_character,
+        },
       };
 
-      const updatedProjects = projects.map(p => (p.id === currentProject.id ? updatedCurrentProject : p));
+      const updatedProjects = projects.map((p) =>
+        p.id === currentProject.id ? updatedCurrentProject : p,
+      );
       setProjects(updatedProjects);
       saveLocalProjects(updatedProjects);
       saveLocalChats(currentProject.id, mergedChats);
@@ -2243,8 +2584,8 @@ export default function App() {
 
       setAlertConfig({
         isOpen: true,
-        title: 'Tomo Fusionado',
-        message: `Se han añadido ${importedChats.length} capítulos, ${importedProject.memory.npcs.length} PNJs y las misiones/lugares de la importación a «${currentProject.name}».`
+        title: "Tomo Fusionado",
+        message: `Se han añadido ${importedChats.length} capítulos, ${importedProject.memory.npcs.length} PNJs y las misiones/lugares de la importación a «${currentProject.name}».`,
       });
       return;
     }
@@ -2262,21 +2603,25 @@ export default function App() {
 
     setAlertConfig({
       isOpen: true,
-      title: 'Nuevo Tomo Creado',
-      message: `¡Campaña «${importedProject.name}» importada con éxito!\nSe han estructurado ${importedChats.length} capítulos con ${extracted.summary.messagesCount} mensajes, ${importedProject.memory.npcs.length} PNJs con afinidad y ficha de personaje lista para jugar.`
+      title: "Nuevo Tomo Creado",
+      message: `¡Campaña «${importedProject.name}» importada con éxito!\nSe han estructurado ${importedChats.length} capítulos con ${extracted.summary.messagesCount} mensajes, ${importedProject.memory.npcs.length} PNJs con afinidad y ficha de personaje lista para jugar.`,
     });
   };
 
-  const currentChapterIndex = currentChats.findIndex(c => c.id === currentChatId);
+  const currentChapterIndex = currentChats.findIndex(
+    (c) => c.id === currentChatId,
+  );
 
   // La fecha va en la propia pestaña: saber en qué día vives no debería costar un
   // clic, y la cabecera es lo único que se ve siempre.
-  const llevaElTiempo = Boolean(currentProject?.currentDate) && calendarioValido(currentProject?.calendar);
-  const fechaBoton = 'Diario';
+  const llevaElTiempo =
+    Boolean(currentProject?.currentDate) &&
+    calendarioValido(currentProject?.calendar);
+  const fechaBoton = "Diario";
   const tituloFecha =
     llevaElTiempo && currentProject?.calendar && currentProject.currentDate
       ? fechaCompleta(currentProject.calendar, currentProject.currentDate)
-      : 'Llevar el tiempo de la campaña';
+      : "Llevar el tiempo de la campaña";
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg-color)] text-[var(--text-primary)] font-lora relative">
@@ -2289,7 +2634,9 @@ export default function App() {
             {topProgress.active && topProgress.percent !== undefined ? (
               <div
                 className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-emerald-400 dark:from-amber-400 dark:via-amber-300 dark:to-emerald-400 transition-all duration-300 ease-out shadow-[0_0_10px_rgba(245,158,11,0.8)]"
-                style={{ width: `${Math.max(5, Math.min(100, topProgress.percent))}%` }}
+                style={{
+                  width: `${Math.max(5, Math.min(100, topProgress.percent))}%`,
+                }}
               />
             ) : (
               <div className="h-full w-full bg-[var(--glass-border)] relative overflow-hidden">
@@ -2302,15 +2649,19 @@ export default function App() {
           {(topProgress.active
             ? topProgress.label
             : isBackgroundSyncingMemory
-            ? 'Sincronizando memoria viva...'
-            : null) && (
+              ? "Sincronizando memoria viva..."
+              : null) && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface)]/95 border border-[var(--glass-border)] text-[var(--accent)] text-[11px] font-cinzel font-semibold shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
               <span className="truncate max-w-[220px] sm:max-w-xs">
-                {topProgress.active ? topProgress.label : 'Sincronizando memoria viva...'}
+                {topProgress.active
+                  ? topProgress.label
+                  : "Sincronizando memoria viva..."}
               </span>
               {topProgress.active && topProgress.percent !== undefined && (
-                <span className="text-[10px] opacity-75 font-mono">({topProgress.percent}%)</span>
+                <span className="text-[10px] opacity-75 font-mono">
+                  ({topProgress.percent}%)
+                </span>
               )}
             </div>
           )}
@@ -2337,12 +2688,12 @@ export default function App() {
           <div className="bg-[var(--surface)] px-6 py-5 rounded-xl shadow-2xl border-2 border-[var(--accent)] flex items-center gap-4 max-w-lg mx-4">
             <div className="w-6 h-6 border-3 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
             <span className="font-cinzel text-xs md:text-sm text-[var(--accent)] font-bold flex-1 tracking-wide">
-              {loadingText || 'Procesando...'}
+              {loadingText || "Procesando..."}
             </span>
             <button
               onClick={() => {
                 setIsGenerating(false);
-                setLoadingText('');
+                setLoadingText("");
               }}
               className="p-1 rounded-full text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-colors"
               title="Cancelar o cerrar espera"
@@ -2369,11 +2720,11 @@ export default function App() {
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
         currentKey={getStoredApiKey()}
-        onSaveKey={key => {
+        onSaveKey={(key) => {
           setStoredApiKey(key);
         }}
         currentModel={getStoredModel()}
-        onSaveModel={model => {
+        onSaveModel={(model) => {
           setStoredModel(model);
         }}
       />
@@ -2430,8 +2781,8 @@ export default function App() {
       <div
         className={`${
           isSidebarOpen
-            ? 'w-[85vw] max-w-xs sm:w-80 md:w-88 translate-x-0'
-            : 'w-0 -translate-x-full md:translate-x-0 md:w-0'
+            ? "w-[85vw] max-w-xs sm:w-80 md:w-88 translate-x-0"
+            : "w-0 -translate-x-full md:translate-x-0 md:w-0"
         } fixed md:relative inset-y-0 left-0 z-40 md:z-30 transition-all duration-300 ease-in-out bg-[var(--sidebar-bg)] border-r border-[var(--glass-border)] flex flex-col shrink-0 overflow-hidden shadow-2xl md:shadow-lg`}
       >
         {/* Sidebar Header */}
@@ -2444,8 +2795,8 @@ export default function App() {
               onClick={handleManualSaveCampaign}
               className={`text-xs font-cinzel transition-all cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border ${
                 isManuallySaved
-                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs'
-                  : 'text-[var(--accent)] hover:underline border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]'
+                  ? "bg-emerald-600 text-white border-emerald-500 shadow-xs"
+                  : "text-[var(--accent)] hover:underline border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
               }`}
               title="Guardar manualmente el progreso de la campaña activa"
               aria-label="Guardar campaña"
@@ -2455,7 +2806,9 @@ export default function App() {
               ) : (
                 <Save className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
               )}
-              <span className="hidden sm:inline">{isManuallySaved ? 'Guardado' : 'Guardar'}</span>
+              <span className="hidden sm:inline">
+                {isManuallySaved ? "Guardado" : "Guardar"}
+              </span>
             </button>
             <button
               onClick={() => setIsImportCampaignModalOpen(true)}
@@ -2501,15 +2854,15 @@ export default function App() {
 
           <div className="flex gap-1.5 items-center w-full min-w-0">
             <select
-              value={currentPId || ''}
-              onChange={e => {
+              value={currentPId || ""}
+              onChange={(e) => {
                 setCurrentPId(e.target.value);
                 setCurrentChatId(null);
               }}
               className="flex-1 min-w-0 bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] border border-[var(--user-border)] p-2 rounded text-xs md:text-sm font-cinzel font-semibold text-[var(--accent)] outline-none cursor-pointer truncate"
             >
               {projects.length === 0 && <option value="">Sin Tomos</option>}
-              {projects.map(p => (
+              {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -2539,15 +2892,18 @@ export default function App() {
             <div className="grid grid-cols-3 gap-1.5">
               <button
                 onClick={() => {
-                  setActiveTab('instructions');
-                  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  setActiveTab("instructions");
+                  if (
+                    typeof window !== "undefined" &&
+                    window.innerWidth < 768
+                  ) {
                     setIsSidebarOpen(false);
                   }
                 }}
                 className={`flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-[11px] font-cinzel transition-all duration-200 cursor-pointer border active:scale-95 ${
-                  activeTab === 'instructions'
-                    ? 'bg-[var(--accent)] text-[var(--on-accent)] font-semibold border-transparent shadow-xs shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]'
-                    : 'bg-[var(--glass)] border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'
+                  activeTab === "instructions"
+                    ? "bg-[var(--accent)] text-[var(--on-accent)] font-semibold border-transparent shadow-xs shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]"
+                    : "bg-[var(--glass)] border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
                 }`}
                 title="Directivas de campaña: Sistema de rol, estilo de narración e instrucciones de juego"
               >
@@ -2557,26 +2913,34 @@ export default function App() {
 
               <button
                 onClick={() => {
-                  setActiveTab('files');
-                  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  setActiveTab("files");
+                  if (
+                    typeof window !== "undefined" &&
+                    window.innerWidth < 768
+                  ) {
                     setIsSidebarOpen(false);
                   }
                 }}
                 className={`flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-[11px] font-cinzel transition-all duration-200 cursor-pointer border active:scale-95 ${
-                  activeTab === 'files'
-                    ? 'bg-[var(--accent)] text-[var(--on-accent)] font-semibold border-transparent shadow-xs shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]'
-                    : 'bg-[var(--glass)] border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'
+                  activeTab === "files"
+                    ? "bg-[var(--accent)] text-[var(--on-accent)] font-semibold border-transparent shadow-xs shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]"
+                    : "bg-[var(--glass)] border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
                 }`}
                 title="Archivos y mapas de campaña"
               >
                 <Paperclip className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate text-[10px]">Archivos ({currentFiles.length})</span>
+                <span className="truncate text-[10px]">
+                  Archivos ({currentFiles.length})
+                </span>
               </button>
 
               <button
                 onClick={() => {
                   setIsApiKeyModalOpen(true);
-                  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  if (
+                    typeof window !== "undefined" &&
+                    window.innerWidth < 768
+                  ) {
                     setIsSidebarOpen(false);
                   }
                 }}
@@ -2586,7 +2950,7 @@ export default function App() {
                 <Sliders className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate text-[10px]">Ajustes</span>
                 <span
-                  className={`w-1.5 h-1.5 rounded-full absolute top-1 right-1 ${hasConfiguredApiKey() ? 'bg-emerald-500' : 'bg-red-500'}`}
+                  className={`w-1.5 h-1.5 rounded-full absolute top-1 right-1 ${hasConfiguredApiKey() ? "bg-emerald-500" : "bg-red-500"}`}
                 />
               </button>
             </div>
@@ -2607,36 +2971,44 @@ export default function App() {
             </button>
           </div>
 
-          {currentChats.map(c => {
+          {currentChats.map((c) => {
             const isSelected = c.id === currentChatId;
             return (
               <div
                 key={c.id}
                 onClick={() => {
                   setCurrentChatId(c.id);
-                  setActiveTab('chat');
-                  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  setActiveTab("chat");
+                  if (
+                    typeof window !== "undefined" &&
+                    window.innerWidth < 768
+                  ) {
                     setIsSidebarOpen(false);
                   }
                 }}
                 className={`group flex justify-between items-center px-3 py-2.5 rounded-lg text-xs md:text-sm transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-[var(--accent)] text-[var(--on-accent)] font-semibold shadow-sm'
-                    : 'text-[var(--text-primary)] hover:bg-[var(--glass)]'
+                    ? "bg-[var(--accent)] text-[var(--on-accent)] font-semibold shadow-sm"
+                    : "text-[var(--text-primary)] hover:bg-[var(--glass)]"
                 }`}
               >
-                <span className="truncate flex-1 font-cinzel flex items-center gap-1.5" title={c.name}>
+                <span
+                  className="truncate flex-1 font-cinzel flex items-center gap-1.5"
+                  title={c.name}
+                >
                   <Scroll className="w-3.5 h-3.5 shrink-0 opacity-70" />
                   <span className="truncate">{c.name}</span>
                 </span>
                 <button
                   type="button"
-                  onClick={e => {
+                  onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteChat(c.id);
                   }}
                   className={`opacity-70 md:opacity-0 group-hover:opacity-100 p-1 text-xs hover:scale-110 transition-all cursor-pointer ${
-                    isSelected ? 'text-white/80 hover:text-white' : 'text-red-600 hover:text-red-700'
+                    isSelected
+                      ? "text-white/80 hover:text-white"
+                      : "text-red-600 hover:text-red-700"
                   }`}
                   title="Borrar sesión"
                   aria-label="Borrar sesión"
@@ -2655,7 +3027,6 @@ export default function App() {
             <CombatHud project={currentProject} variant="sidebar" />
           </div>
         )}
-
 
         {/* Real-time Token & Context Capacity Widget */}
         <ContextUsageWidget
@@ -2691,26 +3062,27 @@ export default function App() {
               <Menu className="w-5 h-5" />
             </button>
             <h2 className="font-cinzel text-xs sm:text-sm md:text-base text-[var(--accent)] font-bold truncate max-w-[110px] sm:max-w-[180px] md:max-w-[280px] m-0">
-              {currentProject?.name || 'Selecciona un Tomo'}
+              {currentProject?.name || "Selecciona un Tomo"}
             </h2>
           </div>
 
           {/* Navigation Tabs */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
-              { id: 'chat', label: 'Crónica', icon: Swords },
-              { id: 'status', label: 'Estado', icon: Compass },
-              { id: 'memory', label: 'Fichas', icon: ScrollText },
+              { id: "chat", label: "Crónica", icon: Swords },
+              { id: "status", label: "Estado", icon: Compass },
+              { id: "memory", label: "Fichas", icon: ScrollText },
               {
-                id: 'calendar',
+                id: "calendar",
                 label: fechaBoton,
                 icon: BookOpen,
-                title: tituloFecha
-              }
-            ].map(tab => {
+                title: tituloFecha,
+              },
+            ].map((tab) => {
               const TabIcon = tab.icon;
               const isCurrentActive =
-                activeTab === tab.id || (tab.id === 'chat' && activeTab === 'novel');
+                activeTab === tab.id ||
+                (tab.id === "chat" && activeTab === "novel");
               return (
                 <button
                   key={tab.id}
@@ -2719,13 +3091,13 @@ export default function App() {
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`font-cinzel text-xs px-2.5 sm:px-2.5 md:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 relative ${
                     isCurrentActive
-                      ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
+                      ? "bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs"
+                      : "text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]"
                   }`}
                 >
                   <TabIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="hidden sm:inline">{tab.label}</span>
-                  {tab.id === 'memory' && isBackgroundSyncingMemory && (
+                  {tab.id === "memory" && isBackgroundSyncingMemory && (
                     <span
                       className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-0.5 -right-0.5"
                       title="Actualizando memoria viva en segundo plano..."
@@ -2740,14 +3112,14 @@ export default function App() {
                 onClick={handleTriggerAISyncMemory}
                 disabled={
                   isBackgroundSyncingMemory ||
-                  !currentChats.some(c =>
+                  !currentChats.some((c) =>
                     (c.messages || []).some(
-                      m =>
+                      (m) =>
                         m.content &&
                         m.content.trim().length > 0 &&
-                        m.content !== 'Pensando...' &&
-                        m.content !== 'Tirando dados...'
-                    )
+                        m.content !== "Pensando..." &&
+                        m.content !== "Tirando dados...",
+                    ),
                   )
                 }
                 className="flex items-center gap-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
@@ -2769,36 +3141,44 @@ export default function App() {
             )}
 
             <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="flex items-center gap-1 text-xs font-cinzel border border-[var(--user-border)] p-1.5 sm:px-2 rounded-lg hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors cursor-pointer bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] shadow-xs"
-              title={theme === 'dark' ? 'Volver al tema de día' : 'Cambiar al tema de noche'}
+              title={
+                theme === "dark"
+                  ? "Volver al tema de día"
+                  : "Cambiar al tema de noche"
+              }
             >
-              {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              {theme === "dark" ? (
+                <Sun className="w-3.5 h-3.5" />
+              ) : (
+                <Moon className="w-3.5 h-3.5" />
+              )}
             </button>
           </div>
         </div>
 
         {/* Tab Views */}
         <Suspense fallback={<ViewLoader />}>
-          {activeTab === 'chat' && (
+          {activeTab === "chat" && (
             <ChatView
               project={
                 currentProject || {
-                  id: '',
-                  name: '',
-                  instructions: '',
-                  system: '',
-                  style: '',
+                  id: "",
+                  name: "",
+                  instructions: "",
+                  system: "",
+                  style: "",
                   memory: {
-                    story: '',
+                    story: "",
                     quests: [],
                     npcs: [],
                     locations: [],
-                    current_status: '',
-                    manual_notes: ''
+                    current_status: "",
+                    manual_notes: "",
                   },
                   chats: [],
-                  files: []
+                  files: [],
                 }
               }
               chat={currentChat}
@@ -2814,29 +3194,29 @@ export default function App() {
               onRollRequest={handleRollRequest}
               onOracleAsk={handleOracleAsk}
               onOracleMeaning={handleOracleMeaning}
-              hasOracle={currentFiles.some(f => f.category === 'oracle')}
+              hasOracle={currentFiles.some((f) => f.category === "oracle")}
               onFileUpload={handleFilesUpload}
               onExportPDF={handleExportPDF}
               onEditMessage={handleEditChatMessage}
               onRegenerateMessage={handleRegenerateChatMessage}
               onContinueNarrative={handleContinueNarrative}
               onDeleteMessage={handleDeleteChatMessage}
-              onOpenNovelReader={() => setActiveTab('novel')}
+              onOpenNovelReader={() => setActiveTab("novel")}
               isBackgroundSyncing={isBackgroundSyncingMemory}
             />
           )}
 
-          {activeTab === 'novel' && currentProject && (
+          {activeTab === "novel" && currentProject && (
             <NovelReaderView
               project={currentProject}
               chats={currentChats}
               currentChatId={currentChatId}
-              onSelectChat={id => setCurrentChatId(id)}
-              onBackToChat={() => setActiveTab('chat')}
+              onSelectChat={(id) => setCurrentChatId(id)}
+              onBackToChat={() => setActiveTab("chat")}
             />
           )}
 
-          {activeTab === 'status' && currentProject && (
+          {activeTab === "status" && currentProject && (
             <StatusView
               project={currentProject}
               files={currentFiles}
@@ -2845,21 +3225,21 @@ export default function App() {
               onUpdateMemory={handleUpdateMemory}
               onTriggerAIUpdate={handleTriggerAISyncMemory}
               isGenerating={isBackgroundSyncingMemory || isGenerating}
-              hasChats={currentChats.some(c =>
+              hasChats={currentChats.some((c) =>
                 (c.messages || []).some(
-                  m =>
+                  (m) =>
                     m.content &&
                     m.content.trim().length > 0 &&
-                    m.content !== 'Pensando...' &&
-                    m.content !== 'Tirando dados...'
-                )
+                    m.content !== "Pensando..." &&
+                    m.content !== "Tirando dados...",
+                ),
               )}
             />
           )}
 
-          {activeTab === 'memory' && currentProject && (
+          {activeTab === "memory" && currentProject && (
             <MemoryManager
-              secciones={['character', 'npcs', 'locs', 'visual', 'quests']}
+              secciones={["character", "npcs", "locs", "visual", "quests"]}
               project={currentProject}
               files={currentFiles}
               onUpdateMemory={handleUpdateMemory}
@@ -2867,23 +3247,23 @@ export default function App() {
               onAnalyzeImageFile={handleAnalyzeImageFile}
               onUpdateFileAnalysis={handleUpdateFileAnalysis}
               onDeleteFileAnalysis={handleDeleteFileAnalysis}
-              onOpenMap={file => setSelectedMapFile(file)}
+              onOpenMap={(file) => setSelectedMapFile(file)}
               onAutoClassifyAll={handleAutoClassifyAll}
               onUploadEntityImage={handleUploadEntityImage}
               isGenerating={isBackgroundSyncingMemory || isGenerating}
-              hasChats={currentChats.some(c =>
+              hasChats={currentChats.some((c) =>
                 (c.messages || []).some(
-                  m =>
+                  (m) =>
                     m.content &&
                     m.content.trim().length > 0 &&
-                    m.content !== 'Pensando...' &&
-                    m.content !== 'Tirando dados...'
-                )
+                    m.content !== "Pensando..." &&
+                    m.content !== "Tirando dados...",
+                ),
               )}
             />
           )}
 
-          {activeTab === 'calendar' && currentProject && (
+          {activeTab === "calendar" && currentProject && (
             <CalendarView
               project={currentProject}
               files={currentFiles}
@@ -2892,25 +3272,25 @@ export default function App() {
               onUpdateMemory={handleUpdateMemory}
               onTriggerAIUpdate={handleTriggerAISyncMemory}
               isGenerating={isBackgroundSyncingMemory || isGenerating}
-              hasChats={currentChats.some(c =>
+              hasChats={currentChats.some((c) =>
                 (c.messages || []).some(
-                  m =>
+                  (m) =>
                     m.content &&
                     m.content.trim().length > 0 &&
-                    m.content !== 'Pensando...' &&
-                    m.content !== 'Tirando dados...'
-                )
+                    m.content !== "Pensando..." &&
+                    m.content !== "Tirando dados...",
+                ),
               )}
             />
           )}
 
-          {activeTab === 'files' && currentProject && (
+          {activeTab === "files" && currentProject && (
             <FilesView
               project={currentProject}
               files={currentFiles}
               onUpload={handleFilesUpload}
               onDeleteFile={handleDeleteFile}
-              onOpenMap={file => setSelectedMapFile(file)}
+              onOpenMap={(file) => setSelectedMapFile(file)}
               onAnalyzeImageFile={handleAnalyzeImageFile}
               onUpdateFileAnalysis={handleUpdateFileAnalysis}
               onDeleteFileAnalysis={handleDeleteFileAnalysis}
@@ -2928,7 +3308,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'instructions' && currentProject && (
+          {activeTab === "instructions" && currentProject && (
             <InstructionsView
               project={currentProject}
               onUpdate={handleUpdateProjectField}
@@ -2936,7 +3316,7 @@ export default function App() {
                 setConfirmConfig({
                   isOpen: true,
                   message,
-                  onConfirm
+                  onConfirm,
                 });
               }}
             />

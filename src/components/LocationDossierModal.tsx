@@ -1,12 +1,6 @@
-import React from 'react';
-import { Location, ProjectFile } from '../types';
-import {
-  X,
-  Castle,
-  MapPin,
-  Camera,
-  Eye
-} from 'lucide-react';
+import React from "react";
+import { Location, ProjectFile } from "../types";
+import { X, Castle, MapPin, Camera, Eye } from "lucide-react";
 
 interface LocationDossierModalProps {
   location: Location;
@@ -19,29 +13,31 @@ export const LocationDossierModal: React.FC<LocationDossierModalProps> = ({
   location,
   allImageFiles,
   onChangeMap,
-  onClose
+  onClose,
 }) => {
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   const matchingMap = location.portrait
-    ? allImageFiles.find(f => f.content === location.portrait)
+    ? allImageFiles.find((f) => f.content === location.portrait)
     : allImageFiles.find(
-        f => location.name.length > 2 && f.name.toLowerCase().includes(location.name.toLowerCase())
+        (f) =>
+          location.name.length > 2 &&
+          f.name.toLowerCase().includes(location.name.toLowerCase()),
       );
   const mapSrc = location.portrait || matchingMap?.content;
 
   return (
     <div
       className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-3 sm:p-5 backdrop-blur-2xs"
-      onClick={e => {
+      onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
@@ -66,7 +62,8 @@ export const LocationDossierModal: React.FC<LocationDossierModalProps> = ({
                 {location.name}
               </h3>
               <span className="text-xs font-cinzel text-[var(--text-secondary)] flex items-center gap-1 mt-1">
-                <MapPin className="w-3.5 h-3.5 text-[var(--accent)]" /> Lugar Clave de Campaña
+                <MapPin className="w-3.5 h-3.5 text-[var(--accent)]" /> Lugar
+                Clave de Campaña
               </span>
             </div>
           </div>
@@ -128,7 +125,8 @@ export const LocationDossierModal: React.FC<LocationDossierModalProps> = ({
           {matchingMap?.analysis && (
             <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl space-y-1 shadow-2xs">
               <span className="font-cinzel text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                <Eye className="w-4 h-4" /> Elementos Visuales Detectados en el Mapa:
+                <Eye className="w-4 h-4" /> Elementos Visuales Detectados en el
+                Mapa:
               </span>
               <p className="text-xs sm:text-sm text-[var(--text-secondary)] italic leading-relaxed m-0 whitespace-pre-wrap">
                 {matchingMap.analysis}
@@ -144,7 +142,7 @@ export const LocationDossierModal: React.FC<LocationDossierModalProps> = ({
             className="px-3.5 py-1.5 text-xs font-cinzel text-[var(--text-primary)] border border-[var(--glass-border)] bg-[var(--surface)] rounded-lg hover:bg-[var(--sidebar-bg)] cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>{mapSrc ? 'Cambiar Mapa' : 'Asignar Mapa'}</span>
+            <span>{mapSrc ? "Cambiar Mapa" : "Asignar Mapa"}</span>
           </button>
 
           <button

@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ProjectFile, FileCategory } from '../types';
-import { optimizeImageFile } from '../utils/fileStorage';
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { ProjectFile, FileCategory } from "../types";
+import { optimizeImageFile } from "../utils/fileStorage";
 import {
   Castle,
   Check,
@@ -13,11 +13,11 @@ import {
   Shield,
   UploadCloud,
   X,
-  Sparkles
-} from 'lucide-react';
+  Sparkles,
+} from "lucide-react";
 
 export interface ImagePickerTarget {
-  type: 'player' | 'npc' | 'location' | 'item';
+  type: "player" | "npc" | "location" | "item";
   id: string;
   name: string;
   desc?: string;
@@ -32,33 +32,41 @@ interface ImagePickerModalProps {
 }
 
 function computeTargetConfig(target: ImagePickerTarget) {
-  const rawName = (target.name || '').trim();
-  const name = rawName || (target.type === 'location' ? 'Lugar' : target.type === 'item' ? 'Objeto' : 'Personaje');
+  const rawName = (target.name || "").trim();
+  const name =
+    rawName ||
+    (target.type === "location"
+      ? "Lugar"
+      : target.type === "item"
+        ? "Objeto"
+        : "Personaje");
 
-  if (target.type === 'location') {
+  if (target.type === "location") {
     return {
       modalTitle: `Ilustración o Mapa: ${name}`,
-      entityLabel: 'lugar o escenario',
-      defaultCategory: 'map' as FileCategory,
-      subtitle: `Sube una ilustración o mapa desde tu equipo para ${name}.`
+      entityLabel: "lugar o escenario",
+      defaultCategory: "map" as FileCategory,
+      subtitle: `Sube una ilustración o mapa desde tu equipo para ${name}.`,
     };
   }
 
-  if (target.type === 'item') {
+  if (target.type === "item") {
     return {
       modalTitle: `Ilustración de Objeto: ${name}`,
-      entityLabel: 'objeto o equipamiento',
-      defaultCategory: 'scene' as FileCategory,
-      subtitle: `Sube una imagen o ilustración para ${name}.`
+      entityLabel: "objeto o equipamiento",
+      defaultCategory: "scene" as FileCategory,
+      subtitle: `Sube una imagen o ilustración para ${name}.`,
     };
   }
 
   // Characters (Protagonist / NPC)
   return {
     modalTitle: `Retrato del Personaje: ${name}`,
-    entityLabel: target.type === 'player' ? 'protagonista' : 'PNJ',
-    defaultCategory: (target.type === 'player' ? 'portrait_pj' : 'portrait_npc') as FileCategory,
-    subtitle: `Sube un retrato o ilustración para ${name}.`
+    entityLabel: target.type === "player" ? "protagonista" : "PNJ",
+    defaultCategory: (target.type === "player"
+      ? "portrait_pj"
+      : "portrait_npc") as FileCategory,
+    subtitle: `Sube un retrato o ilustración para ${name}.`,
   };
 }
 
@@ -67,18 +75,23 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   allImageFiles,
   onSelectImage,
   onUploadFile,
-  onClose
+  onClose,
 }) => {
   const config = useMemo(() => computeTargetConfig(target), [target]);
-  const [filterCategory, setFilterCategory] = useState<'all' | 'map' | 'scene' | 'portrait'>('all');
+  const [filterCategory, setFilterCategory] = useState<
+    "all" | "map" | "scene" | "portrait"
+  >("all");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [urlInput, setUrlInput] = useState('');
+  const [feedbackMsg, setFeedbackMsg] = useState<{
+    text: string;
+    type: "success" | "error";
+  } | null>(null);
+  const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+  const showToast = (text: string, type: "success" | "error" = "success") => {
     setFeedbackMsg({ text, type });
     setTimeout(() => {
       setFeedbackMsg(null);
@@ -89,7 +102,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   const processAndAssignFile = async (file: File) => {
     setIsProcessing(true);
     try {
-      let finalUrl = '';
+      let finalUrl = "";
       if (onUploadFile) {
         finalUrl = await onUploadFile(file, config.defaultCategory);
       } else {
@@ -98,13 +111,13 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
 
       if (finalUrl) {
         onSelectImage(finalUrl);
-        showToast('¡Imagen importada y asignada correctamente!', 'success');
+        showToast("¡Imagen importada y asignada correctamente!", "success");
       } else {
-        showToast('No se pudo procesar el archivo de imagen.', 'error');
+        showToast("No se pudo procesar el archivo de imagen.", "error");
       }
     } catch (err) {
-      console.error('Error importing image:', err);
-      showToast('Error al importar la imagen.', 'error');
+      console.error("Error importing image:", err);
+      showToast("Error al importar la imagen.", "error");
     } finally {
       setIsProcessing(false);
     }
@@ -121,10 +134,18 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         const res = await fetch(trimmed);
         if (res.ok) {
           const blob = await res.blob();
-          const mime = blob.type && blob.type.startsWith('image/') ? blob.type : 'image/jpeg';
-          const ext = mime.split('/')[1] || 'jpg';
-          const cleanName = (target.name || 'imagen').replace(/[^a-zA-Z0-9_-]/g, '_');
-          fileToUpload = new File([blob], `${cleanName}_${Date.now()}.${ext}`, { type: mime });
+          const mime =
+            blob.type && blob.type.startsWith("image/")
+              ? blob.type
+              : "image/jpeg";
+          const ext = mime.split("/")[1] || "jpg";
+          const cleanName = (target.name || "imagen").replace(
+            /[^a-zA-Z0-9_-]/g,
+            "_",
+          );
+          fileToUpload = new File([blob], `${cleanName}_${Date.now()}.${ext}`, {
+            type: mime,
+          });
         }
       } catch {
         // Direct fetch blocked by CORS; we will use the URL directly
@@ -135,13 +156,13 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
       } else {
         // Fallback: assign directly as URL
         onSelectImage(trimmed);
-        showToast('¡Enlace de imagen asignado!', 'success');
+        showToast("¡Enlace de imagen asignado!", "success");
       }
-      setUrlInput('');
+      setUrlInput("");
       setShowUrlInput(false);
     } catch (err) {
-      console.error('Error processing URL:', err);
-      showToast('Error al procesar la URL.', 'error');
+      console.error("Error processing URL:", err);
+      showToast("Error al procesar la URL.", "error");
     } finally {
       setIsProcessing(false);
     }
@@ -151,18 +172,28 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
       const targetElement = e.target as HTMLElement;
-      const isInput = targetElement && (targetElement.tagName === 'INPUT' || targetElement.tagName === 'TEXTAREA');
+      const isInput =
+        targetElement &&
+        (targetElement.tagName === "INPUT" ||
+          targetElement.tagName === "TEXTAREA");
 
       const items = e.clipboardData?.items;
       if (items) {
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
-          if (item.type.indexOf('image') !== -1) {
+          if (item.type.indexOf("image") !== -1) {
             e.preventDefault();
             const blob = item.getAsFile();
             if (blob) {
-              const cleanName = (target.name || 'imagen').replace(/[^a-zA-Z0-9_-]/g, '_');
-              const file = new File([blob], `${cleanName}_pasted_${Date.now()}.png`, { type: blob.type || 'image/png' });
+              const cleanName = (target.name || "imagen").replace(
+                /[^a-zA-Z0-9_-]/g,
+                "_",
+              );
+              const file = new File(
+                [blob],
+                `${cleanName}_pasted_${Date.now()}.png`,
+                { type: blob.type || "image/png" },
+              );
               await processAndAssignFile(file);
               return;
             }
@@ -171,7 +202,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
       }
 
       if (!isInput) {
-        const text = e.clipboardData?.getData('text');
+        const text = e.clipboardData?.getData("text");
         if (text && /^https?:\/\//i.test(text.trim())) {
           e.preventDefault();
           await processAndAssignUrl(text.trim());
@@ -179,9 +210,9 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
       }
     };
 
-    window.addEventListener('paste', handlePaste);
+    window.addEventListener("paste", handlePaste);
     return () => {
-      window.removeEventListener('paste', handlePaste);
+      window.removeEventListener("paste", handlePaste);
     };
   }, [target, config.defaultCategory, onUploadFile]);
 
@@ -192,10 +223,17 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         const clipboardItems = await navigator.clipboard.read();
         for (const item of clipboardItems) {
           for (const type of item.types) {
-            if (type.startsWith('image/')) {
+            if (type.startsWith("image/")) {
               const blob = await item.getType(type);
-              const cleanName = (target.name || 'imagen').replace(/[^a-zA-Z0-9_-]/g, '_');
-              const file = new File([blob], `${cleanName}_pasted_${Date.now()}.png`, { type });
+              const cleanName = (target.name || "imagen").replace(
+                /[^a-zA-Z0-9_-]/g,
+                "_",
+              );
+              const file = new File(
+                [blob],
+                `${cleanName}_pasted_${Date.now()}.png`,
+                { type },
+              );
               await processAndAssignFile(file);
               return;
             }
@@ -210,36 +248,46 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
           return;
         }
       }
-      showToast('No se encontró una imagen en el portapapeles. Copia una imagen y presiona Ctrl + V.', 'error');
+      showToast(
+        "No se encontró una imagen en el portapapeles. Copia una imagen y presiona Ctrl + V.",
+        "error",
+      );
     } catch {
-      showToast('Presiona Ctrl + V para pegar la imagen copiada.', 'error');
+      showToast("Presiona Ctrl + V para pegar la imagen copiada.", "error");
     }
   };
 
   const filteredImages = useMemo(() => {
-    if (filterCategory === 'all') return allImageFiles;
-    if (filterCategory === 'map') return allImageFiles.filter(f => f.category === 'map');
-    if (filterCategory === 'scene') return allImageFiles.filter(f => f.category === 'scene');
-    if (filterCategory === 'portrait') {
-      return allImageFiles.filter(f => f.category === 'portrait_pj' || f.category === 'portrait_npc' || f.category === 'portrait_companion');
+    if (filterCategory === "all") return allImageFiles;
+    if (filterCategory === "map")
+      return allImageFiles.filter((f) => f.category === "map");
+    if (filterCategory === "scene")
+      return allImageFiles.filter((f) => f.category === "scene");
+    if (filterCategory === "portrait") {
+      return allImageFiles.filter(
+        (f) =>
+          f.category === "portrait_pj" ||
+          f.category === "portrait_npc" ||
+          f.category === "portrait_companion",
+      );
     }
     return allImageFiles;
   }, [allImageFiles, filterCategory]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   return (
     <div
       className="fixed inset-0 bg-black/65 flex items-center justify-center z-[70] p-3 sm:p-4 backdrop-blur-2xs"
-      onClick={e => {
+      onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
       onDragOver={(e) => {
@@ -252,7 +300,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         setIsDragging(false);
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
           const file = e.dataTransfer.files[0];
-          if (file.type.startsWith('image/')) {
+          if (file.type.startsWith("image/")) {
             await processAndAssignFile(file);
           }
         }
@@ -273,7 +321,9 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         {isProcessing && (
           <div className="absolute inset-0 bg-black/60 z-40 flex flex-col items-center justify-center backdrop-blur-2xs gap-2 text-white font-cinzel">
             <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
-            <span className="text-sm font-semibold">Procesando y guardando imagen...</span>
+            <span className="text-sm font-semibold">
+              Procesando y guardando imagen...
+            </span>
           </div>
         )}
 
@@ -281,9 +331,9 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         <div className="flex justify-between items-start mb-4 pb-3 border-b border-[var(--glass-border)]">
           <div className="flex items-start gap-3">
             <div className="p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--user-border)] text-[var(--accent)] shrink-0 shadow-2xs">
-              {target.type === 'location' ? (
+              {target.type === "location" ? (
                 <Castle className="w-5 h-5" />
-              ) : target.type === 'item' ? (
+              ) : target.type === "item" ? (
                 <Shield className="w-5 h-5" />
               ) : (
                 <Drama className="w-5 h-5" />
@@ -311,12 +361,16 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         {feedbackMsg && (
           <div
             className={`mb-3 px-3.5 py-2 rounded-xl text-xs font-cinzel font-semibold flex items-center gap-2 border transition-all ${
-              feedbackMsg.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                : 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300'
+              feedbackMsg.type === "success"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                : "bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300"
             }`}
           >
-            {feedbackMsg.type === 'success' ? <Check className="w-4 h-4" /> : <Info className="w-4 h-4" />}
+            {feedbackMsg.type === "success" ? (
+              <Check className="w-4 h-4" />
+            ) : (
+              <Info className="w-4 h-4" />
+            )}
             <span>{feedbackMsg.text}</span>
           </div>
         )}
@@ -328,7 +382,10 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
               <UploadCloud className="w-4 h-4" /> Subida Manual de Imagen
             </span>
             <span className="text-[10px] bg-[var(--surface)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--user-border)] font-cinzel">
-              Arrastra o pega con <kbd className="font-mono font-bold text-[var(--text-primary)]">Ctrl + V</kbd>
+              Arrastra o pega con{" "}
+              <kbd className="font-mono font-bold text-[var(--text-primary)]">
+                Ctrl + V
+              </kbd>
             </span>
           </div>
 
@@ -372,7 +429,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
               onChange={async (e) => {
                 if (e.target.files && e.target.files.length > 0) {
                   await processAndAssignFile(e.target.files[0]);
-                  e.target.value = '';
+                  e.target.value = "";
                 }
               }}
             />
@@ -409,40 +466,41 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         {/* Campaign Files Selector */}
         <div className="flex items-center justify-between mb-2 px-0.5">
           <span className="text-xs font-cinzel font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-[var(--accent)]" /> Galería de la Campaña ({filteredImages.length})
+            <Sparkles className="w-3 h-3 text-[var(--accent)]" /> Galería de la
+            Campaña ({filteredImages.length})
           </span>
           <div className="flex gap-1 text-[11px] font-cinzel">
             <button
               type="button"
-              onClick={() => setFilterCategory('all')}
+              onClick={() => setFilterCategory("all")}
               className={`px-2.5 py-1 rounded-md cursor-pointer transition-all ${
-                filterCategory === 'all'
-                  ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--surface)]'
+                filterCategory === "all"
+                  ? "bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--surface)]"
               }`}
             >
               Todas
             </button>
-            {target.type === 'location' ? (
+            {target.type === "location" ? (
               <>
                 <button
                   type="button"
-                  onClick={() => setFilterCategory('map')}
+                  onClick={() => setFilterCategory("map")}
                   className={`px-2.5 py-1 rounded-md cursor-pointer transition-all ${
-                    filterCategory === 'map'
-                      ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--surface)]'
+                    filterCategory === "map"
+                      ? "bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--surface)]"
                   }`}
                 >
                   Mapas
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFilterCategory('scene')}
+                  onClick={() => setFilterCategory("scene")}
                   className={`px-2.5 py-1 rounded-md cursor-pointer transition-all ${
-                    filterCategory === 'scene'
-                      ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--surface)]'
+                    filterCategory === "scene"
+                      ? "bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--surface)]"
                   }`}
                 >
                   Escenas
@@ -451,11 +509,11 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
             ) : (
               <button
                 type="button"
-                onClick={() => setFilterCategory('portrait')}
+                onClick={() => setFilterCategory("portrait")}
                 className={`px-2.5 py-1 rounded-md cursor-pointer transition-all ${
-                  filterCategory === 'portrait'
-                    ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--surface)]'
+                  filterCategory === "portrait"
+                    ? "bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--surface)]"
                 }`}
               >
                 Retratos
@@ -467,7 +525,8 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         <div className="flex-1 overflow-y-auto pr-1 min-h-[150px]">
           {filteredImages.length === 0 ? (
             <div className="py-8 px-4 text-center text-xs text-[var(--text-secondary)] italic bg-[var(--surface-soft)] rounded-xl border border-[var(--user-border)] leading-relaxed">
-              No hay imágenes en esta categoría. Puedes subir un archivo local o arrastrar una imagen para asignarla.
+              No hay imágenes en esta categoría. Puedes subir un archivo local o
+              arrastrar una imagen para asignarla.
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -503,7 +562,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         {/* Footer */}
         <div className="flex justify-between items-center gap-2 mt-4 pt-3 border-t border-[var(--glass-border)]">
           <button
-            onClick={() => onSelectImage('')}
+            onClick={() => onSelectImage("")}
             className="px-3.5 py-1.5 text-xs font-cinzel text-red-700 dark:text-red-400 hover:text-red-900 border border-red-200 dark:border-red-900/40 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer transition-all"
           >
             Quitar Imagen

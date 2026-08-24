@@ -1,37 +1,94 @@
-import { NPC } from '../types';
+import { NPC } from "../types";
 
 /**
  * Stopwords y partículas en nombres y denominaciones en español y fantasía
  */
 const STOPWORDS_NPC = new Set([
-  'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
-  'de', 'del', 'd', 'da', 'di', 'du', 'des', 'y', 'e', 'en', 'con', 'por', 'para', 'al'
+  "el",
+  "la",
+  "los",
+  "las",
+  "un",
+  "una",
+  "unos",
+  "unas",
+  "de",
+  "del",
+  "d",
+  "da",
+  "di",
+  "du",
+  "des",
+  "y",
+  "e",
+  "en",
+  "con",
+  "por",
+  "para",
+  "al",
 ]);
 
 /**
  * Títulos nobiliarios, militares o eclesiásticos que suelen añadirse u omitirse
  */
 const TITULOS_HONORIFICOS_NPC = new Set([
-  'capitan', 'capitana', 'lord', 'lady', 'sir', 'maestro', 'maestra',
-  'general', 'rey', 'reina', 'principe', 'princesa', 'archimago', 'archimaga',
-  'mago', 'maga', 'padre', 'madre', 'hermano', 'hermana', 'oficial',
-  'sargento', 'comandante', 'teniente', 'duque', 'duquesa', 'conde',
-  'condesa', 'marques', 'marquesa', 'baron', 'baronesa', 'don', 'dona',
-  'fray', 'sor', 'gran', 'sumo', 'suma', 'alto', 'alta', 'corsario', 'corsarios'
+  "capitan",
+  "capitana",
+  "lord",
+  "lady",
+  "sir",
+  "maestro",
+  "maestra",
+  "general",
+  "rey",
+  "reina",
+  "principe",
+  "princesa",
+  "archimago",
+  "archimaga",
+  "mago",
+  "maga",
+  "padre",
+  "madre",
+  "hermano",
+  "hermana",
+  "oficial",
+  "sargento",
+  "comandante",
+  "teniente",
+  "duque",
+  "duquesa",
+  "conde",
+  "condesa",
+  "marques",
+  "marquesa",
+  "baron",
+  "baronesa",
+  "don",
+  "dona",
+  "fray",
+  "sor",
+  "gran",
+  "sumo",
+  "suma",
+  "alto",
+  "alta",
+  "corsario",
+  "corsarios",
 ]);
 
 /**
  * Normaliza un nombre quitando tildes, mayúsculas, comillas, apóstrofes y caracteres no alfanuméricos.
  */
 export function normalizarNombreNpc(nombre?: string): string {
-  if (!nombre) return '';
+  if (!nombre) return "";
   return nombre
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/['’`´"]/g, '')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/['’`´"]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -41,9 +98,7 @@ export function normalizarNombreNpc(nombre?: string): string {
 export function tokensSignificativosNpc(nombre?: string): string[] {
   const norm = normalizarNombreNpc(nombre);
   if (!norm) return [];
-  return norm
-    .split(/\s+/)
-    .filter(w => w.length > 1 && !STOPWORDS_NPC.has(w));
+  return norm.split(/\s+/).filter((w) => w.length > 1 && !STOPWORDS_NPC.has(w));
 }
 
 /**
@@ -51,13 +106,13 @@ export function tokensSignificativosNpc(nombre?: string): string[] {
  */
 export function tokensRaizNpc(nombre?: string): string[] {
   const tokens = tokensSignificativosNpc(nombre);
-  const filtrados = tokens.filter(w => !TITULOS_HONORIFICOS_NPC.has(w));
+  const filtrados = tokens.filter((w) => !TITULOS_HONORIFICOS_NPC.has(w));
   return filtrados.length > 0 ? filtrados : tokens;
 }
 
 /**
  * Determina si dos nombres o referencias se refieren al mismo PNJ.
- * 
+ *
  * Casos contemplados:
  * - Exactos ("Jarlaxle" === "Jarlaxle", "Drow" === "drow")
  * - Nombre corto vs Completo ("Jarlaxle" === "Jarlaxle Baenre")
@@ -71,7 +126,7 @@ export function coincidenNombresNpc(
   nombreA?: string,
   nombreB?: string,
   extraA?: { alias?: string; trueIdentity?: string },
-  extraB?: { alias?: string; trueIdentity?: string }
+  extraB?: { alias?: string; trueIdentity?: string },
 ): boolean {
   if (!nombreA || !nombreB) return false;
 
@@ -84,9 +139,11 @@ export function coincidenNombresNpc(
 
   // 2. Comprobar alias e identidad verdadera si existen
   if (extraA?.alias && coincidenNombresNpc(extraA.alias, nombreB)) return true;
-  if (extraA?.trueIdentity && coincidenNombresNpc(extraA.trueIdentity, nombreB)) return true;
+  if (extraA?.trueIdentity && coincidenNombresNpc(extraA.trueIdentity, nombreB))
+    return true;
   if (extraB?.alias && coincidenNombresNpc(nombreA, extraB.alias)) return true;
-  if (extraB?.trueIdentity && coincidenNombresNpc(nombreA, extraB.trueIdentity)) return true;
+  if (extraB?.trueIdentity && coincidenNombresNpc(nombreA, extraB.trueIdentity))
+    return true;
 
   // 3. Tokens raíz y significativos
   const raizA = tokensRaizNpc(nombreA);
@@ -114,7 +171,7 @@ export function coincidenNombresNpc(
   const setA = new Set(raizA);
   const setB = new Set(raizB);
   let compartidos = 0;
-  setA.forEach(t => {
+  setA.forEach((t) => {
     if (setB.has(t)) compartidos++;
   });
 
@@ -124,7 +181,12 @@ export function coincidenNombresNpc(
   // 7. Substring directo si el término más corto tiene al menos 4 caracteres y está al inicio o fin
   const minLen = Math.min(normA.length, normB.length);
   if (minLen >= 4) {
-    if (normA.startsWith(normB) || normB.startsWith(normA) || normA.endsWith(normB) || normB.endsWith(normA)) {
+    if (
+      normA.startsWith(normB) ||
+      normB.startsWith(normA) ||
+      normA.endsWith(normB) ||
+      normB.endsWith(normA)
+    ) {
       return true;
     }
   }
@@ -138,16 +200,16 @@ export function coincidenNombresNpc(
 export function buscarNpcPorNombre(
   npcs: NPC[],
   nombre: string,
-  extra?: { alias?: string; trueIdentity?: string }
+  extra?: { alias?: string; trueIdentity?: string },
 ): NPC | undefined {
   if (!nombre || !npcs || npcs.length === 0) return undefined;
-  return npcs.find(n =>
+  return npcs.find((n) =>
     coincidenNombresNpc(
       n.name,
       nombre,
       { alias: n.alias, trueIdentity: n.trueIdentity },
-      extra
-    )
+      extra,
+    ),
   );
 }
 
@@ -158,7 +220,9 @@ export function buscarNpcPorNombre(
 export function fusionarDosNpcs(base: NPC, incoming: Partial<NPC>): NPC {
   // Elegir el nombre más completo o específico (por ejemplo "Jarlaxle Baenre" sobre "Jarlaxle")
   const baseTokens = tokensSignificativosNpc(base.name);
-  const incomingTokens = incoming.name ? tokensSignificativosNpc(incoming.name) : [];
+  const incomingTokens = incoming.name
+    ? tokensSignificativosNpc(incoming.name)
+    : [];
   let bestName = base.name;
   if (incoming.name && incomingTokens.length > baseTokens.length) {
     bestName = incoming.name;
@@ -170,9 +234,13 @@ export function fusionarDosNpcs(base: NPC, incoming: Partial<NPC>): NPC {
   const portrait = base.portrait || incoming.portrait;
 
   // Relación: preferir la más descriptiva o no genérica
-  const esGenerica = (r?: string) => !r || /conocido|neutral|desconocido|figurante/i.test(r);
+  const esGenerica = (r?: string) =>
+    !r || /conocido|neutral|desconocido|figurante/i.test(r);
   let relation = base.relation;
-  if (incoming.relation && (esGenerica(base.relation) || !esGenerica(incoming.relation))) {
+  if (
+    incoming.relation &&
+    (esGenerica(base.relation) || !esGenerica(incoming.relation))
+  ) {
     relation = incoming.relation;
   }
 
@@ -187,7 +255,7 @@ export function fusionarDosNpcs(base: NPC, incoming: Partial<NPC>): NPC {
 
   const appearance = pickBestText(base.appearance, incoming.appearance);
   const description = pickBestText(base.description, incoming.description);
-  const notes = pickBestText(base.notes, incoming.notes) || '';
+  const notes = pickBestText(base.notes, incoming.notes) || "";
   const aparenta = pickBestText(base.aparenta, incoming.aparenta);
   const oculta = pickBestText(base.oculta, incoming.oculta);
   const vinculo = pickBestText(base.vinculo, incoming.vinculo);
@@ -207,17 +275,14 @@ export function fusionarDosNpcs(base: NPC, incoming: Partial<NPC>): NPC {
 
   // Registro de días vistos: combinar sin duplicados
   const diasVistos = [
-    ...new Set([
-      ...(base.diasVistos || []),
-      ...(incoming.diasVistos || [])
-    ])
+    ...new Set([...(base.diasVistos || []), ...(incoming.diasVistos || [])]),
   ];
 
   // Último día de subida: combinar
   const ultimoDiaSubida = {
     atr: incoming.ultimoDiaSubida?.atr ?? base.ultimoDiaSubida?.atr,
     vin: incoming.ultimoDiaSubida?.vin ?? base.ultimoDiaSubida?.vin,
-    con: incoming.ultimoDiaSubida?.con ?? base.ultimoDiaSubida?.con
+    con: incoming.ultimoDiaSubida?.con ?? base.ultimoDiaSubida?.con,
   };
 
   // Ficha de personaje / estadísticas
@@ -226,11 +291,11 @@ export function fusionarDosNpcs(base: NPC, incoming: Partial<NPC>): NPC {
   return {
     ...base,
     ...incoming,
-    id: base.portrait ? base.id : (incoming.id || base.id),
+    id: base.portrait ? base.id : incoming.id || base.id,
     name: bestName,
     portrait,
-    relation: relation || 'Conocido',
-    status: incoming.status || base.status || 'Vivo',
+    relation: relation || "Conocido",
+    status: incoming.status || base.status || "Vivo",
     appearance,
     description,
     notes,
@@ -245,8 +310,16 @@ export function fusionarDosNpcs(base: NPC, incoming: Partial<NPC>): NPC {
     con,
     diasVistos,
     ultimoDiaSubida,
-    recurrente: Boolean(base.recurrente || incoming.recurrente || diasVistos.length >= 3 || atr !== undefined || vin !== undefined || con !== undefined || vinculo),
-    characterSheet
+    recurrente: Boolean(
+      base.recurrente ||
+      incoming.recurrente ||
+      diasVistos.length >= 3 ||
+      atr !== undefined ||
+      vin !== undefined ||
+      con !== undefined ||
+      vinculo,
+    ),
+    characterSheet,
   };
 }
 
@@ -272,7 +345,14 @@ export function deduplicarListaNpcs(npcs: NPC[]): NPC[] {
       const otro = npcs[j];
       if (procesadosIds.has(otro.id)) continue;
 
-      if (coincidenNombresNpc(fusionado.name, otro.name, { alias: fusionado.alias, trueIdentity: fusionado.trueIdentity }, { alias: otro.alias, trueIdentity: otro.trueIdentity })) {
+      if (
+        coincidenNombresNpc(
+          fusionado.name,
+          otro.name,
+          { alias: fusionado.alias, trueIdentity: fusionado.trueIdentity },
+          { alias: otro.alias, trueIdentity: otro.trueIdentity },
+        )
+      ) {
         fusionado = fusionarDosNpcs(fusionado, otro);
         procesadosIds.add(otro.id);
       }

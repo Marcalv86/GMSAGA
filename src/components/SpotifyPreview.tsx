@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 export const SpotifyPreview: React.FC<{ content: string }> = ({ content }) => {
   const spotifyRegex =
@@ -11,13 +11,22 @@ export const SpotifyPreview: React.FC<{ content: string }> = ({ content }) => {
   return (
     <div className="flex flex-col gap-3 mt-3">
       {uniqueUrls.map((url, i) => {
-        const embedUrl = url.replace('open.spotify.com', 'open.spotify.com/embed');
+        const embedUrl = url.replace(
+          "open.spotify.com",
+          "open.spotify.com/embed",
+        );
         return (
           <div
             key={i}
             className="w-full max-w-[560px] rounded-xl overflow-hidden shadow-2xl border border-[var(--glass-border)]"
           >
-            <iframe src={embedUrl} width="100%" height="152" allow="encrypted-media" allowFullScreen />
+            <iframe
+              src={embedUrl}
+              width="100%"
+              height="152"
+              allow="encrypted-media"
+              allowFullScreen
+            />
           </div>
         );
       })}

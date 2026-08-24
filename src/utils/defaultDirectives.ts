@@ -105,7 +105,7 @@ Para consultar preferencias fuera de personaje (ej. bifurcación de escenas ínt
 ---
 
 ### 5. Registros Internos de Sincronización Automática (Al Final de Cada Turno)
-Al final de tu respuesta (tras la narración pura), incluye las siguientes etiquetas técnicas según corresponda. La interfaz las lee, actualiza el HUD / Ficha / Calendario en segundo plano y las oculta del relato para mantener el chat limpio:
+Al final de tu respuesta (tras la narración pura), incluye las siguientes etiquetas técnicas SOLO si ha habido cambios reales en ese turno (omítelas si no hay cambios). La interfaz las lee, actualiza el HUD / Ficha / Calendario en segundo plano y las oculta del relato para mantener el chat limpio:
 
 1. \`[PRESENTES: nombre1, nombre2]\` — Quién ha estado presente en escena de forma reconocible.
 2. \`[VÍNCULO: nombre | aparenta: ... | oculta: ... | grado: tipo — descripción]\` — Solo cuando cambie la relación con un PNJ recurrente. Tipos de grado: \`rivalidad\`, \`amistad\`, \`romance\`, \`enemistad\`, \`alianza\`, \`mentor\`.
@@ -118,7 +118,7 @@ Al final de tu respuesta (tras la narración pura), incluye las siguientes etiqu
      b) **DESCANSO LARGO (fin del día, 8 horas / acampar o dormir hasta el alba):** Cuando concluyan la jornada, acampen o duerman. En ese único turno emites UNA sola entrada consolidando los hechos más memorables de todo el día y la noche de descanso (ej: \`[AGENDA: Montamos el campamento junto al arroyo; repasé el mapa a la luz de las brasas antes de caer rendido | lugar: Campamento del Arroyo | hito: descanso — Descanso largo]\`).
      c) **SALTO TEMPORAL NARRATIVO O INCONSCIENCIA:** Si por trama transcurren días enteros de convalecencia, coma o viaje largo.
 6. \`[HILO: título | vence en 15d | qué ocurrirá | oculto]\` — Cuando quede un reloj o evento con fecha límite activa.
-7. \`[ESTADO: PG actuales/máximos | CA valor | condiciones: lista o ninguna]\` — SIEMPRE en último lugar. Actualiza la vida, clase de armadura y estados del protagonista.`;
+7. \`[ESTADO: PG actuales/máximos | CA valor | condiciones: lista o ninguna]\` — SOLO si los puntos de vida, condiciones o armadura han cambiado (ponlo al final de todo). Actualiza la vida, clase de armadura y estados del protagonista.`;
 
 // ============================================================================
 // 2. DIRECTIVAS DE CAMPAÑA DEL MASTER (PERSONALIZABLES Y EDITABLES)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   HardDrive,
   Download,
@@ -13,9 +13,9 @@ import {
   FolderSync,
   Upload,
   AlertTriangle,
-  Save
-} from 'lucide-react';
-import { Project, Chat, ProjectFile } from '../types';
+  Save,
+} from "lucide-react";
+import { Project, Chat, ProjectFile } from "../types";
 import {
   isDiskBackupSupported,
   isRunningInIframe,
@@ -27,12 +27,12 @@ import {
   listCampaignFilesFromDisk,
   deleteCampaignFileFromDisk,
   getCampaignFileName,
-  DiskCampaignFile
-} from '../utils/diskBackup';
+  DiskCampaignFile,
+} from "../utils/diskBackup";
 import {
   requestPersistentStorage,
-  getStorageEstimate
-} from '../utils/fileStorage';
+  getStorageEstimate,
+} from "../utils/fileStorage";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -57,9 +57,9 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   currentProject,
   currentChats,
   currentFiles,
-  onImportCampaignFile
+  onImportCampaignFile,
 }) => {
-  const [activeTab, setActiveTab] = useState<'disk' | 'storage'>('disk');
+  const [activeTab, setActiveTab] = useState<"disk" | "storage">("disk");
   const [backupFolder, setBackupFolder] = useState<string | null>(null);
   const [backupNeedsPermission, setBackupNeedsPermission] = useState(false);
   const [isChoosingFolder, setIsChoosingFolder] = useState(false);
@@ -67,14 +67,19 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   const [folderErrorMsg, setFolderErrorMsg] = useState<string | null>(null);
   const [isPersistedStorage, setIsPersistedStorage] = useState(false);
   const [isSavingManual, setIsSavingManual] = useState(false);
-  const [fileToConfirmDelete, setFileToConfirmDelete] = useState<string | null>(null);
-  const [fileToConfirmRestore, setFileToConfirmRestore] = useState<DiskCampaignFile | null>(null);
+  const [fileToConfirmDelete, setFileToConfirmDelete] = useState<string | null>(
+    null,
+  );
+  const [fileToConfirmRestore, setFileToConfirmRestore] =
+    useState<DiskCampaignFile | null>(null);
   const [isDeletingFile, setIsDeletingFile] = useState(false);
-  const [isOverwritingFile, setIsOverwritingFile] = useState<string | null>(null);
+  const [isOverwritingFile, setIsOverwritingFile] = useState<string | null>(
+    null,
+  );
 
   const handleManualSaveToDisk = async (customTargetFileName?: string) => {
     if (!currentProject) {
-      setFolderErrorMsg('No hay ninguna campaña activa para guardar.');
+      setFolderErrorMsg("No hay ninguna campaña activa para guardar.");
       return;
     }
     setIsSavingManual(true);
@@ -92,19 +97,28 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         setBackupNeedsPermission(false);
       }
 
-      const saveRes = await writeCampaignToDisk(currentProject, currentChats, currentFiles, customTargetFileName);
+      const saveRes = await writeCampaignToDisk(
+        currentProject,
+        currentChats,
+        currentFiles,
+        customTargetFileName,
+      );
       if (saveRes.written) {
-        setFolderSuccessMsg(`¡Campaña guardada con éxito como «${saveRes.fileName || customTargetFileName || getCampaignFileName(currentProject.name)}»!`);
+        setFolderSuccessMsg(
+          `¡Campaña guardada con éxito como «${saveRes.fileName || customTargetFileName || getCampaignFileName(currentProject.name)}»!`,
+        );
         setTimeout(() => setFolderSuccessMsg(null), 5000);
         void fetchDiskFiles();
-      } else if (saveRes.reason === 'no-permission') {
+      } else if (saveRes.reason === "no-permission") {
         setBackupNeedsPermission(true);
-        setFolderErrorMsg('El navegador requiere autorizar el permiso de escritura en la carpeta.');
+        setFolderErrorMsg(
+          "El navegador requiere autorizar el permiso de escritura en la carpeta.",
+        );
       } else {
-        setFolderErrorMsg('No se pudo guardar la campaña en la carpeta.');
+        setFolderErrorMsg("No se pudo guardar la campaña en la carpeta.");
       }
     } catch (err: any) {
-      setFolderErrorMsg(err?.message || 'Error al guardar en carpeta.');
+      setFolderErrorMsg(err?.message || "Error al guardar en carpeta.");
     } finally {
       setIsSavingManual(false);
       setIsOverwritingFile(null);
@@ -118,15 +132,17 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
     try {
       const res = await deleteCampaignFileFromDisk(fileName);
       if (res.ok) {
-        setFolderSuccessMsg(`Archivo «${fileName}» eliminado correctamente de tu carpeta.`);
+        setFolderSuccessMsg(
+          `Archivo «${fileName}» eliminado correctamente de tu carpeta.`,
+        );
         setTimeout(() => setFolderSuccessMsg(null), 4000);
         setFileToConfirmDelete(null);
         void fetchDiskFiles();
       } else {
-        setFolderErrorMsg(res.error || 'No se pudo eliminar el archivo.');
+        setFolderErrorMsg(res.error || "No se pudo eliminar el archivo.");
       }
     } catch (err: any) {
-      setFolderErrorMsg(err?.message || 'Error al eliminar el archivo.');
+      setFolderErrorMsg(err?.message || "Error al eliminar el archivo.");
     } finally {
       setIsDeletingFile(false);
     }
@@ -134,29 +150,38 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
 
   const handleRestoreDiskFile = async (diskFile: DiskCampaignFile) => {
     if (!onImportCampaignFile) {
-      setFolderErrorMsg('Función de importación no disponible.');
+      setFolderErrorMsg("Función de importación no disponible.");
       return;
     }
     setFolderErrorMsg(null);
     try {
       const file = await diskFile.getFile();
       await onImportCampaignFile(file);
-      setFolderSuccessMsg(`¡Campaña «${diskFile.name}» cargada y restaurada con éxito!`);
+      setFolderSuccessMsg(
+        `¡Campaña «${diskFile.name}» cargada y restaurada con éxito!`,
+      );
       setFileToConfirmRestore(null);
       setTimeout(() => {
         setFolderSuccessMsg(null);
         onClose();
       }, 1200);
     } catch (err: any) {
-      setFolderErrorMsg(err?.message || 'Error al restaurar el archivo de partida.');
+      setFolderErrorMsg(
+        err?.message || "Error al restaurar el archivo de partida.",
+      );
     }
   };
-  const [storageStats, setStorageStats] = useState<{ usageMB: string; quotaMB: string; percent: number } | null>(null);
+  const [storageStats, setStorageStats] = useState<{
+    usageMB: string;
+    quotaMB: string;
+    percent: number;
+  } | null>(null);
 
   // Archivos de partida encontrados en la carpeta activa de disco
   const [diskFiles, setDiskFiles] = useState<DiskCampaignFile[]>([]);
   const [isLoadingDiskFiles, setIsLoadingDiskFiles] = useState(false);
-  const [diskFilesPermissionNeeded, setDiskFilesPermissionNeeded] = useState(false);
+  const [diskFilesPermissionNeeded, setDiskFilesPermissionNeeded] =
+    useState(false);
 
   const fetchDiskFiles = useCallback(async () => {
     if (!isDiskBackupSupported()) return;
@@ -170,7 +195,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         setDiskFilesPermissionNeeded(true);
       }
     } catch (err) {
-      console.warn('Error listando archivos de disco:', err);
+      console.warn("Error listando archivos de disco:", err);
     } finally {
       setIsLoadingDiskFiles(false);
     }
@@ -185,7 +210,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
       setBackupFolder(name);
       if (name) {
         const state = await checkBackupPermission(false);
-        const needsPerm = state !== 'granted';
+        const needsPerm = state !== "granted";
         setBackupNeedsPermission(needsPerm);
         if (!needsPerm) {
           void fetchDiskFiles();
@@ -201,7 +226,10 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
       if (estimate && estimate.quota > 0) {
         const usageMB = (estimate.usage / (1024 * 1024)).toFixed(1);
         const quotaMB = (estimate.quota / (1024 * 1024)).toFixed(0);
-        const percent = Math.min(100, Math.round((estimate.usage / estimate.quota) * 100));
+        const percent = Math.min(
+          100,
+          Math.round((estimate.usage / estimate.quota) * 100),
+        );
         setStorageStats({ usageMB, quotaMB, percent });
       }
     })();
@@ -219,14 +247,16 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         if (currentProject) {
           await writeCampaignToDisk(currentProject, currentChats, currentFiles);
         }
-        setFolderSuccessMsg(`Copia en disco activada en la carpeta: "${res.name}".`);
+        setFolderSuccessMsg(
+          `Copia en disco activada en la carpeta: "${res.name}".`,
+        );
         setTimeout(() => setFolderSuccessMsg(null), 5000);
         void fetchDiskFiles();
       } else if (res.error) {
         setFolderErrorMsg(res.error);
       }
     } catch (err: any) {
-      setFolderErrorMsg(err?.message || 'No se pudo seleccionar la carpeta.');
+      setFolderErrorMsg(err?.message || "No se pudo seleccionar la carpeta.");
     } finally {
       setIsChoosingFolder(false);
     }
@@ -234,12 +264,12 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
 
   const handleGrantPermission = async () => {
     const state = await checkBackupPermission(true);
-    setBackupNeedsPermission(state !== 'granted');
-    if (state === 'granted') {
+    setBackupNeedsPermission(state !== "granted");
+    if (state === "granted") {
       if (currentProject) {
         await writeCampaignToDisk(currentProject, currentChats, currentFiles);
       }
-      setFolderSuccessMsg('Permiso reactivado y sincronizado.');
+      setFolderSuccessMsg("Permiso reactivado y sincronizado.");
       setTimeout(() => setFolderSuccessMsg(null), 4000);
       void fetchDiskFiles();
     }
@@ -256,12 +286,12 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -269,7 +299,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4"
-      onClick={e => {
+      onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }
@@ -287,7 +317,8 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                 Copias de Seguridad y Almacenamiento
               </h3>
               <p className="text-xs text-[var(--text-secondary)] m-0 font-lora">
-                100% privado en tu ordenador, sin registros ni servidores externos
+                100% privado en tu ordenador, sin registros ni servidores
+                externos
               </p>
             </div>
           </div>
@@ -303,22 +334,22 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         {/* Sub-Tabs */}
         <div className="flex border-b border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_40%,transparent)] px-4 pt-2 gap-2 text-xs font-cinzel font-bold">
           <button
-            onClick={() => setActiveTab('disk')}
+            onClick={() => setActiveTab("disk")}
             className={`pb-2 px-3 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors ${
-              activeTab === 'disk'
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              activeTab === "disk"
+                ? "border-[var(--accent)] text-[var(--accent)]"
+                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
             <FolderSync className="w-3.5 h-3.5" />
             <span>Auto-Guardado en Disco</span>
           </button>
           <button
-            onClick={() => setActiveTab('storage')}
+            onClick={() => setActiveTab("storage")}
             className={`pb-2 px-3 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors ${
-              activeTab === 'storage'
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              activeTab === "storage"
+                ? "border-[var(--accent)] text-[var(--accent)]"
+                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
             <Database className="w-3.5 h-3.5" />
@@ -329,7 +360,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
           {/* TAB 1: DISK AUTO-BACKUP */}
-          {activeTab === 'disk' && (
+          {activeTab === "disk" && (
             <div className="space-y-4 font-lora">
               <div className="bg-sky-500/10 border border-sky-500/20 p-3.5 rounded-lg space-y-1.5">
                 <div className="font-cinzel font-bold text-xs text-sky-800 dark:text-sky-300 flex items-center gap-1.5">
@@ -337,10 +368,16 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                   <span>Copia en Carpeta de tu Ordenador</span>
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed m-0">
-                  Si juegas en Chrome, Edge o navegadores compatibles con File System, puedes elegir una carpeta local en tu disco. Cada vez que el Narrador termine un turno, la campaña se guardará como archivo <code>.json</code> en esa carpeta de forma transparente.
+                  Si juegas en Chrome, Edge o navegadores compatibles con File
+                  System, puedes elegir una carpeta local en tu disco. Cada vez
+                  que el Narrador termine un turno, la campaña se guardará como
+                  archivo <code>.json</code> en esa carpeta de forma
+                  transparente.
                 </p>
                 <p className="text-[11px] text-sky-700 dark:text-sky-400 font-semibold m-0 pt-0.5">
-                  💡 Truco: Si seleccionas una carpeta sincronizada con Google Drive, OneDrive o Dropbox en tu ordenador, tendrás sincronización automática entre dispositivos.
+                  💡 Truco: Si seleccionas una carpeta sincronizada con Google
+                  Drive, OneDrive o Dropbox en tu ordenador, tendrás
+                  sincronización automática entre dispositivos.
                 </p>
               </div>
 
@@ -367,7 +404,12 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                     <span>Aviso de marco embebido (iFrame)</span>
                   </div>
                   <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                    Las políticas de seguridad del navegador impiden que ventanas embebidas o vistas previas accedan directamente a las carpetas locales de tu ordenador. Para respaldar tu campaña aquí, usa la pestaña <strong>Descargar Copia JSON</strong> o abre la aplicación en una pestaña propia de tu navegador.
+                    Las políticas de seguridad del navegador impiden que
+                    ventanas embebidas o vistas previas accedan directamente a
+                    las carpetas locales de tu ordenador. Para respaldar tu
+                    campaña aquí, usa la pestaña{" "}
+                    <strong>Descargar Copia JSON</strong> o abre la aplicación
+                    en una pestaña propia de tu navegador.
                   </p>
                 </div>
               )}
@@ -396,7 +438,11 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                           className="py-2.5 px-4 rounded-lg font-cinzel font-bold text-xs bg-[color-mix(in_srgb,var(--accent)_15%,var(--surface))] border border-[var(--accent)] text-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_25%,var(--surface))] transition-all inline-flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
                         >
                           <Download className="w-4 h-4" />
-                          <span>{isSavingManual ? 'Guardando...' : 'Guardar Manualmente en Carpeta'}</span>
+                          <span>
+                            {isSavingManual
+                              ? "Guardando..."
+                              : "Guardar Manualmente en Carpeta"}
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -423,7 +469,11 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                             title="Guardar de inmediato el estado actual de la campaña en esta carpeta"
                           >
                             <Download className="w-3.5 h-3.5" />
-                            <span>{isSavingManual ? 'Guardando...' : 'Guardar en Carpeta Ahora'}</span>
+                            <span>
+                              {isSavingManual
+                                ? "Guardando..."
+                                : "Guardar en Carpeta Ahora"}
+                            </span>
                           </button>
                           <button
                             onClick={handleForgetFolder}
@@ -438,7 +488,8 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                       {backupNeedsPermission && (
                         <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded flex items-center justify-between gap-2">
                           <span className="text-[11px] text-amber-900 dark:text-amber-300">
-                            El navegador requiere confirmar el permiso de acceso para sincronizar.
+                            El navegador requiere confirmar el permiso de acceso
+                            para sincronizar.
                           </span>
                           <button
                             onClick={handleGrantPermission}
@@ -465,7 +516,9 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                             className="text-[11px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] flex items-center gap-1 cursor-pointer transition-colors"
                             title="Actualizar lista de archivos"
                           >
-                            <RefreshCw className={`w-3 h-3 ${isLoadingDiskFiles ? 'animate-spin' : ''}`} />
+                            <RefreshCw
+                              className={`w-3 h-3 ${isLoadingDiskFiles ? "animate-spin" : ""}`}
+                            />
                             <span>Actualizar</span>
                           </button>
                         </div>
@@ -473,7 +526,8 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                         {diskFilesPermissionNeeded ? (
                           <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded flex items-center justify-between gap-2">
                             <span className="text-[11px] text-amber-900 dark:text-amber-300">
-                              Pulsa para autorizar la lectura de los archivos de esta carpeta.
+                              Pulsa para autorizar la lectura de los archivos de
+                              esta carpeta.
                             </span>
                             <button
                               type="button"
@@ -493,23 +547,33 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                           </div>
                         ) : diskFiles.length === 0 ? (
                           <p className="text-[11px] text-[var(--text-secondary)] italic m-0 py-1">
-                            No se han detectado archivos <code>.json</code> de partidas en esta carpeta todavía. Se guardará uno aquí al jugar un turno o pulsar guardar.
+                            No se han detectado archivos <code>.json</code> de
+                            partidas en esta carpeta todavía. Se guardará uno
+                            aquí al jugar un turno o pulsar guardar.
                           </p>
                         ) : (
                           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                            {diskFiles.map(df => {
+                            {diskFiles.map((df) => {
                               const isCurrentCampaignFile =
                                 currentProject &&
-                                (df.name === getCampaignFileName(currentProject.name) ||
-                                  df.name.toLowerCase().includes(currentProject.name.toLowerCase().replace(/\s+/g, '-').slice(0, 15)));
+                                (df.name ===
+                                  getCampaignFileName(currentProject.name) ||
+                                  df.name
+                                    .toLowerCase()
+                                    .includes(
+                                      currentProject.name
+                                        .toLowerCase()
+                                        .replace(/\s+/g, "-")
+                                        .slice(0, 15),
+                                    ));
 
                               return (
                                 <div
                                   key={df.name}
                                   className={`p-2.5 rounded-lg border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
                                     isCurrentCampaignFile
-                                      ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface))]'
-                                      : 'border-[var(--glass-border)] bg-[var(--surface)] hover:border-[var(--accent)]/40'
+                                      ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface))]"
+                                      : "border-[var(--glass-border)] bg-[var(--surface)] hover:border-[var(--accent)]/40"
                                   }`}
                                 >
                                   <div className="min-w-0 flex-1">
@@ -528,12 +592,14 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                                       <span>{formatFileSize(df.size)}</span>
                                       <span>•</span>
                                       <span>
-                                        {new Date(df.lastModified).toLocaleDateString('es-ES', {
-                                          day: '2-digit',
-                                          month: '2-digit',
-                                          year: 'numeric',
-                                          hour: '2-digit',
-                                          minute: '2-digit'
+                                        {new Date(
+                                          df.lastModified,
+                                        ).toLocaleDateString("es-ES", {
+                                          day: "2-digit",
+                                          month: "2-digit",
+                                          year: "numeric",
+                                          hour: "2-digit",
+                                          minute: "2-digit",
                                         })}
                                       </span>
                                     </div>
@@ -544,7 +610,9 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                                     {onImportCampaignFile && (
                                       <button
                                         type="button"
-                                        onClick={() => setFileToConfirmRestore(df)}
+                                        onClick={() =>
+                                          setFileToConfirmRestore(df)
+                                        }
                                         className="py-1 px-2 rounded bg-[color-mix(in_srgb,var(--accent)_12%,var(--surface))] hover:bg-[color-mix(in_srgb,var(--accent)_22%,var(--surface))] text-[var(--accent)] border border-[var(--accent)]/40 font-cinzel font-bold text-[10px] inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                         title={`Cargar y continuar jugando la partida de ${df.name}`}
                                       >
@@ -560,20 +628,30 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                                           setIsOverwritingFile(df.name);
                                           void handleManualSaveToDisk(df.name);
                                         }}
-                                        disabled={isSavingManual && isOverwritingFile === df.name}
+                                        disabled={
+                                          isSavingManual &&
+                                          isOverwritingFile === df.name
+                                        }
                                         className="py-1 px-2 rounded bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] hover:bg-[var(--glass-border)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel font-semibold text-[10px] inline-flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
                                         title={`Sobrescribir ${df.name} con el estado más reciente de la campaña activa (${currentProject.name})`}
                                       >
-                                        <Save className={`w-3 h-3 ${isSavingManual && isOverwritingFile === df.name ? 'animate-spin' : ''}`} />
+                                        <Save
+                                          className={`w-3 h-3 ${isSavingManual && isOverwritingFile === df.name ? "animate-spin" : ""}`}
+                                        />
                                         <span>
-                                          {isSavingManual && isOverwritingFile === df.name ? 'Guardando...' : 'Sobrescribir'}
+                                          {isSavingManual &&
+                                          isOverwritingFile === df.name
+                                            ? "Guardando..."
+                                            : "Sobrescribir"}
                                         </span>
                                       </button>
                                     )}
 
                                     <button
                                       type="button"
-                                      onClick={() => setFileToConfirmDelete(df.name)}
+                                      onClick={() =>
+                                        setFileToConfirmDelete(df.name)
+                                      }
                                       className="p-1.5 rounded text-red-600 dark:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors cursor-pointer"
                                       title={`Eliminar ${df.name} definitivamente de la carpeta`}
                                     >
@@ -588,7 +666,20 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
 
                         <div className="pt-2 border-t border-[var(--glass-border)] text-[10px] text-[var(--text-secondary)] space-y-1">
                           <p className="m-0 leading-relaxed">
-                            💡 <strong>Gestión de Copias y Nombres:</strong> Las partidas se guardan automáticamente con el nombre de tu campaña (ej. <code>{currentProject ? getCampaignFileName(currentProject.name) : 'Mi-Campana.gmstudio.json'}</code>). Si has cambiado el nombre de una partida o tienes archivos antiguos como <code>Nueva-Campana.gmstudio.json</code>, puedes eliminarlos con el botón de la papelera o pulsar <strong>Sobrescribir</strong> para reemplazarlos con la versión más moderna.
+                            💡 <strong>Gestión de Copias y Nombres:</strong> Las
+                            partidas se guardan automáticamente con el nombre de
+                            tu campaña (ej.{" "}
+                            <code>
+                              {currentProject
+                                ? getCampaignFileName(currentProject.name)
+                                : "Mi-Campana.gmstudio.json"}
+                            </code>
+                            ). Si has cambiado el nombre de una partida o tienes
+                            archivos antiguos como{" "}
+                            <code>Nueva-Campana.gmstudio.json</code>, puedes
+                            eliminarlos con el botón de la papelera o pulsar{" "}
+                            <strong>Sobrescribir</strong> para reemplazarlos con
+                            la versión más moderna.
                           </p>
                         </div>
                       </div>
@@ -601,7 +692,9 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                             <span>¿Eliminar archivo de la carpeta?</span>
                           </div>
                           <p className="text-[11px] m-0 leading-relaxed text-[var(--text-secondary)]">
-                            Se borrará permanentemente el archivo <strong>«{fileToConfirmDelete}»</strong> de tu carpeta de disco. Esta acción no se puede deshacer.
+                            Se borrará permanentemente el archivo{" "}
+                            <strong>«{fileToConfirmDelete}»</strong> de tu
+                            carpeta de disco. Esta acción no se puede deshacer.
                           </p>
                           <div className="flex items-center justify-end gap-2 pt-1">
                             <button
@@ -614,12 +707,18 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteDiskFile(fileToConfirmDelete)}
+                              onClick={() =>
+                                handleDeleteDiskFile(fileToConfirmDelete)
+                              }
                               disabled={isDeletingFile}
                               className="py-1 px-3 rounded bg-red-600 hover:bg-red-700 text-white font-cinzel font-bold text-[11px] cursor-pointer transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
                             >
                               <Trash2 className="w-3 h-3" />
-                              <span>{isDeletingFile ? 'Borrando...' : 'Sí, Eliminar Archivo'}</span>
+                              <span>
+                                {isDeletingFile
+                                  ? "Borrando..."
+                                  : "Sí, Eliminar Archivo"}
+                              </span>
                             </button>
                           </div>
                         </div>
@@ -633,7 +732,9 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                             <span>¿Cargar y Restaurar Partida?</span>
                           </div>
                           <p className="text-[11px] m-0 leading-relaxed text-[var(--text-secondary)]">
-                            Se importará y cargará la partida desde <strong>«{fileToConfirmRestore.name}»</strong> ({formatFileSize(fileToConfirmRestore.size)}).
+                            Se importará y cargará la partida desde{" "}
+                            <strong>«{fileToConfirmRestore.name}»</strong> (
+                            {formatFileSize(fileToConfirmRestore.size)}).
                           </p>
                           <div className="flex items-center justify-end gap-2 pt-1">
                             <button
@@ -645,7 +746,9 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleRestoreDiskFile(fileToConfirmRestore)}
+                              onClick={() =>
+                                handleRestoreDiskFile(fileToConfirmRestore)
+                              }
                               className="py-1 px-3 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold text-[11px] cursor-pointer hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
                             >
                               <CheckCircle2 className="w-3 h-3" />
@@ -669,14 +772,16 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                 </div>
               ) : (
                 <div className="p-3 bg-stone-100 dark:bg-stone-900/60 border border-stone-300 dark:border-stone-700 rounded text-[11px] text-[var(--text-secondary)]">
-                  Tu navegador actual no admite la API File System nativa para acceso a carpetas locales. Puedes utilizar las funciones de importación y gestión local para respaldar tus partidas.
+                  Tu navegador actual no admite la API File System nativa para
+                  acceso a carpetas locales. Puedes utilizar las funciones de
+                  importación y gestión local para respaldar tus partidas.
                 </div>
               )}
             </div>
           )}
 
           {/* TAB 2: STORAGE STATUS */}
-          {activeTab === 'storage' && (
+          {activeTab === "storage" && (
             <div className="space-y-4 font-lora">
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3.5 rounded-lg border border-[var(--glass-border)] bg-[var(--glass)]">
@@ -691,9 +796,11 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                   <span className="text-[11px] font-cinzel text-[var(--text-secondary)] block mb-1">
                     Almacén Persistente
                   </span>
-                  <span className={`font-cinzel font-bold text-xs flex items-center gap-1.5 ${isPersistedStorage ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600'}`}>
+                  <span
+                    className={`font-cinzel font-bold text-xs flex items-center gap-1.5 ${isPersistedStorage ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600"}`}
+                  >
                     <ShieldCheck className="w-4 h-4" />
-                    {isPersistedStorage ? 'Protegido' : 'Estándar'}
+                    {isPersistedStorage ? "Protegido" : "Estándar"}
                   </span>
                 </div>
               </div>
@@ -701,8 +808,12 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
               {storageStats && (
                 <div className="border border-[var(--glass-border)] bg-[var(--glass)] p-3.5 rounded-lg space-y-2">
                   <div className="flex justify-between text-xs font-cinzel">
-                    <span className="text-[var(--text-secondary)]">Uso de Almacenamiento Local</span>
-                    <span className="font-bold text-[var(--accent)]">{storageStats.usageMB} MB usados</span>
+                    <span className="text-[var(--text-secondary)]">
+                      Uso de Almacenamiento Local
+                    </span>
+                    <span className="font-bold text-[var(--accent)]">
+                      {storageStats.usageMB} MB usados
+                    </span>
                   </div>
                   <div className="w-full bg-stone-200 dark:bg-stone-700 rounded-full h-2 overflow-hidden">
                     <div
@@ -711,7 +822,8 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                     />
                   </div>
                   <p className="text-[10px] text-[var(--text-secondary)] m-0">
-                    Capacidad asignada por el navegador: ~{storageStats.quotaMB} MB
+                    Capacidad asignada por el navegador: ~{storageStats.quotaMB}{" "}
+                    MB
                   </p>
                 </div>
               )}
@@ -722,7 +834,10 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                   <span>Sin conexión ni dependencias externas</span>
                 </div>
                 <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                  Todo tu contenido funciona 100% offline. No necesitas mantener cuentas de Firebase ni permisos de Google Workspace. Tus partidas son tuyas y quedan archivadas en tu propio dispositivo.
+                  Todo tu contenido funciona 100% offline. No necesitas mantener
+                  cuentas de Firebase ni permisos de Google Workspace. Tus
+                  partidas son tuyas y quedan archivadas en tu propio
+                  dispositivo.
                 </p>
               </div>
             </div>

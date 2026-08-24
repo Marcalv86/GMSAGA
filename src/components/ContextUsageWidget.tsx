@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Project, ProjectFile, Chat } from '../types';
+import React, { useState } from "react";
+import { createPortal } from "react-dom";
+import { Project, ProjectFile, Chat } from "../types";
 import {
   countTurnTokens,
   describeApiError,
   getStoredBusquedaLocal,
-  setStoredBusquedaLocal
-} from '../utils/geminiHelper';
+  setStoredBusquedaLocal,
+} from "../utils/geminiHelper";
 
 import {
   BookOpen,
@@ -22,8 +22,8 @@ import {
   Paperclip,
   Search,
   Scroll,
-  X
-} from 'lucide-react';
+  X,
+} from "lucide-react";
 export const ContextUsageWidget: React.FC<{
   project: Project | null;
   files: ProjectFile[];
@@ -38,15 +38,17 @@ export const ContextUsageWidget: React.FC<{
     modelo: string;
   } | null>(null);
   const [midiendo, setMidiendo] = useState(false);
-  const [errorMedida, setErrorMedida] = useState('');
+  const [errorMedida, setErrorMedida] = useState("");
   const [busqueda, setBusqueda] = useState(() => getStoredBusquedaLocal());
 
   const medirDeVerdad = async () => {
     if (!project || !currentChatId) return;
     setMidiendo(true);
-    setErrorMedida('');
+    setErrorMedida("");
     try {
-      setMedida(await countTurnTokens({ project, currentChatId, chats, files }));
+      setMedida(
+        await countTurnTokens({ project, currentChatId, chats, files }),
+      );
     } catch (err) {
       setErrorMedida(describeApiError(err));
     } finally {
@@ -58,47 +60,73 @@ export const ContextUsageWidget: React.FC<{
 
   // Breakdown calculations
   const instructionsChars =
-    (project.instructions?.length || 0) + (project.system?.length || 0) + (project.style?.length || 0);
+    (project.instructions?.length || 0) +
+    (project.system?.length || 0) +
+    (project.style?.length || 0);
 
   const memoryChars =
     (project.memory?.story?.length || 0) +
     (project.memory?.current_status?.length || 0) +
     (project.memory?.manual_notes?.length || 0) +
     (project.memory?.npcs || []).reduce(
-      (acc, n) => acc + (n.name?.length || 0) + (n.notes?.length || 0) + (n.description?.length || 0),
-      0
+      (acc, n) =>
+        acc +
+        (n.name?.length || 0) +
+        (n.notes?.length || 0) +
+        (n.description?.length || 0),
+      0,
     ) +
     (project.memory?.quests || []).reduce(
-      (acc, q) => acc + (q.title?.length || 0) + (q.objective?.length || 0) + (q.progress?.length || 0),
-      0
+      (acc, q) =>
+        acc +
+        (q.title?.length || 0) +
+        (q.objective?.length || 0) +
+        (q.progress?.length || 0),
+      0,
     ) +
     (project.memory?.locations || []).reduce(
-      (acc, l) => acc + (l.name?.length || 0) + (l.desc?.length || 0) + (l.notes?.length || 0),
-      0
+      (acc, l) =>
+        acc +
+        (l.name?.length || 0) +
+        (l.desc?.length || 0) +
+        (l.notes?.length || 0),
+      0,
     );
 
   // Un archivo de texto viaja entero salvo que sea una muestra de estilo (su valor
   // ya se destiló en las directivas) o esté marcado de consulta. Las tablas de
   // oráculo son la excepción a la excepción: se mandan siempre, porque un oráculo
   // que hay que pedir no sirve de nada.
-  const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
-  const viajaEntero = (f: ProjectFile) => esTexto(f) && (!f.onDemand || f.category === 'oracle');
+  const esTexto = (f: ProjectFile) =>
+    !f.isImage && !f.isAudio && f.category !== "style_sample";
+  const viajaEntero = (f: ProjectFile) =>
+    esTexto(f) && (!f.onDemand || f.category === "oracle");
 
-  const filesChars = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
+  const filesChars = files.reduce(
+    (acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0),
+    0,
+  );
 
   // Lo que NO viaja, contado aparte. Antes simplemente desaparecía del reparto, y
   // entonces no había manera de comprobar que marcar algo «de consulta» hubiera
   // servido de algo, ni de saber cuánto te estabas ahorrando.
-  const deConsulta = files.filter(f => esTexto(f) && f.onDemand && f.category !== 'oracle');
-  const deConsultaChars = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
+  const deConsulta = files.filter(
+    (f) => esTexto(f) && f.onDemand && f.category !== "oracle",
+  );
+  const deConsultaChars = deConsulta.reduce(
+    (acc, f) => acc + (f.length || 0),
+    0,
+  );
 
-  const mediaCount = files.filter(f => f.isImage || f.isAudio).length;
+  const mediaCount = files.filter((f) => f.isImage || f.isAudio).length;
 
   // Las imágenes no viajan, pero su análisis escrito sí, y eso hasta ahora no se
   // contaba en ninguna parte.
   const visualChars = files.reduce(
-    (acc, f) => acc + (f.isImage && f.analysis ? f.analysis.length + f.name.length + 40 : 0),
-    0
+    (acc, f) =>
+      acc +
+      (f.isImage && f.analysis ? f.analysis.length + f.name.length + 40 : 0),
+    0,
   );
 
   // Los mismos topes que aplica `buildTurnPayload` al enviar. Antes se sumaban
@@ -107,13 +135,19 @@ export const ContextUsageWidget: React.FC<{
   // el tramo reciente del capítulo actual más una cola de los anteriores.
   const PREVIO_MAX = 8000;
   const ESCENA_MAX = 40000;
-  const largoDe = (c: Chat) => (c.messages || []).reduce((acc, m) => acc + (m.content?.length || 0), 0);
+  const largoDe = (c: Chat) =>
+    (c.messages || []).reduce((acc, m) => acc + (m.content?.length || 0), 0);
 
-  const capituloActual = chats.find(c => c.id === currentChatId) || chats[chats.length - 1];
-  const escenaChars = capituloActual ? Math.min(ESCENA_MAX, largoDe(capituloActual)) : 0;
+  const capituloActual =
+    chats.find((c) => c.id === currentChatId) || chats[chats.length - 1];
+  const escenaChars = capituloActual
+    ? Math.min(ESCENA_MAX, largoDe(capituloActual))
+    : 0;
   const previosChars = Math.min(
     PREVIO_MAX,
-    chats.filter(c => c.id !== capituloActual?.id).reduce((acc, c) => acc + largoDe(c), 0)
+    chats
+      .filter((c) => c.id !== capituloActual?.id)
+      .reduce((acc, c) => acc + largoDe(c), 0),
   );
   const chatsChars = escenaChars + previosChars;
 
@@ -122,15 +156,21 @@ export const ContextUsageWidget: React.FC<{
   // honesto: la barra debe pecar de prudente, no de optimista.
   const rescateChars = busqueda && deConsulta.length ? 6000 : 0;
 
-  const totalChars = instructionsChars + memoryChars + filesChars + visualChars + chatsChars + rescateChars;
+  const totalChars =
+    instructionsChars +
+    memoryChars +
+    filesChars +
+    visualChars +
+    chatsChars +
+    rescateChars;
 
   // Un número como 127.694 no dice nada de un vistazo; 128 mil sí.
   const compact = (n: number) =>
     n >= 1_000_000
-      ? `${(n / 1_000_000).toFixed(1).replace('.', ',')} M`
+      ? `${(n / 1_000_000).toFixed(1).replace(".", ",")} M`
       : n >= 1000
-        ? `${Math.round(n / 1000).toLocaleString('es-ES')} mil`
-        : n.toLocaleString('es-ES');
+        ? `${Math.round(n / 1000).toLocaleString("es-ES")} mil`
+        : n.toLocaleString("es-ES");
 
   // Conversión aproximada para prosa de rol en español: ~3,8 caracteres por token
   const estimatedTokens = Math.round(totalChars / 3.8);
@@ -164,7 +204,11 @@ export const ContextUsageWidget: React.FC<{
         >
           <div
             className={`h-full rounded-full transition-all duration-500 ${
-              percentage > 85 ? 'bg-red-600' : percentage > 50 ? 'bg-amber-600' : 'bg-[var(--accent)]'
+              percentage > 85
+                ? "bg-red-600"
+                : percentage > 50
+                  ? "bg-amber-600"
+                  : "bg-[var(--accent)]"
             } group-hover:brightness-110`}
             style={{ width: `${Math.max(2, percentage)}%` }}
           />
@@ -173,10 +217,14 @@ export const ContextUsageWidget: React.FC<{
         {/* Tokens & Chars Counter */}
         <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] mt-1.5 font-cinzel">
           <span>
-            {medida ? '' : '~'}
+            {medida ? "" : "~"}
             {compact(tokensMostrados)} tokens
           </span>
-          <span>{medida ? `medido · ${medida.modelo}` : `${compact(totalChars)} car.`}</span>
+          <span>
+            {medida
+              ? `medido · ${medida.modelo}`
+              : `${compact(totalChars)} car.`}
+          </span>
         </div>
       </div>
 
@@ -194,7 +242,8 @@ export const ContextUsageWidget: React.FC<{
                       Memoria y Capacidad del Tomo
                     </h3>
                     <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
-                      Gestión de contexto, consumo de tokens y optimización de archivos
+                      Gestión de contexto, consumo de tokens y optimización de
+                      archivos
                     </p>
                   </div>
                 </div>
@@ -202,7 +251,7 @@ export const ContextUsageWidget: React.FC<{
                   onClick={() => setIsGuideOpen(false)}
                   className="text-[var(--text-secondary)] hover:text-[var(--accent)] text-xl font-bold p-1 cursor-pointer"
                 >
-                  <X className="w-3.5 h-3.5" />{' '}
+                  <X className="w-3.5 h-3.5" />{" "}
                 </button>
               </div>
 
@@ -216,45 +265,63 @@ export const ContextUsageWidget: React.FC<{
                       En qué se va el contexto
                     </span>
                     <span className="text-xs bg-[var(--accent)] text-[var(--on-accent)] px-2 py-0.5 rounded-full font-sans">
-                      {percentage < 0.1 ? '<0,1' : percentage.toFixed(1).replace('.', ',')}% de la ventana
+                      {percentage < 0.1
+                        ? "<0,1"
+                        : percentage.toFixed(1).replace(".", ",")}
+                      % de la ventana
                     </span>
                   </h4>
 
                   <p className="text-[11px] text-[var(--text-secondary)] m-0 mb-3">
-                    Reparto de los {compact(totalChars)} caracteres que se envían en cada turno. Del historial
-                    solo viaja el tramo reciente: lo viejo ya está resumido en la Memoria Viva.
+                    Reparto de los {compact(totalChars)} caracteres que se
+                    envían en cada turno. Del historial solo viaja el tramo
+                    reciente: lo viejo ya está resumido en la Memoria Viva.
                   </p>
 
                   <ul className="flex flex-col gap-2.5 m-0 p-0 list-none">
                     {[
-                      { label: 'Directivas', chars: instructionsChars, Icon: Scroll },
-                      { label: 'Memoria viva', chars: memoryChars, Icon: Brain },
                       {
-                        label: 'Archivos que viajan enteros',
+                        label: "Directivas",
+                        chars: instructionsChars,
+                        Icon: Scroll,
+                      },
+                      {
+                        label: "Memoria viva",
+                        chars: memoryChars,
+                        Icon: Brain,
+                      },
+                      {
+                        label: "Archivos que viajan enteros",
                         chars: filesChars,
                         Icon: Paperclip,
-                        extra: mediaCount > 0 ? `${mediaCount} imágenes o audios aparte` : undefined
+                        extra:
+                          mediaCount > 0
+                            ? `${mediaCount} imágenes o audios aparte`
+                            : undefined,
                       },
                       {
-                        label: 'Análisis de imágenes y mapas',
+                        label: "Análisis de imágenes y mapas",
                         chars: visualChars,
                         Icon: Image,
-                        extra: undefined
+                        extra: undefined,
                       },
                       {
-                        label: 'Capítulos (solo el tramo reciente)',
+                        label: "Capítulos (solo el tramo reciente)",
                         chars: chatsChars,
                         Icon: MessageSquare,
-                        extra: undefined
+                        extra: undefined,
                       },
                       {
-                        label: 'Fragmentos rescatados de los de consulta',
+                        label: "Fragmentos rescatados de los de consulta",
                         chars: rescateChars,
                         Icon: Search,
-                        extra: rescateChars ? 'como mucho; lo normal es bastante menos' : undefined
-                      }
+                        extra: rescateChars
+                          ? "como mucho; lo normal es bastante menos"
+                          : undefined,
+                      },
                     ].map(({ label, chars, Icon, extra }) => {
-                      const share = totalChars > 0 ? (chars / totalChars) * 100 : 0;
+                      const share =
+                        totalChars > 0 ? (chars / totalChars) * 100 : 0;
                       return (
                         <li key={label} className="flex flex-col gap-1">
                           <div className="flex items-baseline justify-between gap-3">
@@ -263,16 +330,26 @@ export const ContextUsageWidget: React.FC<{
                               <span className="truncate">{label}</span>
                             </span>
                             <span className="text-[var(--text-secondary)] tabular-nums shrink-0">
-                              {compact(chars)} · {share < 1 && chars > 0 ? '<1' : Math.round(share)}%
+                              {compact(chars)} ·{" "}
+                              {share < 1 && chars > 0
+                                ? "<1"
+                                : Math.round(share)}
+                              %
                             </span>
                           </div>
                           <div className="h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
                             <div
                               className="h-full bg-[var(--accent)]/55 rounded-full"
-                              style={{ width: `${Math.max(share, chars > 0 ? 1.5 : 0)}%` }}
+                              style={{
+                                width: `${Math.max(share, chars > 0 ? 1.5 : 0)}%`,
+                              }}
                             />
                           </div>
-                          {extra && <span className="text-[11px] text-[var(--text-secondary)]">{extra}</span>}
+                          {extra && (
+                            <span className="text-[11px] text-[var(--text-secondary)]">
+                              {extra}
+                            </span>
+                          )}
                         </li>
                       );
                     })}
@@ -282,10 +359,11 @@ export const ContextUsageWidget: React.FC<{
                     <div className="mt-3 rounded-lg border border-dashed border-[var(--user-border)] bg-[var(--surface-soft)] p-2.5 text-[11px] text-[var(--text-secondary)]">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <span className="font-cinzel font-bold text-[var(--text-primary)]">
-                          {deConsulta.length} de consulta · {busqueda ? 'se buscan' : 'solo se anuncian'}
+                          {deConsulta.length} de consulta ·{" "}
+                          {busqueda ? "se buscan" : "solo se anuncian"}
                         </span>
                         <span className="tabular-nums">
-                          {compact(deConsultaChars)} car. ·{' '}
+                          {compact(deConsultaChars)} car. ·{" "}
                           {busqueda ? (
                             <strong className="text-emerald-700">
                               viajan solo los fragmentos que hagan falta
@@ -295,38 +373,48 @@ export const ContextUsageWidget: React.FC<{
                           )}
                         </span>
                       </div>
-                      <div className="mt-1 truncate" title={deConsulta.map(f => f.name).join(', ')}>
-                        {deConsulta.map(f => f.name).join(' · ')}
+                      <div
+                        className="mt-1 truncate"
+                        title={deConsulta.map((f) => f.name).join(", ")}
+                      >
+                        {deConsulta.map((f) => f.name).join(" · ")}
                       </div>
 
                       <label className="mt-2 flex items-start gap-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={busqueda}
-                          onChange={e => {
+                          onChange={(e) => {
                             setStoredBusquedaLocal(e.target.checked);
                             setBusqueda(e.target.checked);
                           }}
                           className="mt-0.5 accent-[var(--accent)]"
                         />
                         <span>
-                          <strong className="text-[var(--text-primary)]">Buscar en ellos cada turno.</strong>{' '}
-                          Rescata hasta 6 mil caracteres de lo que venga a cuento de la escena. La búsqueda
-                          corre en tu navegador y no gasta ninguna petición, pero esos fragmentos sí suman
-                          tokens. Con esto apagado el Narrador solo sabe que los archivos existen y tendrá que
-                          pedirte los datos.
+                          <strong className="text-[var(--text-primary)]">
+                            Buscar en ellos cada turno.
+                          </strong>{" "}
+                          Rescata hasta 6 mil caracteres de lo que venga a
+                          cuento de la escena. La búsqueda corre en tu navegador
+                          y no gasta ninguna petición, pero esos fragmentos sí
+                          suman tokens. Con esto apagado el Narrador solo sabe
+                          que los archivos existen y tendrá que pedirte los
+                          datos.
                           <br />
-                          Los turnos con y sin búsqueda se apuntan por separado en el botón Motor, para que
-                          compares el gasto real en vez de fiarte de la impresión.
+                          Los turnos con y sin búsqueda se apuntan por separado
+                          en el botón Motor, para que compares el gasto real en
+                          vez de fiarte de la impresión.
                         </span>
                       </label>
                     </div>
                   )}
 
                   <div className="mt-3 pt-3 border-t border-[var(--glass-border)] flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)]">
-                    <span>Ventana del modelo: {compact(MAX_TOKENS)} de tokens</span>
                     <span>
-                      Te quedan{' '}
+                      Ventana del modelo: {compact(MAX_TOKENS)} de tokens
+                    </span>
+                    <span>
+                      Te quedan{" "}
                       <strong className="text-[var(--accent)]">
                         {compact(MAX_TOKENS - tokensMostrados)}
                       </strong>
@@ -337,8 +425,8 @@ export const ContextUsageWidget: React.FC<{
                   <div className="mt-3 pt-3 border-t border-[var(--glass-border)] space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-[11px] text-[var(--text-secondary)]">
-                        Lo de arriba es una estimación por caracteres. Google cuenta por tokens, y no salen
-                        los mismos números.
+                        Lo de arriba es una estimación por caracteres. Google
+                        cuenta por tokens, y no salen los mismos números.
                       </span>
                       <button
                         onClick={medirDeVerdad}
@@ -351,11 +439,15 @@ export const ContextUsageWidget: React.FC<{
                         ) : (
                           <Gauge className="w-3.5 h-3.5" />
                         )}
-                        {midiendo ? 'Midiendo…' : 'Medir de verdad'}
+                        {midiendo ? "Midiendo…" : "Medir de verdad"}
                       </button>
                     </div>
 
-                    {errorMedida && <p className="text-[11px] text-red-500 m-0">{errorMedida}</p>}
+                    {errorMedida && (
+                      <p className="text-[11px] text-red-500 m-0">
+                        {errorMedida}
+                      </p>
+                    )}
 
                     {medida && (
                       <div className="rounded-lg bg-[var(--surface-soft)] border border-[var(--user-border)] p-3 text-xs space-y-1">
@@ -364,19 +456,24 @@ export const ContextUsageWidget: React.FC<{
                             Medido en {medida.modelo}
                           </span>
                           <span className="tabular-nums font-bold text-[var(--accent)]">
-                            {medida.total.toLocaleString('es-ES')} tokens
+                            {medida.total.toLocaleString("es-ES")} tokens
                           </span>
                         </div>
                         <div className="flex justify-between gap-3 text-[var(--text-secondary)]">
                           <span>Directivas, ficha, documentos y memoria</span>
-                          <span className="tabular-nums">{medida.sistema.toLocaleString('es-ES')}</span>
+                          <span className="tabular-nums">
+                            {medida.sistema.toLocaleString("es-ES")}
+                          </span>
                         </div>
                         <div className="flex justify-between gap-3 text-[var(--text-secondary)]">
                           <span>Escena en curso</span>
-                          <span className="tabular-nums">{medida.conversacion.toLocaleString('es-ES')}</span>
+                          <span className="tabular-nums">
+                            {medida.conversacion.toLocaleString("es-ES")}
+                          </span>
                         </div>
                         <p className="text-[11px] text-[var(--text-secondary)] m-0 pt-1">
-                          Este es el número que también verías en Google AI Studio con el mismo material.
+                          Este es el número que también verías en Google AI
+                          Studio con el mismo material.
                         </p>
                       </div>
                     )}
@@ -386,27 +483,39 @@ export const ContextUsageWidget: React.FC<{
                 {/* Cómo se gestiona la memoria */}
                 <div className="space-y-2">
                   <h4 className="font-cinzel font-bold text-base text-[var(--accent)] flex items-center gap-2">
-                    <Landmark className="w-4 h-4 shrink-0" /> Cómo recuerda la campaña
+                    <Landmark className="w-4 h-4 shrink-0" /> Cómo recuerda la
+                    campaña
                   </h4>
                   <p className="text-xs md:text-sm text-[var(--text-primary)] m-0">
-                    Todo lo que ves arriba viaja al modelo en cada turno. Se organiza en tres capas para que
-                    la partida no pierda el hilo tras cientos de mensajes:
+                    Todo lo que ves arriba viaja al modelo en cada turno. Se
+                    organiza en tres capas para que la partida no pierda el hilo
+                    tras cientos de mensajes:
                   </p>
                   <ul className="list-disc pl-5 text-xs md:text-sm space-y-1.5 text-[var(--text-secondary)]">
                     <li>
-                      <strong className="text-[var(--text-primary)]">Base de conocimiento.</strong> Tus
-                      documentos, íntegros. Al ser lo que menos cambia, van al principio del mensaje, donde
-                      Google puede reutilizarlos entre turnos en vez de reprocesarlos.
+                      <strong className="text-[var(--text-primary)]">
+                        Base de conocimiento.
+                      </strong>{" "}
+                      Tus documentos, íntegros. Al ser lo que menos cambia, van
+                      al principio del mensaje, donde Google puede reutilizarlos
+                      entre turnos en vez de reprocesarlos.
                     </li>
                     <li>
-                      <strong className="text-[var(--text-primary)]">Memoria viva.</strong> PNJs, lugares,
-                      tramas y estado actual. Se guarda en tu navegador y se inyecta en cada escena, junto al
-                      final del mensaje, que es donde el modelo más atención presta.
+                      <strong className="text-[var(--text-primary)]">
+                        Memoria viva.
+                      </strong>{" "}
+                      PNJs, lugares, tramas y estado actual. Se guarda en tu
+                      navegador y se inyecta en cada escena, junto al final del
+                      mensaje, que es donde el modelo más atención presta.
                     </li>
                     <li>
-                      <strong className="text-[var(--text-primary)]">Sincronización.</strong> Al pulsar{' '}
-                      <em>Sincronizar con IA</em> en Memoria, se releen los capítulos y se actualizan esas
-                      fichas. Cuanto más al día esté la memoria, menos historial hace falta arrastrar.
+                      <strong className="text-[var(--text-primary)]">
+                        Sincronización.
+                      </strong>{" "}
+                      Al pulsar <em>Sincronizar con IA</em> en Memoria, se
+                      releen los capítulos y se actualizan esas fichas. Cuanto
+                      más al día esté la memoria, menos historial hace falta
+                      arrastrar.
                     </li>
                   </ul>
                 </div>
@@ -414,28 +523,33 @@ export const ContextUsageWidget: React.FC<{
                 {/* File Optimization Guide */}
                 <div className="space-y-3">
                   <h4 className="font-cinzel font-bold text-base text-[var(--accent)] flex items-center gap-2">
-                    <Image className="w-4 h-4 shrink-0" /> ¿Subirlo como imagen o como texto?
+                    <Image className="w-4 h-4 shrink-0" /> ¿Subirlo como imagen
+                    o como texto?
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Image Card */}
                     <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-3.5 rounded-lg">
                       <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center gap-1.5 mb-1.5">
-                        <Map className="w-3.5 h-3.5" /> Archivos Ideales como IMAGEN
+                        <Map className="w-3.5 h-3.5" /> Archivos Ideales como
+                        IMAGEN
                       </div>
                       <ul className="text-xs space-y-1.5 text-[var(--text-secondary)]">
                         <li>
-                          <strong>Mapas y Planos tácticos:</strong> Se procesan con visión artificial de
-                          Gemini para extraer geografía, rutas y zonas, permitiendo además añadir{' '}
+                          <strong>Mapas y Planos tácticos:</strong> Se procesan
+                          con visión artificial de Gemini para extraer
+                          geografía, rutas y zonas, permitiendo además añadir{" "}
                           <em>Marcadores interactivos</em>.
                         </li>
                         <li>
-                          <strong>Retratos de Personajes / Criaturas:</strong> Excelentes para asignar en la
-                          ficha del PNJ en <em>Memoria</em> y asociarles notas visuales y de actitud.
+                          <strong>Retratos de Personajes / Criaturas:</strong>{" "}
+                          Excelentes para asignar en la ficha del PNJ en{" "}
+                          <em>Memoria</em> y asociarles notas visuales y de
+                          actitud.
                         </li>
                         <li className="text-[11px] italic text-[var(--accent)]">
-                          * Las imágenes consumen cuota de tokens visuales fijos (~258 tokens por imagen) sin
-                          sobrecargar el texto.
+                          * Las imágenes consumen cuota de tokens visuales fijos
+                          (~258 tokens por imagen) sin sobrecargar el texto.
                         </li>
                       </ul>
                     </div>
@@ -443,20 +557,24 @@ export const ContextUsageWidget: React.FC<{
                     {/* Text Card */}
                     <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-3.5 rounded-lg">
                       <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center gap-1.5 mb-1.5">
-                        <Scroll className="w-3.5 h-3.5" /> Archivos Ideales como TEXTO / PDF
+                        <Scroll className="w-3.5 h-3.5" /> Archivos Ideales como
+                        TEXTO / PDF
                       </div>
                       <ul className="text-xs space-y-1.5 text-[var(--text-secondary)]">
                         <li>
-                          <strong>Novelas y Lore Canónico:</strong> Ideales en .txt, .md o PDF para que el
-                          modelo cite eventos, diálogos y cronología con fidelidad milimétrica.
+                          <strong>Novelas y Lore Canónico:</strong> Ideales en
+                          .txt, .md o PDF para que el modelo cite eventos,
+                          diálogos y cronología con fidelidad milimétrica.
                         </li>
                         <li>
-                          <strong>Módulos y aventuras:</strong> Permite al Narrador extraer encuentros,
-                          acertijos, tesoros y estadísticas de forma instantánea.
+                          <strong>Módulos y aventuras:</strong> Permite al
+                          Narrador extraer encuentros, acertijos, tesoros y
+                          estadísticas de forma instantánea.
                         </li>
                         <li className="text-[11px] italic text-[var(--accent)]">
-                          * Puedes usar el botón <em>«Extraer Estilo/Sistema»</em> en cualquier texto para
-                          adaptar el tono del narrador.
+                          * Puedes usar el botón{" "}
+                          <em>«Extraer Estilo/Sistema»</em> en cualquier texto
+                          para adaptar el tono del narrador.
                         </li>
                       </ul>
                     </div>
@@ -475,7 +593,7 @@ export const ContextUsageWidget: React.FC<{
               </div>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );

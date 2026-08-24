@@ -1,10 +1,10 @@
-import { PlayerCharacter, InventoryItem, PlayerCurrencies } from '../types';
+import { PlayerCharacter, InventoryItem, PlayerCurrencies } from "../types";
 
 export interface InventoryChangeReport {
   itemsToAdd?: Array<{
     name: string;
     quantity: number;
-    category?: InventoryItem['category'];
+    category?: InventoryItem["category"];
     description?: string;
     damageOrAc?: string;
     rarity?: string;
@@ -25,9 +25,9 @@ export interface InventoryChangeReport {
  * Normaliza nombres para comparación (sin tildes, minúsculas, sin puntuación).
  */
 export function normalizeItemName(name: string): string {
-  return (name || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+  return (name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
 }
@@ -35,31 +35,50 @@ export function normalizeItemName(name: string): string {
 /**
  * Detecta la categoría aproximada de un objeto según su nombre o notas.
  */
-export function inferItemCategory(name: string, notes: string): InventoryItem['category'] {
+export function inferItemCategory(
+  name: string,
+  notes: string,
+): InventoryItem["category"] {
   const text = `${name} ${notes}`.toLowerCase();
-  if (/espada|daga|arco|ballesta|hacha|maza|martillo|lanza|vara|bastón|baston|flecha|virote|arma|escudo/i.test(text)) {
-    if (/escudo/i.test(text)) return 'armor';
-    return 'weapon';
+  if (
+    /espada|daga|arco|ballesta|hacha|maza|martillo|lanza|vara|bastón|baston|flecha|virote|arma|escudo/i.test(
+      text,
+    )
+  ) {
+    if (/escudo/i.test(text)) return "armor";
+    return "weapon";
   }
-  if (/armadura|cota|cuero|placas|malla|jubón|jubon|casco|guantes|grebas|coraza/i.test(text)) {
-    return 'armor';
+  if (
+    /armadura|cota|cuero|placas|malla|jubón|jubon|casco|guantes|grebas|coraza/i.test(
+      text,
+    )
+  ) {
+    return "armor";
   }
   if (/poci[oó]n|elixir|bálsamo|balsamo|filtro|vial|ungüento/i.test(text)) {
-    return 'potion';
+    return "potion";
   }
   if (/pergamino|rollo|grimorio|tomo|manual|tratado/i.test(text)) {
-    return 'scroll';
+    return "scroll";
   }
   if (/baya|raci[oó]n|comida|pan|odre|fruta/i.test(text)) {
-    return 'equipment';
+    return "equipment";
   }
-  if (/m[aá]scara|anillo|amuleto|capa|botas|varita|orbe|talism[aá]n|reliquia|m[aá]gic/i.test(text)) {
-    return 'magic';
+  if (
+    /m[aá]scara|anillo|amuleto|capa|botas|varita|orbe|talism[aá]n|reliquia|m[aá]gic/i.test(
+      text,
+    )
+  ) {
+    return "magic";
   }
-  if (/joya|gema|rub[ií]|diamante|zafiro|esmeralda|lingote|cáliz|corona|tesoro/i.test(text)) {
-    return 'treasure';
+  if (
+    /joya|gema|rub[ií]|diamante|zafiro|esmeralda|lingote|cáliz|corona|tesoro/i.test(
+      text,
+    )
+  ) {
+    return "treasure";
   }
-  return 'equipment';
+  return "equipment";
 }
 
 /**
@@ -69,14 +88,19 @@ export function parseInventoryTags(text: string): {
   cleaned: string;
   report: InventoryChangeReport | null;
 } {
-  if (!text || (!text.includes('[INVENTARIO:') && !text.includes('[OBJETOS:') && !text.includes('[MONEDAS:'))) {
+  if (
+    !text ||
+    (!text.includes("[INVENTARIO:") &&
+      !text.includes("[OBJETOS:") &&
+      !text.includes("[MONEDAS:"))
+  ) {
     return { cleaned: text, report: null };
   }
 
   const report: InventoryChangeReport = {
     itemsToAdd: [],
     itemsToRemove: [],
-    currencyDelta: {}
+    currencyDelta: {},
   };
 
   let hasChanges = false;
@@ -88,21 +112,31 @@ export function parseInventoryTags(text: string): {
   while ((match = TAG_RE.exec(text)) !== null) {
     const body = match[1];
     // Partir por comas o punto y coma que no estén dentro de paréntesis
-    const parts = body.split(/(?!\(.*?\)),/).map(p => p.trim()).filter(Boolean);
+    const parts = body
+      .split(/(?!\(.*?\)),/)
+      .map((p) => p.trim())
+      .filter(Boolean);
 
     for (const part of parts) {
       // 1. Monedas: +50 PO, -20 PO, +100 oro, -5 plata, +10 GP, -2 SP, etc.
-      const currMatch = part.match(/^([+-])\s*(\d+)\s*(po|pp|pc|pt|pe|gp|sp|cp|ep|pp|oro|plata|cobre|platino|electro)\b/i);
+      const currMatch = part.match(
+        /^([+-])\s*(\d+)\s*(po|pp|pc|pt|pe|gp|sp|cp|ep|pp|oro|plata|cobre|platino|electro)\b/i,
+      );
       if (currMatch) {
-        const sign = currMatch[1] === '-' ? -1 : 1;
+        const sign = currMatch[1] === "-" ? -1 : 1;
         const amount = parseInt(currMatch[2], 10) * sign;
         const rawUnit = currMatch[3].toLowerCase();
-        let key: keyof PlayerCurrencies = 'gp';
-        if (rawUnit === 'po' || rawUnit === 'gp' || rawUnit === 'oro') key = 'gp';
-        else if (rawUnit === 'pp' || rawUnit === 'sp' || rawUnit === 'plata') key = 'sp';
-        else if (rawUnit === 'pc' || rawUnit === 'cp' || rawUnit === 'cobre') key = 'cp';
-        else if (rawUnit === 'pe' || rawUnit === 'ep' || rawUnit === 'electro') key = 'ep';
-        else if (rawUnit === 'pt' || rawUnit === 'pp' || rawUnit === 'platino') key = 'pp';
+        let key: keyof PlayerCurrencies = "gp";
+        if (rawUnit === "po" || rawUnit === "gp" || rawUnit === "oro")
+          key = "gp";
+        else if (rawUnit === "pp" || rawUnit === "sp" || rawUnit === "plata")
+          key = "sp";
+        else if (rawUnit === "pc" || rawUnit === "cp" || rawUnit === "cobre")
+          key = "cp";
+        else if (rawUnit === "pe" || rawUnit === "ep" || rawUnit === "electro")
+          key = "ep";
+        else if (rawUnit === "pt" || rawUnit === "pp" || rawUnit === "platino")
+          key = "pp";
 
         report.currencyDelta![key] = (report.currencyDelta![key] || 0) + amount;
         hasChanges = true;
@@ -110,31 +144,37 @@ export function parseInventoryTags(text: string): {
       }
 
       // 2. Objetos a añadir: +10 Buenas Bayas (duran 24h) o +1 Máscara de Disfraz o +Espada Larga
-      const addMatch = part.match(/^\+\s*(?:(\d+)\s*(?:x|de)?\s*)?([^(]+)(?:\(([^)]+)\))?/i);
+      const addMatch = part.match(
+        /^\+\s*(?:(\d+)\s*(?:x|de)?\s*)?([^(]+)(?:\(([^)]+)\))?/i,
+      );
       if (addMatch) {
         const qty = addMatch[1] ? parseInt(addMatch[1], 10) : 1;
         const rawName = addMatch[2].trim();
-        const details = (addMatch[3] || '').trim();
+        const details = (addMatch[3] || "").trim();
 
         if (rawName) {
           // Detectar duración temporal (ej: duran 24h, 24 horas, 1 día)
           let durationMinutes: number | undefined;
           let durationNote: string | undefined;
-          const durMatch = details.match(/(?:duran?|caduca|expira|vida [uú]til)\s*(?:en|de)?\s*(\d+)\s*(h|horas?|d|d[ií]as?|m|min|minutos?)/i);
+          const durMatch = details.match(
+            /(?:duran?|caduca|expira|vida [uú]til)\s*(?:en|de)?\s*(\d+)\s*(h|horas?|d|d[ií]as?|m|min|minutos?)/i,
+          );
           if (durMatch) {
             const num = parseInt(durMatch[1], 10);
             const unit = durMatch[2].toLowerCase();
-            if (unit.startsWith('h')) durationMinutes = num * 60;
-            else if (unit.startsWith('d')) durationMinutes = num * 1440;
+            if (unit.startsWith("h")) durationMinutes = num * 60;
+            else if (unit.startsWith("d")) durationMinutes = num * 1440;
             else durationMinutes = num;
             durationNote = durMatch[0];
           } else if (/buenas?\s*bayas?/i.test(rawName)) {
             // Regla oficial D&D 5e: Buenas Bayas caducan en 24 horas
             durationMinutes = 24 * 60;
-            durationNote = 'Duran 24 horas';
+            durationNote = "Duran 24 horas";
           }
 
-          const isEquipped = /equipado|puesta|vestida|empuñada|empuñado/i.test(details);
+          const isEquipped = /equipado|puesta|vestida|empuñada|empuñado/i.test(
+            details,
+          );
           const isAttuned = /sintonizad[oa]|attun/i.test(details);
           const isMagic = /m[aá]gic[oa]|artefacto|legendari[oa]/i.test(details);
 
@@ -145,9 +185,9 @@ export function parseInventoryTags(text: string): {
             description: details || undefined,
             equipped: isEquipped,
             attuned: isAttuned,
-            rarity: isMagic ? 'rare' : 'common',
+            rarity: isMagic ? "rare" : "common",
             durationMinutes,
-            durationNote
+            durationNote,
           });
           hasChanges = true;
           continue;
@@ -162,7 +202,7 @@ export function parseInventoryTags(text: string): {
         if (rawName) {
           report.itemsToRemove!.push({
             name: rawName,
-            quantity: qty
+            quantity: qty,
           });
           hasChanges = true;
           continue;
@@ -172,14 +212,14 @@ export function parseInventoryTags(text: string): {
   }
 
   const cleaned = text
-    .replace(/\[(?:INVENTARIO|OBJETOS|MONEDAS)\s*:[^\]]*\]/gi, '')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\[(?:INVENTARIO|OBJETOS|MONEDAS)\s*:[^\]]*\]/gi, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 
   return {
     cleaned,
-    report: hasChanges ? report : null
+    report: hasChanges ? report : null,
   };
 }
 
@@ -188,7 +228,7 @@ export function parseInventoryTags(text: string): {
  */
 export function applyInventoryReport(
   pc: PlayerCharacter,
-  report: InventoryChangeReport
+  report: InventoryChangeReport,
 ): PlayerCharacter {
   let inventory = [...(pc.inventory || [])];
   const currencies: PlayerCurrencies = {
@@ -196,14 +236,19 @@ export function applyInventoryReport(
     sp: pc.currencies?.sp || 0,
     ep: pc.currencies?.ep || 0,
     gp: pc.currencies?.gp || 0,
-    pp: pc.currencies?.pp || 0
+    pp: pc.currencies?.pp || 0,
   };
 
   // 1. Aplicar cambios de monedas
   if (report.currencyDelta) {
-    for (const key of ['cp', 'sp', 'ep', 'gp', 'pp'] as Array<keyof PlayerCurrencies>) {
+    for (const key of ["cp", "sp", "ep", "gp", "pp"] as Array<
+      keyof PlayerCurrencies
+    >) {
       if (report.currencyDelta[key] !== undefined) {
-        currencies[key] = Math.max(0, (currencies[key] || 0) + report.currencyDelta[key]!);
+        currencies[key] = Math.max(
+          0,
+          (currencies[key] || 0) + report.currencyDelta[key]!,
+        );
       }
     }
   }
@@ -215,9 +260,13 @@ export function applyInventoryReport(
       const qtyToRemove = rem.quantity || 1;
 
       // Buscar coincidencia por nombre normalizado
-      const idx = inventory.findIndex(item => {
+      const idx = inventory.findIndex((item) => {
         const normItem = normalizeItemName(item.name);
-        return normItem === normRem || normItem.includes(normRem) || normRem.includes(normItem);
+        return (
+          normItem === normRem ||
+          normItem.includes(normRem) ||
+          normRem.includes(normItem)
+        );
       });
 
       if (idx !== -1) {
@@ -228,7 +277,7 @@ export function applyInventoryReport(
         } else {
           inventory[idx] = {
             ...existing,
-            quantity: newQty
+            quantity: newQty,
           };
         }
       }
@@ -241,7 +290,7 @@ export function applyInventoryReport(
       const normAdd = normalizeItemName(add.name);
 
       // Buscar si ya existe para incrementar cantidad
-      const existingIdx = inventory.findIndex(item => {
+      const existingIdx = inventory.findIndex((item) => {
         const normItem = normalizeItemName(item.name);
         return normItem === normAdd;
       });
@@ -251,25 +300,27 @@ export function applyInventoryReport(
         inventory[existingIdx] = {
           ...existing,
           quantity: (existing.quantity || 1) + add.quantity,
-          equipped: add.equipped !== undefined ? add.equipped : existing.equipped,
+          equipped:
+            add.equipped !== undefined ? add.equipped : existing.equipped,
           attuned: add.attuned !== undefined ? add.attuned : existing.attuned,
           expiresInMinutes: add.durationMinutes || existing.expiresInMinutes,
-          durationNote: add.durationNote || existing.durationNote
+          durationNote: add.durationNote || existing.durationNote,
         };
       } else {
         const newItem: InventoryItem = {
           id: `item_${Date.now()}_${Math.random().toString(36).substring(7)}`,
           name: add.name,
-          category: add.category || inferItemCategory(add.name, add.description || ''),
+          category:
+            add.category || inferItemCategory(add.name, add.description || ""),
           quantity: add.quantity,
           weight: add.weight ?? 1,
           equipped: add.equipped || false,
           attuned: add.attuned || false,
-          description: add.description || '',
-          damageOrAc: add.damageOrAc || '',
-          rarity: add.rarity || 'common',
+          description: add.description || "",
+          damageOrAc: add.damageOrAc || "",
+          rarity: add.rarity || "common",
           expiresInMinutes: add.durationMinutes,
-          durationNote: add.durationNote
+          durationNote: add.durationNote,
         };
         inventory.push(newItem);
       }
@@ -279,7 +330,7 @@ export function applyInventoryReport(
   return {
     ...pc,
     inventory,
-    currencies
+    currencies,
   };
 }
 
@@ -289,7 +340,7 @@ export function applyInventoryReport(
  */
 export function expireTemporaryItems(
   inventory: InventoryItem[],
-  minutesPassed: number
+  minutesPassed: number,
 ): { updatedInventory: InventoryItem[]; expiredNames: string[] } {
   if (minutesPassed <= 0 || !inventory.length) {
     return { updatedInventory: inventory, expiredNames: [] };
@@ -307,7 +358,7 @@ export function expireTemporaryItems(
       } else {
         updatedInventory.push({
           ...item,
-          expiresInMinutes: remaining
+          expiresInMinutes: remaining,
         });
       }
       continue;
@@ -315,8 +366,14 @@ export function expireTemporaryItems(
 
     // Comprobación de palabras clave como "Buenas Bayas" o "duran 24h"
     const norm = normalizeItemName(item.name);
-    const desc = normalizeItemName(item.description || '');
-    if ((norm.includes('buenas bayas') || norm.includes('buena baya') || desc.includes('24h') || desc.includes('24 horas')) && minutesPassed >= 1440) {
+    const desc = normalizeItemName(item.description || "");
+    if (
+      (norm.includes("buenas bayas") ||
+        norm.includes("buena baya") ||
+        desc.includes("24h") ||
+        desc.includes("24 horas")) &&
+      minutesPassed >= 1440
+    ) {
       expiredNames.push(item.name);
       continue;
     }

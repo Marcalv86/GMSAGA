@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from "@google/genai";
 import {
   Project,
   Chat,
@@ -13,12 +13,21 @@ import {
   PlayerCurrencies,
   CampaignDate,
   TimelineEntry,
-  ScheduledThread
-} from '../types';
-import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
-import { registrarUso } from './usageStats';
-import { parseInventoryTags, InventoryChangeReport } from './inventoryParser';
-import { parseDndSheetText, refineAndDeduplicateInventory, validateCharacterEquipment } from './characterSheetParser';
+  ScheduledThread,
+} from "../types";
+import {
+  CORE_INTERFACE_PROTOCOLS,
+  DEFAULT_DM_INSTRUCTIONS,
+  DEFAULT_SYSTEM,
+  DEFAULT_STYLE,
+} from "./defaultDirectives";
+import { registrarUso } from "./usageStats";
+import { parseInventoryTags, InventoryChangeReport } from "./inventoryParser";
+import {
+  parseDndSheetText,
+  refineAndDeduplicateInventory,
+  validateCharacterEquipment,
+} from "./characterSheetParser";
 import {
   aDiaAbsoluto,
   desdeDiaAbsoluto,
@@ -39,9 +48,13 @@ import {
   leerPresentes,
   leerVinculos,
   VinculoLeido,
-  HiloLeido
-} from './campaignCalendar';
-import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
+  HiloLeido,
+} from "./campaignCalendar";
+import {
+  coincidenNombresNpc,
+  fusionarDosNpcs,
+  deduplicarListaNpcs,
+} from "./npcMatcher";
 
 // In-app API key & model management (stored locally in the user's browser)
 export interface AIModelOption {
@@ -53,57 +66,57 @@ export interface AIModelOption {
 
 export const AVAILABLE_MODELS: AIModelOption[] = [
   {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
-    badge: 'Recomendado · Híbrido y Rápido',
-    desc: 'Modelo insignia con razonamiento adaptativo, narración fluida y detección precisa de mecánicas de rol.'
+    id: "gemini-3.7-flash",
+    name: "Gemini 3.7 Flash",
+    badge: "Recomendado · Híbrido y Rápido",
+    desc: "Modelo insignia con razonamiento adaptativo, narración fluida y detección precisa de mecánicas de rol.",
   },
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    badge: 'Rápido y fluido',
-    desc: 'Alta velocidad, capacidad multimodal y cuota amplia.'
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    badge: "Rápido y fluido",
+    desc: "Alta velocidad, capacidad multimodal y cuota amplia.",
   },
   {
-    id: 'gemini-2.5-flash-lite',
-    name: 'Gemini 2.5 Flash Lite',
-    badge: 'Ultra Ligero · Ahorro de cuota',
-    desc: 'Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para sesiones largas.'
+    id: "gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
+    badge: "Ultra Ligero · Ahorro de cuota",
+    desc: "Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para sesiones largas.",
   },
   {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash',
-    badge: 'Estándar Universal',
-    desc: 'Máxima compatibilidad global en todas las cuentas y regiones de Google AI Studio.'
+    id: "gemini-2.0-flash",
+    name: "Gemini 2.0 Flash",
+    badge: "Estándar Universal",
+    desc: "Máxima compatibilidad global en todas las cuentas y regiones de Google AI Studio.",
   },
   {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    badge: 'Máxima Inteligencia · Prosa rica',
-    desc: 'El modelo superior para razonamiento profundo, prosa literaria exquisita y coherencia impecable en tramas complejas.'
+    id: "gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    badge: "Máxima Inteligencia · Prosa rica",
+    desc: "El modelo superior para razonamiento profundo, prosa literaria exquisita y coherencia impecable en tramas complejas.",
   },
   {
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash',
-    badge: 'Alta Compatibilidad',
-    desc: 'Modelo clásico de gran velocidad y soporte en cualquier clave de API.'
-  }
+    id: "gemini-1.5-flash",
+    name: "Gemini 1.5 Flash",
+    badge: "Alta Compatibilidad",
+    desc: "Modelo clásico de gran velocidad y soporte en cualquier clave de API.",
+  },
 ];
 
 export function esModeloAbierto(modelId: string): boolean {
   return /^gemma/i.test(modelId.trim());
 }
 
-export const DEFAULT_MODEL_ID = 'gemini-3.7-flash';
-export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-2.5-flash';
-export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-2.5-flash-lite';
+export const DEFAULT_MODEL_ID = "gemini-3.7-flash";
+export const DEFAULT_BACKGROUND_MODEL_ID = "gemini-2.5-flash";
+export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = "gemini-2.5-flash-lite";
 
 export function getStoredAutoFailover(): boolean {
-  return localStorage.getItem('gmstudio_auto_failover') !== 'off';
+  return localStorage.getItem("gmstudio_auto_failover") !== "off";
 }
 
 export function setStoredAutoFailover(enabled: boolean): void {
-  localStorage.setItem('gmstudio_auto_failover', enabled ? 'on' : 'off');
+  localStorage.setItem("gmstudio_auto_failover", enabled ? "on" : "off");
 }
 
 /**
@@ -113,19 +126,22 @@ export function setStoredAutoFailover(enabled: boolean): void {
  */
 export function getModelFailoverChain(initialModel: string): string[] {
   const standardFallbacks = [
-    'gemini-3.7-flash',
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-1.5-flash',
-    'gemini-2.5-pro',
-    'gemini-1.5-pro'
+    "gemini-3.7-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-2.5-pro",
+    "gemini-1.5-pro",
   ];
   if (!getStoredAutoFailover()) {
     // Si el failover está desactivado pero el modelo inicial no existe,
     // garantizamos al menos probar los estándar para no cortar la partida.
-    return [initialModel, ...standardFallbacks.filter(m => m !== initialModel)];
+    return [
+      initialModel,
+      ...standardFallbacks.filter((m) => m !== initialModel),
+    ];
   }
   const chain: string[] = [initialModel];
   for (const m of standardFallbacks) {
@@ -141,10 +157,10 @@ export function getModelFailoverChain(initialModel: string): string[] {
  * (sincronización de memoria, extracción de PNJs, destilado de fichas, deducción de fechas).
  */
 export function getStoredBackgroundModel(): string {
-  const local = localStorage.getItem('gemini_background_model');
+  const local = localStorage.getItem("gemini_background_model");
   if (local && local.trim()) {
     const trimmed = local.trim();
-    const validIds = AVAILABLE_MODELS.map(m => m.id);
+    const validIds = AVAILABLE_MODELS.map((m) => m.id);
     if (validIds.includes(trimmed)) return trimmed;
     if (/^(gemini|gemma)[\w.-]*$/i.test(trimmed)) return trimmed;
   }
@@ -153,7 +169,7 @@ export function getStoredBackgroundModel(): string {
 
 export function setStoredBackgroundModel(modelId: string): void {
   if (modelId && modelId.trim()) {
-    localStorage.setItem('gemini_background_model', modelId.trim());
+    localStorage.setItem("gemini_background_model", modelId.trim());
   }
 }
 
@@ -165,10 +181,10 @@ export function getBackgroundTaskModel(): string {
 }
 
 export function getStoredModel(): string {
-  const local = localStorage.getItem('gemini_model');
+  const local = localStorage.getItem("gemini_model");
   if (local && local.trim()) {
     const trimmed = local.trim();
-    const validIds = AVAILABLE_MODELS.map(m => m.id);
+    const validIds = AVAILABLE_MODELS.map((m) => m.id);
     if (validIds.includes(trimmed)) return trimmed;
     // Un identificador escrito a mano en el panel del Motor también vale; solo se
     // descartan restos de versiones anteriores que ya no son nombres de modelo.
@@ -179,49 +195,65 @@ export function getStoredModel(): string {
 
 export function setStoredModel(modelId: string): void {
   if (modelId && modelId.trim()) {
-    localStorage.setItem('gemini_model', modelId.trim());
+    localStorage.setItem("gemini_model", modelId.trim());
   }
 }
 
 export type SafetyThreshold =
-  'BLOCK_NONE' | 'BLOCK_ONLY_HIGH' | 'BLOCK_MEDIUM_AND_ABOVE' | 'BLOCK_LOW_AND_ABOVE';
-export type ThinkingLevelSetting = 'AUTO' | 'HIGH' | 'LOW' | 'MINIMAL';
+  | "BLOCK_NONE"
+  | "BLOCK_ONLY_HIGH"
+  | "BLOCK_MEDIUM_AND_ABOVE"
+  | "BLOCK_LOW_AND_ABOVE";
+export type ThinkingLevelSetting = "AUTO" | "HIGH" | "LOW" | "MINIMAL";
 
 export function getStoredSafetyLevel(): SafetyThreshold {
-  const local = localStorage.getItem('gemini_safety_level');
+  const local = localStorage.getItem("gemini_safety_level");
   if (
     local &&
-    ['BLOCK_NONE', 'BLOCK_ONLY_HIGH', 'BLOCK_MEDIUM_AND_ABOVE', 'BLOCK_LOW_AND_ABOVE'].includes(local)
+    [
+      "BLOCK_NONE",
+      "BLOCK_ONLY_HIGH",
+      "BLOCK_MEDIUM_AND_ABOVE",
+      "BLOCK_LOW_AND_ABOVE",
+    ].includes(local)
   ) {
     return local as SafetyThreshold;
   }
-  return 'BLOCK_NONE'; // Por defecto: Sin censura para rol adulto/18+ y dark fantasy
+  return "BLOCK_NONE"; // Por defecto: Sin censura para rol adulto/18+ y dark fantasy
 }
 
 export function setStoredSafetyLevel(level: SafetyThreshold): void {
-  localStorage.setItem('gemini_safety_level', level);
+  localStorage.setItem("gemini_safety_level", level);
 }
 
 export function getStoredThinkingLevel(): ThinkingLevelSetting {
-  const local = localStorage.getItem('gemini_thinking_level');
-  if (local && ['AUTO', 'HIGH', 'LOW', 'MINIMAL'].includes(local)) {
+  const local = localStorage.getItem("gemini_thinking_level");
+  if (local && ["AUTO", "HIGH", "LOW", "MINIMAL"].includes(local)) {
     return local as ThinkingLevelSetting;
   }
-  return 'AUTO';
+  return "AUTO";
 }
 
 export function setStoredThinkingLevel(level: ThinkingLevelSetting): void {
-  localStorage.setItem('gemini_thinking_level', level);
+  localStorage.setItem("gemini_thinking_level", level);
 }
 
-export function getThinkingBudgetConfig(thinkingSetting: ThinkingLevelSetting, modelId?: string) {
+export function getThinkingBudgetConfig(
+  thinkingSetting: ThinkingLevelSetting,
+  modelId?: string,
+) {
   // Models in Gemini 2.5 and Gemma series do not support thinkingConfig
-  if (modelId && !modelId.includes('3.7') && !modelId.includes('3.1') && !modelId.includes('gemini-3')) {
+  if (
+    modelId &&
+    !modelId.includes("3.7") &&
+    !modelId.includes("3.1") &&
+    !modelId.includes("gemini-3")
+  ) {
     return undefined;
   }
-  if (thinkingSetting === 'HIGH') return { thinkingBudget: 4096 };
-  if (thinkingSetting === 'LOW') return { thinkingBudget: 1024 };
-  if (thinkingSetting === 'MINIMAL') return { thinkingBudget: 0 };
+  if (thinkingSetting === "HIGH") return { thinkingBudget: 4096 };
+  if (thinkingSetting === "LOW") return { thinkingBudget: 1024 };
+  if (thinkingSetting === "MINIMAL") return { thinkingBudget: 0 };
   return undefined; // AUTO: let Gemini 3 model dynamically determine reasoning budget
 }
 
@@ -234,28 +266,28 @@ export function getThinkingBudgetConfig(thinkingSetting: ThinkingLevelSetting, m
  * material y solo sabe que existe.
  */
 export function getStoredBusquedaLocal(): boolean {
-  return localStorage.getItem('gmstudio_busqueda_local') !== 'off';
+  return localStorage.getItem("gmstudio_busqueda_local") !== "off";
 }
 
 export function setStoredBusquedaLocal(activa: boolean): void {
-  localStorage.setItem('gmstudio_busqueda_local', activa ? 'on' : 'off');
+  localStorage.setItem("gmstudio_busqueda_local", activa ? "on" : "off");
 }
 
 export function getStoredTemperature(): number {
-  const local = localStorage.getItem('gemini_temperature');
+  const local = localStorage.getItem("gemini_temperature");
   if (local) {
     const val = parseFloat(local);
     if (!isNaN(val) && val >= 0.1 && val <= 2.0) return val;
   }
-  return 0.80; // Recomendado para rol (0.70 – 0.85): variedad descriptiva y riqueza narrativa sin perder coherencia
+  return 0.8; // Recomendado para rol (0.70 – 0.85): variedad descriptiva y riqueza narrativa sin perder coherencia
 }
 
 export function setStoredTemperature(temp: number): void {
-  localStorage.setItem('gemini_temperature', temp.toString());
+  localStorage.setItem("gemini_temperature", temp.toString());
 }
 
 export function getStoredTopP(): number {
-  const local = localStorage.getItem('gemini_top_p');
+  const local = localStorage.getItem("gemini_top_p");
   if (local) {
     const val = parseFloat(local);
     if (!isNaN(val) && val >= 0.1 && val <= 1.0) return val;
@@ -264,97 +296,68 @@ export function getStoredTopP(): number {
 }
 
 export function setStoredTopP(topP: number): void {
-  localStorage.setItem('gemini_top_p', topP.toString());
+  localStorage.setItem("gemini_top_p", topP.toString());
 }
 
-export function buildSafetySettings(threshold: SafetyThreshold = getStoredSafetyLevel()) {
+export function buildSafetySettings(
+  threshold: SafetyThreshold = getStoredSafetyLevel(),
+) {
   const categories = [
-    'HARM_CATEGORY_HARASSMENT',
-    'HARM_CATEGORY_HATE_SPEECH',
-    'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-    'HARM_CATEGORY_DANGEROUS_CONTENT',
-    'HARM_CATEGORY_CIVIC_INTEGRITY'
+    "HARM_CATEGORY_HARASSMENT",
+    "HARM_CATEGORY_HATE_SPEECH",
+    "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+    "HARM_CATEGORY_DANGEROUS_CONTENT",
+    "HARM_CATEGORY_CIVIC_INTEGRITY",
   ];
-  return categories.map(category => ({
+  return categories.map((category) => ({
     category,
-    threshold
+    threshold,
   }));
 }
 
-export function getStoredAutoSyncMemory(): boolean {
-  const v = localStorage.getItem('gmstudio_auto_sync_memory');
-  if (v === 'off') return false;
-  return true; // por defecto activo
-}
-
-export function setStoredAutoSyncMemory(enabled: boolean): void {
-  localStorage.setItem('gmstudio_auto_sync_memory', enabled ? 'on' : 'off');
-}
-
-export type MemorySyncGranularity = 'smart_lite' | 'full' | 'batch' | 'off';
-
-export function getStoredMemorySyncGranularity(): MemorySyncGranularity {
-  const local = localStorage.getItem('gmstudio_memory_sync_granularity');
-  if (local && ['smart_lite', 'full', 'batch', 'off'].includes(local)) {
-    return local as MemorySyncGranularity;
-  }
-  // Si auto_sync_memory estaba apagado antes, mantenemos 'off'
-  if (localStorage.getItem('gmstudio_auto_sync_memory') === 'off') {
-    return 'off';
-  }
-  return 'smart_lite'; // Por defecto: Optimizado / Esencial (Ahorro de Cuota del 70%)
-}
-
-export function setStoredMemorySyncGranularity(granularity: MemorySyncGranularity): void {
-  localStorage.setItem('gmstudio_memory_sync_granularity', granularity);
-  if (granularity === 'off') {
-    localStorage.setItem('gmstudio_auto_sync_memory', 'off');
-  } else {
-    localStorage.setItem('gmstudio_auto_sync_memory', 'on');
-  }
-}
-
 export function getStoredApiKeys(): string[] {
-  const localList = localStorage.getItem('gemini_api_keys');
+  const localList = localStorage.getItem("gemini_api_keys");
   if (localList) {
     try {
       const parsed = JSON.parse(localList);
       if (Array.isArray(parsed)) {
-        const cleaned = parsed.map((k: any) => (typeof k === 'string' ? k.trim() : '')).filter(Boolean);
+        const cleaned = parsed
+          .map((k: any) => (typeof k === "string" ? k.trim() : ""))
+          .filter(Boolean);
         if (cleaned.length > 0) return cleaned;
       }
     } catch {}
   }
-  const single = localStorage.getItem('gemini_api_key');
+  const single = localStorage.getItem("gemini_api_key");
   if (single && single.trim()) return [single.trim()];
   const envKey = process.env.GEMINI_API_KEY;
-  if (envKey && envKey !== 'MY_GEMINI_API_KEY') return [envKey.trim()];
+  if (envKey && envKey !== "MY_GEMINI_API_KEY") return [envKey.trim()];
   return [];
 }
 
 export function setStoredApiKeys(keys: string[]): void {
-  const cleaned = keys.map(k => k.trim()).filter(Boolean);
+  const cleaned = keys.map((k) => k.trim()).filter(Boolean);
   if (cleaned.length > 0) {
-    localStorage.setItem('gemini_api_keys', JSON.stringify(cleaned));
-    localStorage.setItem('gemini_api_key', cleaned[0]);
+    localStorage.setItem("gemini_api_keys", JSON.stringify(cleaned));
+    localStorage.setItem("gemini_api_key", cleaned[0]);
   } else {
-    localStorage.removeItem('gemini_api_keys');
-    localStorage.removeItem('gemini_api_key');
+    localStorage.removeItem("gemini_api_keys");
+    localStorage.removeItem("gemini_api_key");
   }
 }
 
-export type KeyRotationMode = 'round_robin' | 'failover_only';
+export type KeyRotationMode = "round_robin" | "failover_only";
 
 export function getStoredKeyRotationMode(): KeyRotationMode {
-  const local = localStorage.getItem('gemini_key_rotation_mode');
-  if (local && (local === 'round_robin' || local === 'failover_only')) {
+  const local = localStorage.getItem("gemini_key_rotation_mode");
+  if (local && (local === "round_robin" || local === "failover_only")) {
     return local as KeyRotationMode;
   }
-  return 'round_robin'; // Rotación activa round-robin por defecto para maximizar cuota de peticiones por minuto
+  return "round_robin"; // Rotación activa round-robin por defecto para maximizar cuota de peticiones por minuto
 }
 
 export function setStoredKeyRotationMode(mode: KeyRotationMode): void {
-  localStorage.setItem('gemini_key_rotation_mode', mode);
+  localStorage.setItem("gemini_key_rotation_mode", mode);
 }
 
 // Mapa en memoria para enfriamiento temporal de claves cuando devuelven 429 (Resource Exhausted)
@@ -380,7 +383,7 @@ export function isKeyInCooldown(key: string): boolean {
 // Índice circular persistente para la rotación proactiva Round-Robin
 let globalRoundRobinIndex = (() => {
   try {
-    return parseInt(localStorage.getItem('gemini_rr_index') || '0', 10) || 0;
+    return parseInt(localStorage.getItem("gemini_rr_index") || "0", 10) || 0;
   } catch {
     return 0;
   }
@@ -404,11 +407,11 @@ export function getRotatedApiKeys(): {
 
   const mode = getStoredKeyRotationMode();
 
-  if (mode === 'failover_only' || allKeys.length === 1) {
+  if (mode === "failover_only" || allKeys.length === 1) {
     return {
       keys: allKeys,
       activeOriginalIndex: 0,
-      totalKeys: allKeys.length
+      totalKeys: allKeys.length,
     };
   }
 
@@ -416,7 +419,7 @@ export function getRotatedApiKeys(): {
   const startIdx = globalRoundRobinIndex % allKeys.length;
   globalRoundRobinIndex = (globalRoundRobinIndex + 1) % allKeys.length;
   try {
-    localStorage.setItem('gemini_rr_index', globalRoundRobinIndex.toString());
+    localStorage.setItem("gemini_rr_index", globalRoundRobinIndex.toString());
   } catch {}
 
   // Construir lista circular empezando por startIdx
@@ -434,21 +437,21 @@ export function getRotatedApiKeys(): {
   });
 
   return {
-    keys: rotated.map(r => r.key),
+    keys: rotated.map((r) => r.key),
     activeOriginalIndex: rotated[0].origIdx,
-    totalKeys: allKeys.length
+    totalKeys: allKeys.length,
   };
 }
 
 export function getStoredApiKey(): string {
   const keys = getStoredApiKeys();
-  return keys[0] || '';
+  return keys[0] || "";
 }
 
 export function setStoredApiKey(key: string): void {
   if (key && key.trim()) {
     const current = getStoredApiKeys();
-    const rest = current.filter(k => k !== key.trim());
+    const rest = current.filter((k) => k !== key.trim());
     setStoredApiKeys([key.trim(), ...rest]);
   } else {
     setStoredApiKeys([]);
@@ -463,7 +466,7 @@ export function getAIClient(apiKey?: string): GoogleGenAI {
   const key = apiKey || getStoredApiKey();
   if (!key) {
     throw new Error(
-      'La clave de API de Gemini no está configurada.\n\nPulsa el botón "Motor" de la barra superior e introduce tu clave de Google AI Studio.'
+      'La clave de API de Gemini no está configurada.\n\nPulsa el botón "Motor" de la barra superior e introduce tu clave de Google AI Studio.',
     );
   }
   return new GoogleGenAI({ apiKey: key });
@@ -489,7 +492,7 @@ export function buildTurnPayload({
   chats,
   files,
   userText,
-  dicePool
+  dicePool,
 }: {
   project: Project;
   currentChatId: string;
@@ -498,8 +501,8 @@ export function buildTurnPayload({
   userText: string;
   dicePool: { d20: number[]; d100: number[]; d6: number[] };
 }): TurnPayload {
-  const currentChat = chats.find(c => c.id === currentChatId);
-  if (!currentChat) throw new Error('Sesión no encontrada.');
+  const currentChat = chats.find((c) => c.id === currentChatId);
+  if (!currentChat) throw new Error("Sesión no encontrada.");
 
   // Cola de los capítulos anteriores. Se recorre hacia atrás y se para al
   // llenar el cupo: antes se concatenaban enteros (megas en una campaña larga)
@@ -508,8 +511,11 @@ export function buildTurnPayload({
   // red de seguridad, no como fuente principal: por eso el cupo es pequeño.
   const PREVIO_MAX = 4000;
   const sortedChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
-  const indiceActual = sortedChats.findIndex(c => c.id === currentChatId);
-  const anteriores = sortedChats.slice(0, indiceActual < 0 ? sortedChats.length : indiceActual);
+  const indiceActual = sortedChats.findIndex((c) => c.id === currentChatId);
+  const anteriores = sortedChats.slice(
+    0,
+    indiceActual < 0 ? sortedChats.length : indiceActual,
+  );
 
   const trozos: string[] = [];
   let acumulado = 0;
@@ -517,94 +523,102 @@ export function buildTurnPayload({
     const c = anteriores[i];
     const texto =
       `\n--- Sesión: ${c.name} ---\n` +
-      (c.messages || []).map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n');
+      (c.messages || [])
+        .map(
+          (m) => `${m.role === "user" ? "Jugador" : "Narrador"}: ${m.content}`,
+        )
+        .join("\n");
     const hueco = PREVIO_MAX - acumulado;
     const recorte = texto.length > hueco ? texto.slice(-hueco) : texto;
     trozos.unshift(recorte);
     acumulado += recorte.length;
   }
-  const allPreviousHistory = trozos.join('');
+  const allPreviousHistory = trozos.join("");
 
   const visualFilesText = files
-    .filter(f => f.isImage && f.analysis)
-    .map(f => `=== IMAGEN / MAPA CANÓNICO: ${f.name} ===\nAnálisis Visual:\n${f.analysis}`)
-    .join('\n\n');
+    .filter((f) => f.isImage && f.analysis)
+    .map(
+      (f) =>
+        `=== IMAGEN / MAPA CANÓNICO: ${f.name} ===\nAnálisis Visual:\n${f.analysis}`,
+    )
+    .join("\n\n");
 
   const visualMemoryText = (project.memory?.visual_memory || [])
-    .map(v => `- [${v.fileName}]: ${v.analysis}`)
-    .join('\n');
+    .map((v) => `- [${v.fileName}]: ${v.analysis}`)
+    .join("\n");
 
   const memoryContext = project.memory
     ? `
 HISTORIA HASTA AHORA:
-${project.memory.story || 'Inicio de la crónica.'}
+${project.memory.story || "Inicio de la crónica."}
 
 ESTADO ACTUAL:
-${project.memory.current_status || 'Todo en orden.'}
+${project.memory.current_status || "Todo en orden."}
 
 OBJETIVOS Y TRAMAS ACTIVAS:
-${(project.memory.quests || []).map(q => `- [${q.type}] ${q.title}: ${q.objective} (Progreso: ${q.progress})`).join('\n') || 'Sin tramas activas.'}
+${(project.memory.quests || []).map((q) => `- [${q.type}] ${q.title}: ${q.objective} (Progreso: ${q.progress})`).join("\n") || "Sin tramas activas."}
 
 PERSONAJES IMPORTANTES (NPCS):
-${(project.memory.npcs || []).map(n => `- ${n.name} (${n.relation}): ${n.notes}`).join('\n') || 'Sin PNJs registrados.'}
+${(project.memory.npcs || []).map((n) => `- ${n.name} (${n.relation}): ${n.notes}`).join("\n") || "Sin PNJs registrados."}
 
 VÍNCULOS CON EL PROTAGONISTA (solo los personajes que ya son habituales):
 ${
-  (project.memory.npcs || []).filter(n => n.recurrente).length
+  (project.memory.npcs || []).filter((n) => n.recurrente).length
     ? (project.memory.npcs || [])
-        .filter(n => n.recurrente)
+        .filter((n) => n.recurrente)
         .map(
-          n =>
-            `- ${n.name}${n.vinculo ? ` [${n.vinculo}]` : ''}\n    Deja ver: ${n.aparenta || 'sin registrar'}\n    Se guarda: ${n.oculta || 'sin registrar'}`
+          (n) =>
+            `- ${n.name}${n.vinculo ? ` [${n.vinculo}]` : ""}\n    Deja ver: ${n.aparenta || "sin registrar"}\n    Se guarda: ${n.oculta || "sin registrar"}`,
         )
-        .join('\n')
-    : 'Todavía ninguno. Ningún personaje ha vuelto suficientes veces.'
+        .join("\n")
+    : "Todavía ninguno. Ningún personaje ha vuelto suficientes veces."
 }
 
 LUGARES CLAVE:
-${(project.memory.locations || []).map(l => `- ${l.name}: ${l.desc}`).join('\n') || 'Sin lugares clave.'}
+${(project.memory.locations || []).map((l) => `- ${l.name}: ${l.desc}`).join("\n") || "Sin lugares clave."}
 
 REGISTRO VISUAL Y MAPAS EN MEMORIA:
-${visualMemoryText || (visualFilesText ? 'Registrados en la base de archivos visuales.' : 'Sin registros visuales.')}
+${visualMemoryText || (visualFilesText ? "Registrados en la base de archivos visuales." : "Sin registros visuales.")}
 
 NOTAS DIRECTAS DEL MAESTRO:
-${project.memory.manual_notes || 'Sin notas adicionales.'}
+${project.memory.manual_notes || "Sin notas adicionales."}
 
 RESUMEN DE SESIONES ANTERIORES:
-${allPreviousHistory.length > 0 ? allPreviousHistory : 'No hay sesiones previas.'}
+${allPreviousHistory.length > 0 ? allPreviousHistory : "No hay sesiones previas."}
   `.trim()
-    : 'No hay memoria acumulada aún.';
+    : "No hay memoria acumulada aún.";
 
   // TODOS los documentos de texto subidos a la campaña se envían íntegros y completos.
   // Sin filtros, sin RAG, sin recortes artificiales: Gemini tiene ventana de contexto masiva.
-  const todosLosDocumentos = files.filter(f => !f.isImage && !f.isAudio);
+  const todosLosDocumentos = files.filter((f) => !f.isImage && !f.isAudio);
 
-  const filesText = todosLosDocumentos.length > 0
-    ? todosLosDocumentos
-        .map(f => {
-          let texto = `=== DOCUMENTO: ${f.name} ===\n${f.content || ''}`;
-          if (f.analysis && f.analysis.trim().length > 0) {
-            texto += `\n[Notas / Análisis adjunto de ${f.name}]:\n${f.analysis.trim()}`;
-          }
-          return texto;
-        })
-        .join('\n\n')
-    : 'No hay documentos de texto adicionales adjuntos.';
+  const filesText =
+    todosLosDocumentos.length > 0
+      ? todosLosDocumentos
+          .map((f) => {
+            let texto = `=== DOCUMENTO: ${f.name} ===\n${f.content || ""}`;
+            if (f.analysis && f.analysis.trim().length > 0) {
+              texto += `\n[Notas / Análisis adjunto de ${f.name}]:\n${f.analysis.trim()}`;
+            }
+            return texto;
+          })
+          .join("\n\n")
+      : "No hay documentos de texto adicionales adjuntos.";
 
   // Protagonist / Character Sheet Section
   const pc = project.memory?.player_character;
   const pjSheetFiles = files.filter(
-    f =>
+    (f) =>
       !f.isImage &&
       !f.isAudio &&
-      (f.category === 'sheet_pj' ||
-        f.name.toLowerCase().includes('ficha') ||
-        f.name.toLowerCase().includes('personaje') ||
-        f.name.toLowerCase().includes('character') ||
-        f.name.toLowerCase().includes('sheet') ||
-        f.name.toLowerCase().includes('protagonista') ||
-        f.name.toLowerCase().includes('pj') ||
-        f.name.toLowerCase().includes('oc'))
+      (f.category === "sheet_pj" ||
+        f.name.toLowerCase().includes("ficha") ||
+        f.name.toLowerCase().includes("personaje") ||
+        f.name.toLowerCase().includes("character") ||
+        f.name.toLowerCase().includes("sheet") ||
+        f.name.toLowerCase().includes("protagonista") ||
+        f.name.toLowerCase().includes("pj") ||
+        f.name.toLowerCase().includes("oc")),
   );
 
   const pjSection = `
@@ -618,24 +632,26 @@ ${
   pc
     ? `
 - NOMBRE DEL PROTAGONISTA: ${pc.name}
-${pc.race ? `- RAZA / ESPECIE: ${pc.race}` : ''}
-${pc.class ? `- CLASE Y NIVEL: ${pc.class} ${pc.level || ''}` : ''}
-${pc.appearance ? `- APARIENCIA FÍSICA: ${pc.appearance}` : ''}
-${pc.personality ? `- PERSONALIDAD Y COMPORTAMIENTO: ${pc.personality}` : ''}
-${pc.backstory ? `- TRASFONDO E HISTORIA: ${pc.backstory}` : ''}
-${pc.notes ? `- HABILIDADES / NOTAS: ${pc.notes}` : ''}
-${pc.inventory && pc.inventory.length > 0 ? `- INVENTARIO ACTUAL:\n${pc.inventory.map(i => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? ' [Equipado]' : ''}${i.attuned ? ' [Sintonizado]' : ''}${i.damageOrAc ? ` [${i.damageOrAc}]` : ''}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ''}${i.description ? `: ${i.description}` : ''}`).join('\n')}` : '- INVENTARIO ACTUAL: Mochila vacía.'}
-${pc.currencies ? `- MONEDAS ACTUALES: ${pc.currencies.gp || 0} PO (oro), ${pc.currencies.sp || 0} PP (plata), ${pc.currencies.cp || 0} PC (cobre), ${pc.currencies.ep || 0} PE (electro), ${pc.currencies.pp || 0} PT (platino)` : ''}
-${pc.sheetText ? `\n--- RESUMEN DE HOJA DE PERSONAJE ---\n${pc.sheetText}` : ''}
+${pc.race ? `- RAZA / ESPECIE: ${pc.race}` : ""}
+${pc.class ? `- CLASE Y NIVEL: ${pc.class} ${pc.level || ""}` : ""}
+${pc.appearance ? `- APARIENCIA FÍSICA: ${pc.appearance}` : ""}
+${pc.personality ? `- PERSONALIDAD Y COMPORTAMIENTO: ${pc.personality}` : ""}
+${pc.backstory ? `- TRASFONDO E HISTORIA: ${pc.backstory}` : ""}
+${pc.notes ? `- HABILIDADES / NOTAS: ${pc.notes}` : ""}
+${pc.inventory && pc.inventory.length > 0 ? `- INVENTARIO ACTUAL:\n${pc.inventory.map((i) => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? " [Equipado]" : ""}${i.attuned ? " [Sintonizado]" : ""}${i.damageOrAc ? ` [${i.damageOrAc}]` : ""}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ""}${i.description ? `: ${i.description}` : ""}`).join("\n")}` : "- INVENTARIO ACTUAL: Mochila vacía."}
+${pc.currencies ? `- MONEDAS ACTUALES: ${pc.currencies.gp || 0} PO (oro), ${pc.currencies.sp || 0} PP (plata), ${pc.currencies.cp || 0} PC (cobre), ${pc.currencies.ep || 0} PE (electro), ${pc.currencies.pp || 0} PT (platino)` : ""}
+${pc.sheetText ? `\n--- RESUMEN DE HOJA DE PERSONAJE ---\n${pc.sheetText}` : ""}
 `
-    : 'El protagonista (OC) del jugador está detallado en los documentos y fichas adjuntas.'
+    : "El protagonista (OC) del jugador está detallado en los documentos y fichas adjuntas."
 }
 
 ${
   pjSheetFiles.length > 0
     ? `DOCUMENTOS Y FICHAS ESPECÍFICAS DEL PROTAGONISTA (TEXTO ÍNTEGRO):\n` +
-      pjSheetFiles.map(f => `=== FICHA / TRASFONDO: ${f.name} ===\n${f.content || ''}`).join('\n\n')
-    : ''
+      pjSheetFiles
+        .map((f) => `=== FICHA / TRASFONDO: ${f.name} ===\n${f.content || ""}`)
+        .join("\n\n")
+    : ""
 }
 `.trim();
 
@@ -643,8 +659,14 @@ ${
     project.instructions && project.instructions.trim().length > 10
       ? project.instructions
       : DEFAULT_DM_INSTRUCTIONS;
-  const activeSystem = project.system && project.system.trim().length > 5 ? project.system : DEFAULT_SYSTEM;
-  const activeStyle = project.style && project.style.trim().length > 5 ? project.style : DEFAULT_STYLE;
+  const activeSystem =
+    project.system && project.system.trim().length > 5
+      ? project.system
+      : DEFAULT_SYSTEM;
+  const activeStyle =
+    project.style && project.style.trim().length > 5
+      ? project.style
+      : DEFAULT_STYLE;
 
   // El tiempo de la campaña. Si no hay calendario configurado, todo este bloque
   // desaparece del prompt: quien no lleve la cuenta de los días no debería pagar
@@ -653,13 +675,15 @@ ${
   const fecha = project.currentDate;
   const llevaTiempo = calendarioValido(cal) && Boolean(fecha);
 
-  let calendarioSection = '';
-  let tiempoDirectiva = '';
+  let calendarioSection = "";
+  let tiempoDirectiva = "";
 
   if (llevaTiempo && cal && fecha) {
     const hoyAbs = aDiaAbsoluto(cal, fecha);
     const vencen = hilosQueVencen(project.threads || [], hoyAbs);
-    const enMarcha = hilosPendientes(project.threads || []).filter(h => h.dueAbsDay > hoyAbs);
+    const enMarcha = hilosPendientes(project.threads || []).filter(
+      (h) => h.dueAbsDay > hoyAbs,
+    );
     const diario = (project.timeline || []).slice(-8);
 
     calendarioSection = `
@@ -671,8 +695,8 @@ Ten presente la hora al describir la luz, quién está despierto, qué está abi
 ${
   vencen.length
     ? `SUCESOS PROGRAMADOS QUE VENCEN AHORA — OBLIGATORIO integrarlos en esta escena. Hazlos ocurrir de forma natural dentro del relato, sin anunciarlos como mecánica y sin explicar que estaban programados:
-${vencen.map(h => `- ${h.title}: ${h.effect}`).join('\n')}`
-    : 'No hay sucesos programados que venzan ahora.'
+${vencen.map((h) => `- ${h.title}: ${h.effect}`).join("\n")}`
+    : "No hay sucesos programados que venzan ahora."
 }
 
 ${
@@ -680,14 +704,14 @@ ${
     ? `Hilos en marcha, aún sin vencer (los conoces tú, no necesariamente el jugador). No los adelantes, pero deja caer indicios coherentes si la escena lo permite:
 ${enMarcha
   .map(
-    h =>
-      `- ${h.title} → ${h.dueDate} (${distanciaEnDias(h.dueAbsDay - hoyAbs)})${h.hidden ? ' [oculto al jugador]' : ''}`
+    (h) =>
+      `- ${h.title} → ${h.dueDate} (${distanciaEnDias(h.dueAbsDay - hoyAbs)})${h.hidden ? " [oculto al jugador]" : ""}`,
   )
-  .join('\n')}`
-    : ''
+  .join("\n")}`
+    : ""
 }
 
-${diario.length ? `ÚLTIMOS DÍAS REGISTRADOS EN LA AGENDA:\n${diario.map(d => `- ${d.date}${d.lugar ? ` · ${d.lugar}` : ''}${d.clima ? ` · ${d.clima}` : ''}: ${d.summary}${d.hito ? ` [${d.hito}]` : ''}`).join('\n')}` : ''}
+${diario.length ? `ÚLTIMOS DÍAS REGISTRADOS EN LA AGENDA:\n${diario.map((d) => `- ${d.date}${d.lugar ? ` · ${d.lugar}` : ""}${d.clima ? ` · ${d.clima}` : ""}: ${d.summary}${d.hito ? ` [${d.hito}]` : ""}`).join("\n")}` : ""}
 `.trim();
 
     tiempoDirectiva = `   [TIEMPO: +Xh] — cuánto tiempo de campaña ha consumido esta escena. Usa d para días, h para horas y m para minutos; puedes combinarlos: [TIEMPO: +1d 6h], [TIEMPO: +2d], [TIEMPO: +1 semana].
@@ -760,9 +784,9 @@ ${pjSection}
 
 ### BASE DE CONOCIMIENTO (DOCUMENTOS, FICHAS Y MATERIAL ADJUNTO)
 Los siguientes archivos forman parte del canon íntegro del mundo y debes utilizarlos como fuente de verdad sobre PNJs, lugares, eventos pasados, reglas, oráculos y ambientación:
-${filesText || 'No hay documentos de texto adicionales adjuntos.'}
+${filesText || "No hay documentos de texto adicionales adjuntos."}
 
-${visualFilesText ? `### CONOCIMIENTO VISUAL Y MAPAS DE LA CAMPAÑA (INSPECCIÓN VISUAL)\n${visualFilesText}\n` : ''}
+${visualFilesText ? `### CONOCIMIENTO VISUAL Y MAPAS DE LA CAMPAÑA (INSPECCIÓN VISUAL)\n${visualFilesText}\n` : ""}
 
 ### CONOCIMIENTO DE LA CAMPAÑA (MEMORIA VIVA)
 ${memoryContext}
@@ -777,7 +801,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
    - **Fidelidad al Lore y Ambientación Oscura**: Este es un entorno de rol de fantasía oscura y cruda. Las culturas ficticias y facciones canónicas (como los drow de Menzoberranzan, sectas, tiranos, corsarios de Luskan, asesinos y monstruos de la Infraoscuridad) DEBEN representarse con toda su crueldad, jerarquía despiadada, astucia y malicia canónicas, sin censura, sin suavizaciones y sin reinterpretaciones contemporáneas.
    - **Cero Sermones y Cero Advertencias Éticas**: Trata al usuario como a un jugador adulto en una mesa de rol tradicional. Queda TERMINANTEMENTE PROHIBIDO emitir sermones morales, advertencias éticas fuera de personaje (OOC), disculpas condescendientes ("recuerda que...", "es importante destacar...") o coletillas moralizantes. La ficción es ficción.
    - **Tono Narrativo Visceral y Directo**: Describe el combate táctico, los impactos, las heridas, la magia y las amenazas físicas y psicológicas de forma visceral, directa y evocadora, con peso y consecuencias reales.
-1. [PROTAGONISMO DEL JUGADOR]: La aventura gira estrictamente en torno a este protagonista (${pc?.name || 'el personaje del jugador'}). Al iniciar la escena, sitúa directamente al protagonista en primer plano, describiendo su presencia física, entorno inmediato, sensaciones sensoriales y el contexto según su trasfondo y ficha. Nunca comiences de forma genérica o neutral ignorando su identidad y habilidades.
+1. [PROTAGONISMO DEL JUGADOR]: La aventura gira estrictamente en torno a este protagonista (${pc?.name || "el personaje del jugador"}). Al iniciar la escena, sitúa directamente al protagonista en primer plano, describiendo su presencia física, entorno inmediato, sensaciones sensoriales y el contexto según su trasfondo y ficha. Nunca comiences de forma genérica o neutral ignorando su identidad y habilidades.
 2. [FORMATO EDITORIAL, SALTOS DE PÁRRAFO Y RESPIRACIÓN DE LA PROSA - OBLIGATORIO]:
    Escribe con una maquetación limpia y agradable de leer:
    - Prosa Narrativa 100% Inmersiva: Queda TERMINANTEMENTE PROHIBIDO imprimir cabeceras o bloques de estadísticas en texto plano dentro del relato (como 📅 Fecha, 👤 Nivel, 🌟 Hito, ⚜️ Renombre o 🖤 PNJ ATR). Todos los datos del personaje y del mundo se consultan en el HUD y se actualizan silenciosamente mediante las etiquetas entre corchetes al final del mensaje.
@@ -798,7 +822,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
    A) DETECCIÓN Y RESOLUCIÓN INMEDIATA DE TIRADAS ENVIADAS POR EL JUGADOR:
       - Si el mensaje del jugador contiene una tirada o resultado de dados (ejemplo «[Tirada de Sigilo: d20 natural = 16 | CD 14]», «[Tirada de Salvación de Destreza: d20 natural = 18]», «[Tirada d20: 15]» o una indicación de resultado en texto):
         1. RECONÓCELA AL INSTANTE: Toma el dado natural enviado por el jugador.
-        2. Aplícale tú el modificador de característica y bonificador de competencia correspondiente según la ficha viva del protagonista (${pc?.name || 'el protagonista'}).
+        2. Aplícale tú el modificador de característica y bonificador de competencia correspondiente según la ficha viva del protagonista (${pc?.name || "el protagonista"}).
         3. Expresa en el relato la suma y el cotejo contra la dificultad (ej: «16 natural + 3 de Destreza = 19 frente a CD 14: Éxito rotundo»).
         4. Narra el desenlace de la acción de inmediato con todas sus consecuencias.
         5. Queda TERMINANTEMENTE PROHIBIDO volver a pedir la misma tirada o ignorar el resultado enviado por el jugador.
@@ -826,11 +850,11 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
    [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, +Z PO, -W PO, +A PP, -B PC] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda o consuma objetos o dinero durante la escena (ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)], si come 3 de 10: [INVENTARIO: -3 Buenas Bayas], si gasta 15 de oro en una tienda: [INVENTARIO: +Disfraz noble, -15 PO], si Jarlaxle le entrega una Máscara de Disfraz: [INVENTARIO: +1 Máscara de Disfraz (mágica, equipada)], si pierde la máscara: [INVENTARIO: -1 Máscara de Disfraz]). Si no ha habido alteración de inventario ni monedas, omite esta línea.
 ${tiempoDirectiva}   [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
    Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las heridas y cualquier efecto persistente que hayas narrado. Si nada ha cambiado, repite los valores anteriores. Va SIEMPRE en último lugar.
-   Estado actual conocido: PG ${pc?.hp ?? '?'}/${pc?.maxHp ?? '?'}, CA ${pc?.ac ?? '?'}${pc?.conditions?.length ? `, condiciones: ${pc.conditions.join(', ')}` : ''}.`;
+   Estado actual conocido: PG ${pc?.hp ?? "?"}/${pc?.maxHp ?? "?"}, CA ${pc?.ac ?? "?"}${pc?.conditions?.length ? `, condiciones: ${pc.conditions.join(", ")}` : ""}.`;
 
   // Filter out initial placeholders
   const historyCompleto = currentChat.messages.filter(
-    m => m.content !== 'Tirando dados...' && m.content !== 'Pensando...'
+    (m) => m.content !== "Tirando dados..." && m.content !== "Pensando...",
   );
 
   // Solo la parte reciente del capítulo viaja literal. Lo anterior ya está
@@ -841,7 +865,7 @@ ${tiempoDirectiva}   [ESTADO: PG actuales/máximos | CA valor | condiciones: lis
   let usados = 0;
   let desde = historyCompleto.length;
   while (desde > 0) {
-    const coste = (historyCompleto[desde - 1].content || '').length;
+    const coste = (historyCompleto[desde - 1].content || "").length;
     const yaIncluidos = historyCompleto.length - desde;
     if (usados + coste > ESCENA_MAX && yaIncluidos >= MENSAJES_MINIMOS) break;
     usados += coste;
@@ -850,35 +874,37 @@ ${tiempoDirectiva}   [ESTADO: PG actuales/máximos | CA valor | condiciones: lis
   const history = historyCompleto.slice(desde);
 
   const contents: any[] = [];
-  let lastRole = '';
+  let lastRole = "";
   if (desde > 0) {
     contents.push({
-      role: 'user',
+      role: "user",
       parts: [
         {
-          text: `[Nota del sistema: los ${desde} mensajes anteriores de este capítulo no se incluyen literalmente. Lo ocurrido está recogido en la MEMORIA VIVA y en la CRÓNICA de más arriba. Continúa desde ahí con naturalidad, sin pedir que se repitan.]`
-        }
-      ]
+          text: `[Nota del sistema: los ${desde} mensajes anteriores de este capítulo no se incluyen literalmente. Lo ocurrido está recogido en la MEMORIA VIVA y en la CRÓNICA de más arriba. Continúa desde ahí con naturalidad, sin pedir que se repitan.]`,
+        },
+      ],
     });
-    lastRole = 'user';
+    lastRole = "user";
   }
   for (const m of history) {
     const r = m.role;
     if (r === lastRole) {
-      contents[contents.length - 1].parts.push({ text: '\n\n' + m.content });
+      contents[contents.length - 1].parts.push({ text: "\n\n" + m.content });
     } else {
       contents.push({ role: r, parts: [{ text: m.content }] });
       lastRole = r;
     }
   }
 
-  const diceContext = `\n\n[Dados pre-tirados del Director para acciones ocultas/PNJ en este turno: d20: ${dicePool.d20.join(', ')} | d100: ${dicePool.d100.join(', ')} | d6: ${dicePool.d6.join(', ')}]`;
+  const diceContext = `\n\n[Dados pre-tirados del Director para acciones ocultas/PNJ en este turno: d20: ${dicePool.d20.join(", ")} | d100: ${dicePool.d100.join(", ")} | d6: ${dicePool.d6.join(", ")}]`;
   const finalUserPayload = userText + diceContext;
 
-  if (lastRole === 'user') {
-    contents[contents.length - 1].parts.push({ text: '\n\n' + finalUserPayload });
+  if (lastRole === "user") {
+    contents[contents.length - 1].parts.push({
+      text: "\n\n" + finalUserPayload,
+    });
   } else {
-    contents.push({ role: 'user', parts: [{ text: finalUserPayload }] });
+    contents.push({ role: "user", parts: [{ text: finalUserPayload }] });
   }
 
   return { sys, contents };
@@ -896,7 +922,7 @@ export async function generateStoryTurnStream({
   onTimeReported,
   onInventoryReported,
   setLoadingText,
-  onSaveMessage
+  onSaveMessage,
 }: {
   project: Project;
   currentChatId: string;
@@ -907,7 +933,12 @@ export async function generateStoryTurnStream({
   /** Permite cortar la generación desde la interfaz sin perder lo ya escrito. */
   signal?: AbortSignal;
   /** El Narrador informa del estado del protagonista al cerrar su turno. */
-  onStateReported?: (state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] }) => void;
+  onStateReported?: (state: {
+    hp?: number;
+    maxHp?: number;
+    ac?: number;
+    conditions?: string[];
+  }) => void;
   /** El Narrador informa de cuánto tiempo ha pasado y de qué queda en marcha. */
   onTimeReported?: (t: TiempoReportado) => void;
   /** El Narrador informa de cambios en el inventario o monedas del protagonista. */
@@ -915,13 +946,13 @@ export async function generateStoryTurnStream({
   setLoadingText: (text: string) => void;
   onSaveMessage?: (updatedChat: Chat) => Promise<void> | void;
 }) {
-  const currentChat = chats.find(c => c.id === currentChatId);
-  if (!currentChat) throw new Error('Sesión no encontrada.');
+  const currentChat = chats.find((c) => c.id === currentChatId);
+  if (!currentChat) throw new Error("Sesión no encontrada.");
 
   const { keys: apiKeys, totalKeys } = getRotatedApiKeys();
   if (apiKeys.length === 0) {
     throw new Error(
-      'La clave de API de Gemini no está configurada.\n\nPulsa el botón "Motor" de la barra superior e introduce tu clave de Google AI Studio.'
+      'La clave de API de Gemini no está configurada.\n\nPulsa el botón "Motor" de la barra superior e introduce tu clave de Google AI Studio.',
     );
   }
 
@@ -929,13 +960,18 @@ export async function generateStoryTurnStream({
   const failoverChain = getModelFailoverChain(baseModel);
 
   let success = false;
-  let fullText = '';
+  let fullText = "";
   let lastError: any = null;
 
-  for (let modelIndex = 0; modelIndex < failoverChain.length && !success; modelIndex++) {
+  for (
+    let modelIndex = 0;
+    modelIndex < failoverChain.length && !success;
+    modelIndex++
+  ) {
     const currentModel = failoverChain[modelIndex];
     const isFallback = modelIndex > 0;
-    const modelDisplayName = AVAILABLE_MODELS.find(m => m.id === currentModel)?.name || currentModel;
+    const modelDisplayName =
+      AVAILABLE_MODELS.find((m) => m.id === currentModel)?.name || currentModel;
 
     for (let keyIndex = 0; keyIndex < apiKeys.length && !success; keyIndex++) {
       const currentApiKey = apiKeys[keyIndex];
@@ -943,7 +979,8 @@ export async function generateStoryTurnStream({
       const storedKeys = getStoredApiKeys();
       const origKeyIdx = storedKeys.indexOf(currentApiKey);
       const keyNumDisplay = origKeyIdx >= 0 ? origKeyIdx + 1 : keyIndex + 1;
-      const keyLabel = totalKeys > 1 ? ` (Clave ${keyNumDisplay}/${totalKeys})` : '';
+      const keyLabel =
+        totalKeys > 1 ? ` (Clave ${keyNumDisplay}/${totalKeys})` : "";
 
       // Si es la clave principal y no hay texto previo, intentamos 1 vez y si falla por cuota rotamos de inmediato a la siguiente clave
       const maxRetriesForModel = isFallback ? 1 : 1;
@@ -953,10 +990,12 @@ export async function generateStoryTurnStream({
         try {
           if (isFallback) {
             setLoadingText(
-              `Google saturado en el modelo anterior. Continuando narración con ${modelDisplayName}${keyLabel}...`
+              `Google saturado en el modelo anterior. Continuando narración con ${modelDisplayName}${keyLabel}...`,
             );
           } else {
-            setLoadingText(`El Narrador está hilvanando los hilos del destino${keyLabel}...`);
+            setLoadingText(
+              `El Narrador está hilvanando los hilos del destino${keyLabel}...`,
+            );
           }
 
           const { sys, contents } = buildTurnPayload({
@@ -965,7 +1004,7 @@ export async function generateStoryTurnStream({
             chats,
             files,
             userText,
-            dicePool: rollDicePool()
+            dicePool: rollDicePool(),
           });
 
           const thinkingSetting = getStoredThinkingLevel();
@@ -978,10 +1017,15 @@ export async function generateStoryTurnStream({
             systemInstruction: sys,
             temperature: tempSetting,
             topP: topPSetting,
-            ...(abierto ? {} : { safetySettings: buildSafetySettings(safetySetting) })
+            ...(abierto
+              ? {}
+              : { safetySettings: buildSafetySettings(safetySetting) }),
           };
 
-          const thinkingBudget = getThinkingBudgetConfig(thinkingSetting, currentModel);
+          const thinkingBudget = getThinkingBudgetConfig(
+            thinkingSetting,
+            currentModel,
+          );
           if (thinkingBudget && !abierto) {
             config.thinkingConfig = thinkingBudget;
           }
@@ -989,7 +1033,7 @@ export async function generateStoryTurnStream({
           const responseStream = await ai.models.generateContentStream({
             model: currentModel,
             contents,
-            config: { ...config, abortSignal: signal }
+            config: { ...config, abortSignal: signal },
           });
 
           let lastSaveTime = Date.now();
@@ -997,61 +1041,103 @@ export async function generateStoryTurnStream({
 
           for await (const chunk of responseStream) {
             if (signal?.aborted) break;
-            const textPart = chunk.text ?? '';
+            const textPart = chunk.text ?? "";
             if (textPart) {
               streamReceivedText = true;
               fullText += textPart;
               onChunk(fullText);
             }
-            if ((chunk as any).usageMetadata) uso = (chunk as any).usageMetadata;
+            if ((chunk as any).usageMetadata)
+              uso = (chunk as any).usageMetadata;
 
             // Guardado intermedio cada 1.5s
             const now = Date.now();
             if (now - lastSaveTime > 1500 && fullText.length > 0) {
               lastSaveTime = now;
-              await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, undefined, onInventoryReported);
+              await saveStreamedMessage(
+                currentChat,
+                fullText,
+                onSaveMessage,
+                onStateReported,
+                undefined,
+                onInventoryReported,
+              );
             }
           }
 
           if (uso) {
             const huboBusqueda =
               getStoredBusquedaLocal() &&
-              files.some(f => !f.isImage && !f.isAudio && f.onDemand && f.category !== 'oracle');
+              files.some(
+                (f) =>
+                  !f.isImage &&
+                  !f.isAudio &&
+                  f.onDemand &&
+                  f.category !== "oracle",
+              );
             registrarUso(
               currentModel,
               {
                 entrada: uso.promptTokenCount,
                 cacheados: uso.cachedContentTokenCount,
                 salida: uso.candidatesTokenCount ?? uso.responseTokenCount,
-                total: uso.totalTokenCount
+                total: uso.totalTokenCount,
               },
-              huboBusqueda ? `con búsqueda${isFallback ? ' (respaldo)' : ''}` : isFallback ? 'respaldo' : undefined
+              huboBusqueda
+                ? `con búsqueda${isFallback ? " (respaldo)" : ""}`
+                : isFallback
+                  ? "respaldo"
+                  : undefined,
             );
           }
 
           // Guardado final completo
           if (fullText.trim().length > 0) {
-            await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, onTimeReported, onInventoryReported, true);
+            await saveStreamedMessage(
+              currentChat,
+              fullText,
+              onSaveMessage,
+              onStateReported,
+              onTimeReported,
+              onInventoryReported,
+              true,
+            );
           }
           success = true;
           break; // Salir del bucle si fue exitoso
         } catch (e: any) {
-          if (signal?.aborted || e?.name === 'AbortError') {
+          if (signal?.aborted || e?.name === "AbortError") {
             if (fullText.trim().length > 0) {
-              await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, onTimeReported, onInventoryReported, true);
+              await saveStreamedMessage(
+                currentChat,
+                fullText,
+                onSaveMessage,
+                onStateReported,
+                onTimeReported,
+                onInventoryReported,
+                true,
+              );
             }
             success = true;
             return;
           }
           lastError = e;
-          console.warn(`Error en modelo ${currentModel} (clave ${keyNumDisplay}):`, e);
+          console.warn(
+            `Error en modelo ${currentModel} (clave ${keyNumDisplay}):`,
+            e,
+          );
 
-          const msg = String(e?.message || '');
+          const msg = String(e?.message || "");
           const isRateLimit = /429|RESOURCE_EXHAUSTED|quota|rate/i.test(msg);
-          const isOverloaded = /503|UNAVAILABLE|overloaded|alta demanda|try again later|500|502|504/i.test(msg);
+          const isOverloaded =
+            /503|UNAVAILABLE|overloaded|alta demanda|try again later|500|502|504/i.test(
+              msg,
+            );
           const streamCortado =
             streamReceivedText ||
-            /incomplete json|unexpected end|network|failed to fetch|load failed|terminated|aborted|stream|closed|econnreset|fetch/i.test(msg);
+            /incomplete json|unexpected end|network|failed to fetch|load failed|terminated|aborted|stream|closed|econnreset|fetch/i.test(
+              msg,
+            );
 
           // Si el streaming ya había entregado una respuesta sustancial y la conexión se interrumpió a mitad,
           // preservamos TODO lo que el modelo ya había narrado en lugar de borrarlo y reintentar desde cero.
@@ -1063,7 +1149,7 @@ export async function generateStoryTurnStream({
               onStateReported,
               onTimeReported,
               onInventoryReported,
-              true
+              true,
             );
             success = true;
             return;
@@ -1073,23 +1159,31 @@ export async function generateStoryTurnStream({
           if (isRateLimit) {
             markKeyCooldown(currentApiKey, 60000);
             if (keyIndex < apiKeys.length - 1) {
-              setLoadingText(`Límite de cuota en Clave ${keyNumDisplay}. Rotando a la siguiente clave para ${modelDisplayName}...`);
+              setLoadingText(
+                `Límite de cuota en Clave ${keyNumDisplay}. Rotando a la siguiente clave para ${modelDisplayName}...`,
+              );
               break; // saltar inmediatamente a la siguiente clave
             }
           }
 
           if (isOverloaded || streamCortado) {
             if (keyIndex < apiKeys.length - 1) {
-              setLoadingText(`Reintentando con la siguiente clave (${keyIndex + 2}/${totalKeys}) para ${modelDisplayName}...`);
-              await new Promise(resolve => setTimeout(resolve, 300));
+              setLoadingText(
+                `Reintentando con la siguiente clave (${keyIndex + 2}/${totalKeys}) para ${modelDisplayName}...`,
+              );
+              await new Promise((resolve) => setTimeout(resolve, 300));
               break; // pasar a la siguiente clave del pool
             }
             // Si se agotaron todas las claves en este modelo, pasar al siguiente modelo de respaldo
             if (modelIndex < failoverChain.length - 1) {
               const nextModel = failoverChain[modelIndex + 1];
-              const nextDisplayName = AVAILABLE_MODELS.find(m => m.id === nextModel)?.name || nextModel;
-              setLoadingText(`Servidores de Google saturados en ${modelDisplayName}. Saltando a ${nextDisplayName}...`);
-              await new Promise(resolve => setTimeout(resolve, 500));
+              const nextDisplayName =
+                AVAILABLE_MODELS.find((m) => m.id === nextModel)?.name ||
+                nextModel;
+              setLoadingText(
+                `Servidores de Google saturados en ${modelDisplayName}. Saltando a ${nextDisplayName}...`,
+              );
+              await new Promise((resolve) => setTimeout(resolve, 500));
               break;
             }
           } else {
@@ -1130,7 +1224,12 @@ async function saveStreamedMessage(
   chat: Chat,
   fullText: string,
   onSaveMessage?: (updatedChat: Chat) => Promise<void> | void,
-  onStateReported?: (state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] }) => void,
+  onStateReported?: (state: {
+    hp?: number;
+    maxHp?: number;
+    ac?: number;
+    conditions?: string[];
+  }) => void,
   onTimeReported?: (t: TiempoReportado) => void,
   onInventoryReported?: (invReport: InventoryChangeReport) => void,
   /**
@@ -1138,7 +1237,7 @@ async function saveStreamedMessage(
    * y puede reaplicarse, pero el tiempo se acumula: si se reportara en cada
    * guardado parcial, una sola escena adelantaría el reloj media docena de veces.
    */
-  definitivo = false
+  definitivo = false,
 ) {
   let cleanedText = fullText;
   let chatName = chat.name;
@@ -1148,7 +1247,7 @@ async function saveStreamedMessage(
   if (chapterMatch) {
     chatName = chapterMatch[1];
     autoTitled = true;
-    cleanedText = cleanedText.replace(/\[CHAPTER:.*?\]/g, '').trim();
+    cleanedText = cleanedText.replace(/\[CHAPTER:.*?\]/g, "").trim();
   }
 
   // Los registros internos son para la app: se extraen y se quitan del texto
@@ -1162,13 +1261,24 @@ async function saveStreamedMessage(
   if (
     definitivo &&
     onTimeReported &&
-    (avance.encontrado || agenda.length || hilos.length || presentes.length || vinculos.length)
+    (avance.encontrado ||
+      agenda.length ||
+      hilos.length ||
+      presentes.length ||
+      vinculos.length)
   ) {
-    onTimeReported({ minutos: avance.minutos, agenda, hilos, presentes, vinculos });
+    onTimeReported({
+      minutos: avance.minutos,
+      agenda,
+      hilos,
+      presentes,
+      vinculos,
+    });
   }
 
   // Parsear y limpiar etiquetas de inventario y monedas
-  const { cleaned: cleanedInv, report: invReport } = parseInventoryTags(cleanedText);
+  const { cleaned: cleanedInv, report: invReport } =
+    parseInventoryTags(cleanedText);
   cleanedText = cleanedInv;
   if (definitivo && invReport && onInventoryReported) {
     onInventoryReported(invReport);
@@ -1179,24 +1289,27 @@ async function saveStreamedMessage(
   if (state && onStateReported) onStateReported(state);
 
   const newMessages = [...chat.messages];
-  if (newMessages.length > 0 && newMessages[newMessages.length - 1].role === 'model') {
+  if (
+    newMessages.length > 0 &&
+    newMessages[newMessages.length - 1].role === "model"
+  ) {
     newMessages[newMessages.length - 1].content = cleanedText;
   } else {
-    newMessages.push({ role: 'model', content: cleanedText });
+    newMessages.push({ role: "model", content: cleanedText });
   }
 
   const updatedChat: Chat = {
     ...chat,
     name: chatName,
     autoTitled,
-    messages: newMessages
+    messages: newMessages,
   };
 
   if (onSaveMessage) {
     try {
       await onSaveMessage(updatedChat);
     } catch (e) {
-      console.warn('onSaveMessage callback error:', e);
+      console.warn("onSaveMessage callback error:", e);
     }
   }
 }
@@ -1205,7 +1318,7 @@ export async function generateContentWithFailover({
   contents,
   config = {},
   primaryModel,
-  preferredChain
+  preferredChain,
 }: {
   contents: any;
   config?: any;
@@ -1213,7 +1326,7 @@ export async function generateContentWithFailover({
   preferredChain?: string[];
 }): Promise<any> {
   const { keys: apiKeys } = getRotatedApiKeys();
-  const keysToTry = apiKeys.length > 0 ? apiKeys : [''];
+  const keysToTry = apiKeys.length > 0 ? apiKeys : [""];
   const base = primaryModel || getBackgroundTaskModel();
   const chain = preferredChain || getModelFailoverChain(base);
 
@@ -1226,18 +1339,22 @@ export async function generateContentWithFailover({
       const ai = getAIClient(currentKey || undefined);
       try {
         const abierto = esModeloAbierto(model);
-        const supportsThinking = model.includes('3.7') || model.includes('3.1') || model.includes('gemini-3');
+        const supportsThinking =
+          model.includes("3.7") ||
+          model.includes("3.1") ||
+          model.includes("gemini-3");
         const cleanedConfig: any = {
           ...config,
-          thinkingConfig: supportsThinking && !abierto ? config.thinkingConfig : undefined,
+          thinkingConfig:
+            supportsThinking && !abierto ? config.thinkingConfig : undefined,
           ...(abierto
             ? {
                 safetySettings: undefined,
                 tools: undefined,
                 thinkingConfig: undefined,
-                responseMimeType: undefined
+                responseMimeType: undefined,
               }
-            : {})
+            : {}),
         };
 
         // Timeout de 35s por modelo para evitar bloqueos infinitos
@@ -1247,23 +1364,33 @@ export async function generateContentWithFailover({
             ai.models.generateContent({
               model,
               contents,
-              config: cleanedConfig
+              config: cleanedConfig,
             }),
             new Promise((_, reject) =>
               setTimeout(
-                () => reject(new Error(`Tiempo de espera agotado (35s) en modelo ${model}`)),
-                35000
-              )
-            )
+                () =>
+                  reject(
+                    new Error(
+                      `Tiempo de espera agotado (35s) en modelo ${model}`,
+                    ),
+                  ),
+                35000,
+              ),
+            ),
           ]);
         } catch (firstErr: any) {
-          const errMsg = String(firstErr?.message || '').toLowerCase();
+          const errMsg = String(firstErr?.message || "").toLowerCase();
           // Si falló por responseMimeType no soportado, reintentar en este mismo modelo sin responseMimeType
-          if (cleanedConfig.responseMimeType && (errMsg.includes('not supported') || errMsg.includes('invalid') || errMsg.includes('responsemimetype'))) {
+          if (
+            cleanedConfig.responseMimeType &&
+            (errMsg.includes("not supported") ||
+              errMsg.includes("invalid") ||
+              errMsg.includes("responsemimetype"))
+          ) {
             res = await ai.models.generateContent({
               model,
               contents,
-              config: { ...cleanedConfig, responseMimeType: undefined }
+              config: { ...cleanedConfig, responseMimeType: undefined },
             });
           } else {
             throw firstErr;
@@ -1272,76 +1399,93 @@ export async function generateContentWithFailover({
         return res;
       } catch (err: any) {
         lastError = err;
-        const msg = String(err?.message || '');
+        const msg = String(err?.message || "");
         if (/429|RESOURCE_EXHAUSTED/i.test(msg)) {
           if (currentKey) markKeyCooldown(currentKey, 60000);
         }
-        console.warn(`generateContentWithFailover fallo en ${model} (clave ${k + 1}/${keysToTry.length}):`, err);
+        console.warn(
+          `generateContentWithFailover fallo en ${model} (clave ${k + 1}/${keysToTry.length}):`,
+          err,
+        );
         if (k < keysToTry.length - 1) {
-          await new Promise(r => setTimeout(r, 100));
+          await new Promise((r) => setTimeout(r, 100));
         }
       }
     }
     if (i < chain.length - 1) {
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
     }
   }
-  throw lastError || new Error('No se pudo obtener respuesta de ningún modelo.');
+  throw (
+    lastError || new Error("No se pudo obtener respuesta de ningún modelo.")
+  );
 }
 
-export async function syncMemoryFromChats(project: Project, chats: Chat[]): Promise<Partial<Memory>> {
+export async function syncMemoryFromChats(
+  project: Project,
+  chats: Chat[],
+): Promise<Partial<Memory>> {
   const sortedChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
   let messageCount = 0;
-  let allHistory = '';
+  let allHistory = "";
 
   for (const c of sortedChats) {
     const validMessages = (c.messages || []).filter(
-      m =>
+      (m) =>
         m.content &&
         m.content.trim().length > 0 &&
-        m.content !== 'Pensando...' &&
-        m.content !== 'Tirando dados...'
+        m.content !== "Pensando..." &&
+        m.content !== "Tirando dados...",
     );
     if (validMessages.length > 0) {
       allHistory += `\n--- Sesión / Capítulo: ${c.name} ---\n`;
       allHistory += validMessages
-        .map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`)
-        .join('\n');
+        .map(
+          (m) => `${m.role === "user" ? "Jugador" : "Narrador"}: ${m.content}`,
+        )
+        .join("\n");
       messageCount += validMessages.length;
     }
   }
 
   if (messageCount === 0 || !allHistory.trim()) {
     throw new Error(
-      'No hay mensajes en la crónica de las sesiones todavía. Juega al menos un turno para que el Narrador pueda analizar y actualizar la memoria.'
+      "No hay mensajes en la crónica de las sesiones todavía. Juega al menos un turno para que el Narrador pueda analizar y actualizar la memoria.",
     );
   }
 
   const historyToAnalyze =
-    allHistory.length > 400000 ? allHistory.substring(allHistory.length - 400000) : allHistory;
+    allHistory.length > 400000
+      ? allHistory.substring(allHistory.length - 400000)
+      : allHistory;
 
-  const pcName = project.memory?.player_character?.name || '';
+  const pcName = project.memory?.player_character?.name || "";
   const pcNotes = project.memory?.player_character
-    ? `Protagonista / Personaje Jugador (OC): "${project.memory.player_character.name}" (${project.memory.player_character.race || ''} ${project.memory.player_character.class || ''})`
-    : '';
+    ? `Protagonista / Personaje Jugador (OC): "${project.memory.player_character.name}" (${project.memory.player_character.race || ""} ${project.memory.player_character.class || ""})`
+    : "";
 
   // Lo que ya está registrado, con sus identificadores. Sin esto el modelo
   // reinventa cada entrada con otro título en cada sincronización y acabamos
   // con la misma misión duplicada dos y tres veces.
-  const listExisting = <T extends { id: string }>(items: T[], describe: (i: T) => string) =>
-    items.length ? items.map(i => `- [id: ${i.id}] ${describe(i)}`).join('\n') : '(ninguna todavía)';
+  const listExisting = <T extends { id: string }>(
+    items: T[],
+    describe: (i: T) => string,
+  ) =>
+    items.length
+      ? items.map((i) => `- [id: ${i.id}] ${describe(i)}`).join("\n")
+      : "(ninguna todavía)";
 
   const existingState = `
 ESTADO ACTUAL DE LA MEMORIA (lo que YA está registrado):
 
 TRAMAS EXISTENTES:
-${listExisting(project.memory?.quests || [], q => `"${q.title}" — objetivo: ${q.objective || 'sin objetivo'} — estado: ${q.status || 'activa'}`)}
+${listExisting(project.memory?.quests || [], (q) => `"${q.title}" — objetivo: ${q.objective || "sin objetivo"} — estado: ${q.status || "activa"}`)}
 
 PNJS EXISTENTES:
-${listExisting(project.memory?.npcs || [], n => `"${n.name}" — ${n.relation || 'sin relación'}`)}
+${listExisting(project.memory?.npcs || [], (n) => `"${n.name}" — ${n.relation || "sin relación"}`)}
 
 LUGARES EXISTENTES:
-${listExisting(project.memory?.locations || [], l => `"${l.name}"`)}
+${listExisting(project.memory?.locations || [], (l) => `"${l.name}"`)}
 `.trim();
 
   const prompt = `Analiza el siguiente historial de sesiones de rol y actualiza la memoria viva del proyecto.
@@ -1364,10 +1508,10 @@ REGLAS OBLIGATORIAS DE EXTRACCIÓN:
 2. "current_status": Estado actual de los aventureros, su ubicación inmediata, peligros y recursos.
 3. "quests": Lista de tramas y misiones activas o completadas.
 4. "npcs": EXCLUSIVAMENTE Personajes No Jugadores (PNJs / NPCs) secundarios, aliados, antagonistas, mentores, comerciantes o criaturas.
-   ⚠️ REGLA CRÍTICA: NO incluyas bajo ningún concepto al Personaje Jugador (PC / Protagonista / OC ${pcName ? `"${pcName}"` : ''}) en la lista de "npcs". El protagonista/jugador NO es un PNJ.
+   ⚠️ REGLA CRÍTICA: NO incluyas bajo ningún concepto al Personaje Jugador (PC / Protagonista / OC ${pcName ? `"${pcName}"` : ""}) en la lista de "npcs". El protagonista/jugador NO es un PNJ.
 5. "locations": Lugares, ciudades, tabernas, templos, regiones y mazmorras relevantes.
 
-${pcNotes ? `INFORMACIÓN DEL PROTAGONISTA (NO EXTRAER COMO PNJ):\n${pcNotes}\n` : ''}
+${pcNotes ? `INFORMACIÓN DEL PROTAGONISTA (NO EXTRAER COMO PNJ):\n${pcNotes}\n` : ""}
 
 Devuelve la respuesta ESTRICTAMENTE en formato JSON con la siguiente estructura:
 {
@@ -1400,29 +1544,34 @@ ${historyToAnalyze}`;
   const safetySetting = getStoredSafetyLevel();
 
   const memConfig: any = {
-    responseMimeType: 'application/json',
+    responseMimeType: "application/json",
     temperature: 0.2,
-    ...(esModeloAbierto(activeModel) ? {} : { safetySettings: buildSafetySettings(safetySetting) })
+    ...(esModeloAbierto(activeModel)
+      ? {}
+      : { safetySettings: buildSafetySettings(safetySetting) }),
   };
 
   const response = await generateContentWithFailover({
     primaryModel: activeModel,
     contents: prompt,
-    config: memConfig
+    config: memConfig,
   });
 
   const resultText = response.text;
-  if (!resultText) throw new Error('No se recibió respuesta del modelo al sincronizar la memoria.');
+  if (!resultText)
+    throw new Error(
+      "No se recibió respuesta del modelo al sincronizar la memoria.",
+    );
 
   let cleanText = resultText.trim();
-  if (cleanText.startsWith('```')) {
+  if (cleanText.startsWith("```")) {
     cleanText = cleanText
-      .replace(/^```(?:json)?\n?/, '')
-      .replace(/\n?```$/, '')
+      .replace(/^```(?:json)?\n?/, "")
+      .replace(/\n?```$/, "")
       .trim();
   }
-  const firstBrace = cleanText.indexOf('{');
-  const lastBrace = cleanText.lastIndexOf('}');
+  const firstBrace = cleanText.indexOf("{");
+  const lastBrace = cleanText.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
     cleanText = cleanText.substring(firstBrace, lastBrace + 1);
   }
@@ -1431,41 +1580,46 @@ ${historyToAnalyze}`;
   try {
     parsed = JSON.parse(cleanText);
   } catch (err) {
-    console.error('Failed to parse memory JSON from AI:', cleanText, err);
+    console.error("Failed to parse memory JSON from AI:", cleanText, err);
     throw new Error(
-      'La respuesta de la IA no tenía un formato estructurado reconocible. Inténtalo de nuevo.'
+      "La respuesta de la IA no tenía un formato estructurado reconocible. Inténtalo de nuevo.",
     );
   }
 
   // Assign IDs to all items and strictly filter out any protagonist entry from npcs
   const quests = (parsed.quests || []).map((q: any) => ({
     ...q,
-    id: q.id || Date.now().toString() + Math.random().toString(36).substring(7)
+    id: q.id || Date.now().toString() + Math.random().toString(36).substring(7),
   }));
 
-  const pcNameClean = (project.memory?.player_character?.name || '').trim().toLowerCase();
+  const pcNameClean = (project.memory?.player_character?.name || "")
+    .trim()
+    .toLowerCase();
   const genericPlayerNames = new Set([
-    'protagonista',
-    'jugador',
-    'el jugador',
-    'personaje jugador',
-    'oc',
-    'pj',
-    'hero',
-    'héroe'
+    "protagonista",
+    "jugador",
+    "el jugador",
+    "personaje jugador",
+    "oc",
+    "pj",
+    "hero",
+    "héroe",
   ]);
 
   const rawNpcs = parsed.npcs || [];
   const npcs = rawNpcs
     .filter((n: any) => {
-      const nameLower = (n.name || '').trim().toLowerCase();
+      const nameLower = (n.name || "").trim().toLowerCase();
       if (!nameLower) return false;
       if (genericPlayerNames.has(nameLower)) return false;
       if (pcNameClean && pcNameClean.length > 2) {
         // Only treat it as the protagonist on an exact match or a substantial
         // overlap; a 2-letter NPC name must not be swallowed by a long PC name.
         if (nameLower === pcNameClean) return false;
-        if (nameLower.length > 3 && (nameLower.includes(pcNameClean) || pcNameClean.includes(nameLower))) {
+        if (
+          nameLower.length > 3 &&
+          (nameLower.includes(pcNameClean) || pcNameClean.includes(nameLower))
+        ) {
           return false;
         }
       }
@@ -1473,194 +1627,33 @@ ${historyToAnalyze}`;
     })
     .map((n: any) => ({
       ...n,
-      id: n.id || Date.now().toString() + Math.random().toString(36).substring(7)
+      id:
+        n.id || Date.now().toString() + Math.random().toString(36).substring(7),
     }));
 
   const locations = (parsed.locations || []).map((l: any) => ({
     ...l,
-    id: l.id || Date.now().toString() + Math.random().toString(36).substring(7)
+    id: l.id || Date.now().toString() + Math.random().toString(36).substring(7),
   }));
 
   return {
-    story: parsed.story || project.memory?.story || '',
-    current_status: parsed.current_status || project.memory?.current_status || '',
-    quests: mergeEntities(project.memory?.quests || [], quests, 'title', 'objective'),
-    npcs: mergeEntities(project.memory?.npcs || [], npcs, 'name', 'notes'),
-    locations: mergeEntities(project.memory?.locations || [], locations, 'name', 'desc')
+    story: parsed.story || project.memory?.story || "",
+    current_status:
+      parsed.current_status || project.memory?.current_status || "",
+    quests: mergeEntities(
+      project.memory?.quests || [],
+      quests,
+      "title",
+      "objective",
+    ),
+    npcs: mergeEntities(project.memory?.npcs || [], npcs, "name", "notes"),
+    locations: mergeEntities(
+      project.memory?.locations || [],
+      locations,
+      "name",
+      "desc",
+    ),
   };
-}
-
-/**
- * Actualización incremental en segundo plano (Delta Sync).
- *
- * En lugar de reprocesar todos los capítulos y consumir miles de tokens,
- * analiza únicamente el último turno transcurrido (acción del jugador y respuesta del narrador)
- * comparándolo con el estado actual de la memoria. Si no hay cambios sustanciales, devuelve null.
- */
-export async function syncMemoryDeltaIncremental({
-  project,
-  lastUserAction,
-  lastModelResponse,
-  granularity = getStoredMemorySyncGranularity()
-}: {
-  project: Project;
-  lastUserAction: string;
-  lastModelResponse: string;
-  granularity?: MemorySyncGranularity;
-}): Promise<Partial<Memory> | null> {
-  if (granularity === 'off') return null;
-  if (!lastUserAction && !lastModelResponse) return null;
-
-  const currentMem = project.memory || {
-    story: '',
-    quests: [],
-    npcs: [],
-    locations: [],
-    current_status: '',
-    manual_notes: ''
-  };
-
-  const pcName = currentMem.player_character?.name || '';
-  const pcNotes = currentMem.player_character
-    ? `Protagonista (OC): "${currentMem.player_character.name}" (${currentMem.player_character.race || ''} ${currentMem.player_character.class || ''})`
-    : '';
-
-  const listExisting = <T extends { id: string }>(items: T[], describe: (i: T) => string, maxItems = 10) =>
-    items.length ? items.slice(0, maxItems).map(i => `- [id: ${i.id}] ${describe(i)}`).join('\n') : '(ninguna)';
-
-  let prompt = '';
-
-  if (granularity === 'smart_lite') {
-    // Modo Optimizado / Esencial: Ahorro masivo de tokens (~70% menos de cuota)
-    prompt = `Extrae cambios vitales de este último turno para la memoria del juego de rol (modo esencial optimizado).
-
-MEMORIA ACTUAL:
-- Situación: ${currentMem.current_status || 'Sin especificar'}
-- PNJs clave: ${listExisting(currentMem.npcs || [], n => `"${n.name}" (${n.relation || 'neutral'})`, 6)}
-- Tramas: ${listExisting(currentMem.quests || [], q => `"${q.title}"`, 4)}
-
-${pcNotes ? `IMPORTANTE: ${pcNotes} - No añadir al protagonista a PNJs.\n` : ''}
-ÚLTIMO TURNO:
-Jugador: ${lastUserAction.slice(0, 500)}
-Narrador: ${lastModelResponse.slice(0, 1200)}
-
-INSTRUCCIONES:
-Si NO hay cambios clave (peligro inmediato, nuevo PNJ o avance de trama), responde: {"has_changes": false}
-Si hubo cambios importantes, responde en JSON estricto:
-{
-  "has_changes": true,
-  "current_status": "Situación y peligro inmediato resumido",
-  "new_or_updated_npcs": [{ "name": "Nombre", "relation": "Aliado/Enemigo/Neutral", "notes": "Rasgo o estado" }],
-  "new_or_updated_quests": [{ "title": "Nombre de misión", "status": "Activa/Completada", "progress": "Avance breve" }]
-}`;
-  } else {
-    // Modo Completo / Exhaustivo: Detallado en todas las entidades
-    prompt = `Analiza este ÚLTIMO TURNO de la partida y actualiza la memoria viva de forma incremental.
-
-MEMORIA ACTUAL:
-- TRAMAS ACTIVAS:
-${listExisting(currentMem.quests || [], q => `"${q.title}" (${q.status || 'activa'}): ${q.objective || ''}`)}
-- PNJS CONOCIDOS:
-${listExisting(currentMem.npcs || [], n => `"${n.name}" (${n.relation || 'neutral'}): ${n.notes || ''}`)}
-- LUGARES:
-${listExisting(currentMem.locations || [], l => `"${l.name}": ${l.desc || ''}`)}
-- SITUACIÓN INMEDIATA:
-${currentMem.current_status || 'Sin especificar'}
-
-${pcNotes ? `IMPORTANTE: ${pcNotes} - ¡NUNCA incluyas al protagonista en la lista de "new_or_updated_npcs"!\n` : ''}
-
-ÚLTIMO TURNO:
-Jugador: ${lastUserAction.slice(0, 1500)}
-Narrador: ${lastModelResponse.slice(0, 3000)}
-
-INSTRUCCIONES:
-1. Si este turno NO introduce nuevos PNJs, ni nuevos lugares, ni cambia el estado de misiones, ni altera significativamente la situación inmediata, responde: {"has_changes": false}
-2. Si hubo cambios relevantes (apareció un PNJ nuevo o conocido con nueva información, cambió de sitio, avanzó una misión o cambió el peligro inmediato), responde con los campos actualizados.
-
-Formato JSON estricto:
-{
-  "has_changes": true o false,
-  "current_status": "Nueva situación inmediata si ha cambiado (o dejar igual si no)",
-  "new_or_updated_quests": [
-    { "id": "id existente si es actualización o omitir si es nueva", "title": "Nombre", "objective": "Objetivo", "progress": "Progreso", "status": "Activa/Completada", "type": "Principal/Secundaria" }
-  ],
-  "new_or_updated_npcs": [
-    { "id": "id existente o omitir", "name": "Nombre", "relation": "Aliado/Enemigo/Neutral", "notes": "Notas y estado" }
-  ],
-  "new_or_updated_locations": [
-    { "id": "id existente o omitir", "name": "Nombre", "desc": "Descripción breve" }
-  ]
-}`;
-  }
-
-  try {
-    const bgModel = getBackgroundTaskModel();
-    const safetySetting = getStoredSafetyLevel();
-
-    const memConfig: any = {
-      responseMimeType: 'application/json',
-      temperature: 0.1,
-      ...(esModeloAbierto(bgModel) ? {} : { safetySettings: buildSafetySettings(safetySetting) })
-    };
-
-    const response = await generateContentWithFailover({
-      primaryModel: bgModel,
-      contents: prompt,
-      config: memConfig
-    });
-
-    const text = response.text?.trim() || '';
-    if (!text) return null;
-
-    let clean = text;
-    if (clean.startsWith('```')) {
-      clean = clean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-    }
-    const firstBrace = clean.indexOf('{');
-    const lastBrace = clean.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
-      clean = clean.substring(firstBrace, lastBrace + 1);
-    }
-
-    const parsed = JSON.parse(clean);
-    if (!parsed.has_changes) return null;
-
-    const pcClean = pcName.trim().toLowerCase();
-    const generic = new Set(['protagonista', 'jugador', 'el jugador', 'personaje jugador', 'oc', 'pj', 'hero', 'héroe']);
-
-    const incomingNpcs = (parsed.new_or_updated_npcs || [])
-      .filter((n: any) => {
-        const nl = (n.name || '').trim().toLowerCase();
-        if (!nl || generic.has(nl)) return false;
-        if (pcClean && (nl === pcClean || (nl.length > 3 && (nl.includes(pcClean) || pcClean.includes(nl))))) return false;
-        return true;
-      })
-      .map((n: any) => ({
-        ...n,
-        id: n.id || Date.now().toString() + Math.random().toString(36).substring(7)
-      }));
-
-    const incomingQuests = (parsed.new_or_updated_quests || []).map((q: any) => ({
-      ...q,
-      id: q.id || Date.now().toString() + Math.random().toString(36).substring(7)
-    }));
-
-    const incomingLocs = (parsed.new_or_updated_locations || []).map((l: any) => ({
-      ...l,
-      id: l.id || Date.now().toString() + Math.random().toString(36).substring(7)
-    }));
-
-    return {
-      current_status: parsed.current_status || currentMem.current_status,
-      quests: incomingQuests.length ? mergeEntities(currentMem.quests || [], incomingQuests, 'title', 'objective') : currentMem.quests,
-      npcs: incomingNpcs.length ? mergeEntities(currentMem.npcs || [], incomingNpcs, 'name', 'notes') : currentMem.npcs,
-      locations: incomingLocs.length ? mergeEntities(currentMem.locations || [], incomingLocs, 'name', 'desc') : currentMem.locations
-    };
-  } catch (e) {
-    // Es una tarea en segundo plano: no debe interrumpir el flujo del juego si falla
-    console.warn('Background memory delta sync skipped/failed:', e);
-    return null;
-  }
 }
 
 /**
@@ -1669,47 +1662,47 @@ Formato JSON estricto:
  * end up comparable.
  */
 const STOPWORDS = new Set([
-  'de',
-  'del',
-  'la',
-  'el',
-  'los',
-  'las',
-  'un',
-  'una',
-  'unos',
-  'unas',
-  'y',
-  'o',
-  'a',
-  'al',
-  'en',
-  'por',
-  'para',
-  'con',
-  'sin',
-  'hacia',
-  'hasta',
-  'desde',
-  'su',
-  'sus',
-  'lo',
-  'se',
-  'que',
-  'the',
-  'of',
-  'to'
+  "de",
+  "del",
+  "la",
+  "el",
+  "los",
+  "las",
+  "un",
+  "una",
+  "unos",
+  "unas",
+  "y",
+  "o",
+  "a",
+  "al",
+  "en",
+  "por",
+  "para",
+  "con",
+  "sin",
+  "hacia",
+  "hasta",
+  "desde",
+  "su",
+  "sus",
+  "lo",
+  "se",
+  "que",
+  "the",
+  "of",
+  "to",
 ]);
 
 function tokenise(value: string | undefined): Set<string> {
   return new Set(
-    (value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+    (value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
-      .filter(w => w.length > 2 && !STOPWORDS.has(w))
+      .filter((w) => w.length > 2 && !STOPWORDS.has(w)),
   );
 }
 
@@ -1717,7 +1710,7 @@ function tokenise(value: string | undefined): Set<string> {
 function similarity(a: Set<string>, b: Set<string>): number {
   if (!a.size || !b.size) return 0;
   let shared = 0;
-  a.forEach(t => {
+  a.forEach((t) => {
     if (b.has(t)) shared++;
   });
   return (2 * shared) / (a.size + b.size);
@@ -1733,18 +1726,19 @@ function similarity(a: Set<string>, b: Set<string>): number {
  * duplicates. So we match by id first, then by exact label, then by how much the
  * label and the descriptive field actually overlap.
  */
-function mergeEntities<T extends { id: string; portrait?: string; markers?: unknown }>(
-  existing: T[],
-  incoming: T[],
-  labelKey: keyof T,
-  detailKey?: keyof T
-): T[] {
+function mergeEntities<
+  T extends { id: string; portrait?: string; markers?: unknown },
+>(existing: T[], incoming: T[], labelKey: keyof T, detailKey?: keyof T): T[] {
   const labelOf = (e: T) => e[labelKey] as unknown as string | undefined;
-  const detailOf = detailKey ? (e: T) => e[detailKey] as unknown as string | undefined : undefined;
-  const norm = (v: string | undefined) => (v || '').trim().toLowerCase();
+  const detailOf = detailKey
+    ? (e: T) => e[detailKey] as unknown as string | undefined
+    : undefined;
+  const norm = (v: string | undefined) => (v || "").trim().toLowerCase();
 
-  const byId = new Map(existing.map(e => [e.id, e]));
-  const byLabel = new Map(existing.filter(e => norm(labelOf(e))).map(e => [norm(labelOf(e)), e]));
+  const byId = new Map(existing.map((e) => [e.id, e]));
+  const byLabel = new Map(
+    existing.filter((e) => norm(labelOf(e))).map((e) => [norm(labelOf(e)), e]),
+  );
 
   // Clave: id del existente -> versión actualizada. Así el orden de la lista de
   // la usuaria no se baraja en cada sincronización.
@@ -1754,29 +1748,39 @@ function mergeEntities<T extends { id: string; portrait?: string; markers?: unkn
 
   const findFuzzy = (item: T): T | undefined => {
     // Si estamos comparando nombres de PNJs, usar coincidenNombresNpc
-    if (labelKey === 'name') {
+    if (labelKey === "name") {
       const npcMatch = existing.find(
-        prev =>
+        (prev) =>
           !consumed.has(prev.id) &&
           coincidenNombresNpc(
             labelOf(prev),
             labelOf(item),
-            { alias: (prev as any).alias, trueIdentity: (prev as any).trueIdentity },
-            { alias: (item as any).alias, trueIdentity: (item as any).trueIdentity }
-          )
+            {
+              alias: (prev as any).alias,
+              trueIdentity: (prev as any).trueIdentity,
+            },
+            {
+              alias: (item as any).alias,
+              trueIdentity: (item as any).trueIdentity,
+            },
+          ),
       );
       if (npcMatch) return npcMatch;
     }
 
     const labelTokens = tokenise(labelOf(item));
-    const detailTokens = detailOf ? tokenise(detailOf(item)) : new Set<string>();
+    const detailTokens = detailOf
+      ? tokenise(detailOf(item))
+      : new Set<string>();
     let best: T | undefined;
     let bestScore = 0;
 
     for (const prev of existing) {
       if (consumed.has(prev.id)) continue;
       const labelScore = similarity(labelTokens, tokenise(labelOf(prev)));
-      const detailScore = detailOf ? similarity(detailTokens, tokenise(detailOf(prev))) : 0;
+      const detailScore = detailOf
+        ? similarity(detailTokens, tokenise(detailOf(prev)))
+        : 0;
       // Either a clearly similar title, or a description that is almost the same.
       const score = Math.max(labelScore, detailScore >= 0.7 ? detailScore : 0);
       if (score > bestScore) {
@@ -1788,12 +1792,19 @@ function mergeEntities<T extends { id: string; portrait?: string; markers?: unkn
   };
 
   for (const item of incoming) {
-    const prev = byId.get(item.id) ?? byLabel.get(norm(labelOf(item))) ?? findFuzzy(item);
+    const prev =
+      byId.get(item.id) ?? byLabel.get(norm(labelOf(item))) ?? findFuzzy(item);
     if (prev && !consumed.has(prev.id)) {
       consumed.add(prev.id);
-      if (labelKey === 'name' && ('relation' in (prev as any) || 'relation' in (item as any))) {
+      if (
+        labelKey === "name" &&
+        ("relation" in (prev as any) || "relation" in (item as any))
+      ) {
         // Es un PNJ: usar fusión inteligente de campos de PNJ
-        const mergedNpc = fusionarDosNpcs(prev as unknown as NPC, item as unknown as Partial<NPC>);
+        const mergedNpc = fusionarDosNpcs(
+          prev as unknown as NPC,
+          item as unknown as Partial<NPC>,
+        );
         updates.set(prev.id, mergedNpc as unknown as T);
       } else {
         updates.set(prev.id, {
@@ -1802,7 +1813,9 @@ function mergeEntities<T extends { id: string; portrait?: string; markers?: unkn
           id: prev.id,
           [labelKey]: labelOf(prev) || labelOf(item),
           portrait: item.portrait || prev.portrait,
-          ...(prev.markers !== undefined && (item as T).markers === undefined ? { markers: prev.markers } : {})
+          ...(prev.markers !== undefined && (item as T).markers === undefined
+            ? { markers: prev.markers }
+            : {}),
         } as T);
       }
     } else if (!prev) {
@@ -1811,8 +1824,15 @@ function mergeEntities<T extends { id: string; portrait?: string; markers?: unkn
   }
 
   // Se respeta el orden previo; lo que el modelo no mencionó se conserva.
-  const combined = [...existing.map(prev => updates.get(prev.id) ?? prev), ...additions];
-  if (labelKey === 'name' && combined.length > 0 && 'relation' in (combined[0] as any)) {
+  const combined = [
+    ...existing.map((prev) => updates.get(prev.id) ?? prev),
+    ...additions,
+  ];
+  if (
+    labelKey === "name" &&
+    combined.length > 0 &&
+    "relation" in (combined[0] as any)
+  ) {
     return deduplicarListaNpcs(combined as unknown as NPC[]) as unknown as T[];
   }
   return combined;
@@ -1839,58 +1859,84 @@ function mergeEntities<T extends { id: string; portrait?: string; markers?: unkn
  * errores llegaban a pantalla como "no se pudo", que no dice qué hacer.
  */
 export function describeApiError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err ?? '');
+  const raw = err instanceof Error ? err.message : String(err ?? "");
   const lower = raw.toLowerCase();
 
-  if (lower.includes('429') || lower.includes('resource_exhausted') || lower.includes('quota')) {
-    return 'Has alcanzado temporalmente el límite de peticiones de la capa gratuita. La app intentó rotar a modelos alternativos pero la cuota de tu clave se encuentra en pausa. Espera unos segundos y pulsa «Continuar Narración».';
+  if (
+    lower.includes("429") ||
+    lower.includes("resource_exhausted") ||
+    lower.includes("quota")
+  ) {
+    return "Has alcanzado temporalmente el límite de peticiones de la capa gratuita. La app intentó rotar a modelos alternativos pero la cuota de tu clave se encuentra en pausa. Espera unos segundos y pulsa «Continuar Narración».";
   }
   if (
-    lower.includes('api key') ||
-    lower.includes('api_key') ||
-    lower.includes('401') ||
-    lower.includes('403')
+    lower.includes("api key") ||
+    lower.includes("api_key") ||
+    lower.includes("401") ||
+    lower.includes("403")
   ) {
-    return 'La clave de API no es válida o no tiene permiso. Revísala en el botón Motor.';
-  }
-  if (lower.includes('safety') || lower.includes('blocked') || lower.includes('prohibited')) {
-    return 'El modelo ha bloqueado la respuesta por sus filtros de seguridad. Prueba a bajar los filtros en Motor → Filtros & NSFW.';
+    return "La clave de API no es válida o no tiene permiso. Revísala en el botón Motor.";
   }
   if (
-    lower.includes('503') ||
-    lower.includes('unavailable') ||
-    lower.includes('overloaded') ||
-    lower.includes('alta demanda')
+    lower.includes("safety") ||
+    lower.includes("blocked") ||
+    lower.includes("prohibited")
   ) {
-    return 'Los servidores de Google estuvieron saturados en múltiples modelos de la cadena de respaldo. Espera unos instantes y pulsa «Continuar Narración» para reanudar la escena exactamente donde quedó.';
+    return "El modelo ha bloqueado la respuesta por sus filtros de seguridad. Prueba a bajar los filtros en Motor → Filtros & NSFW.";
   }
-  if (lower.includes('not found') || lower.includes('404')) {
-    return 'El modelo seleccionado no existe o no está disponible con tu clave. Abre el botón Motor y pulsa «Ver los de mi clave» para ver cuáles admite.';
+  if (
+    lower.includes("503") ||
+    lower.includes("unavailable") ||
+    lower.includes("overloaded") ||
+    lower.includes("alta demanda")
+  ) {
+    return "Los servidores de Google estuvieron saturados en múltiples modelos de la cadena de respaldo. Espera unos instantes y pulsa «Continuar Narración» para reanudar la escena exactamente donde quedó.";
+  }
+  if (lower.includes("not found") || lower.includes("404")) {
+    return "El modelo seleccionado no existe o no está disponible con tu clave. Abre el botón Motor y pulsa «Ver los de mi clave» para ver cuáles admite.";
   }
   // «No compatible» casi nunca significa que el modelo no valga: significa que la
   // petición llevaba un campo que ese endpoint no acepta. Confundir las dos cosas
   // manda a la usuaria a cambiar de clave por un fallo que está en el código.
-  if (lower.includes('is not supported') || lower.includes('not supported')) {
-    return `Google ha rechazado un campo de la petición, no tu clave: «${String((err as any)?.message || '').slice(0, 200)}». Si acabas de cambiar de modelo, prueba con otro; si no, es un fallo de la aplicación.`;
+  if (lower.includes("is not supported") || lower.includes("not supported")) {
+    return `Google ha rechazado un campo de la petición, no tu clave: «${String((err as any)?.message || "").slice(0, 200)}». Si acabas de cambiar de modelo, prueba con otro; si no, es un fallo de la aplicación.`;
   }
-  if (lower.includes('incomplete json') || lower.includes('unexpected end') || lower.includes('terminated')) {
-    return 'La respuesta se cortó a mitad de camino, casi siempre por un bache de conexión. Vuelve a intentarlo; si estás con datos móviles, espera a tener mejor cobertura.';
+  if (
+    lower.includes("incomplete json") ||
+    lower.includes("unexpected end") ||
+    lower.includes("terminated")
+  ) {
+    return "La respuesta se cortó a mitad de camino, casi siempre por un bache de conexión. Vuelve a intentarlo; si estás con datos móviles, espera a tener mejor cobertura.";
   }
-  if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('load failed')) {
-    return 'No se ha podido contactar con Google. Comprueba tu conexión a internet.';
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("load failed")
+  ) {
+    return "No se ha podido contactar con Google. Comprueba tu conexión a internet.";
   }
-  return raw || 'Error desconocido.';
+  return raw || "Error desconocido.";
 }
 
 export function parseStateTag(text: string): {
   cleaned: string;
-  state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] } | null;
+  state: {
+    hp?: number;
+    maxHp?: number;
+    ac?: number;
+    conditions?: string[];
+  } | null;
 } {
   const match = text.match(/\[ESTADO:([^\]]*)\]/i);
   if (!match) return { cleaned: text, state: null };
 
   const body = match[1];
-  const state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] } = {};
+  const state: {
+    hp?: number;
+    maxHp?: number;
+    ac?: number;
+    conditions?: string[];
+  } = {};
 
   const hp = body.match(/(?:PG|HP|vida)\s*:?\s*(\d+)\s*\/\s*(\d+)/i);
   if (hp) {
@@ -1908,130 +1954,152 @@ export function parseStateTag(text: string): {
   if (cond) {
     const list = cond[1]
       .split(/[,;]/)
-      .map(c => c.trim())
-      .filter(c => c && !/^(ninguna|ninguno|sin novedad|nada)$/i.test(c));
+      .map((c) => c.trim())
+      .filter((c) => c && !/^(ninguna|ninguno|sin novedad|nada)$/i.test(c));
     state.conditions = list;
   }
 
-  const cleaned = text.replace(/\[ESTADO:[^\]]*\]/gi, '').trim();
-  const hasAny = state.hp !== undefined || state.ac !== undefined || state.conditions !== undefined;
+  const cleaned = text.replace(/\[ESTADO:[^\]]*\]/gi, "").trim();
+  const hasAny =
+    state.hp !== undefined ||
+    state.ac !== undefined ||
+    state.conditions !== undefined;
   return { cleaned, state: hasAny ? state : null };
 }
 
-export function rollDicePool(): { d20: number[]; d100: number[]; d6: number[] } {
+export function rollDicePool(): {
+  d20: number[];
+  d100: number[];
+  d6: number[];
+} {
   const roll = (sides: number, count: number) => {
     const out: number[] = [];
     const buf = new Uint32Array(count);
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
       crypto.getRandomValues(buf);
       for (let i = 0; i < count; i++) out.push((buf[i] % sides) + 1);
     } else {
-      for (let i = 0; i < count; i++) out.push(Math.floor(Math.random() * sides) + 1);
+      for (let i = 0; i < count; i++)
+        out.push(Math.floor(Math.random() * sides) + 1);
     }
     return out;
   };
   return { d20: roll(20, 8), d100: roll(100, 4), d6: roll(6, 6) };
 }
 
-export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCategory {
-  if (file.isAudio) return 'audio';
+export function classifyFileAuto(
+  file: ProjectFile,
+  memory?: Memory,
+): FileCategory {
+  if (file.isAudio) return "audio";
 
   const lowerName = file.name.toLowerCase();
-  const lowerAnalysis = (file.analysis || '').toLowerCase();
-  const lowerDocContent = (file.content || '').substring(0, 4000).toLowerCase();
+  const lowerAnalysis = (file.analysis || "").toLowerCase();
+  const lowerDocContent = (file.content || "").substring(0, 4000).toLowerCase();
 
   const palabraEnTexto = (claves: string[], texto: string) =>
-    claves.some(k => new RegExp(`(^|[^\\p{L}])${k}([^\\p{L}]|$)`, 'u').test(texto));
+    claves.some((k) =>
+      new RegExp(`(^|[^\\p{L}])${k}([^\\p{L}]|$)`, "u").test(texto),
+    );
 
-  const palabraEnNombre = (claves: string[]) => palabraEnTexto(claves, lowerName);
+  const palabraEnNombre = (claves: string[]) =>
+    palabraEnTexto(claves, lowerName);
 
   // Palabras clave específicas de familiar / compañero / montura / invocación
   const companionKeywords = [
-    'familiar',
-    'compañero',
-    'companero',
-    'companion',
-    'mascota',
-    'pet',
-    'montura',
-    'mount',
-    'steed',
-    'invocacion',
-    'invocación',
-    'summon',
-    'pseudodragon',
-    'pseudodragón',
-    'homunculo',
-    'homúnculo',
-    'cuervo familiar',
-    'lechuza familiar',
-    'gato familiar',
-    'diablillo familiar',
-    'quasit',
-    'sprite',
-    'sabueso',
-    'sidekick'
+    "familiar",
+    "compañero",
+    "companero",
+    "companion",
+    "mascota",
+    "pet",
+    "montura",
+    "mount",
+    "steed",
+    "invocacion",
+    "invocación",
+    "summon",
+    "pseudodragon",
+    "pseudodragón",
+    "homunculo",
+    "homúnculo",
+    "cuervo familiar",
+    "lechuza familiar",
+    "gato familiar",
+    "diablillo familiar",
+    "quasit",
+    "sprite",
+    "sabueso",
+    "sidekick",
   ];
 
   // Palabras clave específicas de PNJ / monstruo / bestiario / enemigo
   const npcKeywords = [
-    'pnj',
-    'npc',
-    'boss',
-    'jefe',
-    'villano',
-    'villain',
-    'enemigo',
-    'enemy',
-    'monstruo',
-    'monster',
-    'bestiario',
-    'bestiary',
-    'statblock',
-    'guardia',
-    'guard',
-    'criatura',
-    'creature',
-    'posadero',
-    'tabernero',
-    'mercader',
-    'merchant',
-    'rey',
-    'king',
-    'reina',
-    'queen',
-    'capitan',
-    'capitán',
-    'lich',
-    'vampiro',
-    'bruja'
+    "pnj",
+    "npc",
+    "boss",
+    "jefe",
+    "villano",
+    "villain",
+    "enemigo",
+    "enemy",
+    "monstruo",
+    "monster",
+    "bestiario",
+    "bestiary",
+    "statblock",
+    "guardia",
+    "guard",
+    "criatura",
+    "creature",
+    "posadero",
+    "tabernero",
+    "mercader",
+    "merchant",
+    "rey",
+    "king",
+    "reina",
+    "queen",
+    "capitan",
+    "capitán",
+    "lich",
+    "vampiro",
+    "bruja",
   ];
 
   // Palabras clave de protagonista / personaje jugador (OC)
   const pjKeywords = [
-    'pj',
-    'oc',
-    'protagonista',
-    'heroe',
-    'héroe',
-    'player',
-    'jugador',
-    'personaje jugador',
-    'hoja_personaje'
+    "pj",
+    "oc",
+    "protagonista",
+    "heroe",
+    "héroe",
+    "player",
+    "jugador",
+    "personaje jugador",
+    "hoja_personaje",
   ];
 
   // Comprobar coincidencia con personajes existentes en memoria
-  const pcName = (memory?.player_character?.name || '').toLowerCase().trim();
-  const matchesPcName = pcName.length > 2 && (lowerName.includes(pcName) || lowerAnalysis.includes(pcName));
+  const pcName = (memory?.player_character?.name || "").toLowerCase().trim();
+  const matchesPcName =
+    pcName.length > 2 &&
+    (lowerName.includes(pcName) || lowerAnalysis.includes(pcName));
 
-  const matchesCompanionMemory = memory?.companions?.some(c => {
-    const clean = (c.name || '').toLowerCase().trim();
-    return clean.length > 2 && (lowerName.includes(clean) || lowerAnalysis.includes(clean));
+  const matchesCompanionMemory = memory?.companions?.some((c) => {
+    const clean = (c.name || "").toLowerCase().trim();
+    return (
+      clean.length > 2 &&
+      (lowerName.includes(clean) || lowerAnalysis.includes(clean))
+    );
   });
 
-  const matchesNpcMemory = memory?.npcs?.some(n => {
-    const clean = (n.name || '').toLowerCase().trim();
-    return clean.length > 2 && (lowerName.includes(clean) || lowerAnalysis.includes(clean));
+  const matchesNpcMemory = memory?.npcs?.some((n) => {
+    const clean = (n.name || "").toLowerCase().trim();
+    return (
+      clean.length > 2 &&
+      (lowerName.includes(clean) || lowerAnalysis.includes(clean))
+    );
   });
 
   // 1. CLASIFICACIÓN DE DOCUMENTOS (PDF, TXT, MD, ETC.)
@@ -2040,206 +2108,231 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
       matchesCompanionMemory ||
       palabraEnNombre(companionKeywords) ||
       (palabraEnTexto(companionKeywords, lowerDocContent) &&
-        (lowerDocContent.includes('puntos de golpe') ||
-          lowerDocContent.includes('ficha') ||
-          lowerDocContent.includes('stats') ||
-          lowerDocContent.includes('atributos')));
+        (lowerDocContent.includes("puntos de golpe") ||
+          lowerDocContent.includes("ficha") ||
+          lowerDocContent.includes("stats") ||
+          lowerDocContent.includes("atributos")));
 
-    if (isCompanionDoc) return 'sheet_companion';
+    if (isCompanionDoc) return "sheet_companion";
 
     const isNpcDoc =
       matchesNpcMemory ||
       palabraEnNombre(npcKeywords) ||
       (palabraEnTexto(npcKeywords, lowerDocContent) &&
-        (lowerDocContent.includes('puntos de golpe') ||
-          lowerDocContent.includes('statblock') ||
-          lowerDocContent.includes('desafío') ||
-          lowerDocContent.includes('vd')));
+        (lowerDocContent.includes("puntos de golpe") ||
+          lowerDocContent.includes("statblock") ||
+          lowerDocContent.includes("desafío") ||
+          lowerDocContent.includes("vd")));
 
-    if (isNpcDoc) return 'sheet_npc';
+    if (isNpcDoc) return "sheet_npc";
 
     const isGenericSheet =
       palabraEnNombre([
-        'ficha',
-        'personaje',
-        'character',
-        'sheet',
-        'pj',
-        'oc',
-        'protagonista',
-        'trasfondo',
-        'stats',
-        'estadisticas',
-        'hoja_personaje'
+        "ficha",
+        "personaje",
+        "character",
+        "sheet",
+        "pj",
+        "oc",
+        "protagonista",
+        "trasfondo",
+        "stats",
+        "estadisticas",
+        "hoja_personaje",
       ]) ||
-      lowerDocContent.includes('clase y nivel') ||
-      lowerDocContent.includes('puntos de golpe') ||
-      lowerDocContent.includes('alineamiento') ||
-      lowerDocContent.includes('trasfondo:') ||
-      (lowerDocContent.includes('fuerza') &&
-        lowerDocContent.includes('destreza') &&
-        lowerDocContent.includes('constitución'));
+      lowerDocContent.includes("clase y nivel") ||
+      lowerDocContent.includes("puntos de golpe") ||
+      lowerDocContent.includes("alineamiento") ||
+      lowerDocContent.includes("trasfondo:") ||
+      (lowerDocContent.includes("fuerza") &&
+        lowerDocContent.includes("destreza") &&
+        lowerDocContent.includes("constitución"));
 
     if (isGenericSheet) {
-      if (matchesPcName || palabraEnNombre(pjKeywords)) return 'sheet_pj';
-      return 'sheet_pj';
+      if (matchesPcName || palabraEnNombre(pjKeywords)) return "sheet_pj";
+      return "sheet_pj";
     }
 
     // Elenco
     const nombreDeElenco = palabraEnNombre([
-      'elenco',
-      'dramatis',
-      'personae',
-      'reparto',
-      'quien es quien',
-      'quién es quién',
-      'roster',
-      'cast'
+      "elenco",
+      "dramatis",
+      "personae",
+      "reparto",
+      "quien es quien",
+      "quién es quién",
+      "roster",
+      "cast",
     ]);
-    if (nombreDeElenco) return 'roster';
+    if (nombreDeElenco) return "roster";
 
-    const nombreDeIndice = palabraEnNombre(['indice', 'índice', 'ganchos', 'index']);
-    if (nombreDeIndice) return 'index';
+    const nombreDeIndice = palabraEnNombre([
+      "indice",
+      "índice",
+      "ganchos",
+      "index",
+    ]);
+    if (nombreDeIndice) return "index";
 
-    const nombreDeOraculo = ['oraculo', 'oráculo', 'oracle', 'mythic', 'gme', 'tabla', 'tablas'].some(k =>
-      lowerName.includes(k)
-    );
-    const cuerpo = (file.content || '').slice(0, 6000).toLowerCase();
+    const nombreDeOraculo = [
+      "oraculo",
+      "oráculo",
+      "oracle",
+      "mythic",
+      "gme",
+      "tabla",
+      "tablas",
+    ].some((k) => lowerName.includes(k));
+    const cuerpo = (file.content || "").slice(0, 6000).toLowerCase();
     const senasDeOraculo = [
-      'fate chart',
-      'exceptional yes',
-      'exceptional no',
-      'random event',
-      'game master emulator',
-      'sí excepcional',
-      'no excepcional',
-      'suceso aleatorio',
-      'd100'
-    ].filter(k => cuerpo.includes(k)).length;
-    if (nombreDeOraculo || senasDeOraculo >= 2) return 'oracle';
+      "fate chart",
+      "exceptional yes",
+      "exceptional no",
+      "random event",
+      "game master emulator",
+      "sí excepcional",
+      "no excepcional",
+      "suceso aleatorio",
+      "d100",
+    ].filter((k) => cuerpo.includes(k)).length;
+    if (nombreDeOraculo || senasDeOraculo >= 2) return "oracle";
 
-    const nombreDeEstilo = palabraEnNombre(['estilo', 'prosa', 'muestra', 'voz']);
-    const nombreNarrativo = palabraEnNombre(['novela', 'novelas', 'relato', 'relatos', 'capitulo', 'capítulo', 'fragmento']);
-    const nombreDeLore = palabraEnNombre([
-      'compendio',
-      'cantera',
-      'canon',
-      'lore',
-      'resumen',
-      'resumido',
-      'resumidas',
-      'resumidos',
-      'guia',
-      'guía',
-      'manual',
-      'modulo',
-      'módulo',
-      'aventura'
+    const nombreDeEstilo = palabraEnNombre([
+      "estilo",
+      "prosa",
+      "muestra",
+      "voz",
     ]);
-    const esCorto = (file.content || '').length < 30000;
-    if (nombreDeEstilo || (nombreNarrativo && esCorto && !nombreDeLore)) return 'style_sample';
+    const nombreNarrativo = palabraEnNombre([
+      "novela",
+      "novelas",
+      "relato",
+      "relatos",
+      "capitulo",
+      "capítulo",
+      "fragmento",
+    ]);
+    const nombreDeLore = palabraEnNombre([
+      "compendio",
+      "cantera",
+      "canon",
+      "lore",
+      "resumen",
+      "resumido",
+      "resumidas",
+      "resumidos",
+      "guia",
+      "guía",
+      "manual",
+      "modulo",
+      "módulo",
+      "aventura",
+    ]);
+    const esCorto = (file.content || "").length < 30000;
+    if (nombreDeEstilo || (nombreNarrativo && esCorto && !nombreDeLore))
+      return "style_sample";
 
-    return 'document';
+    return "document";
   }
 
   // 2. CLASIFICACIÓN DE IMÁGENES
-  if (file.markers && file.markers.length > 0) return 'map';
+  if (file.markers && file.markers.length > 0) return "map";
 
   // Coincidencias con memoria
-  if (matchesCompanionMemory) return 'portrait_companion';
-  if (matchesPcName) return 'portrait_pj';
-  if (matchesNpcMemory) return 'portrait_npc';
+  if (matchesCompanionMemory) return "portrait_companion";
+  if (matchesPcName) return "portrait_pj";
+  if (matchesNpcMemory) return "portrait_npc";
 
   // Map keywords
   const mapKeywords = [
-    'map',
-    'mapa',
-    'grid',
-    'dungeon',
-    'plano',
-    'world',
-    'region',
-    'mazmorra',
-    'castillo',
-    'castle',
-    'cueva',
-    'cave',
-    'templo',
-    'temple',
-    'battlemap',
-    'battle_map',
-    'topograph',
-    'costa',
-    'coast',
-    'isla',
-    'island',
-    'valle',
-    'ciudad',
-    'city',
-    'pueblo',
-    'town',
-    'taberna',
-    'tavern',
-    'alcantarilla',
-    'ruinas',
-    'bosque',
-    'montaña',
-    'reino',
-    'cartograf',
-    'terreno',
-    'pantano',
-    'fortaleza',
-    'torre',
-    'drakensberg'
+    "map",
+    "mapa",
+    "grid",
+    "dungeon",
+    "plano",
+    "world",
+    "region",
+    "mazmorra",
+    "castillo",
+    "castle",
+    "cueva",
+    "cave",
+    "templo",
+    "temple",
+    "battlemap",
+    "battle_map",
+    "topograph",
+    "costa",
+    "coast",
+    "isla",
+    "island",
+    "valle",
+    "ciudad",
+    "city",
+    "pueblo",
+    "town",
+    "taberna",
+    "tavern",
+    "alcantarilla",
+    "ruinas",
+    "bosque",
+    "montaña",
+    "reino",
+    "cartograf",
+    "terreno",
+    "pantano",
+    "fortaleza",
+    "torre",
+    "drakensberg",
   ];
-  if (mapKeywords.some(k => lowerName.includes(k))) return 'map';
+  if (mapKeywords.some((k) => lowerName.includes(k))) return "map";
   if (
-    lowerAnalysis.includes('mapa geográfico') ||
-    lowerAnalysis.includes('mapa de batalla') ||
-    lowerAnalysis.includes('plano táctico') ||
-    lowerAnalysis.includes('cuadrícula') ||
-    lowerAnalysis.includes('cartografía') ||
-    lowerAnalysis.includes('distribución de salas')
+    lowerAnalysis.includes("mapa geográfico") ||
+    lowerAnalysis.includes("mapa de batalla") ||
+    lowerAnalysis.includes("plano táctico") ||
+    lowerAnalysis.includes("cuadrícula") ||
+    lowerAnalysis.includes("cartografía") ||
+    lowerAnalysis.includes("distribución de salas")
   ) {
-    return 'map';
+    return "map";
   }
 
   // Familiar / Companion image keywords
   if (
     palabraEnNombre(companionKeywords) ||
-    lowerAnalysis.includes('familiar') ||
-    lowerAnalysis.includes('mascota') ||
-    lowerAnalysis.includes('montura') ||
-    lowerAnalysis.includes('compañero animal')
+    lowerAnalysis.includes("familiar") ||
+    lowerAnalysis.includes("mascota") ||
+    lowerAnalysis.includes("montura") ||
+    lowerAnalysis.includes("compañero animal")
   ) {
-    return 'portrait_companion';
+    return "portrait_companion";
   }
 
   // PJ / Protagonist image keywords
-  if (palabraEnNombre(pjKeywords)) return 'portrait_pj';
+  if (palabraEnNombre(pjKeywords)) return "portrait_pj";
   if (
-    lowerAnalysis.includes('personaje jugador') ||
-    lowerAnalysis.includes('héroe principal') ||
-    lowerAnalysis.includes('protagonista')
+    lowerAnalysis.includes("personaje jugador") ||
+    lowerAnalysis.includes("héroe principal") ||
+    lowerAnalysis.includes("protagonista")
   ) {
-    return 'portrait_pj';
+    return "portrait_pj";
   }
 
   // NPC keywords
-  if (palabraEnNombre(npcKeywords)) return 'portrait_npc';
+  if (palabraEnNombre(npcKeywords)) return "portrait_npc";
   if (
-    lowerAnalysis.includes('retrato') ||
-    lowerAnalysis.includes('rostro') ||
-    lowerAnalysis.includes('personaje no jugador') ||
-    lowerAnalysis.includes('antagonista') ||
-    lowerAnalysis.includes('busto') ||
-    lowerAnalysis.includes('atuendo de') ||
-    lowerAnalysis.includes('vestimenta de')
+    lowerAnalysis.includes("retrato") ||
+    lowerAnalysis.includes("rostro") ||
+    lowerAnalysis.includes("personaje no jugador") ||
+    lowerAnalysis.includes("antagonista") ||
+    lowerAnalysis.includes("busto") ||
+    lowerAnalysis.includes("atuendo de") ||
+    lowerAnalysis.includes("vestimenta de")
   ) {
-    return 'portrait_npc';
+    return "portrait_npc";
   }
 
-  return 'scene';
+  return "scene";
 }
 
 /**
@@ -2248,35 +2341,74 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
  */
 export function looksLikePlayerSheet(file: ProjectFile): boolean {
   if (file.isAudio) return false;
-  if (file.category === 'sheet_pj') return true;
-  if (file.category === 'sheet_companion' || file.category === 'sheet_npc') return false;
+  if (file.category === "sheet_pj") return true;
+  if (file.category === "sheet_companion" || file.category === "sheet_npc")
+    return false;
 
   const name = file.name.toLowerCase();
-  const analysis = (file.analysis || '').toLowerCase();
+  const analysis = (file.analysis || "").toLowerCase();
 
   // Si tiene pistas explícitas de familiar o pnj, NO es la ficha del jugador
-  const companionCues = ['familiar', 'compañero', 'companero', 'pet', 'mascota', 'montura', 'invocacion', 'invocación'];
-  if (companionCues.some(c => name.includes(c) || analysis.includes(c))) return false;
+  const companionCues = [
+    "familiar",
+    "compañero",
+    "companero",
+    "pet",
+    "mascota",
+    "montura",
+    "invocacion",
+    "invocación",
+  ];
+  if (companionCues.some((c) => name.includes(c) || analysis.includes(c)))
+    return false;
 
-  const npcCues = ['pnj', 'npc', 'monstruo', 'monster', 'villano', 'bestiario', 'enemigo'];
-  if (npcCues.some(c => name.includes(c) || analysis.includes(c))) return false;
+  const npcCues = [
+    "pnj",
+    "npc",
+    "monstruo",
+    "monster",
+    "villano",
+    "bestiario",
+    "enemigo",
+  ];
+  if (npcCues.some((c) => name.includes(c) || analysis.includes(c)))
+    return false;
 
-  const hints = ['ficha pj', 'ficha oc', 'personaje jugador', 'protagonista', 'hoja_personaje', 'ficha de personaje', 'character sheet'];
-  if (hints.some(h => name.includes(h) || analysis.includes(h))) return true;
+  const hints = [
+    "ficha pj",
+    "ficha oc",
+    "personaje jugador",
+    "protagonista",
+    "hoja_personaje",
+    "ficha de personaje",
+    "character sheet",
+  ];
+  if (hints.some((h) => name.includes(h) || analysis.includes(h))) return true;
 
   if (file.isImage) {
     return (
-      (analysis.includes('ficha de personaje') || analysis.includes('hoja de personaje')) &&
-      !analysis.includes('familiar') &&
-      !analysis.includes('pnj')
+      (analysis.includes("ficha de personaje") ||
+        analysis.includes("hoja de personaje")) &&
+      !analysis.includes("familiar") &&
+      !analysis.includes("pnj")
     );
   }
 
-  const body = (file.content || '').substring(0, 4000).toLowerCase();
-  const hasAttributes = body.includes('fuerza') && body.includes('destreza') && body.includes('constitución');
-  const hasSheetKeywords = body.includes('clase y nivel') || body.includes('puntos de golpe') || body.includes('trasfondo');
+  const body = (file.content || "").substring(0, 4000).toLowerCase();
+  const hasAttributes =
+    body.includes("fuerza") &&
+    body.includes("destreza") &&
+    body.includes("constitución");
+  const hasSheetKeywords =
+    body.includes("clase y nivel") ||
+    body.includes("puntos de golpe") ||
+    body.includes("trasfondo");
 
-  return (hasAttributes || hasSheetKeywords) && !companionCues.some(c => body.includes(c)) && !npcCues.some(c => body.includes(c));
+  return (
+    (hasAttributes || hasSheetKeywords) &&
+    !companionCues.some((c) => body.includes(c)) &&
+    !npcCues.some((c) => body.includes(c))
+  );
 }
 
 /**
@@ -2284,15 +2416,40 @@ export function looksLikePlayerSheet(file: ProjectFile): boolean {
  */
 export function looksLikeCompanionSheet(file: ProjectFile): boolean {
   if (file.isAudio) return false;
-  if (file.category === 'sheet_companion') return true;
+  if (file.category === "sheet_companion") return true;
 
   const name = file.name.toLowerCase();
-  const analysis = (file.analysis || '').toLowerCase();
-  const companionCues = ['familiar', 'compañero', 'companero', 'pet', 'mascota', 'montura', 'mount', 'pseudodragon', 'pseudodragón', 'homunculo', 'homúnculo', 'cuervo familiar', 'lechuza familiar', 'gato familiar'];
-  
-  if (companionCues.some(c => name.includes(c) || analysis.includes(c))) {
-    const sheetHints = ['ficha', 'sheet', 'stats', 'atributos', 'puntos de golpe', 'ataque', 'ca'];
-    return sheetHints.some(h => name.includes(h) || (file.content || '').toLowerCase().includes(h));
+  const analysis = (file.analysis || "").toLowerCase();
+  const companionCues = [
+    "familiar",
+    "compañero",
+    "companero",
+    "pet",
+    "mascota",
+    "montura",
+    "mount",
+    "pseudodragon",
+    "pseudodragón",
+    "homunculo",
+    "homúnculo",
+    "cuervo familiar",
+    "lechuza familiar",
+    "gato familiar",
+  ];
+
+  if (companionCues.some((c) => name.includes(c) || analysis.includes(c))) {
+    const sheetHints = [
+      "ficha",
+      "sheet",
+      "stats",
+      "atributos",
+      "puntos de golpe",
+      "ataque",
+      "ca",
+    ];
+    return sheetHints.some(
+      (h) => name.includes(h) || (file.content || "").toLowerCase().includes(h),
+    );
   }
   return false;
 }
@@ -2302,15 +2459,37 @@ export function looksLikeCompanionSheet(file: ProjectFile): boolean {
  */
 export function looksLikeNpcSheet(file: ProjectFile): boolean {
   if (file.isAudio) return false;
-  if (file.category === 'sheet_npc') return true;
+  if (file.category === "sheet_npc") return true;
 
   const name = file.name.toLowerCase();
-  const analysis = (file.analysis || '').toLowerCase();
-  const npcCues = ['pnj', 'npc', 'monstruo', 'monster', 'villano', 'bestiario', 'statblock', 'boss', 'jefe', 'criatura'];
+  const analysis = (file.analysis || "").toLowerCase();
+  const npcCues = [
+    "pnj",
+    "npc",
+    "monstruo",
+    "monster",
+    "villano",
+    "bestiario",
+    "statblock",
+    "boss",
+    "jefe",
+    "criatura",
+  ];
 
-  if (npcCues.some(c => name.includes(c) || analysis.includes(c))) {
-    const sheetHints = ['ficha', 'sheet', 'stats', 'statblock', 'atributos', 'puntos de golpe', 'desafío', 'vd'];
-    return sheetHints.some(h => name.includes(h) || (file.content || '').toLowerCase().includes(h));
+  if (npcCues.some((c) => name.includes(c) || analysis.includes(c))) {
+    const sheetHints = [
+      "ficha",
+      "sheet",
+      "stats",
+      "statblock",
+      "atributos",
+      "puntos de golpe",
+      "desafío",
+      "vd",
+    ];
+    return sheetHints.some(
+      (h) => name.includes(h) || (file.content || "").toLowerCase().includes(h),
+    );
   }
   return false;
 }
@@ -2318,8 +2497,10 @@ export function looksLikeNpcSheet(file: ProjectFile): boolean {
 /**
  * Extrae de forma estructurada un familiar o compañero desde un documento.
  */
-export async function extractCompanionFromDocument(file: ProjectFile): Promise<PlayerCharacter> {
-  if (!file.isImage && !(file.content || '').trim()) {
+export async function extractCompanionFromDocument(
+  file: ProjectFile,
+): Promise<PlayerCharacter> {
+  if (!file.isImage && !(file.content || "").trim()) {
     throw new Error(`"${file.name}" no contiene texto legible.`);
   }
 
@@ -2357,53 +2538,67 @@ Responde ÚNICAMENTE con un objeto JSON válido con la estructura de PlayerChara
 
   let contents: any;
   if (file.isImage && file.content) {
-    const base64 = file.content.includes(',') ? file.content.split(',')[1] : file.content;
+    const base64 = file.content.includes(",")
+      ? file.content.split(",")[1]
+      : file.content;
     contents = [
       {
-        role: 'user',
+        role: "user",
         parts: [
-          { inlineData: { mimeType: file.mime || 'image/jpeg', data: base64 } },
-          { text: `${instructions}\n\nLee la imagen adjunta y extrae la ficha del familiar/compañero.` }
-        ]
-      }
+          { inlineData: { mimeType: file.mime || "image/jpeg", data: base64 } },
+          {
+            text: `${instructions}\n\nLee la imagen adjunta y extrae la ficha del familiar/compañero.`,
+          },
+        ],
+      },
     ];
   } else {
-    contents = `${instructions}\n\nDocumento:\n${(file.content || '').slice(0, 40000)}`;
+    contents = `${instructions}\n\nDocumento:\n${(file.content || "").slice(0, 40000)}`;
   }
 
   const response = await generateContentWithFailover({
     primaryModel: getBackgroundTaskModel(),
     contents,
     config: {
-      responseMimeType: 'application/json',
-      temperature: 0.1
-    }
+      responseMimeType: "application/json",
+      temperature: 0.1,
+    },
   });
 
-  const cleanJson = (response.text || '{}').replace(/```json/gi, '').replace(/```/g, '').trim();
+  const cleanJson = (response.text || "{}")
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
   let parsed: any = {};
   try {
     parsed = JSON.parse(cleanJson);
   } catch (e) {
-    console.error('Error parsing companion JSON:', e);
+    console.error("Error parsing companion JSON:", e);
   }
 
   return {
-    id: 'comp_' + Date.now() + '_' + Math.random().toString(36).substring(7),
-    characterType: 'companion',
-    companionType: parsed.companionType || 'Familiar',
-    name: parsed.name || file.name.replace(/\.[^/.]+$/, ''),
-    race: parsed.race || 'Criatura',
-    hp: typeof parsed.hp === 'number' ? parsed.hp : 2,
-    maxHp: typeof parsed.maxHp === 'number' ? parsed.maxHp : (parsed.hp || 2),
-    ac: typeof parsed.ac === 'number' ? parsed.ac : 10,
-    speed: parsed.speed || '30 pies',
-    attributes: parsed.attributes || { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+    id: "comp_" + Date.now() + "_" + Math.random().toString(36).substring(7),
+    characterType: "companion",
+    companionType: parsed.companionType || "Familiar",
+    name: parsed.name || file.name.replace(/\.[^/.]+$/, ""),
+    race: parsed.race || "Criatura",
+    hp: typeof parsed.hp === "number" ? parsed.hp : 2,
+    maxHp: typeof parsed.maxHp === "number" ? parsed.maxHp : parsed.hp || 2,
+    ac: typeof parsed.ac === "number" ? parsed.ac : 10,
+    speed: parsed.speed || "30 pies",
+    attributes: parsed.attributes || {
+      str: 10,
+      dex: 10,
+      con: 10,
+      int: 10,
+      wis: 10,
+      cha: 10,
+    },
     traits: parsed.traits || [],
     spells: parsed.spells || [],
     inventory: parsed.inventory || [],
-    notes: parsed.notes || '',
-    sheetText: !file.isImage ? file.content : undefined
+    notes: parsed.notes || "",
+    sheetText: !file.isImage ? file.content : undefined,
   };
 }
 
@@ -2411,7 +2606,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con la estructura de PlayerChara
  * Extrae de forma estructurada un PNJ o monstruo desde un documento.
  */
 export async function extractNpcFromDocument(file: ProjectFile): Promise<NPC> {
-  if (!file.isImage && !(file.content || '').trim()) {
+  if (!file.isImage && !(file.content || "").trim()) {
     throw new Error(`"${file.name}" no contiene texto legible.`);
   }
 
@@ -2447,78 +2642,92 @@ Responde ÚNICAMENTE con un JSON:
 
   let contents: any;
   if (file.isImage && file.content) {
-    const base64 = file.content.includes(',') ? file.content.split(',')[1] : file.content;
+    const base64 = file.content.includes(",")
+      ? file.content.split(",")[1]
+      : file.content;
     contents = [
       {
-        role: 'user',
+        role: "user",
         parts: [
-          { inlineData: { mimeType: file.mime || 'image/jpeg', data: base64 } },
-          { text: `${instructions}\n\nLee la imagen adjunta y extrae el PNJ/Monstruo.` }
-        ]
-      }
+          { inlineData: { mimeType: file.mime || "image/jpeg", data: base64 } },
+          {
+            text: `${instructions}\n\nLee la imagen adjunta y extrae el PNJ/Monstruo.`,
+          },
+        ],
+      },
     ];
   } else {
-    contents = `${instructions}\n\nDocumento:\n${(file.content || '').slice(0, 40000)}`;
+    contents = `${instructions}\n\nDocumento:\n${(file.content || "").slice(0, 40000)}`;
   }
 
   const response = await generateContentWithFailover({
     primaryModel: getBackgroundTaskModel(),
     contents,
     config: {
-      responseMimeType: 'application/json',
-      temperature: 0.1
-    }
+      responseMimeType: "application/json",
+      temperature: 0.1,
+    },
   });
 
-  const cleanJson = (response.text || '{}').replace(/```json/gi, '').replace(/```/g, '').trim();
+  const cleanJson = (response.text || "{}")
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
   let parsed: any = {};
   try {
     parsed = JSON.parse(cleanJson);
   } catch (e) {
-    console.error('Error parsing NPC JSON:', e);
+    console.error("Error parsing NPC JSON:", e);
   }
 
-  const npcId = 'npc_' + Date.now() + '_' + Math.random().toString(36).substring(7);
+  const npcId =
+    "npc_" + Date.now() + "_" + Math.random().toString(36).substring(7);
 
   return {
     id: npcId,
-    name: parsed.name || file.name.replace(/\.[^/.]+$/, ''),
-    relation: parsed.relation || 'Neutral',
-    status: parsed.status || 'Vivo',
-    description: parsed.description || '',
-    notes: parsed.notes || '',
+    name: parsed.name || file.name.replace(/\.[^/.]+$/, ""),
+    relation: parsed.relation || "Neutral",
+    status: parsed.status || "Vivo",
+    description: parsed.description || "",
+    notes: parsed.notes || "",
     aparenta: parsed.aparenta,
     oculta: parsed.oculta,
-    characterSheet: parsed.sheet ? {
-      name: parsed.name || file.name,
-      characterType: 'npc',
-      hp: parsed.sheet.hp,
-      maxHp: parsed.sheet.maxHp,
-      ac: parsed.sheet.ac,
-      speed: parsed.sheet.speed,
-      attributes: parsed.sheet.attributes,
-      traits: parsed.sheet.traits || []
-    } : undefined
+    characterSheet: parsed.sheet
+      ? {
+          name: parsed.name || file.name,
+          characterType: "npc",
+          hp: parsed.sheet.hp,
+          maxHp: parsed.sheet.maxHp,
+          ac: parsed.sheet.ac,
+          speed: parsed.sheet.speed,
+          attributes: parsed.sheet.attributes,
+          traits: parsed.sheet.traits || [],
+        }
+      : undefined,
   };
 }
 
-export async function extractPlayerCharacterFromDocument(file: ProjectFile): Promise<PlayerCharacter> {
+export async function extractPlayerCharacterFromDocument(
+  file: ProjectFile,
+): Promise<PlayerCharacter> {
   // Un PDF escaneado o hecho de imágenes no deja texto al extraerlo, y entonces no
   // hay nada que analizar. Conviene decirlo con claridad en vez de fallar luego.
-  if (!file.isImage && !(file.content || '').trim()) {
+  if (!file.isImage && !(file.content || "").trim()) {
     throw new Error(
-      `"${file.name}" no contiene texto legible. Si es un PDF escaneado o hecho de imágenes, hazle una captura de pantalla y súbela como imagen: así puedo leerla mirándola.`
+      `"${file.name}" no contiene texto legible. Si es un PDF escaneado o hecho de imágenes, hazle una captura de pantalla y súbela como imagen: así puedo leerla mirándola.`,
     );
   }
 
-  const rawContent = file.content || '';
+  const rawContent = file.content || "";
 
   // Parser determinista para extraer bloques estándar de D&D y rol (por si el modelo omite campos)
   const regexExtractions: Partial<PlayerCharacter> = {};
 
   if (!file.isImage && rawContent) {
     // 1. PG / HP y Dados de Golpe
-    const pgMatch = rawContent.match(/(?:\*\*PG\*\*|\bPG\b|\bHP\b|\bPuntos de Golpe\b)\s*[:·]*\s*(\d+)(?:\s*\(([^)]+)\))?/i);
+    const pgMatch = rawContent.match(
+      /(?:\*\*PG\*\*|\bPG\b|\bHP\b|\bPuntos de Golpe\b)\s*[:·]*\s*(\d+)(?:\s*\(([^)]+)\))?/i,
+    );
     if (pgMatch) {
       regexExtractions.hp = parseInt(pgMatch[1], 10);
       regexExtractions.maxHp = parseInt(pgMatch[1], 10);
@@ -2526,52 +2735,94 @@ export async function extractPlayerCharacterFromDocument(file: ProjectFile): Pro
     }
 
     // 2. CA / AC
-    const caMatch = rawContent.match(/(?:\*\*CA\*\*|\bCA\b|\bAC\b|\bClase de Armadura\b)\s*[:·]*\s*(\d+)/i);
+    const caMatch = rawContent.match(
+      /(?:\*\*CA\*\*|\bCA\b|\bAC\b|\bClase de Armadura\b)\s*[:·]*\s*(\d+)/i,
+    );
     if (caMatch) {
       regexExtractions.ac = parseInt(caMatch[1], 10);
     }
 
     // 3. Velocidad
-    const velMatch = rawContent.match(/(?:\*\*Vel\.\*\*|\bVel\.\b|\bVelocidad\b|\bSpeed\b)\s*[:·]*\s*([^·\n,]+)/i);
+    const velMatch = rawContent.match(
+      /(?:\*\*Vel\.\*\*|\bVel\.\b|\bVelocidad\b|\bSpeed\b)\s*[:·]*\s*([^·\n,]+)/i,
+    );
     if (velMatch) {
       regexExtractions.speed = velMatch[1].trim();
     }
 
     // 4. Iniciativa
-    const inicMatch = rawContent.match(/(?:\*\*Inic\.\*\*|\bInic\.\b|\bIniciativa\b|\bInitiative\b)\s*[:·]*\s*([+\-]?\d+)/i);
+    const inicMatch = rawContent.match(
+      /(?:\*\*Inic\.\*\*|\bInic\.\b|\bIniciativa\b|\bInitiative\b)\s*[:·]*\s*([+\-]?\d+)/i,
+    );
     if (inicMatch) {
       regexExtractions.initiative = inicMatch[1].trim();
     }
 
     // 5. Bono de competencia
-    const compMatch = rawContent.match(/(?:\*\*Comp\.\*\*|\bComp\.\b|\bCompetencia\b|\bBono de Comp\b|\bProficiency\b)\s*[:·]*\s*([+\-]?\d+)/i);
+    const compMatch = rawContent.match(
+      /(?:\*\*Comp\.\*\*|\bComp\.\b|\bCompetencia\b|\bBono de Comp\b|\bProficiency\b)\s*[:·]*\s*([+\-]?\d+)/i,
+    );
     if (compMatch) {
-      regexExtractions.proficiencyBonus = parseInt(compMatch[1].replace('+', ''), 10);
+      regexExtractions.proficiencyBonus = parseInt(
+        compMatch[1].replace("+", ""),
+        10,
+      );
     }
 
     // 6. Tabla de Atributos D&D (ej: | SAB | INT | CAR | CON | DES | FUE | o | FUE | DES | CON | INT | SAB | CAR |)
-    const lines = rawContent.split('\n');
+    const lines = rawContent.split("\n");
     for (let i = 0; i < lines.length - 2; i++) {
       const headerLine = lines[i];
       const sepLine = lines[i + 1];
       const valLine = lines[i + 2];
-      if (headerLine.includes('|') && sepLine.includes('|') && sepLine.includes('-') && valLine.includes('|')) {
-        const headers = headerLine.split('|').map(s => s.trim().toUpperCase()).filter(Boolean);
-        const vals = valLine.split('|').map(s => s.trim()).filter(Boolean);
+      if (
+        headerLine.includes("|") &&
+        sepLine.includes("|") &&
+        sepLine.includes("-") &&
+        valLine.includes("|")
+      ) {
+        const headers = headerLine
+          .split("|")
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean);
+        const vals = valLine
+          .split("|")
+          .map((s) => s.trim())
+          .filter(Boolean);
         if (headers.length >= 6 && vals.length >= 6) {
-          const isAttrTable = headers.some(h => ['FUE', 'STR', 'DES', 'DEX', 'CON', 'INT', 'SAB', 'WIS', 'CAR', 'CHA'].includes(h));
+          const isAttrTable = headers.some((h) =>
+            [
+              "FUE",
+              "STR",
+              "DES",
+              "DEX",
+              "CON",
+              "INT",
+              "SAB",
+              "WIS",
+              "CAR",
+              "CHA",
+            ].includes(h),
+          );
           if (isAttrTable) {
-            const attrObj: PlayerAttributes = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+            const attrObj: PlayerAttributes = {
+              str: 10,
+              dex: 10,
+              con: 10,
+              int: 10,
+              wis: 10,
+              cha: 10,
+            };
             headers.forEach((h, idx) => {
-              const vStr = vals[idx] || '10';
+              const vStr = vals[idx] || "10";
               const numMatch = vStr.match(/\d+/);
               const num = numMatch ? parseInt(numMatch[0], 10) : 10;
-              if (h === 'FUE' || h === 'STR') attrObj.str = num;
-              else if (h === 'DES' || h === 'DEX') attrObj.dex = num;
-              else if (h === 'CON') attrObj.con = num;
-              else if (h === 'INT') attrObj.int = num;
-              else if (h === 'SAB' || h === 'WIS') attrObj.wis = num;
-              else if (h === 'CAR' || h === 'CHA') attrObj.cha = num;
+              if (h === "FUE" || h === "STR") attrObj.str = num;
+              else if (h === "DES" || h === "DEX") attrObj.dex = num;
+              else if (h === "CON") attrObj.con = num;
+              else if (h === "INT") attrObj.int = num;
+              else if (h === "SAB" || h === "WIS") attrObj.wis = num;
+              else if (h === "CAR" || h === "CHA") attrObj.cha = num;
             });
             regexExtractions.attributes = attrObj;
             break;
@@ -2581,17 +2832,30 @@ export async function extractPlayerCharacterFromDocument(file: ProjectFile): Pro
     }
 
     // 7. Salvaciones con competencia
-    const salvMatch = rawContent.match(/(?:Salvaciones(?:\s+con\s+competencia)?|Tiradas\s+de\s+salvaci[oó]n)\s*[:*]*\s*([^\n]+)/i);
+    const salvMatch = rawContent.match(
+      /(?:Salvaciones(?:\s+con\s+competencia)?|Tiradas\s+de\s+salvaci[oó]n)\s*[:*]*\s*([^\n]+)/i,
+    );
     if (salvMatch) {
       const rawS = salvMatch[1];
       const found: string[] = [];
-      ['SAB', 'INT', 'CAR', 'CON', 'DES', 'FUE', 'WIS', 'CHA', 'STR', 'DEX'].forEach(stat => {
-        if (new RegExp(`\\b${stat}\\b`, 'i').test(rawS)) {
+      [
+        "SAB",
+        "INT",
+        "CAR",
+        "CON",
+        "DES",
+        "FUE",
+        "WIS",
+        "CHA",
+        "STR",
+        "DEX",
+      ].forEach((stat) => {
+        if (new RegExp(`\\b${stat}\\b`, "i").test(rawS)) {
           let normalized = stat.toUpperCase();
-          if (normalized === 'WIS') normalized = 'SAB';
-          if (normalized === 'CHA') normalized = 'CAR';
-          if (normalized === 'STR') normalized = 'FUE';
-          if (normalized === 'DEX') normalized = 'DES';
+          if (normalized === "WIS") normalized = "SAB";
+          if (normalized === "CHA") normalized = "CAR";
+          if (normalized === "STR") normalized = "FUE";
+          if (normalized === "DEX") normalized = "DES";
           if (!found.includes(normalized)) found.push(normalized);
         }
       });
@@ -2694,20 +2958,22 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura:
 
   let contents: any;
   if (file.isImage && file.content) {
-    const base64 = file.content.includes(',') ? file.content.split(',')[1] : file.content;
+    const base64 = file.content.includes(",")
+      ? file.content.split(",")[1]
+      : file.content;
     contents = [
       {
-        role: 'user',
+        role: "user",
         parts: [
-          { inlineData: { mimeType: file.mime || 'image/jpeg', data: base64 } },
+          { inlineData: { mimeType: file.mime || "image/jpeg", data: base64 } },
           {
-            text: `${instructions}\n\nLa ficha está en la imagen adjunta ("${file.name}"). Lee todo el texto y extrae absolutamente todos los atributos, estadísticas y objetos reales sin inventar equipo adicional.`
-          }
-        ]
-      }
+            text: `${instructions}\n\nLa ficha está en la imagen adjunta ("${file.name}"). Lee todo el texto y extrae absolutamente todos los atributos, estadísticas y objetos reales sin inventar equipo adicional.`,
+          },
+        ],
+      },
     ];
   } else {
-    contents = `${instructions}\n\nDocumento "${file.name}":\n${(file.content || '').substring(0, 90000)}`;
+    contents = `${instructions}\n\nDocumento "${file.name}":\n${(file.content || "").substring(0, 90000)}`;
   }
 
   let parsedJson: any = {};
@@ -2716,114 +2982,249 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura:
       primaryModel: getBackgroundTaskModel(),
       contents,
       config: {
-        responseMimeType: 'application/json',
-        temperature: 0.1
-      }
+        responseMimeType: "application/json",
+        temperature: 0.1,
+      },
     });
 
-    const rawText = response.text || '{}';
+    const rawText = response.text || "{}";
     let cleanText = rawText.trim();
-    if (cleanText.startsWith('```')) {
+    if (cleanText.startsWith("```")) {
       cleanText = cleanText
-        .replace(/^```(?:json)?\n?/, '')
-        .replace(/\n?```$/, '')
+        .replace(/^```(?:json)?\n?/, "")
+        .replace(/\n?```$/, "")
         .trim();
     }
-    const firstBrace = cleanText.indexOf('{');
-    const lastBrace = cleanText.lastIndexOf('}');
+    const firstBrace = cleanText.indexOf("{");
+    const lastBrace = cleanText.lastIndexOf("}");
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
       cleanText = cleanText.substring(firstBrace, lastBrace + 1);
     }
     parsedJson = JSON.parse(cleanText);
   } catch (e) {
-    console.warn('LLM Character extraction warning/fallback:', e);
+    console.warn("LLM Character extraction warning/fallback:", e);
   }
 
   // Extracción determinista complementaria desde el texto
-  const deterministicParsed = !file.isImage && rawContent ? parseDndSheetText(rawContent) : {};
+  const deterministicParsed =
+    !file.isImage && rawContent ? parseDndSheetText(rawContent) : {};
 
   // Fusión inteligente de LLM, regex determinista y parseo directo sin inventar datos
   const finalAttributes: PlayerAttributes = {
-    str: parsedJson.attributes?.str ?? deterministicParsed.attributes?.str ?? regexExtractions.attributes?.str ?? 10,
-    dex: parsedJson.attributes?.dex ?? deterministicParsed.attributes?.dex ?? regexExtractions.attributes?.dex ?? 10,
-    con: parsedJson.attributes?.con ?? deterministicParsed.attributes?.con ?? regexExtractions.attributes?.con ?? 10,
-    int: parsedJson.attributes?.int ?? deterministicParsed.attributes?.int ?? regexExtractions.attributes?.int ?? 10,
-    wis: parsedJson.attributes?.wis ?? deterministicParsed.attributes?.wis ?? regexExtractions.attributes?.wis ?? 10,
-    cha: parsedJson.attributes?.cha ?? deterministicParsed.attributes?.cha ?? regexExtractions.attributes?.cha ?? 10
+    str:
+      parsedJson.attributes?.str ??
+      deterministicParsed.attributes?.str ??
+      regexExtractions.attributes?.str ??
+      10,
+    dex:
+      parsedJson.attributes?.dex ??
+      deterministicParsed.attributes?.dex ??
+      regexExtractions.attributes?.dex ??
+      10,
+    con:
+      parsedJson.attributes?.con ??
+      deterministicParsed.attributes?.con ??
+      regexExtractions.attributes?.con ??
+      10,
+    int:
+      parsedJson.attributes?.int ??
+      deterministicParsed.attributes?.int ??
+      regexExtractions.attributes?.int ??
+      10,
+    wis:
+      parsedJson.attributes?.wis ??
+      deterministicParsed.attributes?.wis ??
+      regexExtractions.attributes?.wis ??
+      10,
+    cha:
+      parsedJson.attributes?.cha ??
+      deterministicParsed.attributes?.cha ??
+      regexExtractions.attributes?.cha ??
+      10,
   };
 
-  const rawInventory: InventoryItem[] = Array.isArray(parsedJson.inventory) && parsedJson.inventory.length > 0
-    ? parsedJson.inventory.map((item: any, idx: number) => ({
-        id: item.id || `inv_${Date.now()}_${idx}_${Math.random().toString(36).substring(7)}`,
-        name: String(item.name || 'Objeto').trim(),
-        category: ['weapon', 'armor', 'potion', 'scroll', 'magic', 'equipment', 'treasure', 'other'].includes(item.category) ? item.category : 'equipment',
-        quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
-        weight: typeof item.weight === 'number' ? item.weight : undefined,
-        equipped: Boolean(item.equipped),
-        attuned: Boolean(item.attuned),
-        description: item.description ? String(item.description).trim() : undefined,
-        damageOrAc: item.damageOrAc ? String(item.damageOrAc).trim() : undefined,
-        rarity: item.rarity || 'common',
-        cost: item.cost ? String(item.cost).trim() : undefined,
-        durationNote: item.durationNote ? String(item.durationNote).trim() : undefined
-      }))
-    : (deterministicParsed.inventory && deterministicParsed.inventory.length > 0 ? deterministicParsed.inventory : []);
+  const rawInventory: InventoryItem[] =
+    Array.isArray(parsedJson.inventory) && parsedJson.inventory.length > 0
+      ? parsedJson.inventory.map((item: any, idx: number) => ({
+          id:
+            item.id ||
+            `inv_${Date.now()}_${idx}_${Math.random().toString(36).substring(7)}`,
+          name: String(item.name || "Objeto").trim(),
+          category: [
+            "weapon",
+            "armor",
+            "potion",
+            "scroll",
+            "magic",
+            "equipment",
+            "treasure",
+            "other",
+          ].includes(item.category)
+            ? item.category
+            : "equipment",
+          quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
+          weight: typeof item.weight === "number" ? item.weight : undefined,
+          equipped: Boolean(item.equipped),
+          attuned: Boolean(item.attuned),
+          description: item.description
+            ? String(item.description).trim()
+            : undefined,
+          damageOrAc: item.damageOrAc
+            ? String(item.damageOrAc).trim()
+            : undefined,
+          rarity: item.rarity || "common",
+          cost: item.cost ? String(item.cost).trim() : undefined,
+          durationNote: item.durationNote
+            ? String(item.durationNote).trim()
+            : undefined,
+        }))
+      : deterministicParsed.inventory &&
+          deterministicParsed.inventory.length > 0
+        ? deterministicParsed.inventory
+        : [];
 
   // Deduplicación y refinamiento con reglas oficiales (dos manos, oráculos, descarte de genéricos duplicados)
-  const refinedInventory = refineAndDeduplicateInventory(rawInventory, rawContent);
+  const refinedInventory = refineAndDeduplicateInventory(
+    rawInventory,
+    rawContent,
+  );
 
   const finalCurrencies: PlayerCurrencies = {
-    cp: Math.max(0, parseInt(parsedJson.currencies?.cp, 10) || deterministicParsed.currencies?.cp || 0),
-    sp: Math.max(0, parseInt(parsedJson.currencies?.sp, 10) || deterministicParsed.currencies?.sp || 0),
-    ep: Math.max(0, parseInt(parsedJson.currencies?.ep, 10) || deterministicParsed.currencies?.ep || 0),
-    gp: Math.max(0, parseInt(parsedJson.currencies?.gp, 10) || deterministicParsed.currencies?.gp || 0),
-    pp: Math.max(0, parseInt(parsedJson.currencies?.pp, 10) || deterministicParsed.currencies?.pp || 0)
+    cp: Math.max(
+      0,
+      parseInt(parsedJson.currencies?.cp, 10) ||
+        deterministicParsed.currencies?.cp ||
+        0,
+    ),
+    sp: Math.max(
+      0,
+      parseInt(parsedJson.currencies?.sp, 10) ||
+        deterministicParsed.currencies?.sp ||
+        0,
+    ),
+    ep: Math.max(
+      0,
+      parseInt(parsedJson.currencies?.ep, 10) ||
+        deterministicParsed.currencies?.ep ||
+        0,
+    ),
+    gp: Math.max(
+      0,
+      parseInt(parsedJson.currencies?.gp, 10) ||
+        deterministicParsed.currencies?.gp ||
+        0,
+    ),
+    pp: Math.max(
+      0,
+      parseInt(parsedJson.currencies?.pp, 10) ||
+        deterministicParsed.currencies?.pp ||
+        0,
+    ),
   };
 
-  const hpVal = typeof parsedJson.hp === 'number' ? parsedJson.hp : deterministicParsed.hp ?? regexExtractions.hp ?? 10;
-  const maxHpVal = typeof parsedJson.maxHp === 'number' ? parsedJson.maxHp : deterministicParsed.maxHp ?? regexExtractions.maxHp ?? hpVal;
+  const hpVal =
+    typeof parsedJson.hp === "number"
+      ? parsedJson.hp
+      : (deterministicParsed.hp ?? regexExtractions.hp ?? 10);
+  const maxHpVal =
+    typeof parsedJson.maxHp === "number"
+      ? parsedJson.maxHp
+      : (deterministicParsed.maxHp ?? regexExtractions.maxHp ?? hpVal);
 
   const rawPc: PlayerCharacter = {
-    name: parsedJson.name || deterministicParsed.name || file.name.replace(/\.[^/.]+$/, ''),
-    race: parsedJson.race || deterministicParsed.race || '',
-    class: parsedJson.class || deterministicParsed.class || '',
-    subclass: parsedJson.subclass || deterministicParsed.subclass || '',
-    level: parsedJson.level ? String(parsedJson.level) : deterministicParsed.level ? String(deterministicParsed.level) : '1',
-    background: parsedJson.background || deterministicParsed.background || '',
-    alignment: parsedJson.alignment || deterministicParsed.alignment || '',
+    name:
+      parsedJson.name ||
+      deterministicParsed.name ||
+      file.name.replace(/\.[^/.]+$/, ""),
+    race: parsedJson.race || deterministicParsed.race || "",
+    class: parsedJson.class || deterministicParsed.class || "",
+    subclass: parsedJson.subclass || deterministicParsed.subclass || "",
+    level: parsedJson.level
+      ? String(parsedJson.level)
+      : deterministicParsed.level
+        ? String(deterministicParsed.level)
+        : "1",
+    background: parsedJson.background || deterministicParsed.background || "",
+    alignment: parsedJson.alignment || deterministicParsed.alignment || "",
     hp: hpVal,
     maxHp: maxHpVal,
-    hitDice: parsedJson.hitDice || deterministicParsed.hitDice || regexExtractions.hitDice || '1d8',
-    ac: typeof parsedJson.ac === 'number' ? parsedJson.ac : deterministicParsed.ac ?? regexExtractions.ac ?? 10,
-    speed: parsedJson.speed || deterministicParsed.speed || regexExtractions.speed || '30 pies',
-    initiative: parsedJson.initiative || deterministicParsed.initiative || regexExtractions.initiative || '+0',
-    proficiencyBonus: typeof parsedJson.proficiencyBonus === 'number' ? parsedJson.proficiencyBonus : deterministicParsed.proficiencyBonus ?? regexExtractions.proficiencyBonus ?? 2,
+    hitDice:
+      parsedJson.hitDice ||
+      deterministicParsed.hitDice ||
+      regexExtractions.hitDice ||
+      "1d8",
+    ac:
+      typeof parsedJson.ac === "number"
+        ? parsedJson.ac
+        : (deterministicParsed.ac ?? regexExtractions.ac ?? 10),
+    speed:
+      parsedJson.speed ||
+      deterministicParsed.speed ||
+      regexExtractions.speed ||
+      "30 pies",
+    initiative:
+      parsedJson.initiative ||
+      deterministicParsed.initiative ||
+      regexExtractions.initiative ||
+      "+0",
+    proficiencyBonus:
+      typeof parsedJson.proficiencyBonus === "number"
+        ? parsedJson.proficiencyBonus
+        : (deterministicParsed.proficiencyBonus ??
+          regexExtractions.proficiencyBonus ??
+          2),
     attributes: finalAttributes,
-    savingThrowProficiencies: parsedJson.savingThrowProficiencies || deterministicParsed.savingThrowProficiencies || regexExtractions.savingThrowProficiencies || [],
-    skillProficiencies: parsedJson.skillProficiencies || deterministicParsed.skillProficiencies || [],
+    savingThrowProficiencies:
+      parsedJson.savingThrowProficiencies ||
+      deterministicParsed.savingThrowProficiencies ||
+      regexExtractions.savingThrowProficiencies ||
+      [],
+    skillProficiencies:
+      parsedJson.skillProficiencies ||
+      deterministicParsed.skillProficiencies ||
+      [],
     conditions: parsedJson.conditions || [],
     inventory: refinedInventory,
     currencies: finalCurrencies,
     spellcasting: parsedJson.spellcasting || deterministicParsed.spellcasting,
-    traits: Array.isArray(parsedJson.traits) && parsedJson.traits.length > 0 ? parsedJson.traits : undefined,
-    spells: Array.isArray(parsedJson.spells) && parsedJson.spells.length > 0 ? parsedJson.spells : undefined,
-    languages: Array.isArray(parsedJson.languages) && parsedJson.languages.length > 0 ? parsedJson.languages : undefined,
-    proficienciesAndLanguages: parsedJson.proficienciesAndLanguages || deterministicParsed.proficienciesAndLanguages || '',
-    featuresAndTraits: parsedJson.featuresAndTraits || deterministicParsed.featuresAndTraits || '',
-    appearance: parsedJson.appearance || '',
-    personality: parsedJson.personality || '',
-    ideals: parsedJson.ideals || '',
-    bonds: parsedJson.bonds || '',
-    flaws: parsedJson.flaws || '',
-    backstory: parsedJson.backstory || '',
-    notes: parsedJson.notes || '',
-    sheetText: rawContent || parsedJson.sheetText || deterministicParsed.sheetText || ''
+    traits:
+      Array.isArray(parsedJson.traits) && parsedJson.traits.length > 0
+        ? parsedJson.traits
+        : undefined,
+    spells:
+      Array.isArray(parsedJson.spells) && parsedJson.spells.length > 0
+        ? parsedJson.spells
+        : undefined,
+    languages:
+      Array.isArray(parsedJson.languages) && parsedJson.languages.length > 0
+        ? parsedJson.languages
+        : undefined,
+    proficienciesAndLanguages:
+      parsedJson.proficienciesAndLanguages ||
+      deterministicParsed.proficienciesAndLanguages ||
+      "",
+    featuresAndTraits:
+      parsedJson.featuresAndTraits ||
+      deterministicParsed.featuresAndTraits ||
+      "",
+    appearance: parsedJson.appearance || "",
+    personality: parsedJson.personality || "",
+    ideals: parsedJson.ideals || "",
+    bonds: parsedJson.bonds || "",
+    flaws: parsedJson.flaws || "",
+    backstory: parsedJson.backstory || "",
+    notes: parsedJson.notes || "",
+    sheetText:
+      rawContent || parsedJson.sheetText || deterministicParsed.sheetText || "",
   };
 
   return validateCharacterEquipment(rawPc);
 }
 
-export async function analyzeUploadedImage(file: ProjectFile, base64: string): Promise<string> {
+export async function analyzeUploadedImage(
+  file: ProjectFile,
+  base64: string,
+): Promise<string> {
   const prompt = `Analiza esta imagen para la Memoria y Base de Conocimiento de una campaña de rol/fantasía.
 1. Identifica claramente qué representa:
    - [MAPA]: Mapa geográfico, mapa de batalla o plano táctico con salas/rutas.
@@ -2832,25 +3233,28 @@ export async function analyzeUploadedImage(file: ProjectFile, base64: string): P
 2. Describe detalladamente sus elementos visuales clave (geografía, salas, rutas, vestimenta, colores, armas o rasgos distintivos).
 3. Señala cualquier detalle táctico o narrativo relevante para que el Game Master y la IA mantengan coherencia visual absoluta.
 Sé estructurado y comienza indicando el tipo.`;
-  const cleanBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
-  const mimeType = file.mime || 'image/jpeg';
+  const cleanBase64 = base64.includes(",") ? base64.split(",")[1] : base64;
+  const mimeType = file.mime || "image/jpeg";
 
   const response = await generateContentWithFailover({
     primaryModel: getBackgroundTaskModel(),
     contents: {
-      parts: [{ text: prompt }, { inlineData: { data: cleanBase64, mimeType } }]
-    }
+      parts: [
+        { text: prompt },
+        { inlineData: { data: cleanBase64, mimeType } },
+      ],
+    },
   });
 
-  return response.text || '';
+  return response.text || "";
 }
 
 export async function analyzeNarrativeStyleFromDocument(
   text: string,
-  fileName?: string
+  fileName?: string,
 ): Promise<string> {
   const prompt = `Analiza detalladamente cómo está escrito el siguiente fragmento o documento literario${
-    fileName ? ` ("${fileName}")` : ''
+    fileName ? ` ("${fileName}")` : ""
   } y extrae una directiva de estilo narrativo precisa y evocadora para el Narrador/Game Master.
 
 Aspectos a analizar:
@@ -2868,27 +3272,27 @@ ${text.substring(0, 65000)}`;
 
   const response = await generateContentWithFailover({
     primaryModel: getBackgroundTaskModel(),
-    contents: prompt
+    contents: prompt,
   });
 
-  return (response.text || '').trim();
+  return (response.text || "").trim();
 }
 
 export async function extractStyleOrSystemFromFile(
-  type: 'style' | 'system',
-  file: ProjectFile
+  type: "style" | "system",
+  file: ProjectFile,
 ): Promise<string> {
-  if (type === 'style') {
-    return analyzeNarrativeStyleFromDocument(file.content || '', file.name);
+  if (type === "style") {
+    return analyzeNarrativeStyleFromDocument(file.content || "", file.name);
   }
-  const prompt = `Analiza el siguiente texto y extrae las reglas, mecánicas, sistema de juego o lore principal. Devuelve un resumen conciso (máximo 3 párrafos) que sirva como instrucción de sistema/reglas para un Game Master.\n\nTEXTO:\n${(file.content || '').substring(0, 50000)}`;
+  const prompt = `Analiza el siguiente texto y extrae las reglas, mecánicas, sistema de juego o lore principal. Devuelve un resumen conciso (máximo 3 párrafos) que sirva como instrucción de sistema/reglas para un Game Master.\n\nTEXTO:\n${(file.content || "").substring(0, 50000)}`;
 
   const response = await generateContentWithFailover({
     primaryModel: getBackgroundTaskModel(),
-    contents: prompt
+    contents: prompt,
   });
 
-  return response.text || '';
+  return response.text || "";
 }
 
 /**
@@ -2907,13 +3311,18 @@ export async function countTurnTokens({
   project,
   currentChatId,
   chats,
-  files
+  files,
 }: {
   project: Project;
   currentChatId: string;
   chats: Chat[];
   files: ProjectFile[];
-}): Promise<{ total: number; sistema: number; conversacion: number; modelo: string }> {
+}): Promise<{
+  total: number;
+  sistema: number;
+  conversacion: number;
+  modelo: string;
+}> {
   const { keys } = getRotatedApiKeys();
   const apiKey = keys[0] || getStoredApiKey();
   const ai = getAIClient(apiKey || undefined);
@@ -2926,8 +3335,8 @@ export async function countTurnTokens({
     chats,
     files,
     // Un turno en blanco: se mide el contexto que se arrastra, no lo que se escriba.
-    userText: '',
-    dicePool
+    userText: "",
+    dicePool,
   });
 
   const cuenta = async (payload: any) => {
@@ -2942,15 +3351,18 @@ export async function countTurnTokens({
   // problema real. Contar su texto como un turno más da el mismo número salvo
   // por el puñado de tokens de envoltorio del rol.
   const [sistema, conversacion] = await Promise.all([
-    cuenta({ model: modelo, contents: [{ role: 'user', parts: [{ text: sys }] }] }),
-    cuenta({ model: modelo, contents })
+    cuenta({
+      model: modelo,
+      contents: [{ role: "user", parts: [{ text: sys }] }],
+    }),
+    cuenta({ model: modelo, contents }),
   ]);
 
   return {
     total: sistema + conversacion,
     sistema,
     conversacion,
-    modelo
+    modelo,
   };
 }
 
@@ -2958,7 +3370,7 @@ export async function countTurnTokens({
 
 export interface CalendarioDeducido {
   encontrado: boolean;
-  confianza: 'alta' | 'media' | 'baja';
+  confianza: "alta" | "media" | "baja";
   /** De dónde lo ha sacado, para que la jugadora pueda darle o quitarle la razón. */
   evidencia: string;
   calendario: CalendarConfig | null;
@@ -2979,23 +3391,23 @@ export interface CalendarioDeducido {
 export async function deducirCalendario({
   project,
   files,
-  chats
+  chats,
 }: {
   project: Project;
   files: ProjectFile[];
   chats: Chat[];
 }): Promise<CalendarioDeducido> {
   const fuentes = files
-    .filter(f => !f.isImage && !f.isAudio && f.category !== 'style_sample')
-    .map(f => `=== ${f.name} ===\n${(f.content || '').slice(0, 25000)}`)
-    .join('\n\n')
+    .filter((f) => !f.isImage && !f.isAudio && f.category !== "style_sample")
+    .map((f) => `=== ${f.name} ===\n${(f.content || "").slice(0, 25000)}`)
+    .join("\n\n")
     .slice(0, 90000);
 
   const primerRoleo = chats
-    .flatMap(c => c.messages || [])
+    .flatMap((c) => c.messages || [])
     .slice(0, 8)
-    .map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`)
-    .join('\n')
+    .map((m) => `${m.role === "user" ? "Jugador" : "Narrador"}: ${m.content}`)
+    .join("\n")
     .slice(0, 12000);
 
   const prompt = `Eres un archivero. Tu tarea es averiguar EN QUÉ FECHA Y CON QUÉ CALENDARIO transcurre esta campaña, leyendo el material que te doy.
@@ -3022,82 +3434,98 @@ REGLAS:
 - Los días de todos los meses deben sumar un año coherente con lo que diga el material.
 
 DOCUMENTOS DE LA CAMPAÑA:
-${fuentes || 'No hay documentos de texto.'}
+${fuentes || "No hay documentos de texto."}
 
 INSTRUCCIONES DE LA CAMPAÑA:
-${(project.instructions || '').slice(0, 6000) || 'Sin instrucciones.'}
+${(project.instructions || "").slice(0, 6000) || "Sin instrucciones."}
 
 PRIMERAS ESCENAS JUGADAS:
-${primerRoleo || 'Todavía no se ha jugado nada.'}`;
+${primerRoleo || "Todavía no se ha jugado nada."}`;
 
   const modelo = getBackgroundTaskModel();
   const response = await generateContentWithFailover({
     primaryModel: modelo,
     contents: prompt,
     config: {
-      responseMimeType: 'application/json',
+      responseMimeType: "application/json",
       temperature: 0.1,
       ...(esModeloAbierto(modelo)
         ? {}
-        : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
-    } as any
+        : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) }),
+    } as any,
   });
 
-  const raw = (response.text || '').trim();
-  if (!raw) throw new Error('El Narrador no ha devuelto nada al buscar la fecha.');
+  const raw = (response.text || "").trim();
+  if (!raw)
+    throw new Error("El Narrador no ha devuelto nada al buscar la fecha.");
 
   let limpio = raw
-    .replace(/^```(?:json)?\n?/, '')
-    .replace(/\n?```$/, '')
+    .replace(/^```(?:json)?\n?/, "")
+    .replace(/\n?```$/, "")
     .trim();
-  const a = limpio.indexOf('{');
-  const b = limpio.lastIndexOf('}');
+  const a = limpio.indexOf("{");
+  const b = limpio.lastIndexOf("}");
   if (a !== -1 && b > a) limpio = limpio.slice(a, b + 1);
 
   let parsed: any;
   try {
     parsed = JSON.parse(limpio);
   } catch {
-    throw new Error('La respuesta sobre la fecha no era un JSON válido. Prueba otra vez.');
+    throw new Error(
+      "La respuesta sobre la fecha no era un JSON válido. Prueba otra vez.",
+    );
   }
 
   // Saneado: un calendario con meses de cero días rompería toda la aritmética.
   const cal = parsed.calendario;
   if (parsed.encontrado && cal && Array.isArray(cal.months)) {
     cal.months = cal.months
-      .filter((m: any) => m && typeof m.name === 'string' && m.name.trim())
+      .filter((m: any) => m && typeof m.name === "string" && m.name.trim())
       .map((m: any) => ({
         name: String(m.name).trim(),
-        days: Math.max(1, Math.round(Number(m.days) || 30))
+        days: Math.max(1, Math.round(Number(m.days) || 30)),
       }));
     cal.festivals = Array.isArray(cal.festivals)
       ? cal.festivals
-          .filter((f: any) => f && typeof f.name === 'string' && f.name.trim())
+          .filter((f: any) => f && typeof f.name === "string" && f.name.trim())
           .map((f: any) => ({
             name: String(f.name).trim(),
-            afterMonth: Math.min(Math.max(0, Math.round(Number(f.afterMonth) || 0)), cal.months.length - 1)
+            afterMonth: Math.min(
+              Math.max(0, Math.round(Number(f.afterMonth) || 0)),
+              cal.months.length - 1,
+            ),
           }))
       : [];
-    cal.weekdays = Array.isArray(cal.weekdays) ? cal.weekdays.map((d: any) => String(d)) : [];
-    cal.yearSuffix = typeof cal.yearSuffix === 'string' ? cal.yearSuffix : '';
-    cal.name = typeof cal.name === 'string' && cal.name.trim() ? cal.name.trim() : 'Calendario de la campaña';
+    cal.weekdays = Array.isArray(cal.weekdays)
+      ? cal.weekdays.map((d: any) => String(d))
+      : [];
+    cal.yearSuffix = typeof cal.yearSuffix === "string" ? cal.yearSuffix : "";
+    cal.name =
+      typeof cal.name === "string" && cal.name.trim()
+        ? cal.name.trim()
+        : "Calendario de la campaña";
     if (!cal.months.length) parsed.encontrado = false;
   }
 
   return {
     encontrado: Boolean(parsed.encontrado),
-    confianza: ['alta', 'media', 'baja'].includes(parsed.confianza) ? parsed.confianza : 'baja',
-    evidencia: String(parsed.evidencia || '').slice(0, 600),
+    confianza: ["alta", "media", "baja"].includes(parsed.confianza)
+      ? parsed.confianza
+      : "baja",
+    evidencia: String(parsed.evidencia || "").slice(0, 600),
     calendario: parsed.encontrado ? (cal as CalendarConfig) : null,
     fecha:
       parsed.encontrado && parsed.fecha
         ? {
             year: Math.max(1, Math.round(Number(parsed.fecha.year) || 1)),
-            mes: String(parsed.fecha.mes || ''),
+            mes: String(parsed.fecha.mes || ""),
             dia: Math.max(1, Math.round(Number(parsed.fecha.dia) || 1)),
-            hora: Math.min(23, Math.max(0, Math.round(Number(parsed.fecha.hora) ?? 8)))
+            hora: Math.min(
+              23,
+              Math.max(0, Math.round(Number(parsed.fecha.hora) ?? 8)),
+            ),
           }
-        : null
+        : null,
   };
 }
 
@@ -3114,22 +3542,31 @@ export async function listarModelosDeLaClave(): Promise<
   const { keys } = getRotatedApiKeys();
   const apiKey = keys[0] || getStoredApiKey();
   const ai = getAIClient(apiKey || undefined);
-  const salida: { id: string; nombre: string; entrada: number; salida: number }[] = [];
+  const salida: {
+    id: string;
+    nombre: string;
+    entrada: number;
+    salida: number;
+  }[] = [];
 
   const paginas = await ai.models.list();
   for await (const m of paginas) {
-    const nombreCompleto = String((m as any).name || '');
-    const id = nombreCompleto.replace(/^models\//, '');
+    const nombreCompleto = String((m as any).name || "");
+    const id = nombreCompleto.replace(/^models\//, "");
     if (!id) continue;
     // Solo los que sirven para narrar: fuera los de embeddings, imagen y voz.
-    const acciones: string[] = (m as any).supportedActions || (m as any).supportedGenerationMethods || [];
-    if (acciones.length && !acciones.some(a => /generateContent/i.test(a))) continue;
+    const acciones: string[] =
+      (m as any).supportedActions ||
+      (m as any).supportedGenerationMethods ||
+      [];
+    if (acciones.length && !acciones.some((a) => /generateContent/i.test(a)))
+      continue;
     if (/embedding|aqa|imagen|veo|tts|image-generation/i.test(id)) continue;
     salida.push({
       id,
       nombre: String((m as any).displayName || id),
       entrada: Number((m as any).inputTokenLimit || 0),
-      salida: Number((m as any).outputTokenLimit || 0)
+      salida: Number((m as any).outputTokenLimit || 0),
     });
   }
 
@@ -3148,8 +3585,8 @@ export async function listarModelosDeLaClave(): Promise<
  * corregirse a mano antes de fiarse de él.
  */
 export async function destilarTablaOraculo(file: ProjectFile): Promise<string> {
-  const texto = (file.content || '').trim();
-  if (!texto) throw new Error('Ese archivo no tiene texto que destilar.');
+  const texto = (file.content || "").trim();
+  if (!texto) throw new Error("Ese archivo no tiene texto que destilar.");
 
   const prompt = `Te doy el texto extraído de un documento de oráculo para juego de rol en solitario. Devuélveme SOLO lo imprescindible para poder usarlo durante una partida.
 
@@ -3178,18 +3615,19 @@ ${texto.slice(0, 200000)}`;
       temperature: 0,
       ...(esModeloAbierto(modelo)
         ? {}
-        : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
-    } as any
+        : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) }),
+    } as any,
   });
 
-  const salida = (response.text || '').trim();
-  if (!salida) throw new Error('El modelo no ha devuelto nada al destilar la tabla.');
+  const salida = (response.text || "").trim();
+  if (!salida)
+    throw new Error("El modelo no ha devuelto nada al destilar la tabla.");
 
   // Si el destilado sale casi tan largo como el original no ha destilado nada, y
   // es mejor decirlo que guardar una copia disfrazada de mejora.
   if (salida.length > texto.length * 0.9) {
     throw new Error(
-      'El destilado ha salido casi tan largo como el original, así que no ahorraría nada. Probablemente el documento ya sea casi todo tablas.'
+      "El destilado ha salido casi tan largo como el original, así que no ahorraría nada. Probablemente el documento ya sea casi todo tablas.",
     );
   }
 
@@ -3214,8 +3652,8 @@ ${texto.slice(0, 200000)}`;
 export async function extraerElenco(file: ProjectFile): Promise<string> {
   return destilarPorTramos(
     file,
-    'del que extraer el elenco',
-    'Te doy un fragmento de un documento de ambientación para juego de rol. Extrae de él la lista de quién es quién.',
+    "del que extraer el elenco",
+    "Te doy un fragmento de un documento de ambientación para juego de rol. Extrae de él la lista de quién es quién.",
     `QUÉ BUSCAR: todo lo que tenga NOMBRE PROPIO y pueda aparecer en una escena.
 - Personas: nombre completo, qué son, de quién dependen y un rasgo que las distinga de cualquier otro de su gremio.
 - Lugares con nombre: locales, fortalezas, barrios, ciudades. Di QUÉ CLASE de sitio es de verdad, aunque contradiga lo que su categoría sugiere: si es un casino de lujo con clientela distinguida, eso es lo que hay que poner, y no «taberna». Añade entre paréntesis la ciudad o región donde está.
@@ -3231,7 +3669,7 @@ FORMATO, exactamente este y nada más:
 ## Organizaciones
 - **Nombre** — a qué se dedica, quién manda, dónde opera.
 
-Una línea por entrada, máximo unas veinticinco palabras. Sin introducción, sin comentarios, sin explicar lo que has hecho. Conserva el idioma del documento. Si una sección se queda vacía, omite su encabezado.`
+Una línea por entrada, máximo unas veinticinco palabras. Sin introducción, sin comentarios, sin explicar lo que has hecho. Conserva el idioma del documento. Si una sección se queda vacía, omite su encabezado.`,
   );
 }
 
@@ -3252,8 +3690,8 @@ Una línea por entrada, máximo unas veinticinco palabras. Sin introducción, si
 export async function extraerIndice(file: ProjectFile): Promise<string> {
   return destilarPorTramos(
     file,
-    'del que extraer el índice',
-    'Te doy un fragmento de una aventura o módulo publicado para juego de rol. Haz el índice de lo que se puede JUGAR en él.',
+    "del que extraer el índice",
+    "Te doy un fragmento de una aventura o módulo publicado para juego de rol. Haz el índice de lo que se puede JUGAR en él.",
     `QUÉ BUSCAR: las situaciones, no la información. Cada entrada es algo que podría pasarle a un grupo de aventureros.
 - Capítulos y escenas con nombre: qué situación plantea cada uno, quién está detrás y cómo se entra en ella.
 - Lugares donde ocurre algo: el sitio, qué se cuece dentro, quién manda allí.
@@ -3271,7 +3709,7 @@ FORMATO, exactamente este y nada más:
 ## Ganchos
 - **Nombre corto** — la situación en marcha y qué la dispara.
 
-Una línea por entrada, máximo unas veinticinco palabras. Sin introducción, sin comentarios, sin explicar lo que has hecho. Conserva el idioma del documento. Si una sección se queda vacía, omite su encabezado.`
+Una línea por entrada, máximo unas veinticinco palabras. Sin introducción, sin comentarios, sin explicar lo que has hecho. Conserva el idioma del documento. Si una sección se queda vacía, omite su encabezado.`,
   );
 }
 
@@ -3284,15 +3722,17 @@ async function destilarPorTramos(
   file: ProjectFile,
   queja: string,
   encabezado: string,
-  REGLAS: string
+  REGLAS: string,
 ): Promise<string> {
-  const texto = (file.content || '').trim();
+  const texto = (file.content || "").trim();
   if (!texto) throw new Error(`Ese archivo no tiene texto ${queja}.`);
 
   const modelo = getBackgroundTaskModel();
   const config = {
     temperature: 0,
-    ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    ...(esModeloAbierto(modelo)
+      ? {}
+      : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) }),
   } as any;
 
   const TRAMO = 60000;
@@ -3311,13 +3751,13 @@ ${REGLAS}
 
 FRAGMENTO:
 ${tramo}`,
-      config
+      config,
     });
-    const parcial = (response.text || '').trim();
+    const parcial = (response.text || "").trim();
     if (parcial) parciales.push(parcial);
   }
 
-  if (!parciales.length) throw new Error('El modelo no ha devuelto nada.');
+  if (!parciales.length) throw new Error("El modelo no ha devuelto nada.");
   if (parciales.length === 1) return parciales[0];
 
   const fusion = await generateContentWithFailover({
@@ -3329,18 +3769,19 @@ ${tramo}`,
 - Ordena cada sección alfabéticamente.
 - Devuelve solo la lista fundida, con el mismo formato de encabezados y viñetas.
 
-${parciales.map((p, i) => `=== LISTA ${i + 1} ===\n${p}`).join('\n\n')}`,
-    config
+${parciales.map((p, i) => `=== LISTA ${i + 1} ===\n${p}`).join("\n\n")}`,
+    config,
   });
 
-  const salida = (fusion.text || '').trim();
-  if (!salida) throw new Error('El modelo no ha devuelto nada al fundir las listas.');
+  const salida = (fusion.text || "").trim();
+  if (!salida)
+    throw new Error("El modelo no ha devuelto nada al fundir las listas.");
   return salida;
 }
 
 export interface NoticiaSaltoTemporalGenerada {
   diaOffset: number; // día 1, día 2... dentro del salto
-  tipo: 'noticia' | 'rumor' | 'inconsciencia' | 'acontecimiento';
+  tipo: "noticia" | "rumor" | "inconsciencia" | "acontecimiento";
   titulo: string;
   resumen: string;
   fuenteOClima?: string;
@@ -3362,7 +3803,7 @@ export async function generarNoticiasSaltoTemporal({
   project,
   dias,
   motivo,
-  lugar
+  lugar,
 }: {
   project: Project;
   dias: number;
@@ -3373,12 +3814,14 @@ export async function generarNoticiasSaltoTemporal({
   const pc = project.memory?.player_character;
   const config = {
     temperature: 0.7,
-    responseMimeType: 'application/json',
-    ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    responseMimeType: "application/json",
+    ...(esModeloAbierto(modelo)
+      ? {}
+      : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) }),
   } as any;
 
   const prompt = `Eres el Director de Juego de una campaña de rol en solitario.
-El protagonista (${pc?.name || 'el protagonista'}) ha estado ${motivo || 'inconsciente / ausente'} durante ${dias} días en ${lugar || 'la región'}.
+El protagonista (${pc?.name || "el protagonista"}) ha estado ${motivo || "inconsciente / ausente"} durante ${dias} días en ${lugar || "la región"}.
 
 El mundo no se ha detenido. Genera entre 1 y ${Math.min(dias, 4)} acontecimientos o noticias de fondo que ocurrieron en el mundo durante esos ${dias} días de salto temporal, de los cuales el protagonista se enterará al despertar (por pregoneros, tablones de anuncios, gacetas, curanderos o rumores de taberna).
 Por ejemplo: guerras o ataques militares (como "Thay atacó Neverwinter"), intrigas políticas, bandos municipales, robos del gremio de ladrones, movimientos de facciones, o sucesos locales.
@@ -3405,26 +3848,31 @@ Devuelve un array JSON con objetos de la estructura:
   const response = await generateContentWithFailover({
     primaryModel: modelo,
     contents: prompt,
-    config
+    config,
   });
 
-  const raw = (response.text || '').trim();
+  const raw = (response.text || "").trim();
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       return parsed.map((item, idx) => ({
-        diaOffset: typeof item.diaOffset === 'number' ? Math.max(0, Math.min(dias, item.diaOffset)) : idx + 1,
-        tipo: item.tipo || 'noticia',
-        titulo: String(item.titulo || 'Noticia del mundo'),
-        resumen: String(item.resumen || ''),
+        diaOffset:
+          typeof item.diaOffset === "number"
+            ? Math.max(0, Math.min(dias, item.diaOffset))
+            : idx + 1,
+        tipo: item.tipo || "noticia",
+        titulo: String(item.titulo || "Noticia del mundo"),
+        resumen: String(item.resumen || ""),
         fuenteOClima: item.fuenteOClima ? String(item.fuenteOClima) : undefined,
         lugar: item.lugar ? String(item.lugar) : lugar,
-        hito: item.hito ? String(item.hito) : `noticia — ${item.titulo || 'Evento mundial'}`,
-        hiloConsecuencia: item.hiloConsecuencia
+        hito: item.hito
+          ? String(item.hito)
+          : `noticia — ${item.titulo || "Evento mundial"}`,
+        hiloConsecuencia: item.hiloConsecuencia,
       }));
     }
   } catch (e) {
-    console.warn('Error parsing noticias json:', e);
+    console.warn("Error parsing noticias json:", e);
   }
   return [];
 }
@@ -3444,33 +3892,42 @@ export interface ResincronizacionCronologia {
  */
 export async function resincronizarCronologiaDesdeChat({
   project,
-  chats
+  chats,
 }: {
   project: Project;
   chats: Chat[];
 }): Promise<ResincronizacionCronologia> {
   const cal = project.calendar;
   if (!calendarioValido(cal)) {
-    throw new Error('Debes activar un calendario en la campaña antes de sincronizar la cronología.');
+    throw new Error(
+      "Debes activar un calendario en la campaña antes de sincronizar la cronología.",
+    );
   }
 
   // Recopilar mensajes ordenados cronológicamente
   const chatMessages = chats
-    .flatMap(c => (c.messages || []).map(m => ({
-      chatId: c.id,
-      chatName: c.name,
-      role: m.role,
-      content: m.content
-    })))
-    .filter(m => m.content && m.content.trim().length > 0);
+    .flatMap((c) =>
+      (c.messages || []).map((m) => ({
+        chatId: c.id,
+        chatName: c.name,
+        role: m.role,
+        content: m.content,
+      })),
+    )
+    .filter((m) => m.content && m.content.trim().length > 0);
 
   if (chatMessages.length === 0) {
-    throw new Error('No hay mensajes de rol en la campaña para reconstruir la cronología.');
+    throw new Error(
+      "No hay mensajes de rol en la campaña para reconstruir la cronología.",
+    );
   }
 
   const roleoTexto = chatMessages
-    .map(m => `[Capítulo: ${m.chatName}] ${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`)
-    .join('\n\n')
+    .map(
+      (m) =>
+        `[Capítulo: ${m.chatName}] ${m.role === "user" ? "Jugador" : "Narrador"}: ${m.content}`,
+    )
+    .join("\n\n")
     .slice(0, 95000);
 
   const initDate = project.currentDate || fechaInicial(1);
@@ -3482,7 +3939,7 @@ Tu misión es LEER TODO EL HISTORIAL DE PARTIDA (capítulos, escenas, descansos,
 CALENDARIO DE LA CAMPAÑA:
 - Nombre: ${cal.name}
 - Días por año: ${diasPorAno(cal)}
-- Meses: ${cal.months.map(m => `${m.name} (${m.days}d)`).join(', ')}
+- Meses: ${cal.months.map((m) => `${m.name} (${m.days}d)`).join(", ")}
 - Fecha de inicio estimada: Día ${initDate.dayOfYear}, Año ${initDate.year}, Hora ${Math.floor(initDate.minute / 60)}:00
 
 HISTORIAL DE LA PARTIDA:
@@ -3533,55 +3990,77 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con este formato:
     primaryModel: modelo,
     contents: prompt,
     config: {
-      responseMimeType: 'application/json',
+      responseMimeType: "application/json",
       temperature: 0.2,
       ...(esModeloAbierto(modelo)
         ? {}
-        : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
-    } as any
+        : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) }),
+    } as any,
   });
 
-  const raw = (response.text || '').trim();
-  if (!raw) throw new Error('El modelo no devolvió datos de cronología.');
+  const raw = (response.text || "").trim();
+  if (!raw) throw new Error("El modelo no devolvió datos de cronología.");
 
-  let limpio = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-  const a = limpio.indexOf('{');
-  const b = limpio.lastIndexOf('}');
+  let limpio = raw
+    .replace(/^```(?:json)?\n?/, "")
+    .replace(/\n?```$/, "")
+    .trim();
+  const a = limpio.indexOf("{");
+  const b = limpio.lastIndexOf("}");
   if (a !== -1 && b > a) limpio = limpio.slice(a, b + 1);
 
   const parsed = JSON.parse(limpio);
-  
+
   const entries: TimelineEntry[] = [];
   if (Array.isArray(parsed.entradas)) {
     parsed.entradas.forEach((e: any, idx: number) => {
-      const offset = typeof e.diaOffset === 'number' ? Math.max(0, e.diaOffset) : idx;
+      const offset =
+        typeof e.diaOffset === "number" ? Math.max(0, e.diaOffset) : idx;
       const targetAbs = startAbs + offset;
       const entryDateObj = desdeDiaAbsoluto(cal, targetAbs);
-      const minute = typeof e.minute === 'number' ? e.minute : (typeof e.horaAprox === 'number' ? e.horaAprox * 60 : 720);
+      const minute =
+        typeof e.minute === "number"
+          ? e.minute
+          : typeof e.horaAprox === "number"
+            ? e.horaAprox * 60
+            : 720;
 
       entries.push({
         id: `resync_${targetAbs}_${idx}_${Date.now().toString(36)}`,
         absDay: targetAbs,
         date: fechaLegible(cal, entryDateObj),
-        summary: String(e.resumen || '').trim(),
+        summary: String(e.resumen || "").trim(),
         lugar: e.lugar ? String(e.lugar).trim() : undefined,
         clima: e.clima ? String(e.clima).trim() : undefined,
         hito: e.hito ? String(e.hito).trim() : undefined,
         minute,
-        tipo: e.tipo || 'sesion'
+        tipo: e.tipo || "sesion",
       });
     });
   }
 
   // Ordenar cronológicamente por día y minuto
-  entries.sort((x, y) => x.absDay === y.absDay ? (x.minute || 0) - (y.minute || 0) : x.absDay - y.absDay);
+  entries.sort((x, y) =>
+    x.absDay === y.absDay
+      ? (x.minute || 0) - (y.minute || 0)
+      : x.absDay - y.absDay,
+  );
 
   let newCurrentDate: CampaignDate = initDate;
-  if (parsed.fechaFinal && typeof parsed.fechaFinal.dayOfYear === 'number') {
+  if (parsed.fechaFinal && typeof parsed.fechaFinal.dayOfYear === "number") {
     newCurrentDate = {
-      year: typeof parsed.fechaFinal.year === 'number' ? parsed.fechaFinal.year : initDate.year,
-      dayOfYear: Math.max(1, Math.min(diasPorAno(cal), parsed.fechaFinal.dayOfYear)),
-      minute: typeof parsed.fechaFinal.minute === 'number' ? parsed.fechaFinal.minute : 720
+      year:
+        typeof parsed.fechaFinal.year === "number"
+          ? parsed.fechaFinal.year
+          : initDate.year,
+      dayOfYear: Math.max(
+        1,
+        Math.min(diasPorAno(cal), parsed.fechaFinal.dayOfYear),
+      ),
+      minute:
+        typeof parsed.fechaFinal.minute === "number"
+          ? parsed.fechaFinal.minute
+          : 720,
     };
   } else if (entries.length > 0) {
     const lastEntry = entries[entries.length - 1];
@@ -3589,36 +4068,40 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con este formato:
     newCurrentDate = {
       year: lastDateObj.year,
       dayOfYear: lastDateObj.dayOfYear,
-      minute: lastEntry.minute || 720
+      minute: lastEntry.minute || 720,
     };
   }
 
   const newThreads: ScheduledThread[] = [];
   if (Array.isArray(parsed.hilosPendientes)) {
     parsed.hilosPendientes.forEach((h: any, idx: number) => {
-      const offset = typeof h.venceEnDiasDesdeInicio === 'number' ? h.venceEnDiasDesdeInicio : 5;
+      const offset =
+        typeof h.venceEnDiasDesdeInicio === "number"
+          ? h.venceEnDiasDesdeInicio
+          : 5;
       const dueAbs = startAbs + offset;
       newThreads.push({
         id: `resync_thread_${dueAbs}_${idx}_${Date.now().toString(36)}`,
-        title: String(h.title || 'Consecuencia pendiente').trim(),
-        effect: String(h.effect || h.title || '').trim(),
+        title: String(h.title || "Consecuencia pendiente").trim(),
+        effect: String(h.effect || h.title || "").trim(),
         dueAbsDay: dueAbs,
         dueDate: fechaLegible(cal, desdeDiaAbsoluto(cal, dueAbs)),
         hidden: Boolean(h.hidden),
-        status: 'pending',
-        origin: 'narrador'
+        status: "pending",
+        origin: "narrador",
       });
     });
   }
 
-  const diasUnicos = new Set(entries.map(e => e.absDay)).size;
+  const diasUnicos = new Set(entries.map((e) => e.absDay)).size;
 
   return {
     timeline: entries,
     currentDate: newCurrentDate,
     threads: newThreads,
-    resumen: parsed.resumenGlobal || `Cronología reconstruida: ${entries.length} acontecimientos en ${diasUnicos} días.`,
-    diasDetectados: diasUnicos
+    resumen:
+      parsed.resumenGlobal ||
+      `Cronología reconstruida: ${entries.length} acontecimientos en ${diasUnicos} días.`,
+    diasDetectados: diasUnicos,
   };
 }
-

@@ -1,7 +1,7 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { Project, ProjectFile, FileCategory } from '../types';
-import { classifyFileAuto } from '../utils/geminiHelper';
-import { recuperar } from '../utils/localSearch';
+import React, { useState, useRef, useMemo } from "react";
+import { Project, ProjectFile, FileCategory } from "../types";
+import { classifyFileAuto } from "../utils/geminiHelper";
+import { recuperar } from "../utils/localSearch";
 
 import {
   BookOpen,
@@ -19,8 +19,8 @@ import {
   Sparkles,
   Star,
   Trash2,
-  X
-} from 'lucide-react';
+  X,
+} from "lucide-react";
 export const FilesView: React.FC<{
   project: Project;
   files: ProjectFile[];
@@ -30,7 +30,10 @@ export const FilesView: React.FC<{
   onAnalyzeImageFile?: (file: ProjectFile) => Promise<void>;
   onUpdateFileAnalysis?: (fileId: string, analysis: string) => Promise<void>;
   onDeleteFileAnalysis?: (fileId: string) => Promise<void>;
-  onUpdateFileCategory?: (fileId: string, category: FileCategory) => Promise<void>;
+  onUpdateFileCategory?: (
+    fileId: string,
+    category: FileCategory,
+  ) => Promise<void>;
   onToggleOnDemand?: (fileId: string, onDemand: boolean) => Promise<void>;
   /** Deja de una hoja de oráculo solo las tablas y las reglas. */
   onDistillOracle?: (file: ProjectFile) => Promise<void>;
@@ -61,40 +64,45 @@ export const FilesView: React.FC<{
   onCreateNpcFromImage,
   onUsePortraitAsPc,
   isGenerating,
-  extractingFileIds = []
+  extractingFileIds = [],
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<FileCategory | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState<FileCategory | "all">(
+    "all",
+  );
+  const [searchQuery, setSearchQuery] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Fit modes per image (cover vs contain)
-  const [imageFits, setImageFits] = useState<Record<string, 'cover' | 'contain'>>({});
+  const [imageFits, setImageFits] = useState<
+    Record<string, "cover" | "contain">
+  >({});
 
   // Lightbox preview modal
   const [lightboxFile, setLightboxFile] = useState<ProjectFile | null>(null);
 
   // Modal for viewing & editing visual analysis
-  const [selectedAnalysisFile, setSelectedAnalysisFile] = useState<ProjectFile | null>(null);
-  const [analysisDraft, setAnalysisDraft] = useState('');
+  const [selectedAnalysisFile, setSelectedAnalysisFile] =
+    useState<ProjectFile | null>(null);
+  const [analysisDraft, setAnalysisDraft] = useState("");
   const [isEditingModalOpen, setIsEditingModalOpen] = useState(false);
 
-  const toggleImageFit = (fileId: string, defaultFit: 'cover' | 'contain') => {
-    setImageFits(prev => {
+  const toggleImageFit = (fileId: string, defaultFit: "cover" | "contain") => {
+    setImageFits((prev) => {
       const current = prev[fileId] || defaultFit;
-      return { ...prev, [fileId]: current === 'cover' ? 'contain' : 'cover' };
+      return { ...prev, [fileId]: current === "cover" ? "contain" : "cover" };
     });
   };
 
   // Helper to get effective category using comprehensive heuristic + memory match
   const getFileCategory = (f: ProjectFile): FileCategory => {
-    if (f.category && f.category !== 'other') return f.category;
+    if (f.category && f.category !== "other") return f.category;
     return classifyFileAuto(f, project.memory);
   };
 
   // Category counts
   const categoryCounts = useMemo(() => {
-    const counts: Record<FileCategory | 'all', number> = {
+    const counts: Record<FileCategory | "all", number> = {
       all: files.length,
       map: 0,
       sheet_pj: 0,
@@ -110,10 +118,10 @@ export const FilesView: React.FC<{
       roster: 0,
       index: 0,
       audio: 0,
-      other: 0
+      other: 0,
     };
 
-    files.forEach(f => {
+    files.forEach((f) => {
       const cat = getFileCategory(f);
       counts[cat] = (counts[cat] || 0) + 1;
     });
@@ -127,32 +135,46 @@ export const FilesView: React.FC<{
   const countsAsContext = (f: ProjectFile) =>
     !f.isImage &&
     !f.isAudio &&
-    f.category !== 'style_sample' &&
-    (!f.onDemand || f.category === 'oracle' || f.category === 'roster' || f.category === 'index');
-  const textChars = files.reduce((acc, f) => acc + (countsAsContext(f) ? f.length || 0 : 0), 0);
+    f.category !== "style_sample" &&
+    (!f.onDemand ||
+      f.category === "oracle" ||
+      f.category === "roster" ||
+      f.category === "index");
+  const textChars = files.reduce(
+    (acc, f) => acc + (countsAsContext(f) ? f.length || 0 : 0),
+    0,
+  );
   const budgetShare = (textChars / CONTEXT_BUDGET_CHARS) * 100;
-  const budgetLevel = budgetShare < 25 ? 'holgado' : budgetShare < 50 ? 'ajustado' : 'excesivo';
+  const budgetLevel =
+    budgetShare < 25 ? "holgado" : budgetShare < 50 ? "ajustado" : "excesivo";
 
   // La búsqueda corre entera en el navegador, así que probarla no cuesta nada:
   // ni una petición a Google ni esperar a nadie.
-  const [pruebaBusqueda, setPruebaBusqueda] = useState('');
+  const [pruebaBusqueda, setPruebaBusqueda] = useState("");
   const archivosBuscables = useMemo(
-    () => files.filter(f => !f.isImage && !f.isAudio && f.onDemand && f.category !== 'oracle'),
-    [files]
+    () =>
+      files.filter(
+        (f) =>
+          !f.isImage && !f.isAudio && f.onDemand && f.category !== "oracle",
+      ),
+    [files],
   );
   const resultadosPrueba = useMemo(() => {
-    if (pruebaBusqueda.trim().length < 3 || !archivosBuscables.length) return [];
+    if (pruebaBusqueda.trim().length < 3 || !archivosBuscables.length)
+      return [];
     return recuperar(archivosBuscables, pruebaBusqueda, 3000);
   }, [pruebaBusqueda, archivosBuscables]);
 
   const filteredFiles = useMemo(() => {
-    return files.filter(f => {
+    return files.filter((f) => {
       const cat = getFileCategory(f);
-      const matchesCategory = activeCategory === 'all' || cat === activeCategory;
+      const matchesCategory =
+        activeCategory === "all" || cat === activeCategory;
       const matchesQuery =
         !searchQuery.trim() ||
         f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (f.analysis && f.analysis.toLowerCase().includes(searchQuery.toLowerCase()));
+        (f.analysis &&
+          f.analysis.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesCategory && matchesQuery;
     });
   }, [files, activeCategory, searchQuery, project.memory]);
@@ -184,7 +206,9 @@ export const FilesView: React.FC<{
     // Un elenco recién extraído guarda la lista en el propio archivo, no en el
     // análisis. Si abriera el cuadro en blanco parecería que se ha perdido, y al
     // guardar se quedaría una lista vacía tapando a la buena.
-    setAnalysisDraft(file.analysis || (file.category === 'roster' ? file.content || '' : ''));
+    setAnalysisDraft(
+      file.analysis || (file.category === "roster" ? file.content || "" : ""),
+    );
     setIsEditingModalOpen(true);
   };
 
@@ -195,41 +219,86 @@ export const FilesView: React.FC<{
     setSelectedAnalysisFile(null);
   };
 
-  const categoryLabels: { key: FileCategory | 'all'; label: string; icon: string; desc: string }[] = [
-    { key: 'all', label: 'Todos', icon: '', desc: 'Todo el material' },
-    { key: 'sheet_pj', label: 'Fichas PJ (OC)', icon: '', desc: 'Ficha y datos del protagonista' },
-    { key: 'sheet_companion', label: 'Fichas Familiares', icon: '', desc: 'Familiares, monturas y compañeros' },
-    { key: 'sheet_npc', label: 'Fichas PNJs / Monstruos', icon: '', desc: 'Statblocks de PNJs y criaturas' },
-    { key: 'portrait_pj', label: 'Retratos PJ', icon: '', desc: 'Personajes protagonistas' },
-    { key: 'portrait_npc', label: 'Retratos PNJ', icon: '', desc: 'PNJs, criaturas y villanos' },
-    { key: 'map', label: 'Mapas', icon: '', desc: 'Mapas tácticos y del mundo' },
-    { key: 'scene', label: 'Ilustraciones', icon: '', desc: 'Paisajes y escenas' },
-    { key: 'document', label: 'Documentos', icon: '', desc: 'Reglas, lore y libros' },
+  const categoryLabels: {
+    key: FileCategory | "all";
+    label: string;
+    icon: string;
+    desc: string;
+  }[] = [
+    { key: "all", label: "Todos", icon: "", desc: "Todo el material" },
     {
-      key: 'style_sample',
-      label: 'Muestras de estilo',
-      icon: '',
-      desc: 'Fragmentos que solo sirven de referencia de escritura'
+      key: "sheet_pj",
+      label: "Fichas PJ (OC)",
+      icon: "",
+      desc: "Ficha y datos del protagonista",
     },
     {
-      key: 'oracle',
-      label: 'Oráculos y tablas',
-      icon: '',
-      desc: 'Tablas que se consultan tirando dados, no lore que se lee'
+      key: "sheet_companion",
+      label: "Fichas Familiares",
+      icon: "",
+      desc: "Familiares, monturas y compañeros",
     },
     {
-      key: 'roster',
-      label: 'Elenco',
-      icon: '',
-      desc: 'Quién es quién y qué es qué: nombres propios que no debe inventarse'
+      key: "sheet_npc",
+      label: "Fichas PNJs / Monstruos",
+      icon: "",
+      desc: "Statblocks de PNJs y criaturas",
     },
     {
-      key: 'index',
-      label: 'Índices de aventura',
-      icon: '',
-      desc: 'Qué se puede jugar en los módulos que has subido, una línea por capítulo'
+      key: "portrait_pj",
+      label: "Retratos PJ",
+      icon: "",
+      desc: "Personajes protagonistas",
     },
-    { key: 'audio', label: 'Audios', icon: '', desc: 'BSO y efectos' }
+    {
+      key: "portrait_npc",
+      label: "Retratos PNJ",
+      icon: "",
+      desc: "PNJs, criaturas y villanos",
+    },
+    {
+      key: "map",
+      label: "Mapas",
+      icon: "",
+      desc: "Mapas tácticos y del mundo",
+    },
+    {
+      key: "scene",
+      label: "Ilustraciones",
+      icon: "",
+      desc: "Paisajes y escenas",
+    },
+    {
+      key: "document",
+      label: "Documentos",
+      icon: "",
+      desc: "Reglas, lore y libros",
+    },
+    {
+      key: "style_sample",
+      label: "Muestras de estilo",
+      icon: "",
+      desc: "Fragmentos que solo sirven de referencia de escritura",
+    },
+    {
+      key: "oracle",
+      label: "Oráculos y tablas",
+      icon: "",
+      desc: "Tablas que se consultan tirando dados, no lore que se lee",
+    },
+    {
+      key: "roster",
+      label: "Elenco",
+      icon: "",
+      desc: "Quién es quién y qué es qué: nombres propios que no debe inventarse",
+    },
+    {
+      key: "index",
+      label: "Índices de aventura",
+      icon: "",
+      desc: "Qué se puede jugar en los módulos que has subido, una línea por capítulo",
+    },
+    { key: "audio", label: "Audios", icon: "", desc: "BSO y efectos" },
   ];
 
   return (
@@ -242,8 +311,8 @@ export const FilesView: React.FC<{
         onClick={() => fileInputRef.current?.click()}
         className={`border-2 border-dashed rounded-lg p-6 md:p-8 text-center cursor-pointer transition-all mb-8 ${
           isDragging
-            ? 'border-[var(--accent)] bg-amber-50/50 scale-[1.01]'
-            : 'border-[var(--user-border)] bg-[var(--surface-soft)] hover:border-[var(--accent)] hover:bg-[var(--surface-soft)]'
+            ? "border-[var(--accent)] bg-amber-50/50 scale-[1.01]"
+            : "border-[var(--user-border)] bg-[var(--surface-soft)] hover:border-[var(--accent)] hover:bg-[var(--surface-soft)]"
         }`}
       >
         <input
@@ -251,7 +320,7 @@ export const FilesView: React.FC<{
           type="file"
           multiple
           className="hidden"
-          onChange={e => {
+          onChange={(e) => {
             if (e.target.files && e.target.files.length > 0) {
               onUpload(Array.from(e.target.files));
             }
@@ -265,8 +334,10 @@ export const FilesView: React.FC<{
             Añadir Documentos, Fichas de PJ, Mapas, Retratos o Audios
           </div>
           <div className="text-xs md:text-sm text-[var(--text-secondary)] max-w-xl">
-            Arrastra o haz clic para subir fichas de personaje (.pdf, .txt, .md), retratos (.png, .jpg), mapas
-            tácticos o música. Se clasificarán y sincronizarán automáticamente con la Memoria de la campaña.
+            Arrastra o haz clic para subir fichas de personaje (.pdf, .txt,
+            .md), retratos (.png, .jpg), mapas tácticos o música. Se
+            clasificarán y sincronizarán automáticamente con la Memoria de la
+            campaña.
           </div>
         </div>
       </div>
@@ -275,23 +346,24 @@ export const FilesView: React.FC<{
       {textChars > 0 && (
         <div
           className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${
-            budgetLevel === 'excesivo'
-              ? 'border-red-300 bg-red-50/70 text-red-900'
-              : budgetLevel === 'ajustado'
-                ? 'border-amber-300 bg-amber-50/70 text-amber-900'
-                : 'border-emerald-300 bg-emerald-50/60 text-emerald-900'
+            budgetLevel === "excesivo"
+              ? "border-red-300 bg-red-50/70 text-red-900"
+              : budgetLevel === "ajustado"
+                ? "border-amber-300 bg-amber-50/70 text-amber-900"
+                : "border-emerald-300 bg-emerald-50/60 text-emerald-900"
           }`}
         >
           <span className="font-cinzel font-bold">
-            Los documentos ocupan el {budgetShare < 1 ? '<1' : Math.round(budgetShare)}% de la ventana de
+            Los documentos ocupan el{" "}
+            {budgetShare < 1 ? "<1" : Math.round(budgetShare)}% de la ventana de
             contexto
           </span>
           <span className="italic">
-            {budgetLevel === 'holgado'
-              ? 'Margen de sobra para que la crónica crezca.'
-              : budgetLevel === 'ajustado'
-                ? 'Cabe, pero cada turno tarda más. Deja sitio para los capítulos.'
-                : 'Demasiado: la campaña se quedará sin espacio y las respuestas se volverán lentas.'}
+            {budgetLevel === "holgado"
+              ? "Margen de sobra para que la crónica crezca."
+              : budgetLevel === "ajustado"
+                ? "Cabe, pero cada turno tarda más. Deja sitio para los capítulos."
+                : "Demasiado: la campaña se quedará sin espacio y las respuestas se volverán lentas."}
           </span>
         </div>
       )}
@@ -306,13 +378,15 @@ export const FilesView: React.FC<{
               <Search className="w-3.5 h-3.5" /> Probar la búsqueda
             </span>
             <span className="text-[11px] text-[var(--text-secondary)]">
-              en {archivosBuscables.length}{' '}
-              {archivosBuscables.length === 1 ? 'archivo de consulta' : 'archivos de consulta'}
+              en {archivosBuscables.length}{" "}
+              {archivosBuscables.length === 1
+                ? "archivo de consulta"
+                : "archivos de consulta"}
             </span>
           </div>
           <input
             value={pruebaBusqueda}
-            onChange={e => setPruebaBusqueda(e.target.value)}
+            onChange={(e) => setPruebaBusqueda(e.target.value)}
             placeholder="Escribe como en la partida: «me ha mordido una serpiente»"
             className="mt-2 w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2.5 py-1.5 text-sm font-lora outline-none focus:border-[var(--accent)]"
           />
@@ -320,15 +394,18 @@ export const FilesView: React.FC<{
             <div className="mt-2 space-y-1.5">
               {resultadosPrueba.length === 0 && (
                 <p className="text-[11px] text-[var(--text-secondary)] italic m-0">
-                  Nada. Busca por las palabras que usa el libro: encuentra nombres propios y términos
-                  escritos, no sinónimos.
+                  Nada. Busca por las palabras que usa el libro: encuentra
+                  nombres propios y términos escritos, no sinónimos.
                 </p>
               )}
               {resultadosPrueba.map((r, i) => (
-                <div key={i} className="rounded border border-[var(--glass-border)] bg-[var(--bg-color)] p-2">
+                <div
+                  key={i}
+                  className="rounded border border-[var(--glass-border)] bg-[var(--bg-color)] p-2"
+                >
                   <div className="text-[11px] font-cinzel font-bold text-[var(--accent)]">
                     {r.fragmento.fileName}
-                    {r.fragmento.titulo ? ` › ${r.fragmento.titulo}` : ''}
+                    {r.fragmento.titulo ? ` › ${r.fragmento.titulo}` : ""}
                   </div>
                   <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-0.5 line-clamp-3">
                     {r.fragmento.texto.slice(0, 260)}…
@@ -344,7 +421,7 @@ export const FilesView: React.FC<{
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 mb-6 pb-4 border-b border-[var(--glass-border)]">
         {/* Category pills */}
         <div className="flex flex-wrap gap-1.5 sm:gap-2">
-          {categoryLabels.map(cat => {
+          {categoryLabels.map((cat) => {
             const count = categoryCounts[cat.key] || 0;
             const isActive = activeCategory === cat.key;
             return (
@@ -353,8 +430,8 @@ export const FilesView: React.FC<{
                 onClick={() => setActiveCategory(cat.key)}
                 className={`px-3 py-1.5 rounded-md text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
-                    : 'bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)] hover:bg-amber-100/60 hover:text-[var(--accent)] border border-[var(--glass-border)]'
+                    ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-xs"
+                    : "bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)] hover:bg-amber-100/60 hover:text-[var(--accent)] border border-[var(--glass-border)]"
                 }`}
                 title={cat.desc}
               >
@@ -363,8 +440,8 @@ export const FilesView: React.FC<{
                 <span
                   className={`text-[10px] px-1.5 py-0.2 rounded-full ${
                     isActive
-                      ? 'bg-[color-mix(in_srgb,var(--surface)_30%,transparent)] text-white'
-                      : 'bg-black/5 text-[var(--text-secondary)]'
+                      ? "bg-[color-mix(in_srgb,var(--surface)_30%,transparent)] text-white"
+                      : "bg-black/5 text-[var(--text-secondary)]"
                   }`}
                 >
                   {count}
@@ -380,17 +457,17 @@ export const FilesView: React.FC<{
             <input
               type="text"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar archivo o lore..."
               className="w-full pl-8 pr-3 py-1.5 bg-[var(--surface)] border border-[var(--user-border)] rounded-md text-xs font-lora outline-none focus:border-[var(--accent)]"
             />
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-secondary)] opacity-60 pointer-events-none" />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => setSearchQuery("")}
                 className="absolute right-2 top-1.5 text-xs text-[var(--text-secondary)] hover:text-red-700 cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />{' '}
+                <X className="w-3.5 h-3.5" />{" "}
               </button>
             )}
           </div>
@@ -403,7 +480,8 @@ export const FilesView: React.FC<{
               title="Re-analizar y clasificar automáticamente todos los archivos por tipo y vincularlos con la memoria"
               aria-label="Auto-Clasificar"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Auto-Clasificar</span>
+              <RefreshCw className="w-3.5 h-3.5" />{" "}
+              <span className="hidden sm:inline">Auto-Clasificar</span>
             </button>
           )}
         </div>
@@ -413,27 +491,33 @@ export const FilesView: React.FC<{
       {filteredFiles.length === 0 ? (
         <div className="text-center py-8 px-6 text-[var(--text-secondary)] italic bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] max-w-2xl mx-auto shadow-2xs leading-relaxed text-xs md:text-sm">
           {files.length === 0
-            ? 'No hay archivos en la Base de Conocimiento. Sube fichas, mapas o lore arriba.'
-            : 'No se encontraron archivos con los filtros seleccionados.'}
+            ? "No hay archivos en la Base de Conocimiento. Sube fichas, mapas o lore arriba."
+            : "No se encontraron archivos con los filtros seleccionados."}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredFiles.map((f, i) => {
             const currentCat = getFileCategory(f);
-            const fit = imageFits[f.id] || (currentCat === 'map' ? 'contain' : 'cover');
+            const fit =
+              imageFits[f.id] || (currentCat === "map" ? "contain" : "cover");
 
             // Cross-check if linked to an NPC, Location or Protagonist
-            const isProtagonistPortrait = project.memory?.player_character?.portrait === f.content;
-            const isProtagonistSheet = currentCat === 'sheet_pj' || f.name.toLowerCase().includes('ficha');
+            const isProtagonistPortrait =
+              project.memory?.player_character?.portrait === f.content;
+            const isProtagonistSheet =
+              currentCat === "sheet_pj" ||
+              f.name.toLowerCase().includes("ficha");
             const linkedNpc = project.memory?.npcs?.find(
-              n =>
+              (n) =>
                 n.portrait === f.content ||
-                (n.name.length > 2 && f.name.toLowerCase().includes(n.name.toLowerCase()))
+                (n.name.length > 2 &&
+                  f.name.toLowerCase().includes(n.name.toLowerCase())),
             );
             const linkedLoc = project.memory?.locations?.find(
-              l =>
+              (l) =>
                 l.portrait === f.content ||
-                (l.name.length > 2 && f.name.toLowerCase().includes(l.name.toLowerCase()))
+                (l.name.length > 2 &&
+                  f.name.toLowerCase().includes(l.name.toLowerCase())),
             );
 
             return (
@@ -448,21 +532,21 @@ export const FilesView: React.FC<{
                       className="font-cinzel font-bold truncate text-sm text-[var(--text-primary)] flex-1"
                       title={f.name}
                     >
-                      {currentCat === 'map'
-                        ? ''
-                        : currentCat === 'sheet_pj'
-                          ? ''
-                          : currentCat === 'portrait_pj'
-                            ? ''
-                            : currentCat === 'portrait_npc'
-                              ? ''
-                              : currentCat === 'scene'
-                                ? ''
-                                : currentCat === 'audio'
-                                  ? ''
-                                  : f.name.toLowerCase().endsWith('.pdf')
-                                    ? ''
-                                    : ''}{' '}
+                      {currentCat === "map"
+                        ? ""
+                        : currentCat === "sheet_pj"
+                          ? ""
+                          : currentCat === "portrait_pj"
+                            ? ""
+                            : currentCat === "portrait_npc"
+                              ? ""
+                              : currentCat === "scene"
+                                ? ""
+                                : currentCat === "audio"
+                                  ? ""
+                                  : f.name.toLowerCase().endsWith(".pdf")
+                                    ? ""
+                                    : ""}{" "}
                       {f.name}
                     </div>
 
@@ -470,12 +554,19 @@ export const FilesView: React.FC<{
                     {onUpdateFileCategory && (
                       <select
                         value={currentCat}
-                        onChange={e => onUpdateFileCategory(f.id, e.target.value as FileCategory)}
+                        onChange={(e) =>
+                          onUpdateFileCategory(
+                            f.id,
+                            e.target.value as FileCategory,
+                          )
+                        }
                         className="text-[10px] font-cinzel font-bold bg-[var(--surface)] border border-[var(--user-border)] text-[var(--accent)] rounded px-1.5 py-0.5 outline-none cursor-pointer hover:border-[var(--accent)] shrink-0"
                         title="Cambiar categoría de este archivo"
                       >
                         <option value="sheet_pj">Ficha PJ (OC)</option>
-                        <option value="sheet_companion">Ficha Familiar / Compañero</option>
+                        <option value="sheet_companion">
+                          Ficha Familiar / Compañero
+                        </option>
                         <option value="sheet_npc">Ficha PNJ / Monstruo</option>
                         <option value="portrait_pj">Retrato PJ</option>
                         <option value="portrait_npc">Retrato PNJ</option>
@@ -495,11 +586,12 @@ export const FilesView: React.FC<{
                   {/* Metadata line & Link Badges */}
                   <div className="flex items-center justify-between mt-1 text-[11px] text-[var(--text-secondary)] italic flex-wrap gap-1">
                     <span>
-                      {f.type || 'Documento'} • {f.length.toLocaleString('es-ES')}{' '}
-                      {f.isImage || f.isAudio ? 'bytes' : 'caracteres'}
-                      {f.category === 'style_sample' && (
+                      {f.type || "Documento"} •{" "}
+                      {f.length.toLocaleString("es-ES")}{" "}
+                      {f.isImage || f.isAudio ? "bytes" : "caracteres"}
+                      {f.category === "style_sample" && (
                         <>
-                          {' • '}
+                          {" • "}
                           <strong
                             className="text-emerald-800 not-italic"
                             title="Solo se usó para aprender el estilo; su texto no se envía al modelo"
@@ -508,9 +600,9 @@ export const FilesView: React.FC<{
                           </strong>
                         </>
                       )}
-                      {f.category === 'oracle' && (
+                      {f.category === "oracle" && (
                         <>
-                          {' • '}
+                          {" • "}
                           <strong
                             className="text-[var(--accent)] not-italic"
                             title="Se envía entero en cada turno para que el Narrador pueda consultarlo en el momento"
@@ -521,22 +613,26 @@ export const FilesView: React.FC<{
                       )}
                       {countsAsContext(f) && textChars > 0 && (
                         <>
-                          {' • '}
+                          {" • "}
                           <strong
                             className={
                               (f.length || 0) / textChars > 0.4
-                                ? 'text-red-700 not-italic'
-                                : 'text-[var(--text-secondary)] not-italic'
+                                ? "text-red-700 not-italic"
+                                : "text-[var(--text-secondary)] not-italic"
                             }
                             title="Parte del texto que se envía al modelo en cada turno que ocupa este archivo"
                           >
-                            {Math.max(1, Math.round(((f.length || 0) / textChars) * 100))}% del contexto
+                            {Math.max(
+                              1,
+                              Math.round(((f.length || 0) / textChars) * 100),
+                            )}
+                            % del contexto
                           </strong>
                         </>
                       )}
                       {f.onDemand && (
                         <>
-                          {' • '}
+                          {" • "}
                           <strong
                             className="text-emerald-800 not-italic"
                             title="Su texto no se envía en cada turno; el Narrador solo sabe que existe"
@@ -588,98 +684,107 @@ export const FilesView: React.FC<{
                   </div>
 
                   {/* Adaptive Image Container */}
-                  {f.isImage && (f.content.startsWith('data:image') || f.content.startsWith('http')) && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      <div
-                        className="relative w-full aspect-[4/3] bg-[#1a1714] rounded-lg overflow-hidden border border-[var(--glass-border)] shadow-xs group/img flex items-center justify-center cursor-pointer"
-                        onClick={() => setLightboxFile(f)}
-                        title="Clic para ampliar imagen en alta resolución y ver opciones"
-                      >
-                        {/* Ambient blurred backdrop if contained */}
-                        {fit === 'contain' && (
-                          <div
-                            className="absolute inset-0 bg-cover bg-center filter blur-md opacity-25 scale-110"
-                            style={{ backgroundImage: `url(${f.content})` }}
-                          />
-                        )}
-
-                        <img
-                          src={f.content}
-                          alt={f.name}
-                          className={`relative z-10 w-full h-full transition-all duration-300 ${
-                            fit === 'cover'
-                              ? currentCat === 'portrait_pj' || currentCat === 'portrait_npc'
-                                ? 'object-cover object-[center_15%]'
-                                : 'object-cover object-center'
-                              : 'object-contain object-center'
-                          }`}
-                          referrerPolicy="no-referrer"
-                        />
-
-                        {/* Top Fit Toggle Button */}
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            toggleImageFit(f.id, currentCat === 'map' ? 'contain' : 'cover');
-                          }}
-                          className="absolute top-2 right-2 z-20 px-2 py-1 bg-black/70 hover:bg-black text-white text-[10px] font-cinzel rounded shadow-md backdrop-blur-xs flex items-center gap-1 border border-white/20 transition-all opacity-0 group-hover/img:opacity-100 cursor-pointer"
-                          title="Alternar entre encuadre centrado en rostro o vista completa"
+                  {f.isImage &&
+                    (f.content.startsWith("data:image") ||
+                      f.content.startsWith("http")) && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        <div
+                          className="relative w-full aspect-[4/3] bg-[#1a1714] rounded-lg overflow-hidden border border-[var(--glass-border)] shadow-xs group/img flex items-center justify-center cursor-pointer"
+                          onClick={() => setLightboxFile(f)}
+                          title="Clic para ampliar imagen en alta resolución y ver opciones"
                         >
-                          {fit === 'cover' ? 'Rostro / Centro' : 'Completo'}
-                        </button>
+                          {/* Ambient blurred backdrop if contained */}
+                          {fit === "contain" && (
+                            <div
+                              className="absolute inset-0 bg-cover bg-center filter blur-md opacity-25 scale-110"
+                              style={{ backgroundImage: `url(${f.content})` }}
+                            />
+                          )}
 
-                        {/* Hover Overlay with Action hints */}
-                        <div className="absolute inset-0 z-10 bg-black/45 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-cinzel font-bold text-center px-2 pointer-events-none">
-                          <span className="inline-flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-md border border-white/30 backdrop-blur-xs">
-                            <Search className="w-3.5 h-3.5" />
-                            Ampliar / Acciones
-                          </span>
-                        </div>
-                      </div>
+                          <img
+                            src={f.content}
+                            alt={f.name}
+                            className={`relative z-10 w-full h-full transition-all duration-300 ${
+                              fit === "cover"
+                                ? currentCat === "portrait_pj" ||
+                                  currentCat === "portrait_npc"
+                                  ? "object-cover object-[center_15%]"
+                                  : "object-cover object-center"
+                                : "object-contain object-center"
+                            }`}
+                            referrerPolicy="no-referrer"
+                          />
 
-                      {f.analysis ? (
-                        <div className="bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] p-2.5 rounded-md text-xs text-[var(--text-secondary)]">
-                          <div className="font-cinzel font-bold text-[10px] text-[var(--accent)] mb-1 flex justify-between items-center">
-                            <span className="inline-flex items-center gap-1.5">
-                              <Search className="w-3.5 h-3.5" />
-                              ANÁLISIS EN MEMORIA
-                            </span>
-                            <button
-                              onClick={() => handleOpenAnalysisModal(f)}
-                              className="text-[10px] text-[var(--accent)] hover:underline cursor-pointer font-normal"
-                            >
-                              Ver / Editar
-                            </button>
-                          </div>
-                          <p className="line-clamp-2 italic m-0">{f.analysis}</p>
-                        </div>
-                      ) : (
-                        onAnalyzeImageFile && (
+                          {/* Top Fit Toggle Button */}
                           <button
-                            onClick={() => onAnalyzeImageFile(f)}
-                            disabled={extractingFileIds.includes(f.id)}
-                            className="w-full py-1.5 bg-amber-100/70 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-xs font-cinzel font-bold transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleImageFit(
+                                f.id,
+                                currentCat === "map" ? "contain" : "cover",
+                              );
+                            }}
+                            className="absolute top-2 right-2 z-20 px-2 py-1 bg-black/70 hover:bg-black text-white text-[10px] font-cinzel rounded shadow-md backdrop-blur-xs flex items-center gap-1 border border-white/20 transition-all opacity-0 group-hover/img:opacity-100 cursor-pointer"
+                            title="Alternar entre encuadre centrado en rostro o vista completa"
                           >
-                            {extractingFileIds.includes(f.id) ? (
-                              <>
-                                <span className="inline-block w-3.5 h-3.5 border-2 border-amber-800 border-t-transparent rounded-full animate-spin" />
-                                <span>Analizando en 2º plano...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="w-3.5 h-3.5" /> Analizar para Memoria
-                              </>
-                            )}
+                            {fit === "cover" ? "Rostro / Centro" : "Completo"}
                           </button>
-                        )
-                      )}
-                    </div>
-                  )}
+
+                          {/* Hover Overlay with Action hints */}
+                          <div className="absolute inset-0 z-10 bg-black/45 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-cinzel font-bold text-center px-2 pointer-events-none">
+                            <span className="inline-flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-md border border-white/30 backdrop-blur-xs">
+                              <Search className="w-3.5 h-3.5" />
+                              Ampliar / Acciones
+                            </span>
+                          </div>
+                        </div>
+
+                        {f.analysis ? (
+                          <div className="bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] p-2.5 rounded-md text-xs text-[var(--text-secondary)]">
+                            <div className="font-cinzel font-bold text-[10px] text-[var(--accent)] mb-1 flex justify-between items-center">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Search className="w-3.5 h-3.5" />
+                                ANÁLISIS EN MEMORIA
+                              </span>
+                              <button
+                                onClick={() => handleOpenAnalysisModal(f)}
+                                className="text-[10px] text-[var(--accent)] hover:underline cursor-pointer font-normal"
+                              >
+                                Ver / Editar
+                              </button>
+                            </div>
+                            <p className="line-clamp-2 italic m-0">
+                              {f.analysis}
+                            </p>
+                          </div>
+                        ) : (
+                          onAnalyzeImageFile && (
+                            <button
+                              onClick={() => onAnalyzeImageFile(f)}
+                              disabled={extractingFileIds.includes(f.id)}
+                              className="w-full py-1.5 bg-amber-100/70 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-xs font-cinzel font-bold transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+                            >
+                              {extractingFileIds.includes(f.id) ? (
+                                <>
+                                  <span className="inline-block w-3.5 h-3.5 border-2 border-amber-800 border-t-transparent rounded-full animate-spin" />
+                                  <span>Analizando en 2º plano...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-3.5 h-3.5" /> Analizar
+                                  para Memoria
+                                </>
+                              )}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
 
                   {/* Audio Player */}
                   {f.isAudio && (
                     <audio controls className="w-full mt-3 h-8">
-                      <source src={f.content} type={f.mime || 'audio/mpeg'} />
+                      <source src={f.content} type={f.mime || "audio/mpeg"} />
                       Tu navegador no soporta el elemento de audio.
                     </audio>
                   )}
@@ -702,64 +807,79 @@ export const FilesView: React.FC<{
                         {/* Igual que en las imágenes: la acción sigue a la categoría.
                             Una muestra de estilo o un documento de lore no ofrecen
                             extraer la ficha del protagonista. */}
-                        {onExtractPlayerCharacter && (currentCat === 'sheet_pj' || currentCat === 'document') && (
-                          <button
-                            onClick={() => onExtractPlayerCharacter(f)}
-                            disabled={extractingFileIds.includes(f.id)}
-                            className="px-2 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer disabled:opacity-60 font-bold flex items-center gap-1.5"
-                            title="Leer esta ficha y registrar al protagonista de la campaña en segundo plano"
-                          >
-                            {extractingFileIds.includes(f.id) ? (
-                              <>
-                                <span className="inline-block w-3 h-3 border-2 border-amber-800 border-t-transparent rounded-full animate-spin" />
-                                <span>Leyendo ficha...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Star className="w-3.5 h-3.5" /> {currentCat === 'sheet_pj' ? 'Extraer Ficha Protagonista' : 'Ficha Protagonista (OC)'}
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {onExtractCompanion && (currentCat === 'sheet_companion' || currentCat === 'document') && (
-                          <button
-                            onClick={() => onExtractCompanion(f)}
-                            disabled={extractingFileIds.includes(f.id)}
-                            className="px-2 py-1 bg-purple-50 text-purple-900 border border-purple-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-purple-600 hover:text-white transition-colors cursor-pointer disabled:opacity-60 font-bold flex items-center gap-1.5"
-                            title="Extraer ficha como Familiar, Montura o Compañero Animal en segundo plano"
-                          >
-                            {extractingFileIds.includes(f.id) ? (
-                              <>
-                                <span className="inline-block w-3 h-3 border-2 border-purple-800 border-t-transparent rounded-full animate-spin" />
-                                <span>Extrayendo compañero...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="w-3.5 h-3.5" /> {currentCat === 'sheet_companion' ? 'Extraer Familiar / Compañero' : 'Ficha Familiar'}
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {onExtractNpc && (currentCat === 'sheet_npc' || currentCat === 'document') && (
-                          <button
-                            onClick={() => onExtractNpc(f)}
-                            disabled={extractingFileIds.includes(f.id)}
-                            className="px-2 py-1 bg-sky-50 text-sky-900 border border-sky-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-sky-600 hover:text-white transition-colors cursor-pointer disabled:opacity-60 font-bold flex items-center gap-1.5"
-                            title="Extraer ficha de PNJ o Criatura a la lista de PNJs en segundo plano"
-                          >
-                            {extractingFileIds.includes(f.id) ? (
-                              <>
-                                <span className="inline-block w-3 h-3 border-2 border-sky-800 border-t-transparent rounded-full animate-spin" />
-                                <span>Extrayendo PNJ...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Drama className="w-3.5 h-3.5" /> {currentCat === 'sheet_npc' ? 'Extraer Ficha PNJ' : 'Ficha PNJ'}
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {currentCat === 'oracle' && onDistillOracle && (
+                        {onExtractPlayerCharacter &&
+                          (currentCat === "sheet_pj" ||
+                            currentCat === "document") && (
+                            <button
+                              onClick={() => onExtractPlayerCharacter(f)}
+                              disabled={extractingFileIds.includes(f.id)}
+                              className="px-2 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer disabled:opacity-60 font-bold flex items-center gap-1.5"
+                              title="Leer esta ficha y registrar al protagonista de la campaña en segundo plano"
+                            >
+                              {extractingFileIds.includes(f.id) ? (
+                                <>
+                                  <span className="inline-block w-3 h-3 border-2 border-amber-800 border-t-transparent rounded-full animate-spin" />
+                                  <span>Leyendo ficha...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Star className="w-3.5 h-3.5" />{" "}
+                                  {currentCat === "sheet_pj"
+                                    ? "Extraer Ficha Protagonista"
+                                    : "Ficha Protagonista (OC)"}
+                                </>
+                              )}
+                            </button>
+                          )}
+                        {onExtractCompanion &&
+                          (currentCat === "sheet_companion" ||
+                            currentCat === "document") && (
+                            <button
+                              onClick={() => onExtractCompanion(f)}
+                              disabled={extractingFileIds.includes(f.id)}
+                              className="px-2 py-1 bg-purple-50 text-purple-900 border border-purple-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-purple-600 hover:text-white transition-colors cursor-pointer disabled:opacity-60 font-bold flex items-center gap-1.5"
+                              title="Extraer ficha como Familiar, Montura o Compañero Animal en segundo plano"
+                            >
+                              {extractingFileIds.includes(f.id) ? (
+                                <>
+                                  <span className="inline-block w-3 h-3 border-2 border-purple-800 border-t-transparent rounded-full animate-spin" />
+                                  <span>Extrayendo compañero...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-3.5 h-3.5" />{" "}
+                                  {currentCat === "sheet_companion"
+                                    ? "Extraer Familiar / Compañero"
+                                    : "Ficha Familiar"}
+                                </>
+                              )}
+                            </button>
+                          )}
+                        {onExtractNpc &&
+                          (currentCat === "sheet_npc" ||
+                            currentCat === "document") && (
+                            <button
+                              onClick={() => onExtractNpc(f)}
+                              disabled={extractingFileIds.includes(f.id)}
+                              className="px-2 py-1 bg-sky-50 text-sky-900 border border-sky-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-sky-600 hover:text-white transition-colors cursor-pointer disabled:opacity-60 font-bold flex items-center gap-1.5"
+                              title="Extraer ficha de PNJ o Criatura a la lista de PNJs en segundo plano"
+                            >
+                              {extractingFileIds.includes(f.id) ? (
+                                <>
+                                  <span className="inline-block w-3 h-3 border-2 border-sky-800 border-t-transparent rounded-full animate-spin" />
+                                  <span>Extrayendo PNJ...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Drama className="w-3.5 h-3.5" />{" "}
+                                  {currentCat === "sheet_npc"
+                                    ? "Extraer Ficha PNJ"
+                                    : "Ficha PNJ"}
+                                </>
+                              )}
+                            </button>
+                          )}
+                        {currentCat === "oracle" && onDistillOracle && (
                           <button
                             onClick={() => onDistillOracle(f)}
                             disabled={extractingFileIds.includes(f.id)}
@@ -775,60 +895,70 @@ export const FilesView: React.FC<{
                               <>
                                 <Scissors className="w-3.5 h-3.5" />
                                 {f.analysis && f.analysis.trim().length > 80
-                                  ? 'Volver a destilar'
-                                  : 'Destilar la tabla'}
+                                  ? "Volver a destilar"
+                                  : "Destilar la tabla"}
                               </>
                             )}
                           </button>
                         )}
-                        {(currentCat === 'roster' || currentCat === 'index') && (
+                        {(currentCat === "roster" ||
+                          currentCat === "index") && (
                           <button
                             onClick={() => handleOpenAnalysisModal(f)}
                             className="px-2 py-1 bg-[var(--surface)] border border-[var(--user-border)] rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer flex items-center gap-1"
                             title="Leer y corregir la lista a mano: añadir lo que falte, arreglar una entrada que se haya quedado corta"
                           >
-                            <Search className="w-3.5 h-3.5" />{' '}
-                            {currentCat === 'roster' ? 'Ver / corregir el elenco' : 'Ver / corregir el índice'}
+                            <Search className="w-3.5 h-3.5" />{" "}
+                            {currentCat === "roster"
+                              ? "Ver / corregir el elenco"
+                              : "Ver / corregir el índice"}
                           </button>
                         )}
-                        {currentCat === 'oracle' && f.analysis && f.analysis.trim().length > 80 && (
-                          <button
-                            onClick={() => handleOpenAnalysisModal(f)}
-                            className="px-2 py-1 bg-[var(--surface)] border border-[var(--user-border)] rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer flex items-center gap-1"
-                            title="Leer y corregir a mano lo que se le manda al Narrador"
-                          >
-                            <Search className="w-3.5 h-3.5" /> Ver el destilado
-                          </button>
-                        )}
+                        {currentCat === "oracle" &&
+                          f.analysis &&
+                          f.analysis.trim().length > 80 && (
+                            <button
+                              onClick={() => handleOpenAnalysisModal(f)}
+                              className="px-2 py-1 bg-[var(--surface)] border border-[var(--user-border)] rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer flex items-center gap-1"
+                              title="Leer y corregir a mano lo que se le manda al Narrador"
+                            >
+                              <Search className="w-3.5 h-3.5" /> Ver el
+                              destilado
+                            </button>
+                          )}
                         {onToggleOnDemand &&
-                          currentCat !== 'style_sample' &&
-                          currentCat !== 'oracle' &&
-                          currentCat !== 'roster' &&
-                          currentCat !== 'index' && (
-                          <button
-                            onClick={() => onToggleOnDemand(f.id, !f.onDemand)}
-                            className={`px-2 py-1 border rounded text-[10px] md:text-[11px] font-cinzel transition-colors cursor-pointer flex items-center gap-1 ${
-                              f.onDemand
-                                ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
-                                : 'bg-[var(--surface)] border-[var(--user-border)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)]'
-                            }`}
-                            title={
-                              f.onDemand
-                                ? 'Ahora es de consulta: su texto no se envía en cada turno. Pulsa para volver a incluirlo siempre.'
-                                : 'Su texto se envía en cada turno. Pulsa para dejarlo solo como material de consulta y ahorrar contexto.'
-                            }
-                          >
-                            {f.onDemand ? (
-                              <>
-                                <BookOpen className="w-3.5 h-3.5" /> De consulta
-                              </>
-                            ) : (
-                              <>
-                                <Pin className="w-3.5 h-3.5" /> Siempre presente
-                              </>
-                            )}
-                          </button>
-                        )}
+                          currentCat !== "style_sample" &&
+                          currentCat !== "oracle" &&
+                          currentCat !== "roster" &&
+                          currentCat !== "index" && (
+                            <button
+                              onClick={() =>
+                                onToggleOnDemand(f.id, !f.onDemand)
+                              }
+                              className={`px-2 py-1 border rounded text-[10px] md:text-[11px] font-cinzel transition-colors cursor-pointer flex items-center gap-1 ${
+                                f.onDemand
+                                  ? "bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100"
+                                  : "bg-[var(--surface)] border-[var(--user-border)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)]"
+                              }`}
+                              title={
+                                f.onDemand
+                                  ? "Ahora es de consulta: su texto no se envía en cada turno. Pulsa para volver a incluirlo siempre."
+                                  : "Su texto se envía en cada turno. Pulsa para dejarlo solo como material de consulta y ahorrar contexto."
+                              }
+                            >
+                              {f.onDemand ? (
+                                <>
+                                  <BookOpen className="w-3.5 h-3.5" /> De
+                                  consulta
+                                </>
+                              ) : (
+                                <>
+                                  <Pin className="w-3.5 h-3.5" /> Siempre
+                                  presente
+                                </>
+                              )}
+                            </button>
+                          )}
                       </>
                     )}
 
@@ -852,17 +982,18 @@ export const FilesView: React.FC<{
                         )}
                         {/* La acción depende de dónde esté archivada la imagen: un
                             retrato del protagonista no debe ofrecer crear un PNJ. */}
-                        {onCreateNpcFromImage && currentCat === 'portrait_npc' && (
-                          <button
-                            onClick={() => onCreateNpcFromImage(f)}
-                            disabled={isGenerating}
-                            className="px-2 py-1 bg-purple-50 text-purple-900 border border-purple-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer disabled:opacity-50 font-bold flex items-center gap-1"
-                            title="Crear un PNJ en la Memoria usando esta imagen como retrato"
-                          >
-                            <Drama className="w-3.5 h-3.5" /> Crear PNJ
-                          </button>
-                        )}
-                        {onUsePortraitAsPc && currentCat === 'portrait_pj' && (
+                        {onCreateNpcFromImage &&
+                          currentCat === "portrait_npc" && (
+                            <button
+                              onClick={() => onCreateNpcFromImage(f)}
+                              disabled={isGenerating}
+                              className="px-2 py-1 bg-purple-50 text-purple-900 border border-purple-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer disabled:opacity-50 font-bold flex items-center gap-1"
+                              title="Crear un PNJ en la Memoria usando esta imagen como retrato"
+                            >
+                              <Drama className="w-3.5 h-3.5" /> Crear PNJ
+                            </button>
+                          )}
+                        {onUsePortraitAsPc && currentCat === "portrait_pj" && (
                           <button
                             onClick={() => onUsePortraitAsPc(f)}
                             disabled={isGenerating}
@@ -872,16 +1003,17 @@ export const FilesView: React.FC<{
                             <Star className="w-3.5 h-3.5" /> Retrato del PJ
                           </button>
                         )}
-                        {onExtractPlayerCharacter && currentCat === 'sheet_pj' && (
-                          <button
-                            onClick={() => onExtractPlayerCharacter(f)}
-                            disabled={isGenerating}
-                            className="px-2 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer disabled:opacity-50 font-bold flex items-center gap-1"
-                            title="Leer esta ficha y registrar al protagonista"
-                          >
-                            <Star className="w-3.5 h-3.5" /> Extraer ficha
-                          </button>
-                        )}
+                        {onExtractPlayerCharacter &&
+                          currentCat === "sheet_pj" && (
+                            <button
+                              onClick={() => onExtractPlayerCharacter(f)}
+                              disabled={isGenerating}
+                              className="px-2 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer disabled:opacity-50 font-bold flex items-center gap-1"
+                              title="Leer esta ficha y registrar al protagonista"
+                            >
+                              <Star className="w-3.5 h-3.5" /> Extraer ficha
+                            </button>
+                          )}
                       </>
                     )}
                   </div>
@@ -891,7 +1023,7 @@ export const FilesView: React.FC<{
                     className="text-red-700 hover:text-red-900 p-1 font-bold cursor-pointer transition-colors ml-auto"
                     title="Eliminar archivo"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />{' '}
+                    <Trash2 className="w-3.5 h-3.5" />{" "}
                   </button>
                 </div>
               </div>
@@ -908,7 +1040,7 @@ export const FilesView: React.FC<{
         >
           <div
             className="bg-[#1c1917] border border-amber-900/40 rounded-xl overflow-hidden max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="flex justify-between items-center px-4 py-3 bg-[#141210] border-b border-amber-900/30 text-amber-100">
@@ -919,7 +1051,7 @@ export const FilesView: React.FC<{
                 onClick={() => setLightboxFile(null)}
                 className="text-amber-200/70 hover:text-white text-lg font-bold px-2 cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />{' '}
+                <X className="w-3.5 h-3.5" />{" "}
               </button>
             </div>
 
@@ -939,11 +1071,16 @@ export const FilesView: React.FC<{
                 <button
                   onClick={() => {
                     const cat = getFileCategory(lightboxFile);
-                    toggleImageFit(lightboxFile.id, cat === 'map' ? 'contain' : 'cover');
+                    toggleImageFit(
+                      lightboxFile.id,
+                      cat === "map" ? "contain" : "cover",
+                    );
                   }}
                   className="px-3 py-1.5 bg-amber-950/60 hover:bg-amber-900 text-amber-200 border border-amber-700/50 rounded cursor-pointer transition-colors"
                 >
-                  {imageFits[lightboxFile.id] === 'cover' ? 'Encuadre Centrado' : 'Modo Completo'}
+                  {imageFits[lightboxFile.id] === "cover"
+                    ? "Encuadre Centrado"
+                    : "Modo Completo"}
                 </button>
               </div>
 
@@ -981,16 +1118,17 @@ export const FilesView: React.FC<{
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--bg-color)] p-6 rounded-lg shadow-2xl border border-[var(--glass-border)] w-[580px] max-w-full font-lora flex flex-col max-h-[90vh]">
             <h4 className="font-cinzel text-lg text-[var(--accent)] mb-1 font-bold flex items-center gap-2">
-              <Image className="w-3.5 h-3.5" /> Análisis en Memoria: {selectedAnalysisFile.name}
+              <Image className="w-3.5 h-3.5" /> Análisis en Memoria:{" "}
+              {selectedAnalysisFile.name}
             </h4>
             <p className="text-xs text-[var(--text-secondary)] mb-3">
-              Esta descripción visual es consultada por el Narrador IA para mantener coherencia en las
-              escenas.
+              Esta descripción visual es consultada por el Narrador IA para
+              mantener coherencia en las escenas.
             </p>
             <div className="flex-1 overflow-y-auto mb-4">
               <textarea
                 value={analysisDraft}
-                onChange={e => setAnalysisDraft(e.target.value)}
+                onChange={(e) => setAnalysisDraft(e.target.value)}
                 placeholder="Escribe o edita el análisis visual de esta imagen..."
                 className="w-full h-64 bg-[var(--surface)] border border-[var(--user-border)] p-3 rounded-lg text-sm font-lora outline-none focus:border-[var(--accent)] leading-relaxed shadow-inner"
               />

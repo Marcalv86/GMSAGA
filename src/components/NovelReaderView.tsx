@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import { Project, Chat } from '../types';
-import { exportChronicleToPDF } from '../utils/pdfExport';
-import { stripRollRequests, stripStateTag } from '../utils/rollRequests';
-import { formatNarrativeText } from '../utils/textFormatter';
-import { Swords, Shield, FileDown, BookOpen } from 'lucide-react';
+import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import { Project, Chat } from "../types";
+import { exportChronicleToPDF } from "../utils/pdfExport";
+import { stripRollRequests, stripStateTag } from "../utils/rollRequests";
+import { formatNarrativeText } from "../utils/textFormatter";
+import { Swords, Shield, FileDown, BookOpen } from "lucide-react";
 
-type ReaderTheme = 'parchment' | 'dark' | 'sepia' | 'light';
+type ReaderTheme = "parchment" | "dark" | "sepia" | "light";
 
 export const NovelReaderView: React.FC<{
   project: Project;
@@ -15,73 +15,79 @@ export const NovelReaderView: React.FC<{
   onSelectChat: (chatId: string) => void;
   onBackToChat: () => void;
 }> = ({ project, chats, currentChatId, onSelectChat, onBackToChat }) => {
-  const [selectedScope, setSelectedScope] = useState<'current' | 'all'>('current');
-  const [theme, setTheme] = useState<ReaderTheme>('parchment');
-  const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
+  const [selectedScope, setSelectedScope] = useState<"current" | "all">(
+    "current",
+  );
+  const [theme, setTheme] = useState<ReaderTheme>("parchment");
+  const [fontSize, setFontSize] = useState<"sm" | "md" | "lg" | "xl">("md");
   const [showPlayerActions, setShowPlayerActions] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
-  const activeChat = chats.find(c => c.id === currentChatId) || chats[0];
+  const activeChat = chats.find((c) => c.id === currentChatId) || chats[0];
 
   // Theme styling definitions
   const themeStyles = {
     parchment: {
-      bg: 'bg-[#f4ecd8]',
-      pageBg: 'bg-[#fdfaf3]',
-      border: 'border-[#c5a059]/40',
-      text: 'text-[#2d201c]',
-      accent: 'text-[#8b0000]',
-      subtext: 'text-[#5e473c]',
-      headerBg: 'bg-[#e8dcc4]',
-      badgeBg: 'bg-[#c5a059]/20 text-[#2d201c]'
+      bg: "bg-[#f4ecd8]",
+      pageBg: "bg-[#fdfaf3]",
+      border: "border-[#c5a059]/40",
+      text: "text-[#2d201c]",
+      accent: "text-[#8b0000]",
+      subtext: "text-[#5e473c]",
+      headerBg: "bg-[#e8dcc4]",
+      badgeBg: "bg-[#c5a059]/20 text-[#2d201c]",
     },
     dark: {
-      bg: 'bg-[#181210]',
-      pageBg: 'bg-[#221815]',
-      border: 'border-[#c5a059]/30',
-      text: 'text-[#e6dbcf]',
-      accent: 'text-[#e5a855]',
-      subtext: 'text-[#a89587]',
-      headerBg: 'bg-[#140e0c]',
-      badgeBg: 'bg-[#e5a855]/20 text-[#e5a855]'
+      bg: "bg-[#181210]",
+      pageBg: "bg-[#221815]",
+      border: "border-[#c5a059]/30",
+      text: "text-[#e6dbcf]",
+      accent: "text-[#e5a855]",
+      subtext: "text-[#a89587]",
+      headerBg: "bg-[#140e0c]",
+      badgeBg: "bg-[#e5a855]/20 text-[#e5a855]",
     },
     sepia: {
-      bg: 'bg-[#ebdec9]',
-      pageBg: 'bg-[#f5ede0]',
-      border: 'border-[#8b5a2b]/30',
-      text: 'text-[#362415]',
-      accent: 'text-[#702910]',
-      subtext: 'text-[#614532]',
-      headerBg: 'bg-[#decaad]',
-      badgeBg: 'bg-[#8b5a2b]/20 text-[#362415]'
+      bg: "bg-[#ebdec9]",
+      pageBg: "bg-[#f5ede0]",
+      border: "border-[#8b5a2b]/30",
+      text: "text-[#362415]",
+      accent: "text-[#702910]",
+      subtext: "text-[#614532]",
+      headerBg: "bg-[#decaad]",
+      badgeBg: "bg-[#8b5a2b]/20 text-[#362415]",
     },
     light: {
-      bg: 'bg-[#f7f7f9]',
-      pageBg: 'bg-[#ffffff]',
-      border: 'border-[#d0d0d8]',
-      text: 'text-[#242426]',
-      accent: 'text-[#6b1d1d]',
-      subtext: 'text-[#666670]',
-      headerBg: 'bg-[#ebebee]',
-      badgeBg: 'bg-[#e0e0e5] text-[#242426]'
-    }
+      bg: "bg-[#f7f7f9]",
+      pageBg: "bg-[#ffffff]",
+      border: "border-[#d0d0d8]",
+      text: "text-[#242426]",
+      accent: "text-[#6b1d1d]",
+      subtext: "text-[#666670]",
+      headerBg: "bg-[#ebebee]",
+      badgeBg: "bg-[#e0e0e5] text-[#242426]",
+    },
   };
 
   const currentTheme = themeStyles[theme];
 
   const fontSizeClasses = {
-    sm: 'text-[15px] leading-relaxed',
-    md: 'text-[17px] leading-[1.75]',
-    lg: 'text-[19px] leading-[1.8]',
-    xl: 'text-[22px] leading-[1.85]'
+    sm: "text-[15px] leading-relaxed",
+    md: "text-[17px] leading-[1.75]",
+    lg: "text-[19px] leading-[1.8]",
+    xl: "text-[22px] leading-[1.85]",
   };
 
   // Prepare chapters to render
-  const chaptersToRender = selectedScope === 'all' ? chats : activeChat ? [activeChat] : [];
+  const chaptersToRender =
+    selectedScope === "all" ? chats : activeChat ? [activeChat] : [];
 
   // Compute total word count
   const totalWords = chaptersToRender.reduce((acc, ch) => {
-    return acc + ch.messages.reduce((mAcc, m) => mAcc + m.content.split(/\s+/).length, 0);
+    return (
+      acc +
+      ch.messages.reduce((mAcc, m) => mAcc + m.content.split(/\s+/).length, 0)
+    );
   }, 0);
   const readingTimeMin = Math.max(1, Math.round(totalWords / 200));
 
@@ -91,7 +97,7 @@ export const NovelReaderView: React.FC<{
     try {
       await exportChronicleToPDF(project, activeChat, () => {});
     } catch (err) {
-      console.error('Error exporting PDF:', err);
+      console.error("Error exporting PDF:", err);
     } finally {
       setIsExporting(false);
     }
@@ -114,10 +120,15 @@ export const NovelReaderView: React.FC<{
               title="Volver a la vista de Crónica / Chat interactivo"
               aria-label="Volver a Crónica"
             >
-              <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Crónica</span>
+              <Swords className="w-3.5 h-3.5" />{" "}
+              <span className="hidden sm:inline">Crónica</span>
             </button>
-            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo Novela">
-              <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
+            <span
+              className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs"
+              title="Modo Novela"
+            >
+              <BookOpen className="w-3.5 h-3.5" />{" "}
+              <span className="hidden sm:inline">Novela</span>
             </span>
           </div>
 
@@ -136,9 +147,9 @@ export const NovelReaderView: React.FC<{
           {/* Scope Selector: Single Chapter vs All Chapters */}
           <div className="flex bg-black/10 rounded-lg p-0.5 border border-black/10 text-xs font-cinzel">
             <button
-              onClick={() => setSelectedScope('current')}
+              onClick={() => setSelectedScope("current")}
               className={`px-2 sm:px-2.5 py-1 rounded transition-all cursor-pointer ${
-                selectedScope === 'current'
+                selectedScope === "current"
                   ? `${currentTheme.pageBg} ${currentTheme.text} font-bold shadow-xs`
                   : `${currentTheme.subtext} hover:opacity-100`
               }`}
@@ -148,9 +159,9 @@ export const NovelReaderView: React.FC<{
               <span className="sm:hidden">Cap</span>
             </button>
             <button
-              onClick={() => setSelectedScope('all')}
+              onClick={() => setSelectedScope("all")}
               className={`px-2 sm:px-2.5 py-1 rounded transition-all cursor-pointer ${
-                selectedScope === 'all'
+                selectedScope === "all"
                   ? `${currentTheme.pageBg} ${currentTheme.text} font-bold shadow-xs`
                   : `${currentTheme.subtext} hover:opacity-100`
               }`}
@@ -162,10 +173,10 @@ export const NovelReaderView: React.FC<{
           </div>
 
           {/* Chapter dropdown when in single mode */}
-          {selectedScope === 'current' && (
+          {selectedScope === "current" && (
             <select
-              value={currentChatId || ''}
-              onChange={e => onSelectChat(e.target.value)}
+              value={currentChatId || ""}
+              onChange={(e) => onSelectChat(e.target.value)}
               className={`text-xs font-cinzel p-1.5 rounded border ${currentTheme.border} ${currentTheme.pageBg} ${currentTheme.text} outline-none cursor-pointer max-w-[110px] sm:max-w-[150px] truncate`}
             >
               {chats.map((c, i) => (
@@ -179,9 +190,9 @@ export const NovelReaderView: React.FC<{
           {/* Font Size Selector */}
           <div className="flex items-center gap-0.5 sm:gap-1 bg-black/10 rounded-lg p-0.5 text-xs">
             <button
-              onClick={() => setFontSize('sm')}
+              onClick={() => setFontSize("sm")}
               className={`w-6 h-6 rounded flex items-center justify-center font-bold cursor-pointer ${
-                fontSize === 'sm'
+                fontSize === "sm"
                   ? `${currentTheme.pageBg} ${currentTheme.text} shadow-xs`
                   : `${currentTheme.subtext}`
               }`}
@@ -190,9 +201,9 @@ export const NovelReaderView: React.FC<{
               A-
             </button>
             <button
-              onClick={() => setFontSize('md')}
+              onClick={() => setFontSize("md")}
               className={`w-6 h-6 rounded flex items-center justify-center font-bold cursor-pointer ${
-                fontSize === 'md'
+                fontSize === "md"
                   ? `${currentTheme.pageBg} ${currentTheme.text} shadow-xs`
                   : `${currentTheme.subtext}`
               }`}
@@ -201,9 +212,9 @@ export const NovelReaderView: React.FC<{
               A
             </button>
             <button
-              onClick={() => setFontSize('lg')}
+              onClick={() => setFontSize("lg")}
               className={`w-6 h-6 rounded flex items-center justify-center font-bold cursor-pointer ${
-                fontSize === 'lg'
+                fontSize === "lg"
                   ? `${currentTheme.pageBg} ${currentTheme.text} shadow-xs`
                   : `${currentTheme.subtext}`
               }`}
@@ -216,33 +227,41 @@ export const NovelReaderView: React.FC<{
           {/* Theme Palette Swatches */}
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setTheme('parchment')}
+              onClick={() => setTheme("parchment")}
               className={`w-5 h-5 rounded-full bg-[#f4ecd8] border-2 cursor-pointer ${
-                theme === 'parchment' ? 'border-[var(--accent)] scale-110' : 'border-black/20'
+                theme === "parchment"
+                  ? "border-[var(--accent)] scale-110"
+                  : "border-black/20"
               }`}
               title="Pergamino Clásico"
               aria-label="Tema Pergamino"
             />
             <button
-              onClick={() => setTheme('sepia')}
+              onClick={() => setTheme("sepia")}
               className={`w-5 h-5 rounded-full bg-[#ebdec9] border-2 cursor-pointer ${
-                theme === 'sepia' ? 'border-[var(--accent)] scale-110' : 'border-black/20'
+                theme === "sepia"
+                  ? "border-[var(--accent)] scale-110"
+                  : "border-black/20"
               }`}
               title="Papel Sepia"
               aria-label="Tema Sepia"
             />
             <button
-              onClick={() => setTheme('dark')}
+              onClick={() => setTheme("dark")}
               className={`w-5 h-5 rounded-full bg-[#1e1715] border-2 cursor-pointer ${
-                theme === 'dark' ? 'border-[#e5a855] scale-110' : 'border-black/20'
+                theme === "dark"
+                  ? "border-[#e5a855] scale-110"
+                  : "border-black/20"
               }`}
               title="Modo Nocturno"
               aria-label="Tema Nocturno"
             />
             <button
-              onClick={() => setTheme('light')}
+              onClick={() => setTheme("light")}
               className={`w-5 h-5 rounded-full bg-[#ffffff] border-2 cursor-pointer ${
-                theme === 'light' ? 'border-[var(--accent)] scale-110' : 'border-black/20'
+                theme === "light"
+                  ? "border-[var(--accent)] scale-110"
+                  : "border-black/20"
               }`}
               title="Lino Claro"
               aria-label="Tema Claro"
@@ -253,13 +272,15 @@ export const NovelReaderView: React.FC<{
           <button
             onClick={() => setShowPlayerActions(!showPlayerActions)}
             className={`text-xs px-2 sm:px-2.5 py-1 rounded border ${currentTheme.border} ${
-              showPlayerActions ? currentTheme.badgeBg : 'opacity-60'
+              showPlayerActions ? currentTheme.badgeBg : "opacity-60"
             } transition-all cursor-pointer font-cinzel flex items-center gap-1.5`}
             title="Mostrar u ocultar los turnos de acción del jugador"
             aria-label="Acciones de jugador"
           >
             <Shield className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{showPlayerActions ? 'Acciones: ON' : 'Acciones: OFF'}</span>
+            <span className="hidden sm:inline">
+              {showPlayerActions ? "Acciones: ON" : "Acciones: OFF"}
+            </span>
           </button>
 
           {/* Export / Print */}
@@ -291,16 +312,19 @@ export const NovelReaderView: React.FC<{
             >
               {project.name}
             </h1>
-            <p className={`font-cinzel text-xs md:text-sm tracking-wider uppercase ${currentTheme.subtext}`}>
+            <p
+              className={`font-cinzel text-xs md:text-sm tracking-wider uppercase ${currentTheme.subtext}`}
+            >
               Una crónica de tu campaña
             </p>
             <div className="flex justify-center items-center gap-4 text-xs mt-4 opacity-75 font-lora">
-              <span>{totalWords.toLocaleString('es-ES')} palabras</span>
+              <span>{totalWords.toLocaleString("es-ES")} palabras</span>
               <span>•</span>
               <span>~{readingTimeMin} min de lectura</span>
               <span>•</span>
               <span>
-                {chaptersToRender.length} capítulo{chaptersToRender.length > 1 ? 's' : ''}
+                {chaptersToRender.length} capítulo
+                {chaptersToRender.length > 1 ? "s" : ""}
               </span>
             </div>
           </div>
@@ -310,7 +334,7 @@ export const NovelReaderView: React.FC<{
             // Filter messages based on player actions preference
             const visibleMessages = showPlayerActions
               ? chapter.messages
-              : chapter.messages.filter(m => m.role === 'model');
+              : chapter.messages.filter((m) => m.role === "model");
 
             return (
               <div key={chapter.id} className="flex flex-col gap-6">
@@ -339,7 +363,7 @@ export const NovelReaderView: React.FC<{
                     </p>
                   ) : (
                     visibleMessages.map((msg, mIdx) => {
-                      const isUser = msg.role === 'user';
+                      const isUser = msg.role === "user";
 
                       if (isUser) {
                         return (
@@ -348,33 +372,64 @@ export const NovelReaderView: React.FC<{
                             className={`my-2 p-3.5 rounded-lg border border-dashed border-current/25 bg-black/5 flex items-start gap-2.5 text-sm`}
                           >
                             <Shield className="w-4 h-4 shrink-0 mt-0.5" />
-                            <div className="flex-1 italic leading-relaxed font-lora">{msg.content}</div>
+                            <div className="flex-1 italic leading-relaxed font-lora">
+                              {msg.content}
+                            </div>
                           </div>
                         );
                       }
 
                       return (
-                        <div key={mIdx} className={`${fontSizeClasses[fontSize]} text-left sm:text-justify`}>
+                        <div
+                          key={mIdx}
+                          className={`${fontSizeClasses[fontSize]} text-left sm:text-justify`}
+                        >
                           <div className="markdown-body narrative-body space-y-4">
                             <ReactMarkdown
                               components={{
                                 p: ({ children }) => {
                                   const str = Array.isArray(children)
-                                    ? children.map(c => (typeof c === 'string' ? c : '')).join('')
-                                    : typeof children === 'string' ? children : '';
-                                  const isDialogue = /^[—–\-"«]/.test(str.trim());
+                                    ? children
+                                        .map((c) =>
+                                          typeof c === "string" ? c : "",
+                                        )
+                                        .join("")
+                                    : typeof children === "string"
+                                      ? children
+                                      : "";
+                                  const isDialogue = /^[—–\-"«]/.test(
+                                    str.trim(),
+                                  );
                                   return (
-                                    <p className={isDialogue ? 'narrative-dialogue' : undefined}>
+                                    <p
+                                      className={
+                                        isDialogue
+                                          ? "narrative-dialogue"
+                                          : undefined
+                                      }
+                                    >
                                       {children}
                                     </p>
                                   );
                                 },
-                                strong: ({ children }) => <strong className="narrative-strong">{children}</strong>,
-                                em: ({ children }) => <em className="narrative-em">{children}</em>,
-                                blockquote: ({ children }) => <blockquote className="narrative-quote">{children}</blockquote>
+                                strong: ({ children }) => (
+                                  <strong className="narrative-strong">
+                                    {children}
+                                  </strong>
+                                ),
+                                em: ({ children }) => (
+                                  <em className="narrative-em">{children}</em>
+                                ),
+                                blockquote: ({ children }) => (
+                                  <blockquote className="narrative-quote">
+                                    {children}
+                                  </blockquote>
+                                ),
                               }}
                             >
-                              {formatNarrativeText(stripStateTag(stripRollRequests(msg.content)))}
+                              {formatNarrativeText(
+                                stripStateTag(stripRollRequests(msg.content)),
+                              )}
                             </ReactMarkdown>
                           </div>
                         </div>
@@ -385,7 +440,9 @@ export const NovelReaderView: React.FC<{
 
                 {/* Chapter End Ornament */}
                 {cIdx < chaptersToRender.length - 1 && (
-                  <div className="text-center my-6 text-xl opacity-30 select-none">——— ◆ ———</div>
+                  <div className="text-center my-6 text-xl opacity-30 select-none">
+                    ——— ◆ ———
+                  </div>
                 )}
               </div>
             );
