@@ -914,18 +914,18 @@ export async function generateStoryTurnStream({
   let fullText = '';
   let lastError: any = null;
 
-  for (let keyIndex = 0; keyIndex < apiKeys.length && !success; keyIndex++) {
-    const currentApiKey = apiKeys[keyIndex];
-    const ai = getAIClient(currentApiKey);
-    const storedKeys = getStoredApiKeys();
-    const origKeyIdx = storedKeys.indexOf(currentApiKey);
-    const keyNumDisplay = origKeyIdx >= 0 ? origKeyIdx + 1 : keyIndex + 1;
-    const keyLabel = totalKeys > 1 ? ` (Clave ${keyNumDisplay}/${totalKeys})` : '';
+  for (let modelIndex = 0; modelIndex < failoverChain.length && !success; modelIndex++) {
+    const currentModel = failoverChain[modelIndex];
+    const isFallback = modelIndex > 0;
+    const modelDisplayName = AVAILABLE_MODELS.find(m => m.id === currentModel)?.name || currentModel;
 
-    for (let modelIndex = 0; modelIndex < failoverChain.length && !success; modelIndex++) {
-      const currentModel = failoverChain[modelIndex];
-      const isFallback = modelIndex > 0;
-      const modelDisplayName = AVAILABLE_MODELS.find(m => m.id === currentModel)?.name || currentModel;
+    for (let keyIndex = 0; keyIndex < apiKeys.length && !success; keyIndex++) {
+      const currentApiKey = apiKeys[keyIndex];
+      const ai = getAIClient(currentApiKey);
+      const storedKeys = getStoredApiKeys();
+      const origKeyIdx = storedKeys.indexOf(currentApiKey);
+      const keyNumDisplay = origKeyIdx >= 0 ? origKeyIdx + 1 : keyIndex + 1;
+      const keyLabel = totalKeys > 1 ? ` (Clave ${keyNumDisplay}/${totalKeys})` : '';
 
       // Retry once for the base model or fallbacks if transient
       const maxRetriesForModel = isFallback ? 1 : 2;
@@ -1046,7 +1046,8 @@ export async function generateStoryTurnStream({
           if (isRateLimit) {
             markKeyCooldown(currentApiKey, 60000);
             if (keyIndex < apiKeys.length - 1) {
-              setLoadingText(`Límite de cuota en Clave ${keyNumDisplay}. Rotando a la siguiente clave del pool...`);
+              setLoadingText(`Límite de cuota en Clave ${keyNumDisplay}. Rotando a la siguiente clave para ${modelDisplayName}...`);
+              break; // saltar inmediatamente a la siguiente clave para el mismo modelo
             }
           }
 
@@ -1055,16 +1056,23 @@ export async function generateStoryTurnStream({
               await new Promise(resolve => setTimeout(resolve, 800 * (retry + 1)));
               continue;
             }
-            // If we have more fallback models in the chain, advance to next model!
+            // Si se agotaron los reintentos en esta clave, pasar a la siguiente clave del pool
+            if (keyIndex < apiKeys.length - 1) {
+              break;
+            }
+            // Si se agotaron todas las claves en este modelo, pasar al siguiente modelo de respaldo
             if (modelIndex < failoverChain.length - 1) {
               const nextModel = failoverChain[modelIndex + 1];
               const nextDisplayName = AVAILABLE_MODELS.find(m => m.id === nextModel)?.name || nextModel;
               setLoadingText(`Servidores de Google saturados en ${modelDisplayName}. Saltando a ${nextDisplayName}...`);
               await new Promise(resolve => setTimeout(resolve, 500));
-              break; // Break inner loop to try next model in failoverChain
+              break;
             }
           } else {
-            // Non-transient error or unsupported parameter: try next model if available
+            // Error no transitorio: pasar a la siguiente clave o modelo
+            if (keyIndex < apiKeys.length - 1) {
+              break;
+            }
             if (modelIndex < failoverChain.length - 1) {
               break;
             }
@@ -1187,12 +1195,11 @@ export async function generateContentWithFailover({
 
   let lastError: any = null;
 
-  for (let k = 0; k < keysToTry.length; k++) {
-    const currentKey = keysToTry[k];
-    const ai = getAIClient(currentKey || undefined);
-
-    for (let i = 0; i < chain.length; i++) {
-      const model = chain[i];
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
+    for (let k = 0; k < keysToTry.length; k++) {
+      const currentKey = keysToTry[k];
+      const ai = getAIClient(currentKey || undefined);
       try {
         const abierto = esModeloAbierto(model);
         const cleanedConfig = {
@@ -1229,10 +1236,13 @@ export async function generateContentWithFailover({
           if (currentKey) markKeyCooldown(currentKey, 60000);
         }
         console.warn(`generateContentWithFailover fallo en ${model} (clave ${k + 1}/${keysToTry.length}):`, err);
-        if (i < chain.length - 1) {
-          await new Promise(r => setTimeout(r, 400));
+        if (k < keysToTry.length - 1) {
+          await new Promise(r => setTimeout(r, 100));
         }
       }
+    }
+    if (i < chain.length - 1) {
+      await new Promise(r => setTimeout(r, 300));
     }
   }
   throw lastError || new Error('No se pudo obtener respuesta de ningún modelo.');
@@ -2863,7 +2873,9 @@ export async function countTurnTokens({
   chats: Chat[];
   files: ProjectFile[];
 }): Promise<{ total: number; sistema: number; conversacion: number; modelo: string }> {
-  const ai = getAIClient();
+  const { keys } = getRotatedApiKeys();
+  const apiKey = keys[0] || getStoredApiKey();
+  const ai = getAIClient(apiKey || undefined);
   const modelo = getStoredModel();
   const dicePool = rollDicePool();
 
@@ -3058,7 +3070,9 @@ ${primerRoleo || 'Todavía no se ha jugado nada.'}`;
 export async function listarModelosDeLaClave(): Promise<
   { id: string; nombre: string; entrada: number; salida: number }[]
 > {
-  const ai = getAIClient();
+  const { keys } = getRotatedApiKeys();
+  const apiKey = keys[0] || getStoredApiKey();
+  const ai = getAIClient(apiKey || undefined);
   const salida: { id: string; nombre: string; entrada: number; salida: number }[] = [];
 
   const paginas = await ai.models.list();
