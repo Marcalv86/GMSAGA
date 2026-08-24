@@ -2,16 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Project, NPC, Quest, Location, ProjectFile, PlayerEvent } from '../types';
 import { classifyFileAuto } from '../utils/geminiHelper';
-import { obtenerInfoRelacion } from '../utils/campaignCalendar';
+import {
+  obtenerInfoRelacion
+} from '../utils/campaignCalendar';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
 import { NpcDossierModal } from './NpcDossierModal';
 import { LocationDossierModal } from './LocationDossierModal';
 import { NpcEditModal } from './NpcEditModal';
 import { LocationEditModal } from './LocationEditModal';
+import { DailyAgendaDiary } from './DailyAgendaDiary';
 
 import {
   BookOpen,
+  CalendarClock,
   Camera,
   Castle,
   ChevronDown,
@@ -142,6 +146,7 @@ export function tieneAfinidadActiva(npc: NPC): boolean {
 
 export type SeccionMemoria =
   | 'character'
+  | 'diary'
   | 'npcs'
   | 'locs'
   | 'visual'
@@ -154,6 +159,7 @@ export const MemoryManager: React.FC<{
   project: Project;
   files: ProjectFile[];
   onUpdateMemory: (updater: (prevMem: Project['memory']) => Project['memory']) => Promise<void>;
+  onUpdateProject?: (updater: (prev: Project) => Partial<Project>) => Promise<void>;
   onTriggerAIUpdate?: () => Promise<void>;
   onAnalyzeImageFile?: (file: ProjectFile) => Promise<void>;
   onUpdateFileAnalysis?: (fileId: string, analysis: string) => Promise<void>;
@@ -169,6 +175,7 @@ export const MemoryManager: React.FC<{
   project,
   files,
   onUpdateMemory,
+  onUpdateProject,
   onTriggerAIUpdate,
   onAnalyzeImageFile,
   onUpdateFileAnalysis,
@@ -177,7 +184,7 @@ export const MemoryManager: React.FC<{
   onAutoClassifyAll,
   onUploadEntityImage,
   isGenerating = false,
-  hasChats: _hasChats = false,
+  hasChats = false,
   secciones
 }) => {
   /**
@@ -187,7 +194,7 @@ export const MemoryManager: React.FC<{
    */
   const seccionesVisibles: SeccionMemoria[] = secciones?.length
     ? secciones
-    : ['character', 'npcs', 'locs', 'visual', 'quests', 'story', 'status', 'notes'];
+    : ['character', 'diary', 'npcs', 'locs', 'visual', 'quests', 'story', 'status', 'notes'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
 
@@ -746,6 +753,15 @@ export const MemoryManager: React.FC<{
               icon: User,
               count: memory.player_character?.name ? `(${memory.player_character.name})` : ''
             },
+            {
+              id: 'diary',
+              label: 'Diario & Agenda',
+              shortLabel: 'Diario',
+              icon: CalendarClock,
+              count: (project.threads || []).filter(t => t.status === 'pending').length
+                ? `(${(project.threads || []).filter(t => t.status === 'pending').length})`
+                : ''
+            },
             { id: 'npcs', label: 'PNJs', shortLabel: 'PNJs', icon: Users, count: memory.npcs?.length ? `(${memory.npcs.length})` : '' },
             {
               id: 'locs',
@@ -1104,6 +1120,23 @@ export const MemoryManager: React.FC<{
             )}
           </div>
         </div>
+      )}
+
+      {/* Tab: Diary & Agenda (Diario, Agenda con Día Vista, Selector de Calendario y Relojes) */}
+      {activeTab === 'diary' && (
+        <DailyAgendaDiary
+          project={project}
+          files={files}
+          onUpdate={async fields => {
+            if (onUpdateProject) {
+              await onUpdateProject(typeof fields === 'function' ? fields : () => fields);
+            }
+          }}
+          onUpdateMemory={onUpdateMemory}
+          onTriggerAIUpdate={onTriggerAIUpdate}
+          isGenerating={isGenerating}
+          hasChats={hasChats}
+        />
       )}
 
       {/* Tab: Story (Crónica General) */}

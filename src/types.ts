@@ -54,7 +54,19 @@ export interface TimelineEntry {
   absDay: number;
   /** La fecha ya escrita, para no depender de la configuración al mostrarla. */
   date: string;
+  /** Título o encabezado temático de la entrada (ej. "Mi fiesta de cumpleaños", "Llegada a Luskan") */
+  title?: string;
   summary: string;
+  /** Emoticono o ánimo/mood temático asociado al acontecimiento (ej. 🌸, 😊, ⚔️, 🍷, 👑) */
+  mood?: string;
+  /** URLs o imágenes asociadas a este acontecimiento/escena */
+  images?: string[];
+  /** Duración o etiqueta de nota de voz/audio (ej. "00:49") */
+  audioDuration?: string;
+  /** Si es un borrador o apunte provisional */
+  isDraft?: boolean;
+  /** Etiquetas adicionales o de contexto */
+  tags?: string[];
   chatId?: string;
   /** ID del mensaje de chat que originó esta entrada (para sincronización precisa al borrar). */
   msgId?: string;
@@ -72,7 +84,7 @@ export interface TimelineEntry {
   /** Minutos desde medianoche, para saber a qué hora ocurrió. */
   minute?: number;
   /** Categoría especial de la entrada (noticia del mundo, rumor, inconsciencia, etc.) */
-  tipo?: 'acontecimiento' | 'noticia' | 'rumor' | 'inconsciencia' | 'salto_temporal';
+  tipo?: 'acontecimiento' | 'noticia' | 'rumor' | 'inconsciencia' | 'salto_temporal' | 'diario' | 'personal';
   /** Si representa o abarca un salto temporal de múltiples días */
   timeSkipDays?: number;
 }

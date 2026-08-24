@@ -2477,9 +2477,9 @@ export default function App() {
           {activeTab === 'memory' && currentProject && (
             <MemoryManager
               project={currentProject}
-              secciones={['character', 'npcs', 'locs', 'visual', 'quests']}
               files={currentFiles}
               onUpdateMemory={handleUpdateMemory}
+              onUpdateProject={handleUpdateProjectField}
               onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
               onAnalyzeImageFile={handleAnalyzeImageFile}
               onUpdateFileAnalysis={handleUpdateFileAnalysis}

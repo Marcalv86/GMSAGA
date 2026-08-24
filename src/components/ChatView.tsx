@@ -4,6 +4,7 @@ import { Chat, PlayerCharacter } from '../types';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
 import { CreativeStudioModal } from './CreativeStudioModal';
+import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
 import { parseMessageRolls, RollBadgeCard } from './RollBadge';
@@ -29,6 +30,7 @@ import {
   Scroll,
   Search,
   Send,
+  Smile,
   Square,
   Swords,
   Trash2,
@@ -584,6 +586,31 @@ export const ChatView: React.FC<{
     tab: 'music' | 'image' | 'video' | 'voice';
     sceneText?: string;
   } | null>(null);
+
+  // Ventana rápida de emojis temáticos
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const handleInsertEmoji = (emoji: string) => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart ?? inputText.length;
+      const end = textarea.selectionEnd ?? inputText.length;
+      const before = inputText.substring(0, start);
+      const after = inputText.substring(end);
+      const newText = `${before}${emoji}${after}`;
+      setInputText(newText);
+
+      // Reposicionar cursor después del emoji y mantener foco
+      setTimeout(() => {
+        textarea.focus();
+        const newPos = start + emoji.length;
+        textarea.setSelectionRange(newPos, newPos);
+      }, 20);
+    } else {
+      setInputText(prev => (prev ? `${prev} ${emoji}` : emoji));
+    }
+  };
 
   // Reconocimiento y Dictado por Voz en tiempo real
   const [isListening, setIsListening] = useState(false);
@@ -1201,73 +1228,112 @@ export const ChatView: React.FC<{
             >
               <Wand2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Taller Creativo</span>
             </button>
+
+            {/* Botón de Acceso Rápido a Emojis */}
+            <button
+              onClick={() => setIsEmojiPickerOpen(prev => !prev)}
+              className={`rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer flex items-center gap-1.5 hover:scale-105 active:scale-95 ${
+                isEmojiPickerOpen
+                  ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-xs'
+                  : 'border-yellow-700/60 dark:border-yellow-400/60 bg-yellow-100/90 dark:bg-yellow-950/50 text-yellow-950 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-900/60'
+              }`}
+              title="Ventana rápida de emojis de rol, expresiones, combate y símbolos"
+              aria-label="Emojis rápidos"
+            >
+              <Smile className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Emojis</span>
+            </button>
           </div>
         </div>
 
         {/* Input Field & Attachments */}
-        <div className="max-w-[900px] mx-auto bg-[var(--bg-color)] border border-[var(--user-border)] rounded-xl px-2.5 sm:px-3.5 md:px-4 py-1.5 md:py-2 flex items-center gap-1.5 sm:gap-2 md:gap-3 shadow-inner focus-within:border-[var(--accent)] focus-within:shadow-md transition-all">
-          <input
-            type="file"
-            multiple
-            accept=".txt,.md,.pdf,.json,image/*,audio/*"
-            onChange={e => {
-              if (e.target.files && e.target.files.length > 0) {
-                onFileUpload(Array.from(e.target.files));
-              }
-              e.target.value = '';
-            }}
-            className="hidden"
-            id="chat-file-upload"
+        <div className="max-w-[900px] mx-auto relative">
+          {/* Ventana rápida flotante de emojis */}
+          <EmojiPickerPopover
+            isOpen={isEmojiPickerOpen}
+            onClose={() => setIsEmojiPickerOpen(false)}
+            onSelectEmoji={handleInsertEmoji}
           />
-          <label
-            htmlFor="chat-file-upload"
-            className="text-[var(--accent)] w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 hover:bg-[var(--glass)] active:scale-95 transition-all cursor-pointer text-base"
-            title="Adjuntar múltiples documentos, imágenes o audios a la campaña"
-          >
-            <Paperclip className="w-4 h-4" />
-          </label>
 
-          {/* Botón de dictado por voz (Micrófono) */}
-          <button
-            type="button"
-            onClick={toggleSpeechRecognition}
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 transition-all cursor-pointer ${
-              isListening
-                ? 'bg-red-600 text-white animate-pulse shadow-md shadow-red-500/40 ring-2 ring-red-400'
-                : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] active:scale-95'
-            }`}
-            title={isListening ? 'Detener dictado por voz' : 'Dictar tu acción por voz (Micrófono en vivo)'}
-          >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
+          <div className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded-xl px-2.5 sm:px-3.5 md:px-4 py-1.5 md:py-2 flex items-center gap-1.5 sm:gap-2 md:gap-3 shadow-inner focus-within:border-[var(--accent)] focus-within:shadow-md transition-all">
+            <input
+              type="file"
+              multiple
+              accept=".txt,.md,.pdf,.json,image/*,audio/*"
+              onChange={e => {
+                if (e.target.files && e.target.files.length > 0) {
+                  onFileUpload(Array.from(e.target.files));
+                }
+                e.target.value = '';
+              }}
+              className="hidden"
+              id="chat-file-upload"
+            />
+            <label
+              htmlFor="chat-file-upload"
+              className="text-[var(--accent)] w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 hover:bg-[var(--glass)] active:scale-95 transition-all cursor-pointer text-base"
+              title="Adjuntar múltiples documentos, imágenes o audios a la campaña"
+            >
+              <Paperclip className="w-4 h-4" />
+            </label>
 
-          <textarea
-            value={inputText}
-            onChange={e => {
-              setInputText(e.target.value);
-              // Auto-ajustar altura suavemente
-              const target = e.target;
-              target.style.height = 'auto';
-              target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                onSendMessage();
-              }
-            }}
-            placeholder={isListening ? '🎙️ Escuchando... habla con normalidad...' : '¿Qué hace tu personaje? (Escribe o pulsa el micrófono para dictar)'}
-            className="flex-1 bg-transparent border-none text-[var(--text-primary)] text-sm sm:text-base md:text-lg outline-none resize-none min-h-[38px] max-h-[140px] md:max-h-[220px] py-2 px-1 font-lora leading-normal placeholder:text-[var(--text-secondary)] placeholder:opacity-60 overflow-y-auto"
-            rows={1}
-          />
-          <button
-            onClick={onSendMessage}
-            disabled={isGenerating || !inputText.trim()}
-            className="bg-[var(--accent)] text-[var(--on-accent)] w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-[#5a0000] flex items-center justify-center shrink-0 hover:bg-[var(--accent-hover)] active:scale-95 transition-all disabled:opacity-30 shadow-2xs cursor-pointer"
-            title="Enviar acción"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+            {/* Botón de selector rápido de emojis en el input */}
+            <button
+              type="button"
+              onClick={() => setIsEmojiPickerOpen(prev => !prev)}
+              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                isEmojiPickerOpen
+                  ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-105'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] active:scale-95'
+              }`}
+              title="Abrir ventana rápida de emojis (Rol, Expresiones, Magia y Combate)"
+              aria-label="Selector de emojis"
+            >
+              <Smile className="w-4 h-4" />
+            </button>
+
+            {/* Botón de dictado por voz (Micrófono) */}
+            <button
+              type="button"
+              onClick={toggleSpeechRecognition}
+              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                isListening
+                  ? 'bg-red-600 text-white animate-pulse shadow-md shadow-red-500/40 ring-2 ring-red-400'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] active:scale-95'
+              }`}
+              title={isListening ? 'Detener dictado por voz' : 'Dictar tu acción por voz (Micrófono en vivo)'}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+
+            <textarea
+              ref={textareaRef}
+              value={inputText}
+              onChange={e => {
+                setInputText(e.target.value);
+                // Auto-ajustar altura suavemente
+                const target = e.target;
+                target.style.height = 'auto';
+                target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  onSendMessage();
+                }
+              }}
+              placeholder={isListening ? '🎙️ Escuchando... habla con normalidad...' : '¿Qué hace tu personaje? (Escribe o pulsa el micrófono para dictar)'}
+              className="flex-1 bg-transparent border-none text-[var(--text-primary)] text-sm sm:text-base md:text-lg outline-none resize-none min-h-[38px] max-h-[140px] md:max-h-[220px] py-2 px-1 font-lora leading-normal placeholder:text-[var(--text-secondary)] placeholder:opacity-60 overflow-y-auto"
+              rows={1}
+            />
+            <button
+              onClick={onSendMessage}
+              disabled={isGenerating || !inputText.trim()}
+              className="bg-[var(--accent)] text-[var(--on-accent)] w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-[#5a0000] flex items-center justify-center shrink-0 hover:bg-[var(--accent-hover)] active:scale-95 transition-all disabled:opacity-30 shadow-2xs cursor-pointer"
+              title="Enviar acción"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
