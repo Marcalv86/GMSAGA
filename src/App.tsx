@@ -1553,7 +1553,7 @@ export default function App() {
       setAlertConfig({
         isOpen: true,
         title: 'Error de Sincronización',
-        message: err.message || 'No se pudo sincronizar la memoria viva.'
+        message: describeApiError(err) || 'No se pudo sincronizar la memoria viva.'
       });
     } finally {
       setIsGenerating(false);

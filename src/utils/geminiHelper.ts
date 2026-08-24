@@ -58,31 +58,31 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     id: 'gemini-2.5-flash',
     name: 'Gemini 2.5 Flash',
     badge: 'Rápido y fluido',
-    desc: 'Alta velocidad, capacidad multimodal y cuota amplia.'
+    desc: 'Alta velocidad, gran ventana de contexto y cuota amplia.'
+  },
+  {
+    id: 'gemini-3.1-flash-lite',
+    name: 'Gemini 3.1 Flash Lite',
+    badge: 'Ultra Ligero · Ahorro de cuota',
+    desc: 'Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para tareas en segundo plano.'
   },
   {
     id: 'gemini-2.5-flash-lite',
     name: 'Gemini 2.5 Flash Lite',
-    badge: 'Ultra Ligero · Ahorro de cuota',
-    desc: 'Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para sesiones largas.'
+    badge: 'Económico y veloz',
+    desc: 'Baja latencia y ahorro de cuota para sesiones continuas.'
   },
   {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash',
-    badge: 'Estándar Universal',
-    desc: 'Máxima compatibilidad global en todas las cuentas y regiones de Google AI Studio.'
-  },
-  {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
+    id: 'gemini-3.1-pro-preview',
+    name: 'Gemini 3.1 Pro',
     badge: 'Máxima Inteligencia · Prosa rica',
     desc: 'El modelo superior para razonamiento profundo, prosa literaria exquisita y coherencia impecable en tramas complejas.'
   },
   {
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash',
-    badge: 'Alta Compatibilidad',
-    desc: 'Modelo clásico de gran velocidad y soporte en cualquier clave de API.'
+    id: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
+    badge: 'Pro · Gran Capacidad',
+    desc: 'Excelente precisión deductiva y consistencia en el seguimiento de reglas.'
   }
 ];
 
@@ -90,9 +90,29 @@ export function esModeloAbierto(modelId: string): boolean {
   return /^gemma/i.test(modelId.trim());
 }
 
+export function isModelDeprecated(modelId: string): boolean {
+  if (!modelId) return true;
+  const m = modelId.toLowerCase().trim();
+  return (
+    m.includes('1.5') ||
+    m.includes('2.0') ||
+    m === 'gemini-pro' ||
+    m === 'gemini-flash' ||
+    m.includes('thinking-exp') ||
+    m.includes('flash-thinking')
+  );
+}
+
 export const DEFAULT_MODEL_ID = 'gemini-3.7-flash';
 export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-2.5-flash';
-export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-2.5-flash-lite';
+export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.1-flash-lite';
+
+export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODEL_ID): string {
+  if (!modelId || isModelDeprecated(modelId)) {
+    return fallback;
+  }
+  return modelId.trim();
+}
 
 export function getStoredAutoFailover(): boolean {
   return localStorage.getItem('gmstudio_auto_failover') !== 'off';
@@ -108,24 +128,22 @@ export function setStoredAutoFailover(enabled: boolean): void {
  * salta automáticamente al siguiente de forma transparente para que la partida nunca se detenga.
  */
 export function getModelFailoverChain(initialModel: string): string[] {
+  const safeInitial = sanitizeModelId(initialModel, DEFAULT_MODEL_ID);
   const standardFallbacks = [
     'gemini-3.7-flash',
     'gemini-2.5-flash',
+    'gemini-3.1-flash-lite',
     'gemini-2.5-flash-lite',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-1.5-flash',
+    'gemini-3.1-pro-preview',
     'gemini-2.5-pro',
-    'gemini-1.5-pro'
+    'gemini-flash-latest'
   ];
   if (!getStoredAutoFailover()) {
-    // Si el failover está desactivado pero el modelo inicial no existe,
-    // garantizamos al menos probar los estándar para no cortar la partida.
-    return [initialModel, ...standardFallbacks.filter(m => m !== initialModel)];
+    return [safeInitial, ...standardFallbacks.filter(m => m !== safeInitial && !isModelDeprecated(m))];
   }
-  const chain: string[] = [initialModel];
+  const chain: string[] = [safeInitial];
   for (const m of standardFallbacks) {
-    if (!chain.includes(m)) {
+    if (!chain.includes(m) && !isModelDeprecated(m)) {
       chain.push(m);
     }
   }
@@ -140,6 +158,10 @@ export function getStoredBackgroundModel(): string {
   const local = localStorage.getItem('gemini_background_model');
   if (local && local.trim()) {
     const trimmed = local.trim();
+    if (isModelDeprecated(trimmed)) {
+      localStorage.setItem('gemini_background_model', DEFAULT_BACKGROUND_MODEL_ID);
+      return DEFAULT_BACKGROUND_MODEL_ID;
+    }
     const validIds = AVAILABLE_MODELS.map(m => m.id);
     if (validIds.includes(trimmed)) return trimmed;
     if (/^(gemini|gemma)[\w.-]*$/i.test(trimmed)) return trimmed;
@@ -148,9 +170,8 @@ export function getStoredBackgroundModel(): string {
 }
 
 export function setStoredBackgroundModel(modelId: string): void {
-  if (modelId && modelId.trim()) {
-    localStorage.setItem('gemini_background_model', modelId.trim());
-  }
+  const safe = sanitizeModelId(modelId, DEFAULT_BACKGROUND_MODEL_ID);
+  localStorage.setItem('gemini_background_model', safe);
 }
 
 /**
@@ -164,6 +185,10 @@ export function getStoredModel(): string {
   const local = localStorage.getItem('gemini_model');
   if (local && local.trim()) {
     const trimmed = local.trim();
+    if (isModelDeprecated(trimmed)) {
+      localStorage.setItem('gemini_model', DEFAULT_MODEL_ID);
+      return DEFAULT_MODEL_ID;
+    }
     const validIds = AVAILABLE_MODELS.map(m => m.id);
     if (validIds.includes(trimmed)) return trimmed;
     // Un identificador escrito a mano en el panel del Motor también vale; solo se
@@ -174,9 +199,8 @@ export function getStoredModel(): string {
 }
 
 export function setStoredModel(modelId: string): void {
-  if (modelId && modelId.trim()) {
-    localStorage.setItem('gemini_model', modelId.trim());
-  }
+  const safe = sanitizeModelId(modelId, DEFAULT_MODEL_ID);
+  localStorage.setItem('gemini_model', safe);
 }
 
 export type SafetyThreshold =
@@ -1266,8 +1290,14 @@ export async function generateContentWithFailover({
 }): Promise<any> {
   const { keys: apiKeys } = getRotatedApiKeys();
   const keysToTry = apiKeys.length > 0 ? apiKeys : [''];
-  const base = primaryModel || getBackgroundTaskModel();
-  const chain = preferredChain || getModelFailoverChain(base);
+  const base = sanitizeModelId(primaryModel || getBackgroundTaskModel(), DEFAULT_BACKGROUND_MODEL_ID);
+  const rawChain = preferredChain || getModelFailoverChain(base);
+  const chain = rawChain
+    .map(m => sanitizeModelId(m, DEFAULT_MODEL_ID))
+    .filter((m, idx, arr) => !isModelDeprecated(m) && arr.indexOf(m) === idx);
+  if (chain.length === 0) {
+    chain.push(DEFAULT_MODEL_ID, DEFAULT_BACKGROUND_MODEL_ID);
+  }
 
   let lastError: any = null;
 
