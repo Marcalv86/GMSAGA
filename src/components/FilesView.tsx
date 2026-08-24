@@ -399,10 +399,11 @@ export const FilesView: React.FC<{
             <button
               onClick={onAutoClassifyAll}
               disabled={isGenerating}
-              className="px-3 py-1.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md font-cinzel text-xs font-bold hover:bg-amber-200 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 shrink-0 shadow-2xs"
+              className="px-2.5 sm:px-3 py-1.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md font-cinzel text-xs font-bold hover:bg-amber-200 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 shrink-0 shadow-2xs"
               title="Re-analizar y clasificar automáticamente todos los archivos por tipo y vincularlos con la memoria"
+              aria-label="Auto-Clasificar"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Auto-Clasificar
+              <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Auto-Clasificar</span>
             </button>
           )}
         </div>

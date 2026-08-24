@@ -110,20 +110,21 @@ export const NovelReaderView: React.FC<{
           <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-0.5 text-xs font-cinzel shadow-2xs shrink-0">
             <button
               onClick={onBackToChat}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
+              className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
               title="Volver a la vista de Crónica / Chat interactivo"
+              aria-label="Volver a Crónica"
             >
-              <Swords className="w-3.5 h-3.5" /> Crónica
+              <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Crónica</span>
             </button>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs">
-              <BookOpen className="w-3.5 h-3.5" /> Novela
+            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo Novela">
+              <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
             </span>
           </div>
 
           <span className="border-r border-[var(--glass-border)] h-4 hidden sm:inline shrink-0" />
 
           <h3
-            className={`font-cinzel text-xs sm:text-sm md:text-base font-bold ${currentTheme.accent} m-0 truncate max-w-[180px] md:max-w-[280px]`}
+            className={`font-cinzel text-xs sm:text-sm md:text-base font-bold ${currentTheme.accent} m-0 truncate max-w-[130px] sm:max-w-[180px] md:max-w-[280px]`}
             title={project.name}
           >
             {project.name}
@@ -131,28 +132,32 @@ export const NovelReaderView: React.FC<{
         </div>
 
         {/* Customization Toolbar */}
-        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-wrap">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-3 flex-wrap">
           {/* Scope Selector: Single Chapter vs All Chapters */}
           <div className="flex bg-black/10 rounded-lg p-0.5 border border-black/10 text-xs font-cinzel">
             <button
               onClick={() => setSelectedScope('current')}
-              className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
+              className={`px-2 sm:px-2.5 py-1 rounded transition-all cursor-pointer ${
                 selectedScope === 'current'
                   ? `${currentTheme.pageBg} ${currentTheme.text} font-bold shadow-xs`
                   : `${currentTheme.subtext} hover:opacity-100`
               }`}
+              title="Ver solo el capítulo actual"
             >
-              Capítulo
+              <span className="hidden sm:inline">Capítulo</span>
+              <span className="sm:hidden">Cap</span>
             </button>
             <button
               onClick={() => setSelectedScope('all')}
-              className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
+              className={`px-2 sm:px-2.5 py-1 rounded transition-all cursor-pointer ${
                 selectedScope === 'all'
                   ? `${currentTheme.pageBg} ${currentTheme.text} font-bold shadow-xs`
                   : `${currentTheme.subtext} hover:opacity-100`
               }`}
+              title="Ver toda la novela"
             >
-              Toda la Novela
+              <span className="hidden sm:inline">Toda la Novela</span>
+              <span className="sm:hidden">Todo</span>
             </button>
           </div>
 
@@ -161,7 +166,7 @@ export const NovelReaderView: React.FC<{
             <select
               value={currentChatId || ''}
               onChange={e => onSelectChat(e.target.value)}
-              className={`text-xs font-cinzel p-1.5 rounded border ${currentTheme.border} ${currentTheme.pageBg} ${currentTheme.text} outline-none cursor-pointer max-w-[150px] truncate`}
+              className={`text-xs font-cinzel p-1.5 rounded border ${currentTheme.border} ${currentTheme.pageBg} ${currentTheme.text} outline-none cursor-pointer max-w-[110px] sm:max-w-[150px] truncate`}
             >
               {chats.map((c, i) => (
                 <option key={c.id} value={c.id}>
@@ -172,7 +177,7 @@ export const NovelReaderView: React.FC<{
           )}
 
           {/* Font Size Selector */}
-          <div className="flex items-center gap-1 bg-black/10 rounded-lg p-0.5 text-xs">
+          <div className="flex items-center gap-0.5 sm:gap-1 bg-black/10 rounded-lg p-0.5 text-xs">
             <button
               onClick={() => setFontSize('sm')}
               className={`w-6 h-6 rounded flex items-center justify-center font-bold cursor-pointer ${
@@ -216,6 +221,7 @@ export const NovelReaderView: React.FC<{
                 theme === 'parchment' ? 'border-[var(--accent)] scale-110' : 'border-black/20'
               }`}
               title="Pergamino Clásico"
+              aria-label="Tema Pergamino"
             />
             <button
               onClick={() => setTheme('sepia')}
@@ -223,6 +229,7 @@ export const NovelReaderView: React.FC<{
                 theme === 'sepia' ? 'border-[var(--accent)] scale-110' : 'border-black/20'
               }`}
               title="Papel Sepia"
+              aria-label="Tema Sepia"
             />
             <button
               onClick={() => setTheme('dark')}
@@ -230,6 +237,7 @@ export const NovelReaderView: React.FC<{
                 theme === 'dark' ? 'border-[#e5a855] scale-110' : 'border-black/20'
               }`}
               title="Modo Nocturno"
+              aria-label="Tema Nocturno"
             />
             <button
               onClick={() => setTheme('light')}
@@ -237,27 +245,30 @@ export const NovelReaderView: React.FC<{
                 theme === 'light' ? 'border-[var(--accent)] scale-110' : 'border-black/20'
               }`}
               title="Lino Claro"
+              aria-label="Tema Claro"
             />
           </div>
 
           {/* Toggle player dialogs */}
           <button
             onClick={() => setShowPlayerActions(!showPlayerActions)}
-            className={`text-xs px-2.5 py-1 rounded border ${currentTheme.border} ${
+            className={`text-xs px-2 sm:px-2.5 py-1 rounded border ${currentTheme.border} ${
               showPlayerActions ? currentTheme.badgeBg : 'opacity-60'
             } transition-all cursor-pointer font-cinzel flex items-center gap-1.5`}
             title="Mostrar u ocultar los turnos de acción del jugador"
+            aria-label="Acciones de jugador"
           >
             <Shield className="w-3.5 h-3.5" />
-            <span>{showPlayerActions ? 'Acciones: ON' : 'Acciones: OFF'}</span>
+            <span className="hidden sm:inline">{showPlayerActions ? 'Acciones: ON' : 'Acciones: OFF'}</span>
           </button>
 
           {/* Export / Print */}
           <button
             onClick={handleExportPDF}
             disabled={isExporting}
-            className={`text-xs font-cinzel font-bold px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all cursor-pointer flex items-center gap-1 shadow-xs`}
+            className={`text-xs font-cinzel font-bold px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all cursor-pointer flex items-center gap-1 shadow-xs`}
             title="Exportar la novela completa en formato PDF"
+            aria-label="Exportar PDF"
           >
             <FileDown className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">PDF</span>

@@ -65,6 +65,7 @@ import {
   TiempoReportado,
   syncMemoryFromChats,
   syncMemoryDeltaIncremental,
+  resincronizarCronologiaDesdeChat,
   analyzeUploadedImage,
   extractPlayerCharacterFromDocument,
   extractCompanionFromDocument,
@@ -1963,33 +1964,48 @@ export default function App() {
     }
 
     setIsGenerating(true);
-    setLoadingText('Sincronizando memoria viva desde todas las sesiones...');
+    setLoadingText('Sincronizando memoria y cronología desde todas las sesiones...');
     setTopProgress({
       active: true,
-      label: 'Sincronizando memoria viva de toda la crónica...',
+      label: 'Sincronizando la partida completa...',
       type: 'sync'
     });
     try {
-      const updatedMem = await syncMemoryFromChats(currentProject, currentChats);
+      const isCalValido = calendarioValido(currentProject.calendar);
+      
+      const [updatedMem, calRes] = await Promise.all([
+        syncMemoryFromChats(currentProject, currentChats),
+        isCalValido ? resincronizarCronologiaDesdeChat({ project: currentProject, chats: currentChats }) : Promise.resolve(null)
+      ]);
+
       await handleUpdateMemory(prev => ({
         ...prev,
         ...updatedMem
       }));
+
+      if (calRes) {
+        await handleUpdateProjectField({
+          timeline: calRes.timeline,
+          currentDate: calRes.currentDate,
+          threads: calRes.threads
+        });
+      }
+
       setAlertConfig({
         isOpen: true,
-        title: 'Memoria Sincronizada',
+        title: 'Sincronización Completada',
         message:
-          'La crónica, estado actual, tramas, PNJs y lugares se han actualizado con éxito a partir de tus partidas.'
+          'La memoria viva (estado, tramas, PNJs) y la cronología (agenda y tiempos) se han actualizado con éxito en un solo paso a partir de tus partidas.'
       });
     } catch (error: any) {
-      console.error('Error syncing memory:', error);
-      const errMsg = error?.message || 'No se pudo sincronizar la memoria. Inténtalo de nuevo.';
+      console.error('Error syncing project:', error);
+      const errMsg = error?.message || 'No se pudo sincronizar la partida. Inténtalo de nuevo.';
       if (errMsg.includes('GEMINI_API_KEY') || errMsg.includes('API key') || errMsg.includes('clave')) {
         setIsApiKeyModalOpen(true);
       }
       setAlertConfig({
         isOpen: true,
-        title: 'Sincronización de Memoria',
+        title: 'Error de Sincronización',
         message: errMsg
       });
     } finally {
@@ -2698,15 +2714,16 @@ export default function App() {
                 <button
                   key={tab.id}
                   title={(tab as { title?: string }).title || tab.label}
+                  aria-label={(tab as { title?: string }).title || tab.label}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`font-cinzel text-xs px-2 sm:px-2.5 md:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 relative ${
+                  className={`font-cinzel text-xs px-2.5 sm:px-2.5 md:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 relative ${
                     isCurrentActive
                       ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs'
                       : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
                   }`}
                 >
-                  <TabIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{tab.label}</span>
+                  <TabIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">{tab.label}</span>
                   {tab.id === 'memory' && isBackgroundSyncingMemory && (
                     <span
                       className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-0.5 -right-0.5"

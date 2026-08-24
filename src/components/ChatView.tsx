@@ -777,16 +777,17 @@ export const ChatView: React.FC<{
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           {/* Selector de modo de lectura integrado: idéntico en Crónica y Novela */}
           <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-0.5 text-xs font-cinzel shadow-2xs shrink-0">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs">
-              <Swords className="w-3.5 h-3.5" /> Crónica
+            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo Crónica / Juego">
+              <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Crónica</span>
             </span>
             {onOpenNovelReader && (
               <button
                 onClick={onOpenNovelReader}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
+                className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
                 title="Cambiar a la vista de lectura inmersiva tipo Novela / Tomo Antiguo"
+                aria-label="Modo Novela"
               >
-                <BookOpen className="w-3.5 h-3.5" /> Novela
+                <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
               </button>
             )}
           </div>
@@ -856,8 +857,9 @@ export const ChatView: React.FC<{
           ) : (
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[var(--glass)] px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+              className="text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[var(--glass)] px-2 sm:px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
               title="Buscar dentro de este capítulo"
+              aria-label="Buscar"
             >
               <Search className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Buscar</span>
             </button>
@@ -866,10 +868,11 @@ export const ChatView: React.FC<{
           <button
             onClick={onExportPDF}
             disabled={isGenerating || !chat?.messages?.length}
-            className="text-xs font-cinzel font-bold text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-2.5 py-1 rounded-lg cursor-pointer disabled:opacity-30 transition-all flex items-center gap-1.5 shadow-2xs"
+            className="text-xs font-cinzel font-bold text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-2 sm:px-2.5 py-1 rounded-lg cursor-pointer disabled:opacity-30 transition-all flex items-center gap-1.5 shadow-2xs"
             title="Exportar este capítulo como libro ilustrado en PDF"
+            aria-label="Exportar PDF"
           >
-            <Scroll className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Exportar Tomo (PDF)</span><span className="sm:hidden">PDF</span>
+            <Scroll className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Exportar Tomo (PDF)</span>
           </button>
         </div>
       </div>
@@ -1103,18 +1106,19 @@ export const ChatView: React.FC<{
           )}
 
           {/* Barra de dados con estilizado temático por dado */}
-          <div className="flex gap-1.5 md:gap-2 justify-center flex-wrap">
+          <div className="flex gap-1 sm:gap-1.5 md:gap-2 justify-center items-center flex-wrap">
             {hasOracle && (
               <button
                 onClick={() => setOraculoAbierto(v => !v)}
-                className={`rounded-lg px-3 py-1 text-xs font-cinzel font-semibold border transition-all shadow-sm cursor-pointer flex items-center gap-1.5 ${
+                className={`rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-semibold border transition-all shadow-sm cursor-pointer flex items-center gap-1.5 ${
                   oraculoAbierto
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/30'
                     : 'bg-[var(--msg-user)] text-indigo-700 dark:text-indigo-300 border-indigo-300/40 hover:border-indigo-400 hover:bg-indigo-500/15 hover:scale-105 active:scale-95'
                 }`}
                 title="Consultar tus tablas de oráculo"
+                aria-label="Oráculo"
               >
-                <Sparkles className="w-3.5 h-3.5" /> Oráculo
+                <Sparkles className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Oráculo</span>
               </button>
             )}
 
@@ -1165,8 +1169,9 @@ export const ChatView: React.FC<{
               <button
                 key={d.sides}
                 onClick={() => handleDieClick(d.sides)}
-                className={`rounded-lg px-2.5 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer hover:scale-105 active:scale-95 ${d.theme}`}
+                className={`rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer hover:scale-105 active:scale-95 ${d.theme}`}
                 title={`Tirar dado de ${d.sides} caras y añadir al mensaje`}
+                aria-label={d.label}
               >
                 {d.label}
               </button>
@@ -1181,10 +1186,11 @@ export const ChatView: React.FC<{
                 const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
                 setStudioModal({ isOpen: true, tab: 'music', sceneText: lastModelMsg });
               }}
-              className="rounded-lg px-3 py-1 text-xs font-cinzel font-bold border border-purple-700/60 dark:border-purple-400/60 bg-purple-100/90 dark:bg-purple-950/50 text-purple-950 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-purple-700/60 dark:border-purple-400/60 bg-purple-100/90 dark:bg-purple-950/50 text-purple-950 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
               title="Música ambiental, sintetizador de laúd/taberna, canciones de YouTube y Spotify"
+              aria-label="Bardo & Música"
             >
-              <Music className="w-3.5 h-3.5" /> Bardo & Música
+              <Music className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Bardo & Música</span>
             </button>
 
             {/* Botón de Taller Creativo (Imágenes, Cinemática y Escena) */}
@@ -1193,10 +1199,11 @@ export const ChatView: React.FC<{
                 const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
                 setStudioModal({ isOpen: true, tab: 'image', sceneText: lastModelMsg });
               }}
-              className="rounded-lg px-3 py-1 text-xs font-cinzel font-bold border border-amber-700/60 dark:border-amber-400/60 bg-amber-100/90 dark:bg-amber-950/50 text-amber-950 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-amber-700/60 dark:border-amber-400/60 bg-amber-100/90 dark:bg-amber-950/50 text-amber-950 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
               title="Taller multimedia: Generar ilustraciones de escenas, retratos de personajes y videos cinemáticos a partir de la escena"
+              aria-label="Taller Creativo"
             >
-              <Wand2 className="w-3.5 h-3.5" /> Taller Creativo
+              <Wand2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Taller Creativo</span>
             </button>
           </div>
         </div>

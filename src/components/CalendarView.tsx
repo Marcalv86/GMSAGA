@@ -10,7 +10,6 @@ import {
 import {
   CalendarioDeducido,
   deducirCalendario,
-  resincronizarCronologiaDesdeChat,
   describeApiError
 } from '../utils/geminiHelper';
 import {
@@ -40,7 +39,6 @@ import {
   CalendarClock,
   CalendarDays,
   Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   History,
@@ -58,8 +56,7 @@ import {
   Wand2,
   X,
   Newspaper,
-  Moon,
-  AlertTriangle
+  Moon
 } from 'lucide-react';
 import { CreativeStudioModal } from './CreativeStudioModal';
 
@@ -141,49 +138,7 @@ export const CalendarView: React.FC<{
   } | null>(null);
 
   // Sincronización y reconstrucción de la cronología desde el Chat
-  const [sincronizandoChat, setSincronizandoChat] = useState(false);
-  const [syncNotice, setSyncNotice] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [showLimpiezaMenu, setShowLimpiezaMenu] = useState(false);
-
-  const handleSincronizarChat = async (modo: 'reemplazar' | 'combinar' = 'reemplazar') => {
-    if (!calendarioValido(cal)) return;
-    const totalMsgs = chats.reduce((acc, c) => acc + (c.messages?.length || 0), 0);
-    if (totalMsgs === 0) {
-      setSyncNotice({
-        tipo: 'error',
-        texto: 'No hay mensajes de rol en el chat para reconstruir la cronología.'
-      });
-      return;
-    }
-    setSincronizandoChat(true);
-    setSyncNotice(null);
-    setShowLimpiezaMenu(false);
-    try {
-      const res = await resincronizarCronologiaDesdeChat({ project, chats });
-      if (modo === 'reemplazar') {
-        await onUpdate({
-          timeline: res.timeline,
-          currentDate: res.currentDate,
-          threads: res.threads
-        });
-        setDiaSeleccionado(aDiaAbsoluto(cal, res.currentDate));
-      } else {
-        const existingIds = new Set((project.timeline || []).map(t => t.id));
-        const nuevas = res.timeline.filter(t => !existingIds.has(t.id));
-        await onUpdate({
-          timeline: [...(project.timeline || []), ...nuevas],
-          currentDate: res.currentDate,
-          threads: [...(project.threads || []), ...(res.threads || [])]
-        });
-        setDiaSeleccionado(aDiaAbsoluto(cal, res.currentDate));
-      }
-      setSyncNotice({ tipo: 'ok', texto: res.resumen });
-    } catch (err: any) {
-      setSyncNotice({ tipo: 'error', texto: describeApiError(err) });
-    } finally {
-      setSincronizandoChat(false);
-    }
-  };
 
   const handleVaciarTodaLaCronologia = () => {
     setShowLimpiezaMenu(false);
@@ -193,7 +148,6 @@ export const CalendarView: React.FC<{
       message: '¿Estás seguro de que deseas eliminar TODAS las entradas de diario y acontecimientos registrados en la campaña? El calendario seguirá configurado pero el diario se quedará a cero.',
       onConfirm: async () => {
         await onUpdate({ timeline: [] });
-        setSyncNotice({ tipo: 'ok', texto: 'Se ha vaciado toda la cronología de la campaña (0 entradas).' });
         setConfirmDialog(null);
       }
     });
@@ -214,7 +168,6 @@ export const CalendarView: React.FC<{
           threads: []
         });
         setDiaSeleccionado(aDiaAbsoluto(cal, initD));
-        setSyncNotice({ tipo: 'ok', texto: 'Calendario reiniciado al Día 1 y cronología vaciada por completo.' });
         setConfirmDialog(null);
       }
     });
@@ -677,20 +630,21 @@ export const CalendarView: React.FC<{
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 relative">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 relative">
               <button
-                onClick={() => handleSincronizarChat('reemplazar')}
-                disabled={sincronizandoChat}
-                className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] px-3 py-1.5 text-xs font-cinzel font-bold hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                onClick={() => _onTriggerAIUpdate?.()}
+                disabled={_isGenerating}
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] px-2.5 sm:px-3 py-1.5 text-xs font-cinzel font-bold hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
                 title="Analiza todos los capítulos y mensajes del chat para reconstruir la cronología completa de días y sucesos"
+                aria-label="Sincronizar con el Chat"
               >
-                {sincronizandoChat ? (
+                {_isGenerating ? (
                   <>
-                    <Loader className="w-3.5 h-3.5 animate-spin" /> Sincronizando...
+                    <Loader className="w-3.5 h-3.5 animate-spin" /> <span className="hidden sm:inline">Sincronizando...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3.5 h-3.5" /> Sincronizar con el Chat
+                    <Sparkles className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sincronizar con el Chat</span>
                   </>
                 )}
               </button>
@@ -700,19 +654,21 @@ export const CalendarView: React.FC<{
                   setBorrador(JSON.parse(JSON.stringify(calSeguro)));
                   setEditandoCal(true);
                 }}
-                className="flex items-center gap-1 rounded-lg border border-[var(--user-border)] px-2.5 py-1.5 text-xs font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer bg-[var(--surface)] transition-colors"
+                className="flex items-center gap-1 rounded-lg border border-[var(--user-border)] px-2 sm:px-2.5 py-1.5 text-xs font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer bg-[var(--surface)] transition-colors"
                 title="Editar nombres de meses, festividades y días"
+                aria-label="Editar calendario"
               >
-                <Settings2 className="w-3.5 h-3.5" /> Editar
+                <Settings2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Editar</span>
               </button>
 
               <div className="relative">
                 <button
                   onClick={() => setShowLimpiezaMenu(!showLimpiezaMenu)}
-                  className="flex items-center gap-1 rounded-lg border border-[var(--user-border)] px-2.5 py-1.5 text-xs font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer bg-[var(--surface)] transition-colors"
+                  className="flex items-center gap-1 rounded-lg border border-[var(--user-border)] px-2 sm:px-2.5 py-1.5 text-xs font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer bg-[var(--surface)] transition-colors"
                   title="Opciones de limpieza y reinicio"
+                  aria-label="Opciones de limpieza"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-stone-500" /> Opciones
+                  <Trash2 className="w-3.5 h-3.5 text-stone-500" /> <span className="hidden sm:inline">Opciones</span>
                 </button>
 
                 {showLimpiezaMenu && (
@@ -760,31 +716,6 @@ export const CalendarView: React.FC<{
               </div>
             </div>
           </div>
-
-          {syncNotice && (
-            <div
-              className={`mt-3 p-3 rounded-lg text-xs flex items-start justify-between gap-2 ${
-                syncNotice.tipo === 'ok'
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 dark:text-emerald-300'
-                  : 'bg-red-500/10 border border-red-500/30 text-red-900 dark:text-red-300'
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                {syncNotice.tipo === 'ok' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                )}
-                <span className="leading-relaxed">{syncNotice.texto}</span>
-              </div>
-              <button
-                onClick={() => setSyncNotice(null)}
-                className="text-stone-400 hover:text-stone-600 cursor-pointer p-0.5"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
 
           {!corrigiendo && (
             <button
@@ -1433,25 +1364,28 @@ export const CalendarView: React.FC<{
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleSincronizarChat('reemplazar')}
-                    disabled={sincronizandoChat}
+                    onClick={() => _onTriggerAIUpdate?.()}
+                    disabled={_isGenerating}
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold hover:bg-[var(--accent-hover)] cursor-pointer disabled:opacity-50"
+                    title="Sincronizar cronología"
+                    aria-label="Sincronizar"
                   >
-                    {sincronizandoChat ? (
+                    {_isGenerating ? (
                       <Loader className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <Sparkles className="w-3.5 h-3.5" />
                     )}
-                    <span>Reconstruir desde el Chat</span>
+                    <span className="hidden sm:inline">Sincronizar</span>
                   </button>
                   {timeline.length > 0 && (
                     <button
                       onClick={handleVaciarTodaLaCronologia}
                       className="flex items-center gap-1 px-2.5 py-1 rounded border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 text-xs font-cinzel cursor-pointer"
                       title="Eliminar todas las entradas y dejar la cronología limpia"
+                      aria-label="Vaciar diario"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>Vaciar diario</span>
+                      <span className="hidden sm:inline">Vaciar diario</span>
                     </button>
                   )}
                 </div>
@@ -1463,14 +1397,18 @@ export const CalendarView: React.FC<{
                     Aún no hay días registrados en la cronología.
                   </p>
                   <p className="text-xs text-[var(--text-secondary)] m-0">
-                    Puedes pulsar <strong>«Reconstruir desde el Chat»</strong> para que el Narrador analice tus capítulos jugados y ordene todos los sucesos temporalmente.
+                    Puedes pulsar <strong>«Sincronizar cronología con el Chat ahora»</strong> para que el Narrador analice tus capítulos jugados y ordene todos los sucesos temporalmente.
                   </p>
                   <button
-                    onClick={() => handleSincronizarChat('reemplazar')}
-                    disabled={sincronizandoChat}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold hover:bg-[var(--accent-hover)] cursor-pointer"
+                    onClick={() => _onTriggerAIUpdate?.()}
+                    disabled={_isGenerating}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold hover:bg-[var(--accent-hover)] cursor-pointer disabled:opacity-50"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
+                    {_isGenerating ? (
+                      <Loader className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
                     <span>Sincronizar cronología con el Chat ahora</span>
                   </button>
                 </div>

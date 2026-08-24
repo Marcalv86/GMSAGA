@@ -156,14 +156,15 @@ export const StatusView: React.FC<StatusViewProps> = ({
                   ? 'Requiere al menos un mensaje en los capítulos para sincronizar con IA'
                   : 'Extraer y actualizar estado actual, tramas y notas analizando las sesiones de juego'
               }
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              aria-label="Sincronizar con IA"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
             >
               {isGenerating ? (
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               ) : (
                 <Sparkles className="w-3.5 h-3.5" />
               )}
-              <span>Sincronizar con IA</span>
+              <span className="hidden sm:inline">Sincronizar con IA</span>
             </button>
           </div>
         )}

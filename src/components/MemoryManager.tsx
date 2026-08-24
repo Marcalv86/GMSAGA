@@ -16,9 +16,11 @@ import {
   Castle,
   ChevronDown,
   ChevronUp,
+  Compass,
   Crown,
   Eye,
   EyeOff,
+  FileText,
   GitMerge,
   Heart,
   Image,
@@ -28,10 +30,12 @@ import {
   Pencil,
   RefreshCw,
   Save,
+  Scroll,
   Shield,
   Sparkles,
   Trash2,
-  User
+  User,
+  Users
 } from 'lucide-react';
 
 export function getAtrInfo(val?: number) {
@@ -639,44 +643,57 @@ export const MemoryManager: React.FC<{
 
       {/* Top Nav & AI Action Button */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 md:mb-6 border-b border-[var(--glass-border)] pb-3 md:pb-4 gap-3 md:gap-4 w-full">
-        <div className="flex gap-1.5 sm:gap-2 md:gap-3 flex-wrap w-full lg:w-auto">
+        <div className="flex gap-1 sm:gap-2 md:gap-3 flex-wrap w-full lg:w-auto">
           {[
-            { id: 'character', label: 'Protagonista (OC)', count: memory.player_character?.name ? '' : '' },
-            { id: 'npcs', label: 'PNJs', count: memory.npcs?.length ? `(${memory.npcs.length})` : '' },
+            { id: 'character', label: 'Protagonista (OC)', shortLabel: 'PJ', icon: User, count: memory.player_character?.name ? '' : '' },
+            { id: 'npcs', label: 'PNJs', shortLabel: 'PNJs', icon: Users, count: memory.npcs?.length ? `(${memory.npcs.length})` : '' },
             {
               id: 'locs',
               label: 'Lugares',
+              shortLabel: 'Lugares',
+              icon: MapPin,
               count: memory.locations?.length ? `(${memory.locations.length})` : ''
             },
             {
               id: 'visual',
               label: 'Mapas y Visual',
+              shortLabel: 'Visual',
+              icon: Image,
               count: visualFiles.length ? `(${analyzedCount}/${visualFiles.length})` : ''
             },
             {
               id: 'quests',
               label: 'Tramas',
+              shortLabel: 'Tramas',
+              icon: Scroll,
               count: memory.quests?.length ? `(${memory.quests.length})` : ''
             },
-            { id: 'story', label: 'Resumen', count: memory.story ? '' : '' },
-            { id: 'status', label: 'Estado', count: memory.current_status ? '' : '' },
-            { id: 'notes', label: 'Notas', count: memory.manual_notes ? '' : '' }
+            { id: 'story', label: 'Resumen', shortLabel: 'Resumen', icon: BookOpen, count: memory.story ? '' : '' },
+            { id: 'status', label: 'Estado', shortLabel: 'Estado', icon: Compass, count: memory.current_status ? '' : '' },
+            { id: 'notes', label: 'Notas', shortLabel: 'Notas', icon: FileText, count: memory.manual_notes ? '' : '' }
           ]
             .filter(tab => seccionesVisibles.includes(tab.id as SeccionMemoria))
-            .map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`font-cinzel text-xs md:text-sm px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-md transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 shrink-0 ${
-                  activeTab === tab.id
-                    ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-sm'
-                    : 'text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--surface)_40%,transparent)] hover:bg-[var(--glass)] hover:text-[var(--accent)] border border-[var(--glass-border)]'
-                }`}
-              >
-                <span>{tab.label}</span>
-                {tab.count && <span className="text-[10px] opacity-80">{tab.count}</span>}
-              </button>
-            ))}
+            .map(tab => {
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  title={tab.label}
+                  aria-label={tab.label}
+                  className={`font-cinzel text-xs md:text-sm px-2 sm:px-3 py-1.5 sm:py-2 rounded-md transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 shrink-0 ${
+                    activeTab === tab.id
+                      ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-sm'
+                      : 'text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--surface)_40%,transparent)] hover:bg-[var(--glass)] hover:text-[var(--accent)] border border-[var(--glass-border)]'
+                  }`}
+                >
+                  <TabIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.shortLabel}</span>
+                  {tab.count && <span className="text-[10px] opacity-80">{tab.count}</span>}
+                </button>
+              );
+            })}
         </div>
 
         <div className="flex items-center gap-2 w-full lg:w-auto justify-end flex-wrap">
@@ -688,17 +705,19 @@ export const MemoryManager: React.FC<{
                 ? 'Requiere que haya al menos un mensaje en la crónica para sincronizar'
                 : 'Extraer y sincronizar la memoria analizando los capítulos jugados'
             }
-            className="bg-[var(--sidebar-bg)] border border-[var(--glass-border)] px-3 py-1.5 md:py-2 rounded-md text-xs font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-all disabled:opacity-50 font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+            aria-label="Sincronizar con IA"
+            className="bg-[var(--sidebar-bg)] border border-[var(--glass-border)] px-2.5 sm:px-3 py-1.5 md:py-2 rounded-md text-xs font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-all disabled:opacity-50 font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
           >
-            <Sparkles className="w-3.5 h-3.5" /> Sincronizar con IA (Manual)
+            <Sparkles className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sincronizar con IA</span>
           </button>
           <button
             onClick={handleWipeEntireMemory}
             disabled={isGenerating}
             title="Borrar todos los datos de memoria automática"
-            className="text-xs text-red-700 hover:text-red-900 border border-red-200 bg-red-50/50 hover:bg-red-100 px-2.5 py-1.5 md:py-2 rounded-md font-cinzel transition-all cursor-pointer"
+            aria-label="Vaciar memoria"
+            className="text-xs text-red-700 hover:text-red-900 border border-red-200 bg-red-50/50 hover:bg-red-100 px-2 sm:px-2.5 py-1.5 md:py-2 rounded-md font-cinzel transition-all cursor-pointer flex items-center gap-1.5"
           >
-            <Trash2 className="w-3.5 h-3.5" /> Vaciar
+            <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Vaciar</span>
           </button>
         </div>
       </div>
