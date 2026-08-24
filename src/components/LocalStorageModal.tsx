@@ -13,7 +13,10 @@ import {
   FolderSync,
   Upload,
   AlertTriangle,
-  Save
+  Save,
+  Bug,
+  Copy,
+  Check
 } from 'lucide-react';
 import { Project, Chat, ProjectFile } from '../types';
 import {
@@ -33,6 +36,13 @@ import {
   requestPersistentStorage,
   getStorageEstimate
 } from '../utils/fileStorage';
+import {
+  getLogs,
+  exportLogsToTextFile,
+  getLogsAsFormattedText,
+  clearLogs,
+  LogEntry
+} from '../utils/logger';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -59,7 +69,16 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   currentFiles,
   onImportCampaignFile
 }) => {
-  const [activeTab, setActiveTab] = useState<'disk' | 'storage'>('disk');
+  const [activeTab, setActiveTab] = useState<'disk' | 'storage' | 'logs'>('disk');
+  const [logsList, setLogsList] = useState<LogEntry[]>([]);
+  const [logsExported, setLogsExported] = useState(false);
+  const [logsCopied, setLogsCopied] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'logs') {
+      setLogsList(getLogs());
+    }
+  }, [isOpen, activeTab]);
   const [backupFolder, setBackupFolder] = useState<string | null>(null);
   const [backupNeedsPermission, setBackupNeedsPermission] = useState(false);
   const [isChoosingFolder, setIsChoosingFolder] = useState(false);
@@ -323,6 +342,17 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
           >
             <Database className="w-3.5 h-3.5" />
             <span>Estado del Almacén</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`pb-2 px-3 border-b-2 flex items-center gap-1.5 cursor-pointer transition-colors ${
+              activeTab === 'logs'
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Bug className="w-3.5 h-3.5" />
+            <span>Registro & Depuración</span>
           </button>
         </div>
 
@@ -724,6 +754,116 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                 <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
                   Todo tu contenido funciona 100% offline. No necesitas mantener cuentas de Firebase ni permisos de Google Workspace. Tus partidas son tuyas y quedan archivadas en tu propio dispositivo.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: ERROR LOGS & DIAGNOSTICS */}
+          {activeTab === 'logs' && (
+            <div className="space-y-4 font-lora">
+              <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-lg space-y-1.5">
+                <div className="font-cinzel font-bold text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <Bug className="w-4 h-4" />
+                  <span>Registro de Errores y Depuración de Hilos</span>
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed m-0">
+                  Captura incidencias en la generación de hilos, saltos temporales, streaming con la IA y sincronización de estado. Puedes exportar el registro completo a un archivo <code>.txt</code> para compartirlo o analizarlo.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[var(--surface-soft)] border border-[var(--glass-border)] rounded-lg">
+                <div className="text-xs font-cinzel">
+                  <span className="font-bold text-[var(--accent)]">{logsList.length}</span> eventos capturados
+                  {logsList.filter(l => l.level === 'error').length > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 font-mono font-bold">
+                      {logsList.filter(l => l.level === 'error').length} errores
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const ok = exportLogsToTextFile();
+                      if (ok) {
+                        setLogsExported(true);
+                        setTimeout(() => setLogsExported(false), 2500);
+                      }
+                    }}
+                    disabled={logsList.length === 0}
+                    className="px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                    title="Descargar archivo .txt completo"
+                  >
+                    {logsExported ? <Check className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
+                    <span>{logsExported ? '¡Descargado!' : 'Exportar a TXT'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const text = getLogsAsFormattedText();
+                      navigator.clipboard.writeText(text);
+                      setLogsCopied(true);
+                      setTimeout(() => setLogsCopied(false), 2000);
+                    }}
+                    disabled={logsList.length === 0}
+                    className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-cinzel border border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-primary)] hover:border-[var(--accent)] transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Copiar texto de depuración"
+                  >
+                    {logsCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span className="hidden sm:inline">{logsCopied ? 'Copiado' : 'Copiar'}</span>
+                  </button>
+
+                  {logsList.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm('¿Vaciar todo el registro de errores?')) {
+                          clearLogs();
+                          setLogsList([]);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg text-xs border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 cursor-pointer"
+                      title="Limpiar registro"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Mini preview of logs */}
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {logsList.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-[var(--text-secondary)] italic border border-dashed border-[var(--glass-border)] rounded-lg">
+                    No hay errores ni eventos registrados. Todo opera con normalidad.
+                  </div>
+                ) : (
+                  logsList.slice(0, 10).map(item => (
+                    <div
+                      key={item.id}
+                      className={`p-2.5 rounded-lg border text-xs ${
+                        item.level === 'error'
+                          ? 'bg-rose-950/10 border-rose-500/30'
+                          : item.level === 'warn'
+                            ? 'bg-amber-950/10 border-amber-500/30'
+                            : 'bg-[var(--surface-soft)] border-[var(--glass-border)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-secondary)] mb-1">
+                        <span className="font-bold text-[var(--accent)] uppercase font-cinzel">
+                          [{item.category}] {item.level.toUpperCase()}
+                        </span>
+                        <span>{item.formattedTime}</span>
+                      </div>
+                      <div className="font-bold font-cinzel text-xs text-[var(--text-primary)] mb-0.5">
+                        {item.title}
+                      </div>
+                      <div className="text-[11px] text-[var(--text-secondary)] font-sans line-clamp-2">
+                        {item.message}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}

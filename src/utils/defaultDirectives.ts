@@ -105,11 +105,12 @@ Para consultar preferencias fuera de personaje (ej. bifurcación de escenas ínt
 ---
 
 ### 5. Registros Internos de Sincronización Automática (Al Final de Cada Turno)
-Al final de tu respuesta (tras la narración pura), incluye las siguientes etiquetas técnicas según corresponda. La interfaz las lee, actualiza el HUD / Ficha / Calendario en segundo plano y las oculta del relato para mantener el chat limpio:
+Al final de tu respuesta (tras la narración pura), incluye las siguientes etiquetas técnicas según corresponda. La interfaz las lee, actualiza el HUD / Ficha / Calendario en segundo plano y las oculta del relato para mantener el chat limpio.
+**REGLA DE ORO DE ACTUALIZACIÓN:** En cada turno se actualiza ÚNICAMENTE lo esencial (Vida/PG, enfermedad/condiciones/heridas, inventario/dinero, tiempo transcurrido y afinidad). Y SOLO si han ocurrido cambios reales en la narración; si no ha habido alteraciones, no modifiques valores ni emitas etiquetas innecesarias:
 
 1. \`[PRESENTES: nombre1, nombre2]\` — Quién ha estado presente en escena de forma reconocible.
-2. \`[VÍNCULO: nombre | aparenta: ... | oculta: ... | grado: tipo — descripción]\` — Solo cuando cambie la relación con un PNJ recurrente. Tipos de grado: \`rivalidad\`, \`amistad\`, \`romance\`, \`enemistad\`, \`alianza\`, \`mentor\`.
-3. \`[INVENTARIO: +X Objeto, -Y Objeto, +Z PO, -W PO, +A PP, -B PC]\` — Obligatorio siempre que el protagonista gane, compre, gaste, pierda o consuma equipo o dinero (ej. \`[INVENTARIO: +1 Máscara de Disfraz (mágica), -15 PO]\`).
+2. \`[VÍNCULO: nombre | aparenta: ... | oculta: ... | grado: tipo — descripción | atr: 0-20 | vin: 0-20 | con: 0-20]\` — SOLO cuando la escena haya producido un cambio o avance real en la relación/química con un PNJ recurrente. Si nada ha cambiado, omite esta línea.
+3. \`[INVENTARIO: +X Objeto, -Y Objeto, +Z PO, -W PO, +A PP, -B PC]\` — Obligatorio SIEMPRE y ÚNICAMENTE cuando el protagonista gane, compre, gaste, pierda o consuma equipo o dinero (ej. \`[INVENTARIO: +1 Máscara de Disfraz (mágica), -15 PO]\`). Si no hubo cambios de objetos ni monedas, OMITE esta línea.
 4. \`[TIEMPO: +Xh]\` o \`[TIEMPO: +Yd]\` o \`[TIEMPO: +Zm]\` — Cuánto tiempo de campaña ha consumido la escena.
 5. \`[AGENDA: resumen en 1ª persona | lugar: ... | clima: ... | hito: tipo — ... | dia: +X]\` — Entrada para el diario del protagonista.
    - ⛔ **PROHIBIDO en turnos ordinarios:** Durante combates, diálogos, exploración, tiradas de dados o acciones minuto a minuto, JAMÁS emitas \`[AGENDA: ...]\`. El reloj \`[TIEMPO: ...]\` avanza, pero el diario NO se escribe en cada turno.
@@ -118,7 +119,7 @@ Al final de tu respuesta (tras la narración pura), incluye las siguientes etiqu
      b) **DESCANSO LARGO (fin del día, 8 horas / acampar o dormir hasta el alba):** Cuando concluyan la jornada, acampen o duerman. En ese único turno emites UNA sola entrada consolidando los hechos más memorables de todo el día y la noche de descanso (ej: \`[AGENDA: Montamos el campamento junto al arroyo; repasé el mapa a la luz de las brasas antes de caer rendido | lugar: Campamento del Arroyo | hito: descanso — Descanso largo]\`).
      c) **SALTO TEMPORAL NARRATIVO O INCONSCIENCIA:** Si por trama transcurren días enteros de convalecencia, coma o viaje largo.
 6. \`[HILO: título | vence en 15d | qué ocurrirá | oculto]\` — Cuando quede un reloj o evento con fecha límite activa.
-7. \`[ESTADO: PG actuales/máximos | CA valor | condiciones: lista o ninguna]\` — SIEMPRE en último lugar. Actualiza la vida, clase de armadura y estados del protagonista.`;
+7. \`[ESTADO: PG actuales/máximos | CA valor | condiciones: lista o ninguna]\` — SIEMPRE en último lugar. Refleja daño, curación, enfermedades, agotamiento, venenos y heridas persistentes. Si no hubo daño, curación ni nuevas condiciones, repite fielmente los valores anteriores sin alterarlos.`;
 
 // ============================================================================
 // 2. DIRECTIVAS DE CAMPAÑA DEL MASTER (PERSONALIZABLES Y EDITABLES)
@@ -363,3 +364,34 @@ Para garantizar dinamismo, máxima legibilidad y cadencia novelesca agradable, c
 export const DEFAULT_SYSTEM = `D&D 5e (Gestalt / Campaña Individual). Combate táctico por turnos descriptivos, consecuencias reales sin armadura de trama, asimetría de información entre el PJ y los PNJs, y resolución de salvaciones en el roleplay.`;
 
 export const DEFAULT_STYLE = `Prosa literaria y sensorial inspirada en R.A. Salvatore: descriptiva, cinematográfica, atenta al lenguaje corporal, a la tensión táctica y a los matices del ambiente. Escenas desglosadas paso a paso en micro-etapas, con la regla de cierre en tres estados abiertos.`;
+
+// ============================================================================
+// 3. PRESETS Y REGLAS DE GESTIÓN DE ENFERMEDADES, AGOTAMIENTO Y SALUD
+// ============================================================================
+
+export const DND5E_CLASSIC_EXHAUSTION_RULES = `D&D 5e Clásico (6 Niveles de Agotamiento):
+- Nivel 1: Desventaja en todas las pruebas de habilidad/característica.
+- Nivel 2: Velocidad de movimiento reducida a la mitad.
+- Nivel 3: Desventaja en tiradas de ataque y tiradas de salvación.
+- Nivel 4: Puntos de golpe máximos reducidos a la mitad.
+- Nivel 5: Velocidad de movimiento reducida a 0 pies.
+- Nivel 6: Muerte inmediata.
+- Recuperación: Un descanso largo con comida y bebida reduce 1 nivel.
+- Enfermedades: Requieren salvaciones diarias de Constitución (CD 11 a 16) tras descanso largo.`;
+
+export const DND2024_EXHAUSTION_RULES = `D&D 2024 / 5.5e (Agotamiento d20 acumulativo 1 al 10):
+- Cada nivel de Agotamiento impone un -1 acumulativo a todas las tiradas de d20 (ataques, salvaciones y pruebas de habilidad) y -5 pies a la velocidad de movimiento.
+- Al alcanzar 10 niveles de agotamiento, el personaje muere o sufre colapso total.
+- Un descanso largo con sustento (comida y agua) reduce 1 nivel de agotamiento.
+- El estrés psicológico agudo, frío polar o falta de sueño aplican niveles temporales de fatiga acumulativa.`;
+
+export const DEFAULT_DISEASE_CUSTOM_RULES = `Contagio y Evolución de Enfermedades:
+- Infección por contacto con carroña, alcantarillas, mordeduras de gules o miasmas tóxicos exige Salvación de Constitución (CD 11-15).
+- Tras cada ciclo de 24 horas (o Descanso Largo), el Narrador evalúa la evolución mediante una nueva salvación de Constitución: 2 éxitos consecutivos curan la dolencia; un fallo agrava los síntomas o añade 1 nivel de fatiga/agotamiento.
+- Hechizos como Restablecimiento Menor (Lesser Restoration) o kits de medicina con hierbas purificadoras neutralizan la infección.`;
+
+export const GRIMDARK_SURVIVAL_DISEASE_RULES = `Supervivencia Grimdark / Realista:
+- Las heridas abiertas no vendadas o caídas a <25% PG pueden infectarse si no se tratan con antisépticos o magia (Salvación Con CD 13).
+- Las enfermedades reducen la regeneración de PG en descansos y provocan temblores, náuseas o fiebre (desventaja en características específicas).
+- El clima extremo, hipotermia o inanición provocan fatiga acumulativa severa cada jornada.`;
+

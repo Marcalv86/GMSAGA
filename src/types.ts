@@ -17,6 +17,17 @@ export interface Project {
   timeline?: TimelineEntry[];
   /** Consecuencias con fecha de vencimiento: el mundo actuando por su cuenta. */
   threads?: ScheduledThread[];
+  /** Configuración de gestión de enfermedades, agotamiento y penalizadores de salud. */
+  diseaseConfig?: DiseaseConfig;
+}
+
+export type DiseaseRuleSystem = 'dnd5e' | 'dnd5e_2024' | 'custom' | 'narrative_only';
+
+export interface DiseaseConfig {
+  system: DiseaseRuleSystem;
+  autoPenalties: boolean;
+  exhaustionRules?: string;
+  customRules?: string;
 }
 
 export interface CalendarConfig {

@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import {
-  BookOpen,
   Check,
-  Compass,
   FolderSync,
   Menu,
   Moon,
@@ -46,6 +44,8 @@ import { CalendarView } from './components/CalendarView';
 import { InstallAppModal } from './components/InstallAppModal';
 import { LocalStorageModal } from './components/LocalStorageModal';
 import { ImportCampaignModal } from './components/ImportCampaignModal';
+import { Logger } from './components/Logger';
+import { logError } from './utils/logger';
 import { ExtractedCampaignResult } from './utils/campaignImporter';
 import { writeCampaignToDisk } from './utils/diskBackup';
 import {
@@ -100,7 +100,6 @@ import {
   calendarioValido,
   DIAS_PARA_SER_RECURRENTE,
   desdeDiaAbsoluto,
-  fechaCompleta,
   fechaLegible,
   obtenerInfoRelacion
 } from './utils/campaignCalendar';
@@ -984,6 +983,10 @@ export default function App() {
           return { ...c, messages: msgs };
         })
       );
+      logError('gemini_stream', 'Error durante la generación del turno narrativo', error, {
+        projectName: currentProject?.name,
+        chatName: currentChat?.name
+      });
       if (error?.message?.includes('GEMINI_API_KEY') || error?.message?.includes('API key')) {
         setIsApiKeyModalOpen(true);
       } else {
@@ -2184,15 +2187,6 @@ export default function App() {
 
   const currentChapterIndex = currentChats.findIndex(c => c.id === currentChatId);
 
-  // La fecha va en la propia pestaña: saber en qué día vives no debería costar un
-  // clic, y la cabecera es lo único que se ve siempre.
-  const llevaElTiempo = Boolean(currentProject?.currentDate) && calendarioValido(currentProject?.calendar);
-  const fechaBoton = 'Diario';
-  const tituloFecha =
-    llevaElTiempo && currentProject?.calendar && currentProject.currentDate
-      ? fechaCompleta(currentProject.calendar, currentProject.currentDate)
-      : 'Llevar el tiempo de la campaña';
-
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg-color)] text-[var(--text-primary)] font-lora relative">
       {/* Sutil viñeteado para efecto de inmersión / iluminación central */}
@@ -2346,19 +2340,19 @@ export default function App() {
         } fixed md:relative inset-y-0 left-0 z-40 md:z-30 transition-all duration-300 ease-in-out bg-[var(--sidebar-bg)] border-r border-[var(--glass-border)] flex flex-col shrink-0 overflow-hidden shadow-2xl md:shadow-lg`}
       >
         {/* Sidebar Header */}
-        <div className="p-3 border-b border-[var(--glass-border)] flex justify-between items-center bg-[var(--glass)]">
-          <h1 className="font-cinzel text-lg md:text-xl text-[var(--accent)] font-bold tracking-wider m-0">
+        <div className="p-3 border-b border-[var(--glass-border)] flex justify-between items-center bg-[var(--glass)] gap-2 min-w-0">
+          <h1 className="font-cinzel text-base md:text-lg text-[var(--accent)] font-bold tracking-wider m-0 shrink-0 whitespace-nowrap">
             GM STUDIO
           </h1>
-          <div className="flex items-center gap-1 sm:gap-1.5">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={handleManualSaveCampaign}
-              className={`text-xs font-cinzel transition-all cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border ${
+              className={`p-1.5 text-xs font-cinzel transition-all cursor-pointer flex items-center justify-center rounded-lg border ${
                 isManuallySaved
                   ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs'
-                  : 'text-[var(--accent)] hover:underline border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]'
+                  : 'text-[var(--accent)] hover:border-[var(--accent)] border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] shadow-xs hover:bg-[var(--glass)]'
               }`}
-              title="Guardar manualmente el progreso de la campaña activa"
+              title={isManuallySaved ? 'Campaña guardada' : 'Guardar manualmente el progreso de la campaña activa'}
               aria-label="Guardar campaña"
             >
               {isManuallySaved ? (
@@ -2366,29 +2360,27 @@ export default function App() {
               ) : (
                 <Save className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
               )}
-              <span className="hidden sm:inline">{isManuallySaved ? 'Guardado' : 'Guardar'}</span>
             </button>
             <button
               onClick={() => setIsImportCampaignModalOpen(true)}
-              className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
+              className="p-1.5 text-xs text-[var(--accent)] hover:border-[var(--accent)] font-cinzel transition-colors cursor-pointer flex items-center justify-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] shadow-xs hover:bg-[var(--glass)]"
               title="Importar campaña desde PDF, Gemini, NotebookLM o JSON"
               aria-label="Importar campaña"
             >
               <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="hidden sm:inline">Importar</span>
             </button>
             <button
               onClick={() => setIsLocalStorageModalOpen(true)}
-              className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
+              className="p-1.5 text-xs text-[var(--accent)] hover:border-[var(--accent)] font-cinzel transition-colors cursor-pointer flex items-center justify-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] shadow-xs hover:bg-[var(--glass)]"
               title="Copias de Seguridad y Almacenamiento Local"
               aria-label="Copias de seguridad"
             >
               <FolderSync className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="hidden sm:inline">Copias</span>
             </button>
+            <Logger variant="compact" />
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="md:hidden text-base text-[var(--text-secondary)] hover:text-[var(--accent)] p-1 cursor-pointer"
+              className="md:hidden text-base text-[var(--text-secondary)] hover:text-[var(--accent)] p-1 cursor-pointer ml-0.5"
               title="Cerrar menú"
               aria-label="Cerrar menú"
             >
@@ -2577,10 +2569,11 @@ export default function App() {
         />
 
         {/* User & Install Footer */}
-        <div className="p-3 border-t border-[var(--glass-border)] bg-[var(--glass)] flex items-center gap-2">
+        <div className="p-3 border-t border-[var(--glass-border)] bg-[var(--glass)] flex flex-col gap-2">
+          <Logger variant="sidebar" />
           <button
             onClick={() => setIsInstallModalOpen(true)}
-            className="flex-1 text-xs font-cinzel font-bold px-2.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+            className="w-full text-xs font-cinzel font-bold px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
             title="Instalar GM Studio en este dispositivo (Web App PWA)"
           >
             <Smartphone className="w-3.5 h-3.5" />
@@ -2610,14 +2603,9 @@ export default function App() {
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
               { id: 'chat', label: 'Crónica', icon: Swords },
-              { id: 'status', label: 'Estado', icon: Compass },
-              { id: 'memory', label: 'Fichas', icon: ScrollText },
-              {
-                id: 'calendar',
-                label: fechaBoton,
-                icon: BookOpen,
-                title: tituloFecha
-              }
+              { id: 'memory', label: 'Memoria Viva', icon: ScrollText },
+              { id: 'files', label: 'Archivos & Lore', icon: Paperclip },
+              { id: 'instructions', label: 'Directivas & NSFW', icon: Scroll }
             ].map(tab => {
               const TabIcon = tab.icon;
               const isCurrentActive =
@@ -2625,8 +2613,8 @@ export default function App() {
               return (
                 <button
                   key={tab.id}
-                  title={(tab as { title?: string }).title || tab.label}
-                  aria-label={(tab as { title?: string }).title || tab.label}
+                  title={tab.label}
+                  aria-label={tab.label}
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`font-cinzel text-xs px-2.5 sm:px-2.5 md:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 relative ${
                     isCurrentActive

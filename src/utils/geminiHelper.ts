@@ -42,6 +42,7 @@ import {
   HiloLeido
 } from './campaignCalendar';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
+import { logError, logWarn, logInfo } from './logger';
 
 // In-app API key & model management (stored locally in the user's browser)
 export interface AIModelOption {
@@ -743,6 +744,31 @@ ${diario.length ? `ÚLTIMOS DÍAS REGISTRADOS EN LA AGENDA:\n${diario.map(d => `
   // cualquiera al medir tokens, donde los números concretos dan igual. Va al
   // final, con lo volátil, para no romper el caché del prefijo estable.
 
+  // Gestión de enfermedades, agotamiento y salud
+  const diseaseConfig = project.diseaseConfig || {
+    system: 'dnd5e_2024',
+    autoPenalties: true
+  };
+
+  let diseaseSection = '';
+  if (diseaseConfig.system === 'narrative_only') {
+    diseaseSection = `### GESTIÓN DE ENFERMEDADES, SALUD Y AGOTAMIENTO (MODO NARRATIVO EXCLUSIVO)
+- Las enfermedades, heridas y fatiga se representan exclusivamente mediante descripción literaria, sensaciones y roleplay, sin aplicar penalizaciones numéricas estrictas salvo que la situación lo requiera de forma dramática.`;
+  } else {
+    const isClassic = diseaseConfig.system === 'dnd5e';
+    const is2024 = diseaseConfig.system === 'dnd5e_2024';
+    
+    diseaseSection = `### GESTIÓN DE ENFERMEDADES, AGOTAMIENTO Y ESTADO DE SALUD
+- **Sistema de Reglas Activo:** ${isClassic ? 'D&D 5e Clásico (6 Niveles de Agotamiento)' : is2024 ? 'D&D 2024 / 5.5e (Agotamiento d20 acumulativo -1 por nivel del 1 al 10)' : 'Sistema Personalizado de Campaña'}
+- **Penalizadores Automáticos del Narrador:** ${diseaseConfig.autoPenalties ? 'ACTIVADOS (El Narrador debe arbitrar y aplicar penalizadores mecánicos de forma autónoma según las dolencias, heridas, venenos, frío, falta de sueño y nivel de agotamiento del protagonista en cada tirada y reflejarlos en [ESTADO: ...])' : 'DESACTIVADOS (Solo aplicar penalizadores cuando el jugador lo solicite expresamente)'}
+${diseaseConfig.exhaustionRules ? `\n- **Reglas de Agotamiento y Fatiga:**\n${diseaseConfig.exhaustionRules}` : ''}
+${diseaseConfig.customRules ? `\n- **Reglas de Enfermedad, Contagio y Estrés:**\n${diseaseConfig.customRules}` : ''}
+- **Pautas de Arbitraje Clínico y Biológico:**
+  1. Si el protagonista sufre una enfermedad (ej. Fiebre de las alcantarillas, esporas fúngicas, gangrena), veneno, hipotermia o agotamiento, descríbelo en la escena y añade la condición al registro final: \`[ESTADO: PG ... | condiciones: Enfermo (...), Agotamiento X, ...]\`.
+  2. ${diseaseConfig.autoPenalties ? 'Cuando solicites una tirada de d20 o calcules el resultado del PJ, ten en cuenta activamente las desventajas, penalizadores numéricos o modificaciones de CD que correspondan a su estado de salud actual.' : ''}
+  3. Tras un Descanso Largo o al cumplir 24 horas en el calendario, pide la correspondiente Tirada de Salvación de Constitución para evaluar si la enfermedad remite, se estabiliza o empeora.`;
+  }
+
   // El orden importa por dinero y por atención. Gemini cachea automáticamente
   // el prefijo común entre peticiones, y ese prefijo se rompe en el primer
   // carácter que cambia: por eso va primero todo lo estable (directivas,
@@ -756,6 +782,8 @@ ${activeInstructions}
 
 ### SISTEMA DE JUEGO Y MECÁNICAS
 ${activeSystem}
+
+${diseaseSection}
 
 ### ESTILO NARRATIVO (VOZ Y RITMO NOVELESCO)
 ${activeStyle}
@@ -816,9 +844,10 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
       - Puedes pedir varias si la situación lo requiere. Después de pedirla, **no sigas narrando**: espera a que el jugador responda en su siguiente mensaje y resuélvelo entonces.
       - Caso obligatorio: cuando estalle un combate o una emboscada, describe el detonante y pide la iniciativa antes de narrar el primer intercambio de golpes → [Petición de Tirada: Iniciativa].
 6. Si has pedido una tirada, la narración acaba en la petición: no añadas < ¿Qué haces? > ni sigas la escena (los registros internos del punto 7 sí van siempre, al final del todo). Si NO has pedido ninguna tirada, termina con < ¿Qué haces? > sin proponer opciones, para dar libertad total al jugador.
-7. [REGISTROS INTERNOS - OBLIGATORIOS]: después de la narración, y en este orden, añade las siguientes líneas. Son registros de la aplicación: no los comentes, no los expliques y no los menciones dentro del relato. El jugador no los ve.
-   [PRESENTES: nombres separados por comas] — quién ha estado en escena de forma reconocible, con nombre propio. No incluyas figurantes sin nombre («un marinero», «la multitud»). Sirve para saber quién vuelve: alguien que reaparece deja de ser un extra y se le abre una ficha de vínculo con el protagonista.
-   [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | atr: 0-20 | vin: 0-20 | con: 0-20] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y solo cuando la escena haya movido algo entre ellos o se inicie un nuevo vínculo. No lo repitas cada turno si nada ha cambiado.
+7. [REGISTROS INTERNOS - ACTUALIZACIÓN ESTRICTAMENTE ESENCIAL Y CONDICIONAL]:
+   Después de la narración, añade las siguientes líneas según corresponda. Son registros internos de la aplicación que el jugador no ve. REGLA FUNDAMENTAL: En cada turno se actualiza ÚNICAMENTE lo esencial (Vida, enfermedad/condiciones/heridas, inventario/dinero, tiempo transcurrido y afinidad de PNJs). Y SOLO si ha habido cambios reales en la narración; si no ha habido cambios, NO alteres nada ni emitas etiquetas innecesarias.
+   - [PRESENTES: nombres separados por comas] — quién ha estado en escena de forma reconocible, con nombre propio. No incluyas figurantes sin nombre («un marinero», «la multitud»). Sirve para saber quién vuelve: alguien que reaparece deja de ser un extra y se le abre una ficha de vínculo con el protagonista.
+   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | atr: 0-20 | vin: 0-20 | con: 0-20] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea.
      «aparenta» es lo que el protagonista podría percibir observándolo. «oculta» es lo que hay debajo: sus reservas, sus intenciones, lo que calla.
      «grado» debe comenzar indicando el tipo para que la interfaz muestre el icono adecuado:
        - ⚔️ Rivalidad: «grado: rivalidad — ...»
@@ -828,10 +857,10 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
        - 🤝 Alianza: «grado: alianza — ...»
        - 🛡️ Mentor: «grado: mentor — ...»
      «atr» (0-20), «vin» (0-20) y «con» (0-20) representan la Atracción/Romance, Vínculo y Confianza que el PNJ siente hacia el protagonista. El Narrador los actualiza de forma autónoma según las vivencias y la química; son de solo lectura para el jugador.
-   [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, +Z PO, -W PO, +A PP, -B PC] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda o consuma objetos o dinero durante la escena (ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)], si come 3 de 10: [INVENTARIO: -3 Buenas Bayas], si gasta 15 de oro en una tienda: [INVENTARIO: +Disfraz noble, -15 PO], si Jarlaxle le entrega una Máscara de Disfraz: [INVENTARIO: +1 Máscara de Disfraz (mágica, equipada)], si pierde la máscara: [INVENTARIO: -1 Máscara de Disfraz]). Si no ha habido alteración de inventario ni monedas, omite esta línea.
-${tiempoDirectiva}   [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
-   Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las heridas y cualquier efecto persistente que hayas narrado. Si nada ha cambiado, repite los valores anteriores. Va SIEMPRE en último lugar.
-   Estado actual conocido: PG ${pc?.hp ?? '?'}/${pc?.maxHp ?? '?'}, CA ${pc?.ac ?? '?'}${pc?.conditions?.length ? `, condiciones: ${pc.conditions.join(', ')}` : ''}.`;
+   - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, +Z PO, -W PO, +A PP, -B PC] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda o consuma objetos o dinero durante la escena (ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)], si come 3 de 10: [INVENTARIO: -3 Buenas Bayas], si gasta 15 de oro en una tienda: [INVENTARIO: +Disfraz noble, -15 PO], si Jarlaxle le entrega una Máscara de Disfraz: [INVENTARIO: +1 Máscara de Disfraz (mágica, equipada)], si pierde la máscara: [INVENTARIO: -1 Máscara de Disfraz]). Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
+${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
+     Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.
+     Estado actual conocido: PG ${pc?.hp ?? '?'}/${pc?.maxHp ?? '?'}, CA ${pc?.ac ?? '?'}${pc?.conditions?.length ? `, condiciones: ${pc.conditions.join(', ')}` : ''}.`;
 
   // Filter out initial placeholders
   const historyCompleto = currentChat.messages.filter(
@@ -1058,6 +1087,23 @@ export async function generateStoryTurnStream({
             streamReceivedText ||
             /incomplete json|unexpected end|network|failed to fetch|load failed|terminated|aborted|stream|closed|econnreset|fetch/i.test(msg);
 
+          logWarn(
+            'gemini_stream',
+            `Incidencia en modelo ${currentModel} (Clave ${keyNumDisplay}/${totalKeys})`,
+            msg || 'Error en streaming',
+            {
+              chatName: currentChat.name,
+              model: currentModel,
+              details: {
+                isRateLimit,
+                isOverloaded,
+                streamCortado,
+                keyIndex,
+                totalKeys
+              }
+            }
+          );
+
           // Si el streaming ya había entregado una respuesta sustancial y la conexión se interrumpió a mitad,
           // preservamos TODO lo que el modelo ya había narrado en lugar de borrarlo y reintentar desde cero.
           if (fullText.trim().length > 30) {
@@ -1113,6 +1159,10 @@ export async function generateStoryTurnStream({
 
   if (!success && lastError) {
     const errorMsg = describeApiError(lastError);
+    logError('gemini_stream', 'Fallo definitivo en la generación de narrativa', lastError, {
+      chatName: currentChat.name,
+      message: errorMsg
+    });
     await saveStreamedMessage(currentChat, errorMsg, onSaveMessage);
     throw lastError;
   }
@@ -1164,12 +1214,27 @@ async function saveStreamedMessage(
   const presentes = leerPresentes(cleanedText);
   const vinculos = leerVinculos(cleanedText);
   cleanedText = limpiarEtiquetasDePnj(limpiarEtiquetasDeTiempo(cleanedText));
+
+  if (definitivo && hilos.length > 0) {
+    logInfo('threads', `${hilos.length} ${hilos.length === 1 ? 'hilo narrativo programado' : 'hilos narrativos programados'}`, `El Narrador ha dejado programados los siguientes hilos en este turno: ${hilos.map(h => `"${h.title}" (en ${h.dueInDays}d)`).join(', ')}`, {
+      chatName: chat.name,
+      details: { hilos }
+    });
+  }
+
   if (
     definitivo &&
     onTimeReported &&
     (avance.encontrado || agenda.length || hilos.length || presentes.length || vinculos.length)
   ) {
-    onTimeReported({ minutos: avance.minutos, agenda, hilos, presentes, vinculos });
+    try {
+      onTimeReported({ minutos: avance.minutos, agenda, hilos, presentes, vinculos });
+    } catch (err) {
+      logError('threads', 'Error al procesar el reporte de tiempo e hilos de la escena', err, {
+        chatName: chat.name,
+        details: { hilos, avance, agenda }
+      });
+    }
   }
 
   // Parsear y limpiar etiquetas de inventario y monedas
@@ -3417,7 +3482,7 @@ Devuelve un array JSON con objetos de la estructura:
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.map((item, idx) => ({
+      const results = parsed.map((item, idx) => ({
         diaOffset: typeof item.diaOffset === 'number' ? Math.max(0, Math.min(dias, item.diaOffset)) : idx + 1,
         tipo: item.tipo || 'noticia',
         titulo: String(item.titulo || 'Noticia del mundo'),
@@ -3427,9 +3492,23 @@ Devuelve un array JSON con objetos de la estructura:
         hito: item.hito ? String(item.hito) : `noticia — ${item.titulo || 'Evento mundial'}`,
         hiloConsecuencia: item.hiloConsecuencia
       }));
+
+      const hilosGenerados = results.filter(r => r.hiloConsecuencia);
+      if (hilosGenerados.length > 0) {
+        logInfo('threads', `${hilosGenerados.length} ${hilosGenerados.length === 1 ? 'hilo de consecuencia generado' : 'hilos de consecuencias generados'} en salto temporal`, `Hilos creados durante el salto de ${dias} días: ${hilosGenerados.map(h => `"${h.hiloConsecuencia?.titulo}"`).join(', ')}`, {
+          projectName: project.name,
+          details: { hilos: hilosGenerados.map(h => h.hiloConsecuencia) }
+        });
+      }
+
+      return results;
     }
-  } catch (e) {
+  } catch (e: any) {
     console.warn('Error parsing noticias json:', e);
+    logError('threads', 'Error al procesar JSON de hilos y noticias de salto temporal', e, {
+      projectName: project.name,
+      details: { raw, dias, motivo }
+    });
   }
   return [];
 }
@@ -3554,7 +3633,16 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con este formato:
   const b = limpio.lastIndexOf('}');
   if (a !== -1 && b > a) limpio = limpio.slice(a, b + 1);
 
-  const parsed = JSON.parse(limpio);
+  let parsed: any;
+  try {
+    parsed = JSON.parse(limpio);
+  } catch (err: any) {
+    logError('calendar_timeline', 'Error al procesar JSON de cronología e hilos', err, {
+      projectName: project.name,
+      details: { raw, limpio }
+    });
+    throw new Error('La respuesta de la IA no tenía un formato JSON válido para reconstruir la cronología.');
+  }
   
   const entries: TimelineEntry[] = [];
   if (Array.isArray(parsed.entradas)) {

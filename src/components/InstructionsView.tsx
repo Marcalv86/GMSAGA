@@ -1,14 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Project } from '../types';
-import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from '../utils/defaultDirectives';
+import { Project, DiseaseConfig, DiseaseRuleSystem } from '../types';
+import {
+  DEFAULT_DM_INSTRUCTIONS,
+  DEFAULT_SYSTEM,
+  DEFAULT_STYLE,
+  DND5E_CLASSIC_EXHAUSTION_RULES,
+  DND2024_EXHAUSTION_RULES,
+  DEFAULT_DISEASE_CUSTOM_RULES,
+  GRIMDARK_SURVIVAL_DISEASE_RULES
+} from '../utils/defaultDirectives';
 import { analyzeNarrativeStyleFromDocument, describeApiError } from '../utils/geminiHelper';
 
 import {
+  Activity,
   Check,
   ChevronDown,
   ChevronUp,
   Dices,
+  Flame,
   Heart,
+  HeartPulse,
   Hourglass,
   Info,
   Lock,
@@ -18,7 +29,9 @@ import {
   Save,
   Scroll,
   Settings,
+  ShieldAlert,
   ShieldCheck,
+  Sliders,
   Sparkles,
   Swords,
   Upload,
@@ -28,14 +41,28 @@ import {
 
 export const InstructionsView: React.FC<{
   project: Project;
-  onUpdate: (fields: Partial<Pick<Project, 'instructions' | 'system' | 'style'>>) => Promise<void>;
+  onUpdate: (fields: Partial<Project>) => Promise<void>;
   onRequestConfirm?: (message: string, onConfirm: () => void) => void;
 }> = ({ project, onUpdate, onRequestConfirm }) => {
   const [instructions, setInstructions] = useState(project.instructions || '');
   const [system, setSystem] = useState(project.system || '');
   const [style, setStyle] = useState(project.style || '');
+  const [diseaseSystem, setDiseaseSystem] = useState<DiseaseRuleSystem>(
+    project.diseaseConfig?.system || 'dnd5e_2024'
+  );
+  const [autoPenalties, setAutoPenalties] = useState<boolean>(
+    project.diseaseConfig?.autoPenalties !== undefined ? project.diseaseConfig.autoPenalties : true
+  );
+  const [exhaustionRules, setExhaustionRules] = useState<string>(
+    project.diseaseConfig?.exhaustionRules || DND2024_EXHAUSTION_RULES
+  );
+  const [customDiseaseRules, setCustomDiseaseRules] = useState<string>(
+    project.diseaseConfig?.customRules || DEFAULT_DISEASE_CUSTOM_RULES
+  );
+
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [showProtocolsDetail, setShowProtocolsDetail] = useState(false);
+  const [showDiseaseAdvanced, setShowDiseaseAdvanced] = useState(false);
 
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
   const [analyzingMessage, setAnalyzingMessage] = useState('');
@@ -43,7 +70,12 @@ export const InstructionsView: React.FC<{
   const styleFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingRef = useRef<{ instructions: string; system: string; style: string } | null>(null);
+  const pendingRef = useRef<{
+    instructions: string;
+    system: string;
+    style: string;
+    diseaseConfig: DiseaseConfig;
+  } | null>(null);
 
   useEffect(() => {
     return () => {
@@ -63,14 +95,33 @@ export const InstructionsView: React.FC<{
     setInstructions(project.instructions || '');
     setSystem(project.system || '');
     setStyle(project.style || '');
+    setDiseaseSystem(project.diseaseConfig?.system || 'dnd5e_2024');
+    setAutoPenalties(
+      project.diseaseConfig?.autoPenalties !== undefined ? project.diseaseConfig.autoPenalties : true
+    );
+    setExhaustionRules(project.diseaseConfig?.exhaustionRules || DND2024_EXHAUSTION_RULES);
+    setCustomDiseaseRules(project.diseaseConfig?.customRules || DEFAULT_DISEASE_CUSTOM_RULES);
     setSaveStatus('saved');
   }, [project.id]);
 
-  const saveChanges = async (newInst?: string, newSys?: string, newSty?: string) => {
-    const payload = {
+  const saveChanges = async (
+    newInst?: string,
+    newSys?: string,
+    newSty?: string,
+    newDiseaseCfg?: Partial<DiseaseConfig>
+  ) => {
+    const activeDiseaseCfg: DiseaseConfig = {
+      system: newDiseaseCfg?.system ?? diseaseSystem,
+      autoPenalties: newDiseaseCfg?.autoPenalties ?? autoPenalties,
+      exhaustionRules: newDiseaseCfg?.exhaustionRules ?? exhaustionRules,
+      customRules: newDiseaseCfg?.customRules ?? customDiseaseRules
+    };
+
+    const payload: Partial<Project> = {
       instructions: newInst !== undefined ? newInst : instructions,
       system: newSys !== undefined ? newSys : system,
-      style: newSty !== undefined ? newSty : style
+      style: newSty !== undefined ? newSty : style,
+      diseaseConfig: activeDiseaseCfg
     };
 
     setSaveStatus('saving');
@@ -84,19 +135,68 @@ export const InstructionsView: React.FC<{
     }
   };
 
-  const scheduleDebouncedSave = (newInst?: string, newSys?: string, newSty?: string) => {
+  const scheduleDebouncedSave = (
+    newInst?: string,
+    newSys?: string,
+    newSty?: string,
+    newDiseaseCfg?: Partial<DiseaseConfig>
+  ) => {
     setSaveStatus('unsaved');
+    const activeDiseaseCfg: DiseaseConfig = {
+      system: newDiseaseCfg?.system ?? diseaseSystem,
+      autoPenalties: newDiseaseCfg?.autoPenalties ?? autoPenalties,
+      exhaustionRules: newDiseaseCfg?.exhaustionRules ?? exhaustionRules,
+      customRules: newDiseaseCfg?.customRules ?? customDiseaseRules
+    };
+
     pendingRef.current = {
       instructions: newInst !== undefined ? newInst : instructions,
       system: newSys !== undefined ? newSys : system,
-      style: newSty !== undefined ? newSty : style
+      style: newSty !== undefined ? newSty : style,
+      diseaseConfig: activeDiseaseCfg
     };
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = setTimeout(() => {
-      saveChanges(newInst, newSys, newSty);
+      saveChanges(newInst, newSys, newSty, newDiseaseCfg);
     }, 1500);
+  };
+
+  const handleApplyDiseasePreset = async (presetType: 'dnd5e_2024' | 'dnd5e' | 'grimdark' | 'narrative') => {
+    if (presetType === 'dnd5e_2024') {
+      setDiseaseSystem('dnd5e_2024');
+      setExhaustionRules(DND2024_EXHAUSTION_RULES);
+      setCustomDiseaseRules(DEFAULT_DISEASE_CUSTOM_RULES);
+      await saveChanges(undefined, undefined, undefined, {
+        system: 'dnd5e_2024',
+        exhaustionRules: DND2024_EXHAUSTION_RULES,
+        customRules: DEFAULT_DISEASE_CUSTOM_RULES
+      });
+    } else if (presetType === 'dnd5e') {
+      setDiseaseSystem('dnd5e');
+      setExhaustionRules(DND5E_CLASSIC_EXHAUSTION_RULES);
+      setCustomDiseaseRules(DEFAULT_DISEASE_CUSTOM_RULES);
+      await saveChanges(undefined, undefined, undefined, {
+        system: 'dnd5e',
+        exhaustionRules: DND5E_CLASSIC_EXHAUSTION_RULES,
+        customRules: DEFAULT_DISEASE_CUSTOM_RULES
+      });
+    } else if (presetType === 'grimdark') {
+      setDiseaseSystem('custom');
+      setExhaustionRules(DND2024_EXHAUSTION_RULES);
+      setCustomDiseaseRules(GRIMDARK_SURVIVAL_DISEASE_RULES);
+      await saveChanges(undefined, undefined, undefined, {
+        system: 'custom',
+        exhaustionRules: DND2024_EXHAUSTION_RULES,
+        customRules: GRIMDARK_SURVIVAL_DISEASE_RULES
+      });
+    } else if (presetType === 'narrative') {
+      setDiseaseSystem('narrative_only');
+      await saveChanges(undefined, undefined, undefined, {
+        system: 'narrative_only'
+      });
+    }
   };
 
   const handleRestoreMasterInstructions = () => {
@@ -105,7 +205,16 @@ export const InstructionsView: React.FC<{
       setInstructions(DEFAULT_DM_INSTRUCTIONS);
       setSystem(DEFAULT_SYSTEM);
       setStyle(DEFAULT_STYLE);
-      await saveChanges(DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE);
+      setDiseaseSystem('dnd5e_2024');
+      setAutoPenalties(true);
+      setExhaustionRules(DND2024_EXHAUSTION_RULES);
+      setCustomDiseaseRules(DEFAULT_DISEASE_CUSTOM_RULES);
+      await saveChanges(DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE, {
+        system: 'dnd5e_2024',
+        autoPenalties: true,
+        exhaustionRules: DND2024_EXHAUSTION_RULES,
+        customRules: DEFAULT_DISEASE_CUSTOM_RULES
+      });
     };
 
     if (onRequestConfirm) {
@@ -282,6 +391,236 @@ export const InstructionsView: React.FC<{
         )}
       </div>
 
+      {/* NUEVA SECCIÓN DE CONFIGURACIÓN: GESTIÓN DE ENFERMEDADES, AGOTAMIENTO Y SALUD */}
+      <div className="bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.25)] rounded-lg p-4 md:p-6 shadow-sm mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-md bg-rose-900/20 text-rose-700 shrink-0">
+              <HeartPulse className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-cinzel text-base md:text-lg m-0 text-[var(--accent)] flex items-center gap-2">
+                Gestión de Enfermedades, Agotamiento y Salud
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
+                Define el sistema de fatiga/enfermedad y el grado de autonomía del Narrador para penalizar tiradas según el estado físico y mental del personaje.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap">
+            <span className="text-[11px] font-cinzel font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+              {diseaseSystem === 'dnd5e_2024'
+                ? 'D&D 2024 (5.5e)'
+                : diseaseSystem === 'dnd5e'
+                ? 'D&D 5e Clásico'
+                : diseaseSystem === 'custom'
+                ? 'Personalizado'
+                : 'Solo Narrativo'}
+            </span>
+          </div>
+        </div>
+
+        {/* Selector de Sistema */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mb-4">
+          <button
+            type="button"
+            onClick={() => {
+              setDiseaseSystem('dnd5e_2024');
+              scheduleDebouncedSave(undefined, undefined, undefined, { system: 'dnd5e_2024' });
+            }}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              diseaseSystem === 'dnd5e_2024'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>D&D 2024 / 5.5e</span>
+              {diseaseSystem === 'dnd5e_2024' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Agotamiento d20 acumulativo (-1 por nivel, 1-10) y penalización a la velocidad. Más fluido.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDiseaseSystem('dnd5e');
+              scheduleDebouncedSave(undefined, undefined, undefined, { system: 'dnd5e' });
+            }}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              diseaseSystem === 'dnd5e'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>D&D 5e Clásico</span>
+              {diseaseSystem === 'dnd5e' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Tabla clásica de 6 niveles con desventaja escalonada, mitad de velocidad y reducción de PG máx.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDiseaseSystem('custom');
+              scheduleDebouncedSave(undefined, undefined, undefined, { system: 'custom' });
+            }}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              diseaseSystem === 'custom'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>Personalizado</span>
+              {diseaseSystem === 'custom' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Reglas a medida para supervivencia extrema, infecciones, estrés mental o mecánicas propias.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDiseaseSystem('narrative_only');
+              scheduleDebouncedSave(undefined, undefined, undefined, { system: 'narrative_only' });
+            }}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              diseaseSystem === 'narrative_only'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>Solo Narrativo</span>
+              {diseaseSystem === 'narrative_only' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Sin penalizadores matemáticos estrictos; las enfermedades y el cansancio solo se rolean en la historia.
+            </p>
+          </button>
+        </div>
+
+        {/* Conmutador de Penalizadores Automáticos */}
+        <div className="bg-[var(--bg-color)] p-3.5 rounded-lg border border-[rgba(139,69,19,0.2)] mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <div className="p-1.5 rounded bg-amber-900/15 text-[var(--accent)] mt-0.5">
+              <Activity className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-cinzel text-xs font-bold text-[var(--text-primary)]">
+                Aplicar penalizadores automáticos según el estado de salud
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-0.5 leading-relaxed">
+                Permite al Narrador arbitrar y aplicar de forma autónoma desventajas, penalizaciones numéricas a tiradas de d20 o aumentos de CD cuando el protagonista sufra fiebres, venenos, frío, heridas abiertas o fatiga acumulada.
+              </p>
+            </div>
+          </div>
+
+          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={autoPenalties}
+              onChange={e => {
+                const checked = e.target.checked;
+                setAutoPenalties(checked);
+                scheduleDebouncedSave(undefined, undefined, undefined, { autoPenalties: checked });
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+          </label>
+        </div>
+
+        {/* Presets Rápidos y Desplegable de Reglas */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[rgba(139,69,19,0.15)]">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-cinzel font-bold uppercase text-[var(--text-secondary)] mr-1">
+              Plantillas rápidas:
+            </span>
+            <button
+              type="button"
+              onClick={() => handleApplyDiseasePreset('dnd5e_2024')}
+              className="text-[10px] font-cinzel font-semibold px-2 py-1 bg-amber-100/70 hover:bg-amber-200 text-amber-950 rounded border border-amber-300 transition-colors cursor-pointer"
+            >
+              Cargar D&D 2024 (Recomendado)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApplyDiseasePreset('dnd5e')}
+              className="text-[10px] font-cinzel font-semibold px-2 py-1 bg-amber-100/70 hover:bg-amber-200 text-amber-950 rounded border border-amber-300 transition-colors cursor-pointer"
+            >
+              Cargar D&D 5e Clásico
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApplyDiseasePreset('grimdark')}
+              className="text-[10px] font-cinzel font-semibold px-2 py-1 bg-rose-100/70 hover:bg-rose-200 text-rose-950 rounded border border-rose-300 transition-colors cursor-pointer"
+            >
+              Supervivencia Grimdark
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowDiseaseAdvanced(!showDiseaseAdvanced)}
+            className="text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--accent-hover)] flex items-center gap-1 cursor-pointer"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            {showDiseaseAdvanced ? 'Ocultar editor de reglas de salud' : 'Personalizar texto de reglas'}
+            {showDiseaseAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* Textareas para Reglas de Agotamiento y Enfermedad */}
+        {showDiseaseAdvanced && (
+          <div className="mt-4 pt-3 border-t border-[rgba(139,69,19,0.15)] grid grid-cols-1 md:grid-cols-2 gap-4 animate-[fadeIn_0.2s_ease]">
+            <div>
+              <div className="font-cinzel text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-amber-700" /> Reglas de Agotamiento, Fatiga y Estrés
+              </div>
+              <textarea
+                value={exhaustionRules}
+                onChange={e => {
+                  const val = e.target.value;
+                  setExhaustionRules(val);
+                  scheduleDebouncedSave(undefined, undefined, undefined, { exhaustionRules: val });
+                }}
+                onBlur={() => saveChanges()}
+                rows={5}
+                className="w-full bg-[var(--bg-color)] border border-[rgba(139,69,19,0.3)] p-2.5 rounded-lg text-xs font-mono outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
+                placeholder="Describe cómo progresa el agotamiento y qué penalizaciones se aplican en cada nivel..."
+              />
+            </div>
+
+            <div>
+              <div className="font-cinzel text-xs font-bold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide flex items-center gap-1.5">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-700" /> Reglas de Contagio, Enfermedades y Cura
+              </div>
+              <textarea
+                value={customDiseaseRules}
+                onChange={e => {
+                  const val = e.target.value;
+                  setCustomDiseaseRules(val);
+                  scheduleDebouncedSave(undefined, undefined, undefined, { customRules: val });
+                }}
+                onBlur={() => saveChanges()}
+                rows={5}
+                className="w-full bg-[var(--bg-color)] border border-[rgba(139,69,19,0.3)] p-2.5 rounded-lg text-xs font-mono outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
+                placeholder="Describe cómo se contraen las enfermedades, salvaciones periódicas y métodos de curación..."
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* SECCIÓN EDITABLE: DIRECTIVAS DE CAMPAÑA, LORE, SISTEMA Y ESTILO */}
       <div className="bg-[var(--sidebar-bg)] border-l-4 border-[var(--accent)] p-4 md:p-6 rounded-lg shadow-sm mb-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
@@ -438,3 +777,4 @@ export const InstructionsView: React.FC<{
     </div>
   );
 };
+
