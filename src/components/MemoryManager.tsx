@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, NPC, Quest, Location, ProjectFile } from '../types';
+import { Project, NPC, Quest, Location, ProjectFile, PlayerEvent } from '../types';
 import { classifyFileAuto } from '../utils/geminiHelper';
 import { obtenerInfoRelacion } from '../utils/campaignCalendar';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
@@ -35,7 +35,8 @@ import {
   Sparkles,
   Trash2,
   User,
-  Users
+  Users,
+  X
 } from 'lucide-react';
 
 export function getAtrInfo(val?: number) {
@@ -140,12 +141,20 @@ export function tieneAfinidadActiva(npc: NPC): boolean {
 }
 
 export type SeccionMemoria =
-  'npcs' | 'locs' | 'visual' | 'quests' | 'story' | 'status' | 'notes';
+  | 'character'
+  | 'npcs'
+  | 'locs'
+  | 'visual'
+  | 'quests'
+  | 'story'
+  | 'status'
+  | 'notes';
 
 export const MemoryManager: React.FC<{
   project: Project;
   files: ProjectFile[];
   onUpdateMemory: (updater: (prevMem: Project['memory']) => Project['memory']) => Promise<void>;
+  onTriggerAIUpdate?: () => Promise<void>;
   onAnalyzeImageFile?: (file: ProjectFile) => Promise<void>;
   onUpdateFileAnalysis?: (fileId: string, analysis: string) => Promise<void>;
   onDeleteFileAnalysis?: (fileId: string) => Promise<void>;
@@ -160,6 +169,7 @@ export const MemoryManager: React.FC<{
   project,
   files,
   onUpdateMemory,
+  onTriggerAIUpdate,
   onAnalyzeImageFile,
   onUpdateFileAnalysis,
   onDeleteFileAnalysis,
@@ -177,7 +187,7 @@ export const MemoryManager: React.FC<{
    */
   const seccionesVisibles: SeccionMemoria[] = secciones?.length
     ? secciones
-    : ['npcs', 'locs', 'visual', 'quests', 'story', 'status', 'notes'];
+    : ['character', 'npcs', 'locs', 'visual', 'quests', 'story', 'status', 'notes'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
 
@@ -185,6 +195,19 @@ export const MemoryManager: React.FC<{
   React.useEffect(() => {
     if (!seccionesVisibles.includes(activeTab)) setActiveTab(seccionesVisibles[0]);
   }, [secciones]);
+
+  // Protagonist (OC) State
+  const [isEditingOcName, setIsEditingOcName] = useState(false);
+  const [ocNameDraft, setOcNameDraft] = useState('');
+  const [ocTitleDraft, setOcTitleDraft] = useState('');
+
+  const [isEditingOcSummary, setIsEditingOcSummary] = useState(false);
+  const [ocSummaryDraft, setOcSummaryDraft] = useState('');
+
+  const [isOcEventModalOpen, setIsOcEventModalOpen] = useState(false);
+  const [editingOcEvent, setEditingOcEvent] = useState<Partial<PlayerEvent> | null>(null);
+
+  const [isSyncingAI, setIsSyncingAI] = useState(false);
 
   // NPC Edit Modal state
   const [isNpcModalOpen, setIsNpcModalOpen] = useState(false);
@@ -398,11 +421,111 @@ export const MemoryManager: React.FC<{
     });
   };
 
+  // Protagonist (OC) Handlers
+  const handleSaveOcHeader = async () => {
+    await onUpdateMemory(mem => ({
+      ...mem,
+      player_character: {
+        ...(mem.player_character || { name: 'Protagonista' }),
+        name: ocNameDraft.trim() || 'Protagonista',
+        title: ocTitleDraft.trim() || undefined
+      }
+    }));
+    setIsEditingOcName(false);
+  };
+
+  const handleSaveOcSummary = async () => {
+    await onUpdateMemory(mem => ({
+      ...mem,
+      player_character: {
+        ...(mem.player_character || { name: 'Protagonista' }),
+        summary: ocSummaryDraft.trim()
+      }
+    }));
+    setIsEditingOcSummary(false);
+  };
+
+  const handleSaveOcEvent = async (e: { id?: string; title: string; description: string; dateOrTime?: string }) => {
+    if (!e.title.trim()) return;
+    await onUpdateMemory(mem => {
+      const pc = mem.player_character || { name: 'Protagonista' };
+      const events = pc.events || [];
+      let updatedEvents: PlayerEvent[];
+      if (e.id) {
+        updatedEvents = events.map(item =>
+          item.id === e.id
+            ? { ...item, title: e.title.trim(), description: e.description.trim(), dateOrTime: e.dateOrTime?.trim() }
+            : item
+        );
+      } else {
+        const newEvent: PlayerEvent = {
+          id: 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(7),
+          title: e.title.trim(),
+          description: e.description.trim(),
+          dateOrTime: e.dateOrTime?.trim(),
+          createdAt: Date.now()
+        };
+        updatedEvents = [newEvent, ...events];
+      }
+      return {
+        ...mem,
+        player_character: {
+          ...pc,
+          events: updatedEvents
+        }
+      };
+    });
+    setIsOcEventModalOpen(false);
+    setEditingOcEvent(null);
+  };
+
+  const handleDeleteOcEvent = async (eventId: string) => {
+    await onUpdateMemory(mem => {
+      const pc = mem.player_character || { name: 'Protagonista' };
+      return {
+        ...mem,
+        player_character: {
+          ...pc,
+          events: (pc.events || []).filter(ev => ev.id !== eventId)
+        }
+      };
+    });
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleRemoveOcPortrait = async () => {
+    await onUpdateMemory(mem => ({
+      ...mem,
+      player_character: {
+        ...(mem.player_character || { name: 'Protagonista' }),
+        portrait: undefined
+      }
+    }));
+  };
+
+  const handleSyncWithAI = async () => {
+    if (!onTriggerAIUpdate || isSyncingAI) return;
+    setIsSyncingAI(true);
+    try {
+      await onTriggerAIUpdate();
+    } finally {
+      setIsSyncingAI(false);
+    }
+  };
+
   // NPC Handlers
   const handleAssignPortraitDirectly = async (imageContent: string) => {
     if (!targetForPortraitPicker) return;
     const { type, id } = targetForPortraitPicker;
-    if (type === 'npc') {
+    if (type === 'player') {
+      await onUpdateMemory(mem => ({
+        ...mem,
+        player_character: {
+          ...(mem.player_character || { name: 'Protagonista' }),
+          portrait: imageContent
+        }
+      }));
+    } else if (type === 'npc') {
       await onUpdateMemory(mem => {
         const npcs = (mem.npcs || []).map(n => (n.id === id ? { ...n, portrait: imageContent } : n));
         return { ...mem, npcs };
@@ -616,6 +739,13 @@ export const MemoryManager: React.FC<{
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 md:mb-6 border-b border-[var(--glass-border)] pb-3 md:pb-4 gap-3 md:gap-4 w-full">
         <div className="flex gap-1 sm:gap-2 md:gap-3 flex-wrap w-full lg:w-auto">
           {[
+            {
+              id: 'character',
+              label: 'Protagonista (OC)',
+              shortLabel: 'Protagonista',
+              icon: User,
+              count: memory.player_character?.name ? `(${memory.player_character.name})` : ''
+            },
             { id: 'npcs', label: 'PNJs', shortLabel: 'PNJs', icon: Users, count: memory.npcs?.length ? `(${memory.npcs.length})` : '' },
             {
               id: 'locs',
@@ -667,6 +797,19 @@ export const MemoryManager: React.FC<{
         </div>
 
         <div className="flex items-center gap-2 w-full lg:w-auto justify-end flex-wrap">
+          {onTriggerAIUpdate && (
+            <button
+              onClick={handleSyncWithAI}
+              disabled={isGenerating || isSyncingAI}
+              title="Analizar las sesiones de crónica y sincronizar bajo demanda la memoria viva con la IA"
+              aria-label="Sincronizar con IA"
+              className="text-xs text-amber-900 dark:text-amber-100 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 px-2.5 sm:px-3.5 py-1.5 md:py-2 rounded-md font-cinzel transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-xs disabled:opacity-50"
+            >
+              <Sparkles className={`w-3.5 h-3.5 text-amber-600 dark:text-amber-400 ${isSyncingAI ? 'animate-spin' : ''}`} />
+              <span>{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
+            </button>
+          )}
+
           <button
             onClick={handleWipeEntireMemory}
             disabled={isGenerating}
@@ -678,6 +821,290 @@ export const MemoryManager: React.FC<{
           </button>
         </div>
       </div>
+
+      {/* Tab: Protagonist (OC) */}
+      {activeTab === 'character' && (
+        <div className="flex flex-col gap-6">
+          {/* Identity & Portrait Card */}
+          <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-4 sm:p-6 rounded-xl shadow-sm flex flex-col md:flex-row gap-5 items-start">
+            {/* Portrait Box */}
+            <div className="flex flex-col items-center gap-2 shrink-0 self-center md:self-start">
+              <div className="w-36 h-48 sm:w-40 sm:h-52 rounded-xl border-2 border-[var(--accent)]/40 shadow-md overflow-hidden relative group bg-[var(--surface)] flex items-center justify-center">
+                {memory.player_character?.portrait ? (
+                  <>
+                    <img
+                      src={memory.player_character.portrait}
+                      alt={memory.player_character?.name || 'Protagonista'}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
+                      <button
+                        onClick={() =>
+                          setTargetForPortraitPicker({
+                            type: 'player',
+                            id: 'oc_portrait',
+                            name: memory.player_character?.name || 'Protagonista',
+                            desc: memory.player_character?.title || 'Personaje Jugador'
+                          })
+                        }
+                        className="px-2.5 py-1 text-xs bg-[var(--accent)] text-[var(--on-accent)] font-cinzel rounded-md hover:scale-105 transition-transform flex items-center gap-1 cursor-pointer font-bold shadow"
+                      >
+                        <Camera className="w-3.5 h-3.5" /> Cambiar
+                      </button>
+                      <button
+                        onClick={handleRemoveOcPortrait}
+                        className="px-2.5 py-1 text-xs bg-red-800 text-white font-cinzel rounded-md hover:bg-red-700 transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Quitar
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center p-3 gap-2">
+                    <User className="w-12 h-12 text-[var(--text-secondary)] opacity-50" />
+                    <span className="text-[11px] text-[var(--text-secondary)] font-cinzel">Sin Retrato</span>
+                    <button
+                      onClick={() =>
+                        setTargetForPortraitPicker({
+                          type: 'player',
+                          id: 'oc_portrait',
+                          name: memory.player_character?.name || 'Protagonista',
+                          desc: memory.player_character?.title || 'Personaje Jugador'
+                        })
+                      }
+                      className="px-2.5 py-1 text-[11px] font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded-md hover:scale-105 transition-all flex items-center gap-1 cursor-pointer font-bold shadow-xs mt-1"
+                    >
+                      <Plus className="w-3 h-3" /> Asignar
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Identity & Header Info */}
+            <div className="flex-1 flex flex-col justify-between w-full min-w-0">
+              <div>
+                <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
+                  {!isEditingOcName ? (
+                    <div>
+                      <h2 className="font-cinzel text-xl sm:text-2xl font-bold text-[var(--accent)] m-0 flex items-center gap-2">
+                        {memory.player_character?.name || 'Protagonista (OC)'}
+                      </h2>
+                      {memory.player_character?.title && (
+                        <p className="text-sm font-lora italic text-[var(--text-secondary)] mt-0.5 m-0">
+                          {memory.player_character.title}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 w-full max-w-md">
+                      <input
+                        type="text"
+                        value={ocNameDraft}
+                        onChange={e => setOcNameDraft(e.target.value)}
+                        placeholder="Nombre del OC (ej. Aryendell)"
+                        className="bg-[var(--bg-color)] border border-[var(--glass-border)] rounded px-3 py-1 text-base font-cinzel font-bold text-[var(--accent)] outline-none focus:border-[var(--accent)]"
+                      />
+                      <input
+                        type="text"
+                        value={ocTitleDraft}
+                        onChange={e => setOcTitleDraft(e.target.value)}
+                        placeholder="Concepto o Título (ej. Maga Elfa de la Luna | Discípula de Auron)"
+                        className="bg-[var(--bg-color)] border border-[var(--glass-border)] rounded px-3 py-1 text-xs font-lora italic text-[var(--text-secondary)] outline-none focus:border-[var(--accent)]"
+                      />
+                      <div className="flex gap-2 mt-1">
+                        <button
+                          onClick={handleSaveOcHeader}
+                          className="px-3 py-1 text-xs font-cinzel font-bold bg-emerald-700 text-white rounded hover:bg-emerald-800 transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Save className="w-3 h-3" /> Guardar
+                        </button>
+                        <button
+                          onClick={() => setIsEditingOcName(false)}
+                          className="px-2.5 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] text-[var(--text-secondary)] transition-colors cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isEditingOcName && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setOcNameDraft(memory.player_character?.name || '');
+                          setOcTitleDraft(memory.player_character?.title || '');
+                          setIsEditingOcName(true);
+                        }}
+                        className="px-2.5 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded-md hover:bg-[var(--glass)] hover:text-[var(--accent)] transition-colors flex items-center gap-1 text-[var(--text-secondary)] cursor-pointer"
+                      >
+                        <Pencil className="w-3 h-3" /> Editar Identidad
+                      </button>
+                      {onTriggerAIUpdate && (
+                        <button
+                          onClick={handleSyncWithAI}
+                          disabled={isGenerating || isSyncingAI}
+                          className="px-3 py-1 text-xs font-cinzel bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-100 border border-amber-500/50 rounded-md transition-all flex items-center gap-1.5 font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                        >
+                          <Sparkles className={`w-3.5 h-3.5 text-amber-600 dark:text-amber-400 ${isSyncingAI ? 'animate-spin' : ''}`} />
+                          <span>{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3 text-xs text-[var(--text-secondary)] bg-[var(--surface)]/70 p-3 rounded-lg border border-[var(--glass-border)] font-lora leading-relaxed">
+                  Aquí se registran los acontecimientos, evolución personal y hechos trascendentales que le van sucediendo a tu personaje. Puedes añadir entradas manualmente cuando lo desees o pulsar <strong>"Sincronizar con IA"</strong> para que el Narrador actualice la memoria viva a partir de la crónica de juego.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Protagonist Narrative Summary */}
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
+              <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-[var(--accent)]" />
+                Resumen de lo que le va sucediendo al Protagonista:
+              </span>
+              <div className="flex gap-2">
+                {!isEditingOcSummary ? (
+                  <button
+                    onClick={() => {
+                      setOcSummaryDraft(memory.player_character?.summary || '');
+                      setIsEditingOcSummary(true);
+                    }}
+                    className="px-3 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <Pencil className="w-3.5 h-3.5" /> Editar Resumen
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleSaveOcSummary}
+                      className="px-3 py-1 text-xs font-cinzel bg-emerald-700 text-white rounded hover:bg-emerald-800 transition-all cursor-pointer font-bold flex items-center gap-1"
+                    >
+                      <Save className="w-3.5 h-3.5" /> Guardar
+                    </button>
+                    <button
+                      onClick={() => setIsEditingOcSummary(false)}
+                      className="px-3 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] transition-all cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {isEditingOcSummary ? (
+              <textarea
+                value={ocSummaryDraft}
+                onChange={e => setOcSummaryDraft(e.target.value)}
+                placeholder="Escribe o edita el resumen de las vivencias, estado emocional y situación del protagonista..."
+                className="w-full h-48 bg-[var(--surface)] border-2 border-[var(--accent)] p-4 rounded-lg text-base font-lora outline-none leading-relaxed shadow-inner"
+              />
+            ) : (
+              <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-5 rounded-lg shadow-sm text-base leading-relaxed markdown-body min-h-[100px]">
+                {memory.player_character?.summary ? (
+                  <ReactMarkdown>{memory.player_character.summary}</ReactMarkdown>
+                ) : (
+                  <span className="text-[var(--text-secondary)] italic font-lora">
+                    Aún no hay un resumen narrativo para el protagonista. Haz clic en "Editar Resumen" o pulsa "Sincronizar con IA" para que se genere a partir de la partida.
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Key Events & Hitos List */}
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
+              <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+                Acontecimientos Importantes y Memoria del OC ({memory.player_character?.events?.length || 0}):
+              </span>
+              <button
+                onClick={() => {
+                  setEditingOcEvent({ title: '', description: '', dateOrTime: '' });
+                  setIsOcEventModalOpen(true);
+                }}
+                className="px-3 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" /> + Añadir Acontecimiento / Nota
+              </button>
+            </div>
+
+            {(!memory.player_character?.events || memory.player_character.events.length === 0) ? (
+              <div className="bg-[var(--surface-soft)] border border-dashed border-[var(--glass-border)] p-8 rounded-xl text-center flex flex-col items-center justify-center gap-2">
+                <Sparkles className="w-8 h-8 text-[var(--accent)] opacity-40" />
+                <p className="text-sm font-cinzel text-[var(--text-secondary)] m-0">
+                  No hay acontecimientos registrados para el protagonista todavía.
+                </p>
+                <p className="text-xs text-[var(--text-secondary)] font-lora italic m-0 max-w-md">
+                  Puedes registrar momentos clave, acuerdos, pérdidas o revelaciones usando el botón "+ Añadir Acontecimiento / Nota" o sincronizar bajo demanda con la IA.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {memory.player_character.events.map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="bg-[var(--surface)] border border-[var(--glass-border)] hover:border-[var(--accent)]/50 p-4 rounded-xl shadow-xs transition-all flex flex-col justify-between gap-3"
+                  >
+                    <div>
+                      <div className="flex justify-between items-start gap-2 mb-1.5">
+                        <h4 className="font-cinzel font-bold text-sm sm:text-base text-[var(--accent)] m-0">
+                          {ev.title}
+                        </h4>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingOcEvent(ev);
+                              setIsOcEventModalOpen(true);
+                            }}
+                            className="p-1 rounded hover:bg-[var(--glass)] text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                            title="Editar Acontecimiento"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setConfirmModal({
+                                isOpen: true,
+                                title: 'Eliminar Acontecimiento',
+                                message: `¿Seguro que deseas eliminar "${ev.title}" de la memoria del protagonista?`,
+                                onConfirm: () => handleDeleteOcEvent(ev.id)
+                              });
+                            }}
+                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 transition-colors cursor-pointer"
+                            title="Eliminar Acontecimiento"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {ev.dateOrTime && (
+                        <span className="inline-block text-[11px] font-cinzel px-2 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 mb-2">
+                          {ev.dateOrTime}
+                        </span>
+                      )}
+
+                      <p className="text-xs sm:text-sm font-lora text-[var(--text-primary)] leading-relaxed m-0 whitespace-pre-wrap">
+                        {ev.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tab: Story (Crónica General) */}
       {activeTab === 'story' && (
@@ -1869,6 +2296,98 @@ export const MemoryManager: React.FC<{
           onUploadFile={onUploadEntityImage}
           onClose={() => setTargetForPortraitPicker(null)}
         />
+      )}
+
+      {/* OC Event Modal */}
+      {isOcEventModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--surface)] border border-[var(--glass-border)] rounded-xl w-full max-w-lg shadow-2xl p-5 md:p-6 flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-[var(--glass-border)] pb-3">
+              <h3 className="font-cinzel text-base md:text-lg font-bold text-[var(--accent)] flex items-center gap-2 m-0">
+                <Sparkles className="w-4 h-4" />
+                {editingOcEvent?.id ? 'Editar Acontecimiento del OC' : 'Nuevo Acontecimiento o Hito del OC'}
+              </h3>
+              <button
+                onClick={() => {
+                  setIsOcEventModalOpen(false);
+                  setEditingOcEvent(null);
+                }}
+                className="p-1 rounded hover:bg-[var(--glass)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">
+                  Título del Acontecimiento o Suceso: *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: El pacto con el corsario, El secreto de Luskan, La visión de Auron..."
+                  value={editingOcEvent?.title || ''}
+                  onChange={e => setEditingOcEvent(prev => ({ ...(prev || {}), title: e.target.value }))}
+                  className="w-full bg-[var(--bg-color)] border border-[var(--glass-border)] rounded-lg px-3 py-2 text-sm font-cinzel text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">
+                  Momento / Fecha (Opcional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: 15 de Marpenoth, Capítulo 2, Noche en alta mar..."
+                  value={editingOcEvent?.dateOrTime || ''}
+                  onChange={e => setEditingOcEvent(prev => ({ ...(prev || {}), dateOrTime: e.target.value }))}
+                  className="w-full bg-[var(--bg-color)] border border-[var(--glass-border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">
+                  Descripción y Repercusión para el Personaje: *
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Describe qué ocurrió, cómo afectó al personaje, qué descubrió o qué decisión importante tomó..."
+                  value={editingOcEvent?.description || ''}
+                  onChange={e => setEditingOcEvent(prev => ({ ...(prev || {}), description: e.target.value }))}
+                  className="w-full bg-[var(--bg-color)] border border-[var(--glass-border)] rounded-lg p-3 text-sm font-lora text-[var(--text-primary)] outline-none focus:border-[var(--accent)] resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-[var(--glass-border)] pt-3">
+              <button
+                onClick={() => {
+                  setIsOcEventModalOpen(false);
+                  setEditingOcEvent(null);
+                }}
+                className="px-3 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded-lg hover:bg-[var(--surface)] text-[var(--text-secondary)] transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (editingOcEvent && editingOcEvent.title?.trim()) {
+                    handleSaveOcEvent({
+                      id: editingOcEvent.id,
+                      title: editingOcEvent.title,
+                      description: editingOcEvent.description || '',
+                      dateOrTime: editingOcEvent.dateOrTime
+                    });
+                  }
+                }}
+                disabled={!editingOcEvent?.title?.trim()}
+                className="px-4 py-1.5 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" /> Guardar Acontecimiento
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Generic Confirmation Modal */}

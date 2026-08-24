@@ -6,6 +6,7 @@ import {
   Memory,
   FileCategory,
   NPC,
+  PlayerCharacter,
   CalendarConfig,
   CampaignDate,
   TimelineEntry,
@@ -1417,6 +1418,8 @@ REGLAS OBLIGATORIAS DE EXTRACCIÓN:
 4. "npcs": EXCLUSIVAMENTE Personajes No Jugadores (PNJs / NPCs) secundarios, aliados, antagonistas, mentores, comerciantes o criaturas.
    ⚠️ REGLA CRÍTICA: NO incluyas bajo ningún concepto al Personaje Jugador (PC / Protagonista / OC ${pcName ? `"${pcName}"` : ''}) en la lista de "npcs". El protagonista/jugador NO es un PNJ.
 5. "locations": Lugares, ciudades, tabernas, templos, regiones y mazmorras relevantes.
+6. "player_summary": Resumen narrativo enfocado en el PROTAGONISTA (OC): lo que le va sucediendo, sus vivencias, cambios emocionales, relaciones y estado general.
+7. "player_events": Lista de hitos y acontecimientos importantes que le han ocurrido directamente al protagonista en la crónica.
 
 ${pcNotes ? `INFORMACIÓN DEL PROTAGONISTA (NO EXTRAER COMO PNJ):\n${pcNotes}\n` : ''}
 
@@ -1424,6 +1427,10 @@ Devuelve la respuesta ESTRICTAMENTE en formato JSON con la siguiente estructura:
 {
   "story": "Resumen narrativo de la historia hasta ahora (máximo 3 párrafos).",
   "current_status": "El estado actual de los personajes y la situación inmediata.",
+  "player_summary": "Resumen de lo que le va sucediendo al protagonista y sus experiencias clave.",
+  "player_events": [
+    { "title": "Título del suceso clave del OC", "description": "Qué ocurrió y qué significado tuvo para el personaje", "dateOrTime": "Momento o fecha aproximada" }
+  ],
   "quests": [
     { "id": "id existente o omitir si es nueva", "title": "Nombre", "type": "Principal o Secundaria", "objective": "Objetivo", "progress": "Progreso actual", "status": "Activa" }
   ],
@@ -1532,12 +1539,37 @@ ${historyToAnalyze}`;
     id: l.id || Date.now().toString() + Math.random().toString(36).substring(7)
   }));
 
+  const prevPc = project.memory?.player_character;
+  const parsedPcEvents = (parsed.player_events || []).map((e: any) => ({
+    id: e.id || Date.now().toString() + Math.random().toString(36).substring(7),
+    title: e.title || 'Acontecimiento',
+    description: e.description || '',
+    dateOrTime: e.dateOrTime || '',
+    createdAt: Date.now()
+  }));
+
+  const existingEvents = prevPc?.events || [];
+  const mergedEvents = [
+    ...existingEvents,
+    ...parsedPcEvents.filter((ne: any) => !existingEvents.some(oe => oe.title.toLowerCase().trim() === ne.title.toLowerCase().trim()))
+  ];
+
+  const updatedPc: PlayerCharacter = {
+    ...(prevPc || { name: 'Protagonista' }),
+    name: prevPc?.name || 'Protagonista',
+    title: prevPc?.title,
+    summary: parsed.player_summary || prevPc?.summary || '',
+    events: mergedEvents,
+    portrait: prevPc?.portrait
+  };
+
   return {
     story: parsed.story || project.memory?.story || '',
     current_status: parsed.current_status || project.memory?.current_status || '',
     quests: mergeEntities(project.memory?.quests || [], quests, 'title', 'objective'),
     npcs: mergeEntities(project.memory?.npcs || [], npcs, 'name', 'notes'),
-    locations: mergeEntities(project.memory?.locations || [], locations, 'name', 'desc')
+    locations: mergeEntities(project.memory?.locations || [], locations, 'name', 'desc'),
+    player_character: updatedPc
   };
 }
 

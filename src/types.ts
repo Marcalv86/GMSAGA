@@ -188,9 +188,20 @@ export interface CharacterTrait {
   };
 }
 
+export interface PlayerEvent {
+  id: string;
+  title: string;
+  description: string;
+  dateOrTime?: string;
+  createdAt?: number;
+}
+
 export interface PlayerCharacter {
   id?: string;
   name: string;
+  title?: string; // e.g. "Maga Elfa de la Luna"
+  summary?: string; // Resumen narrativo de lo que le va sucediendo al OC
+  events?: PlayerEvent[]; // Acontecimientos importantes del OC (añadibles a mano o por IA)
   characterType?: 'pc' | 'companion' | 'familiar' | 'mount' | 'sidekick' | 'npc';
   companionType?: string; // 'Familiar' | 'Montura' | 'Compañero Animal' | 'Invocación' | 'Aliado'
   ownerName?: string;

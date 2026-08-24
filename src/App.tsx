@@ -82,7 +82,8 @@ import {
   setStoredTopP,
   setStoredAutoFailover,
   setStoredKeyRotationMode,
-  setStoredMemorySyncGranularity
+  setStoredMemorySyncGranularity,
+  syncMemoryFromChats
 } from './utils/geminiHelper';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie, formatRollResult } from './utils/rollRequests';
@@ -1519,6 +1520,47 @@ export default function App() {
     }
   };
 
+  const handleTriggerMemorySyncWithAI = async () => {
+    if (!currentProject || !currentChats || currentChats.length === 0) {
+      setAlertConfig({
+        isOpen: true,
+        title: 'Sin Crónica',
+        message: 'No hay mensajes en la crónica para analizar y sincronizar la memoria viva.'
+      });
+      return;
+    }
+    setIsGenerating(true);
+    setTopProgress({
+      active: true,
+      label: 'Sincronizando memoria viva (Protagonista, PNJs, Lugares y Tramas) con la IA...',
+      type: 'sync'
+    });
+    try {
+      const updatedMemory = await syncMemoryFromChats(currentProject, currentChats);
+      await handleUpdateProjectField(p => ({
+        memory: {
+          ...(p.memory || {}),
+          ...updatedMemory
+        }
+      }));
+      setAlertConfig({
+        isOpen: true,
+        title: 'Memoria Viva Sincronizada',
+        message: 'La memoria viva del tomo (Protagonista, PNJs, Lugares y Tramas) ha sido actualizada con éxito a partir de la crónica.'
+      });
+    } catch (err: any) {
+      console.error('Error al sincronizar memoria con IA:', err);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Error de Sincronización',
+        message: err.message || 'No se pudo sincronizar la memoria viva.'
+      });
+    } finally {
+      setIsGenerating(false);
+      setTopProgress({ active: false, label: '' });
+    }
+  };
+
   const handleCreateNpcFromImage = async (file: ProjectFile) => {
     if (!currentProject || !currentPId) return;
     const rawName = file.name
@@ -2433,11 +2475,12 @@ export default function App() {
           )}
 
           {activeTab === 'memory' && currentProject && (
-            <MemoryManager project={currentProject}
-              secciones={['npcs', 'locs', 'visual', 'quests']}
-              
+            <MemoryManager
+              project={currentProject}
+              secciones={['character', 'npcs', 'locs', 'visual', 'quests']}
               files={currentFiles}
               onUpdateMemory={handleUpdateMemory}
+              onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
               onAnalyzeImageFile={handleAnalyzeImageFile}
               onUpdateFileAnalysis={handleUpdateFileAnalysis}
               onDeleteFileAnalysis={handleDeleteFileAnalysis}
