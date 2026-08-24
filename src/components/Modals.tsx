@@ -52,7 +52,11 @@ import {
   Zap,
   Plus,
   Trash2,
-  Layers
+  Layers,
+  FileText,
+  Upload,
+  Download,
+  ClipboardList
 } from 'lucide-react';
 export interface PromptConfig {
   isOpen: boolean;
@@ -147,10 +151,130 @@ export const ApiKeyModal: React.FC<{
   const [apiKeysList, setApiKeysList] = useState<string[]>(getStoredApiKeys());
   const [newKeyInput, setNewKeyInput] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [showBatchBox, setShowBatchBox] = useState(false);
+  const [batchRawText, setBatchRawText] = useState('');
+  const [batchFeedback, setBatchFeedback] = useState<{ text: string; isError?: boolean } | null>(null);
+  const keyFileInputRef = React.useRef<HTMLInputElement>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'model' | 'sync' | 'safety' | 'thinking' | 'key'>(
     'model'
   );
+
+  const parseKeysFromRawText = (rawText: string): string[] => {
+    if (!rawText) return [];
+    const foundKeys: string[] = [];
+
+    // 1. Line-by-line / whitespace / comma / semicolon tokens
+    const tokens = rawText.split(/[\r\n,;\t\s]+/);
+    for (let token of tokens) {
+      let clean = token.trim().replace(/^["'`]|["'`]$/g, '');
+      if (clean.includes('=')) {
+        clean = clean.split('=').pop()?.trim().replace(/^["'`]|["'`]$/g, '') || '';
+      }
+      // Remove leading/trailing non-alphanumeric punctuation except dot/underscore/hyphen if part of key
+      clean = clean.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+      if (clean.length >= 15 && /^[a-zA-Z0-9_.-]+$/.test(clean)) {
+        if (!foundKeys.includes(clean)) {
+          foundKeys.push(clean);
+        }
+      }
+    }
+
+    // 2. Specific patterns: standard AI Studio (AIzaSy...) and newer/GCP formats (AQ.***)
+    const googlePatterns = [
+      /AIza[0-9A-Za-z-_]{30,}/g,
+      /AQ\.[0-9A-Za-z-_.]+/g
+    ];
+
+    for (const pat of googlePatterns) {
+      const matches = rawText.match(pat);
+      if (matches) {
+        for (const m of matches) {
+          const cleanM = m.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+          if (cleanM.length >= 15 && !foundKeys.includes(cleanM)) {
+            foundKeys.push(cleanM);
+          }
+        }
+      }
+    }
+
+    return foundKeys;
+  };
+
+  const handleImportBatchKeys = (textToImport: string) => {
+    const extracted = parseKeysFromRawText(textToImport);
+    if (extracted.length === 0) {
+      setBatchFeedback({
+        text: 'No se detectaron claves de API válidas en el texto. Asegúrate de incluir claves que empiecen por "AIzaSy..." o tengan al menos 20 caracteres.',
+        isError: true
+      });
+      return;
+    }
+
+    let addedCount = 0;
+    const currentSet = new Set(apiKeysList);
+    const updated = [...apiKeysList];
+
+    for (const k of extracted) {
+      if (!currentSet.has(k)) {
+        currentSet.add(k);
+        updated.push(k);
+        addedCount++;
+      }
+    }
+
+    setApiKeysList(updated);
+    if (!keyInput.trim() && updated.length > 0) {
+      setKeyInput(updated[0]);
+    }
+
+    const duplicates = extracted.length - addedCount;
+    setBatchFeedback({
+      text: `✓ Se ${addedCount === 1 ? 'ha importado 1 clave nueva' : `han importado ${addedCount} claves nuevas`}${
+        duplicates > 0 ? ` (${duplicates} ya existían en el pool)` : ''
+      }. Total en el pool: ${updated.length}.`,
+      isError: false
+    });
+    setBatchRawText('');
+    setShowBatchBox(false);
+  };
+
+  const handleKeyFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        handleImportBatchKeys(content);
+      }
+      if (keyFileInputRef.current) {
+        keyFileInputRef.current.value = '';
+      }
+    };
+    reader.onerror = () => {
+      setBatchFeedback({ text: 'Error al leer el archivo seleccionado.', isError: true });
+      if (keyFileInputRef.current) {
+        keyFileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExportKeys = () => {
+    if (apiKeysList.length === 0) return;
+    const content = `# Claves de API Google AI Studio - GM Studio\n# Total: ${apiKeysList.length}\n# Fecha: ${new Date().toLocaleString()}\n\n` + apiKeysList.join('\n') + '\n';
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gemini_api_keys_${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -527,18 +651,18 @@ export const ApiKeyModal: React.FC<{
                     desc: 'Extrae y actualiza solo el estado inmediato, peligros vitales y PNJs cruciales con prompts ultra-compactos. Máximo rendimiento y protección de tu cuota de Google AI Studio.'
                   },
                   {
+                    id: 'batch',
+                    title: '⏳ Por Lotes (Cada 20 turnos)',
+                    badge: '-95% Llamadas API',
+                    badgeColor: 'bg-purple-700',
+                    desc: 'Acumula los turnos recientes y actualiza la memoria viva únicamente cada 20 mensajes. Ideal para jugar sesiones completas sin apenas consumir peticiones en segundo plano.'
+                  },
+                  {
                     id: 'full',
-                    title: '📜 Completo / Exhaustivo',
+                    title: '📜 Completo / Cada Turno',
                     badge: 'Análisis Total',
                     badgeColor: 'bg-blue-700',
                     desc: 'Sincroniza y actualiza exhaustivamente todas las tramas secundarias, PNJs, estados de relación y lugares tras cada turno.'
-                  },
-                  {
-                    id: 'batch',
-                    title: '⏳ Por Lotes (Cada 3 turnos)',
-                    badge: '-66% Llamadas API',
-                    badgeColor: 'bg-purple-700',
-                    desc: 'Acumula los turnos recientes y actualiza la memoria cada 3 mensajes, reduciendo radicalmente las peticiones en segundo plano.'
                   },
                   {
                     id: 'off',
@@ -939,25 +1063,160 @@ export const ApiKeyModal: React.FC<{
               </div>
 
               {/* Pool de Claves de Respaldo / Rotación */}
-              <div className="bg-[var(--glass)] p-3 rounded-lg border border-[var(--glass-border)] space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="bg-[var(--glass)] p-3.5 rounded-lg border border-[var(--glass-border)] space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-1.5 font-cinzel font-bold text-xs text-[var(--accent)]">
                     <Layers className="w-3.5 h-3.5" /> Pool de Claves (Rotación Automática Anti-Límite de Cuota)
                   </div>
-                  <span className="text-[10px] text-[var(--text-secondary)]">
-                    {apiKeysList.length} {apiKeysList.length === 1 ? 'clave' : 'claves'}
+                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] text-[var(--accent)]">
+                    {apiKeysList.length} {apiKeysList.length === 1 ? 'clave configurada' : 'claves configuradas'}
                   </span>
                 </div>
 
                 <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                  Si añades varias claves de Google AI Studio, la app <strong>saltará automáticamente a la siguiente clave</strong> si la actual alcanza el límite de cuota (429 / Resource Exhausted) o se satura.
+                  Si añades varias claves de Google AI Studio, la app <strong>saltará automáticamente a la siguiente clave</strong> si la actual alcanza el límite de cuota (429 / Resource Exhausted) o rotará entre ellas de forma equitativa.
                 </p>
 
-                {/* Input para añadir nueva clave al pool */}
+                {/* Feedback banner */}
+                {batchFeedback && (
+                  <div
+                    className={`p-2.5 rounded-lg text-xs flex items-center justify-between gap-2 animate-[fadeIn_0.2s_ease] ${
+                      batchFeedback.isError
+                        ? 'bg-red-50 dark:bg-red-950/60 border border-red-300 dark:border-red-800 text-red-900 dark:text-red-200'
+                        : 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
+                    }`}
+                  >
+                    <span className="flex-1 font-semibold">{batchFeedback.text}</span>
+                    <button
+                      type="button"
+                      onClick={() => setBatchFeedback(null)}
+                      className="text-xs cursor-pointer p-0.5 hover:opacity-70"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Barra de Acciones Rápidas (Importar TXT / Pegar Varias / Exportar / Vaciar) */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    ref={keyFileInputRef}
+                    onChange={handleKeyFileSelected}
+                    accept=".txt,.json,.csv,.env,text/plain"
+                    className="hidden"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => keyFileInputRef.current?.click()}
+                    className="px-2.5 py-1.5 bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] hover:bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--user-border)] rounded font-cinzel font-semibold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer hover:border-[var(--accent)]"
+                    title="Importar claves desde un archivo .txt, .env o .json"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-[var(--accent)]" /> Importar Archivo .TXT
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBatchBox(!showBatchBox);
+                      setBatchFeedback(null);
+                    }}
+                    className={`px-2.5 py-1.5 rounded font-cinzel font-semibold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                      showBatchBox
+                        ? 'bg-[var(--accent)] text-[var(--on-accent)]'
+                        : 'bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] hover:bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--user-border)] hover:border-[var(--accent)]'
+                    }`}
+                    title="Pegar una lista de múltiples claves a la vez"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5" /> Pegar Varias a la Vez
+                  </button>
+
+                  {apiKeysList.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleExportKeys}
+                        className="px-2.5 py-1.5 bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--user-border)] rounded font-cinzel font-semibold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                        title="Descargar copia de respaldo en formato .txt"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Exportar (.txt)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('¿Seguro que deseas vaciar todas las claves de API del pool?')) {
+                            setApiKeysList([]);
+                            setKeyInput('');
+                            setBatchFeedback({ text: 'Pool de claves vaciado.', isError: false });
+                          }
+                        }}
+                        className="px-2 py-1.5 text-stone-400 hover:text-red-500 rounded font-cinzel text-xs flex items-center gap-1 transition-all cursor-pointer ml-auto"
+                        title="Vaciar todo el pool"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Vaciar Todo
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Panel desplegable para Pegar Varias Claves a la vez */}
+                {showBatchBox && (
+                  <div className="bg-[color-mix(in_srgb,var(--surface)_95%,transparent)] p-3 rounded-lg border-2 border-[var(--accent)]/40 space-y-2 animate-[fadeIn_0.15s_ease]">
+                    <div className="flex items-center justify-between">
+                      <label className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" /> Pega aquí tus claves de API (separadas por saltos de línea, comas o espacios):
+                      </label>
+                      {batchRawText.trim() && (
+                        <span className="text-[11px] font-mono text-[var(--accent)] font-semibold">
+                          {parseKeysFromRawText(batchRawText).length} detectadas
+                        </span>
+                      )}
+                    </div>
+
+                    <textarea
+                      rows={4}
+                      value={batchRawText}
+                      onChange={e => setBatchRawText(e.target.value)}
+                      placeholder={`AIzaSyA1234567890abcdef...\nAIzaSyB0987654321fedcba...\nAIzaSyC1122334455aabbcc...`}
+                      className="w-full bg-[var(--surface)] border border-[var(--user-border)] p-2 rounded font-mono text-xs outline-none focus:border-[var(--accent)] shadow-inner text-[var(--text-primary)] leading-relaxed resize-y"
+                    />
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="text-[10px] text-[var(--text-secondary)]">
+                        * Admite formato .env, JSON o texto plano pegado directamente de Google AI Studio.
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowBatchBox(false);
+                            setBatchRawText('');
+                          }}
+                          className="px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleImportBatchKeys(batchRawText)}
+                          disabled={!batchRawText.trim()}
+                          className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded font-cinzel font-bold text-xs hover:bg-[var(--accent-hover)] disabled:opacity-40 cursor-pointer shadow-xs flex items-center gap-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Añadir al Pool ({parseKeysFromRawText(batchRawText).length || 0})
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Input para añadir una clave individual */}
                 <div className="flex gap-2">
                   <input
                     type="password"
-                    placeholder="Pegar otra clave API de AI Studio (AIzaSy...)"
+                    placeholder="O añade una clave suelta (AIzaSy...)"
                     value={newKeyInput}
                     onChange={e => setNewKeyInput(e.target.value)}
                     onKeyDown={e => {
@@ -988,13 +1247,13 @@ export const ApiKeyModal: React.FC<{
                     disabled={!newKeyInput.trim()}
                     className="px-3 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded font-cinzel font-bold text-xs flex items-center gap-1 hover:bg-[var(--accent-hover)] disabled:opacity-40 cursor-pointer"
                   >
-                    <Plus className="w-3 h-3" /> Añadir Clave
+                    <Plus className="w-3 h-3" /> Añadir
                   </button>
                 </div>
 
                 {/* Lista de claves configuradas en el Pool */}
                 {apiKeysList.length > 0 && (
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                     {apiKeysList.map((k, idx) => {
                       const isMain = idx === 0;
                       const masked = k.length > 10 ? `${k.slice(0, 7)}••••••••${k.slice(-4)}` : '••••••••';

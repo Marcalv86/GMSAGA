@@ -961,7 +961,7 @@ export default function App() {
         let shouldRunSync = true;
         if (syncGranularity === 'batch') {
           turnsSinceSyncRef.current += 1;
-          if (turnsSinceSyncRef.current < 3) {
+          if (turnsSinceSyncRef.current < 20) {
             shouldRunSync = false;
           } else {
             turnsSinceSyncRef.current = 0;
