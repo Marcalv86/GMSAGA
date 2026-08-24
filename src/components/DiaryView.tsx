@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Project } from '../types';
-import { Eye, EyeOff, NotebookPen, Pencil, RefreshCw, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { Eye, EyeOff, NotebookPen, Pencil, RefreshCw, Save, Sparkles, Trash2, Wand2, X } from 'lucide-react';
+import { CreativeStudioModal } from './CreativeStudioModal';
 
 /**
  * El diario del Narrador — crónica, estado y notas — como una sección más de
@@ -36,6 +37,11 @@ export const DiaryView: React.FC<{
   const [notesDraft, setNotesDraft] = useState(memory.manual_notes || '');
   const [showNotes, setShowNotes] = useState(false);
   const [confirmClear, setConfirmClear] = useState<Seccion | null>(null);
+  const [studioModal, setStudioModal] = useState<{
+    isOpen: boolean;
+    tab?: 'image' | 'video' | 'music' | 'diary';
+    sceneText: string;
+  } | null>(null);
 
   useEffect(() => {
     setStoryDraft(memory.story || '');
@@ -169,6 +175,21 @@ export const DiaryView: React.FC<{
 
                 {editing !== s.id && (
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {s.value && (
+                      <button
+                        onClick={() =>
+                          setStudioModal({
+                            isOpen: true,
+                            tab: 'image',
+                            sceneText: `${s.label}: ${s.value}`
+                          })
+                        }
+                        title={`Taller Creativo: Generar contenido (ilustración, música, video) a partir de ${s.label}`}
+                        className="flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-cinzel font-bold text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 cursor-pointer shadow-2xs"
+                      >
+                        <Wand2 className="w-3 h-3" /> Crear contenido
+                      </button>
+                    )}
                     {s.id === 'notes' && s.value && (
                       <button
                         onClick={() => setShowNotes(!showNotes)}
@@ -302,6 +323,24 @@ export const DiaryView: React.FC<{
             </div>
           </div>
         </div>
+      )}
+      {/* Modal del Taller Creativo basado en la escena / sección del diario */}
+      {studioModal?.isOpen && (
+        <CreativeStudioModal
+          isOpen={studioModal.isOpen}
+          initialTab={studioModal.tab || 'image'}
+          sceneText={studioModal.sceneText}
+          onClose={() => setStudioModal(null)}
+          onInsertIntoChat={async text => {
+            // If user inserts into chat or memory
+            if (onUpdateMemory) {
+              await onUpdateMemory(mem => ({
+                ...mem,
+                manual_notes: mem.manual_notes ? `${mem.manual_notes}\n\n${text}` : text
+              }));
+            }
+          }}
+        />
       )}
     </>
   );

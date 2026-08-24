@@ -61,11 +61,13 @@ import {
   Settings2,
   Sparkles,
   Trash2,
+  Wand2,
   X,
   Newspaper,
   Moon,
   AlertTriangle
 } from 'lucide-react';
+import { CreativeStudioModal } from './CreativeStudioModal';
 
 /**
  * Vista unificada de Calendario y Diario de Campaña.
@@ -136,6 +138,11 @@ export const CalendarView: React.FC<{
   const [editandoNotas, setEditandoNotas] = useState(false);
   const [draftNotas, setDraftNotas] = useState(project.memory?.manual_notes || '');
   const [mostrarNotasNarrador, setMostrarNotasNarrador] = useState(false);
+  const [studioModal, setStudioModal] = useState<{
+    isOpen: boolean;
+    tab?: 'image' | 'video' | 'music' | 'diary';
+    sceneText: string;
+  } | null>(null);
 
   useEffect(() => {
     setDraftEstado(project.memory?.current_status || '');
@@ -1346,7 +1353,26 @@ export const CalendarView: React.FC<{
                     Acontecimientos del día ({entradasDiaActivo.length})
                   </div>
                   {entradasDiaActivo.length > 0 && (
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const fullScene = entradasDiaActivo
+                            .map(
+                              e =>
+                                `${e.lugar ? `[${e.lugar}] ` : ''}${e.summary}${e.hito ? ` (${e.hito})` : ''}`
+                            )
+                            .join('. ');
+                          setStudioModal({
+                            isOpen: true,
+                            tab: 'image',
+                            sceneText: `Acontecimientos del ${nombreDiaActivo}: ${fullScene}`
+                          });
+                        }}
+                        className="text-[11px] font-cinzel font-bold text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/40 border border-amber-500/50 hover:bg-amber-200 dark:hover:bg-amber-900/60 px-2.5 py-1 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors"
+                        title="Taller Creativo: Generar ilustración, música o cinemática con todos los acontecimientos de este día"
+                      >
+                        <Wand2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" /> Taller Creativo del Día
+                      </button>
                       {entradasDiaActivo.length > 1 && (
                         <button
                           onClick={() => consolidarEntradasDia(diaActivo, nombreDiaActivo)}
@@ -1489,8 +1515,23 @@ export const CalendarView: React.FC<{
                               )}
                             </div>
 
-                            {/* Botones de acción por entrada (Editar y Borrar) */}
+                            {/* Botones de acción por entrada (Crear contenido, Editar y Borrar) */}
                             <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => {
+                                  const sceneText = `${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ''}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ''}`;
+                                  setStudioModal({
+                                    isOpen: true,
+                                    tab: 'image',
+                                    sceneText
+                                  });
+                                }}
+                                className="px-1.5 py-0.5 rounded text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer flex items-center gap-1 text-[10px] font-cinzel font-semibold shadow-2xs"
+                                title="Taller Creativo: Crear ilustración, música o cinemática para este acontecimiento"
+                              >
+                                <Wand2 className="w-3 h-3 text-amber-700 dark:text-amber-400" />
+                                <span className="hidden sm:inline">Crear contenido</span>
+                              </button>
                               <button
                                 onClick={() => iniciarEdicionEntrada(entrada)}
                                 className="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-color)] cursor-pointer"
@@ -1991,6 +2032,21 @@ export const CalendarView: React.FC<{
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button
+                                      onClick={() => {
+                                        const sceneText = `${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ''}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ''}`;
+                                        setStudioModal({
+                                          isOpen: true,
+                                          tab: 'image',
+                                          sceneText
+                                        });
+                                      }}
+                                      className="px-1.5 py-0.5 rounded text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer flex items-center gap-1 text-[10px] font-cinzel font-semibold shadow-2xs"
+                                      title="Taller Creativo: Crear contenido para este acontecimiento"
+                                    >
+                                      <Wand2 className="w-3 h-3 text-amber-700 dark:text-amber-400" />
+                                      <span className="hidden sm:inline">Crear</span>
+                                    </button>
+                                    <button
                                       onClick={() => iniciarEdicionEntrada(entrada)}
                                       className="text-[var(--text-secondary)] hover:text-[var(--accent)] p-1 cursor-pointer"
                                       title="Editar"
@@ -2328,6 +2384,32 @@ export const CalendarView: React.FC<{
             </div>
           </div>
         </div>
+      )}
+      {/* Modal del Taller Creativo para acontecimientos del calendario */}
+      {studioModal?.isOpen && (
+        <CreativeStudioModal
+          isOpen={studioModal.isOpen}
+          initialTab={studioModal.tab || 'image'}
+          sceneText={studioModal.sceneText}
+          onClose={() => setStudioModal(null)}
+          onInsertIntoChat={async text => {
+            // Guardar en notas del narrador si se solicita
+            if (onUpdate) {
+              const prevNotes = project.memory?.manual_notes || '';
+              await onUpdate({
+                memory: {
+                  ...project.memory,
+                  story: project.memory?.story || '',
+                  quests: project.memory?.quests || [],
+                  npcs: project.memory?.npcs || [],
+                  locations: project.memory?.locations || [],
+                  current_status: project.memory?.current_status || '',
+                  manual_notes: prevNotes ? `${prevNotes}\n\n${text}` : text
+                }
+              });
+            }
+          }}
+        />
       )}
     </div>
   );

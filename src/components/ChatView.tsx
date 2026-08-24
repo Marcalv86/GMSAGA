@@ -1119,18 +1119,53 @@ export const ChatView: React.FC<{
             )}
 
             {[
-              { sides: 20, label: 'd20', theme: 'border-amber-400/60 text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/25 hover:border-amber-400 shadow-amber-500/10 hover:shadow-amber-500/25' },
-              { sides: 12, label: 'd12', theme: 'border-purple-400/60 text-purple-700 dark:text-purple-300 bg-purple-500/10 hover:bg-purple-500/25 hover:border-purple-400 shadow-purple-500/10 hover:shadow-purple-500/25' },
-              { sides: 10, label: 'd10', theme: 'border-blue-400/60 text-blue-700 dark:text-blue-300 bg-blue-500/10 hover:bg-blue-500/25 hover:border-blue-400 shadow-blue-500/10 hover:shadow-blue-500/25' },
-              { sides: 8, label: 'd8', theme: 'border-emerald-400/60 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/25 hover:border-emerald-400 shadow-emerald-500/10 hover:shadow-emerald-500/25' },
-              { sides: 6, label: 'd6', theme: 'border-rose-400/60 text-rose-700 dark:text-rose-300 bg-rose-500/10 hover:bg-rose-500/25 hover:border-rose-400 shadow-rose-500/10 hover:shadow-rose-500/25' },
-              { sides: 4, label: 'd4', theme: 'border-orange-400/60 text-orange-700 dark:text-orange-300 bg-orange-500/10 hover:bg-orange-500/25 hover:border-orange-400 shadow-orange-500/10 hover:shadow-orange-500/25' },
-              { sides: 100, label: 'd100', theme: 'border-cyan-400/60 text-cyan-700 dark:text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/25 hover:border-cyan-400 shadow-cyan-500/10 hover:shadow-cyan-500/25' },
+              {
+                sides: 20,
+                label: 'd20',
+                theme:
+                  'border-amber-700/60 dark:border-amber-400/60 text-amber-950 dark:text-amber-200 bg-amber-100/90 dark:bg-amber-950/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 shadow-amber-950/10'
+              },
+              {
+                sides: 12,
+                label: 'd12',
+                theme:
+                  'border-purple-700/60 dark:border-purple-400/60 text-purple-950 dark:text-purple-200 bg-purple-100/90 dark:bg-purple-950/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 shadow-purple-950/10'
+              },
+              {
+                sides: 10,
+                label: 'd10',
+                theme:
+                  'border-blue-700/60 dark:border-blue-400/60 text-blue-950 dark:text-blue-200 bg-blue-100/90 dark:bg-blue-950/40 hover:bg-blue-200 dark:hover:bg-blue-900/60 shadow-blue-950/10'
+              },
+              {
+                sides: 8,
+                label: 'd8',
+                theme:
+                  'border-emerald-700/60 dark:border-emerald-400/60 text-emerald-950 dark:text-emerald-200 bg-emerald-100/90 dark:bg-emerald-950/40 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 shadow-emerald-950/10'
+              },
+              {
+                sides: 6,
+                label: 'd6',
+                theme:
+                  'border-rose-700/60 dark:border-rose-400/60 text-rose-950 dark:text-rose-200 bg-rose-100/90 dark:bg-rose-950/40 hover:bg-rose-200 dark:hover:bg-rose-900/60 shadow-rose-950/10'
+              },
+              {
+                sides: 4,
+                label: 'd4',
+                theme:
+                  'border-orange-700/60 dark:border-orange-400/60 text-orange-950 dark:text-orange-200 bg-orange-100/90 dark:bg-orange-950/40 hover:bg-orange-200 dark:hover:bg-orange-900/60 shadow-orange-950/10'
+              },
+              {
+                sides: 100,
+                label: 'd100',
+                theme:
+                  'border-teal-700/60 dark:border-teal-400/60 text-teal-950 dark:text-teal-200 bg-teal-100/90 dark:bg-teal-950/40 hover:bg-teal-200 dark:hover:bg-teal-900/60 shadow-teal-950/10'
+              }
             ].map(d => (
               <button
                 key={d.sides}
                 onClick={() => handleDieClick(d.sides)}
-                className={`rounded-lg px-2.5 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-sm cursor-pointer hover:scale-105 active:scale-95 ${d.theme}`}
+                className={`rounded-lg px-2.5 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer hover:scale-105 active:scale-95 ${d.theme}`}
                 title={`Tirar dado de ${d.sides} caras y añadir al mensaje`}
               >
                 {d.label}
@@ -1142,18 +1177,24 @@ export const ChatView: React.FC<{
 
             {/* Botón de Música & Bardo */}
             <button
-              onClick={() => setStudioModal({ isOpen: true, tab: 'music' })}
-              className="rounded-lg px-3 py-1 text-xs font-cinzel font-semibold border border-purple-400/50 bg-purple-500/15 text-purple-700 dark:text-purple-300 hover:bg-purple-500/30 hover:scale-105 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              onClick={() => {
+                const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
+                setStudioModal({ isOpen: true, tab: 'music', sceneText: lastModelMsg });
+              }}
+              className="rounded-lg px-3 py-1 text-xs font-cinzel font-bold border border-purple-700/60 dark:border-purple-400/60 bg-purple-100/90 dark:bg-purple-950/50 text-purple-950 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
               title="Música ambiental, sintetizador de laúd/taberna, canciones de YouTube y Spotify"
             >
               <Music className="w-3.5 h-3.5" /> Bardo & Música
             </button>
 
-            {/* Botón de Taller Creativo (Imágenes y Video) */}
+            {/* Botón de Taller Creativo (Imágenes, Cinemática y Escena) */}
             <button
-              onClick={() => setStudioModal({ isOpen: true, tab: 'image' })}
-              className="rounded-lg px-3 py-1 text-xs font-cinzel font-semibold border border-amber-400/50 bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/30 hover:scale-105 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
-              title="Taller multimedia: Generar ilustraciones de escenas, retratos de personajes y videos cinemáticos"
+              onClick={() => {
+                const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
+                setStudioModal({ isOpen: true, tab: 'image', sceneText: lastModelMsg });
+              }}
+              className="rounded-lg px-3 py-1 text-xs font-cinzel font-bold border border-amber-700/60 dark:border-amber-400/60 bg-amber-100/90 dark:bg-amber-950/50 text-amber-950 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              title="Taller multimedia: Generar ilustraciones de escenas, retratos de personajes y videos cinemáticos a partir de la escena"
             >
               <Wand2 className="w-3.5 h-3.5" /> Taller Creativo
             </button>
