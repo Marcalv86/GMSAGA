@@ -160,9 +160,9 @@ body {
   letter-spacing: -0.01em;
   overflow-wrap: break-word;
   word-wrap: break-word;
-  word-break: break-word;
-  -webkit-hyphens: auto;
-  hyphens: auto;
+  word-break: normal;
+  -webkit-hyphens: manual;
+  hyphens: manual;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
 }
 
@@ -179,17 +179,14 @@ html[data-theme='dark'] .narrative-body {
   margin-bottom: 0;
 }
 
-/* Diálogos novelescos resaltados con sangría y borde tenue */
+/* Diálogos novelescos sutiles con sangría y borde tenue */
 .narrative-body p.narrative-dialogue {
   color: var(--text-primary);
-  padding-left: 0.85rem;
-  border-left: 2.5px solid color-mix(in srgb, var(--accent) 60%, transparent);
-  background: color-mix(in srgb, var(--accent) 3.5%, transparent);
-  border-radius: 0 6px 6px 0;
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
-  margin-bottom: 1.4em;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  padding-left: 0.65rem;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+  margin-bottom: 1.35em;
 }
 
 /* Nombres propios y palabras clave en negrita enriquecida */
@@ -242,16 +239,16 @@ html[data-theme='dark'] .narrative-body {
     font-size: 1.05rem; /* ~16.8px */
     line-height: 1.8;
     letter-spacing: -0.012em;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    -webkit-hyphens: auto;
-    hyphens: auto;
+    overflow-wrap: break-word;
+    word-break: normal;
+    -webkit-hyphens: manual;
+    hyphens: manual;
   }
   .narrative-body p {
     margin-bottom: 1.45em; /* Generoso espacio entre párrafos en móvil */
   }
   .narrative-body p.narrative-dialogue {
-    padding-left: 0.75rem;
+    padding-left: 0.65rem;
     margin-bottom: 1.35em;
   }
 }

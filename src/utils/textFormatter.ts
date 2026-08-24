@@ -63,8 +63,8 @@ export function formatNarrativeText(raw: string | undefined | null): string {
     .replace(/\r/g, '\n');
 
   // 2. Normalizar guiones de diálogo para que empiecen en nueva línea
-  text = text.replace(/([.!?…»”"'])\s*([—–-]\s*[A-ZÁÉÍÓÚÑa-záéíóúñ])/g, '$1\n\n$2');
-  text = text.replace(/\n\s*([—–-]\s*)/g, '\n\n$1');
+  text = text.replace(/([.!?…»”"'])\s*([—–]\s*[A-ZÁÉÍÓÚÑa-záéíóúñ¿¡])/g, '$1\n\n$2');
+  text = text.replace(/\n\s*([—–]\s*)/g, '\n\n$1');
 
   // 3. Separar por párrafos preexistentes (si ya hay \n\n)
   const rawParagraphs = text.split(/\n\s*\n/);

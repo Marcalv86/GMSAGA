@@ -343,7 +343,7 @@ export const NovelReaderView: React.FC<{
                       }
 
                       return (
-                        <div key={mIdx} className={`${fontSizeClasses[fontSize]} text-justify hyphens-auto`}>
+                        <div key={mIdx} className={`${fontSizeClasses[fontSize]} text-left sm:text-justify`}>
                           <div className="markdown-body narrative-body space-y-4">
                             <ReactMarkdown
                               components={{

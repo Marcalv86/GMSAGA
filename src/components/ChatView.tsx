@@ -93,7 +93,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
 
   // Extraer tiradas estructuradas embebidas en el mensaje (ej: [Tirada de Sigilo: d20 natural = 18 | CD 15])
   const { narrativeText, rolls } = parseMessageRolls(baseContent);
-  const bodyText = formatNarrativeText(narrativeText);
+  const bodyText = isModel ? formatNarrativeText(narrativeText) : narrativeText;
 
   // Detección de elementos técnicos sincronizados en segundo plano
   const hasSyncTags = isModel && (
@@ -273,7 +273,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                     const str = Array.isArray(children)
                       ? children.map(c => (typeof c === 'string' ? c : '')).join('')
                       : typeof children === 'string' ? children : '';
-                    const isDialogue = /^[—–\-"«]/.test(str.trim());
+                    const isDialogue = isModel && /^[—–\-"«]/.test(str.trim());
                     return (
                       <p className={isDialogue ? 'narrative-dialogue' : undefined}>
                         {children}
