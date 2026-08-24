@@ -1,4 +1,4 @@
-import { NPC } from "../types";
+import { NPC } from '../types';
 
 /**
  * Número mínimo de días/encuentros distintos requeridos para alcanzar cada puntuación en la escala 1-20.
@@ -41,7 +41,7 @@ export function calcularProgresoEje(
   valorReportado: number | undefined,
   totalDiasVistos: number,
   diaActual: number,
-  ultimoDiaSubidaEje: number | undefined,
+  ultimoDiaSubidaEje: number | undefined
 ): { nuevoValor: number | undefined; diaSubida: number | undefined } {
   if (valorReportado === undefined || valorReportado === null) {
     return { nuevoValor: valorActual, diaSubida: ultimoDiaSubidaEje };
@@ -87,52 +87,27 @@ export function calcularProgresoEje(
  */
 export function actualizarAfinidadNpc(
   npc: NPC,
-  reportado: {
-    atr?: number;
-    vin?: number;
-    con?: number;
-    vinculo?: string;
-    aparenta?: string;
-    oculta?: string;
-  },
+  reportado: { atr?: number; vin?: number; con?: number; vinculo?: string; aparenta?: string; oculta?: string },
   diasActualizados: number[],
-  diaActual: number,
+  diaActual: number
 ): Partial<NPC> {
   const totalDias = diasActualizados.length;
   const ultimosDias = npc.ultimoDiaSubida || {};
 
-  const progresoAtr = calcularProgresoEje(
-    npc.atr,
-    reportado.atr,
-    totalDias,
-    diaActual,
-    ultimosDias.atr,
-  );
-  const progresoVin = calcularProgresoEje(
-    npc.vin,
-    reportado.vin,
-    totalDias,
-    diaActual,
-    ultimosDias.vin,
-  );
-  const progresoCon = calcularProgresoEje(
-    npc.con,
-    reportado.con,
-    totalDias,
-    diaActual,
-    ultimosDias.con,
-  );
+  const progresoAtr = calcularProgresoEje(npc.atr, reportado.atr, totalDias, diaActual, ultimosDias.atr);
+  const progresoVin = calcularProgresoEje(npc.vin, reportado.vin, totalDias, diaActual, ultimosDias.vin);
+  const progresoCon = calcularProgresoEje(npc.con, reportado.con, totalDias, diaActual, ultimosDias.con);
 
   const nuevoUltimoDiaSubida = {
     atr: progresoAtr.diaSubida ?? ultimosDias.atr,
     vin: progresoVin.diaSubida ?? ultimosDias.vin,
-    con: progresoCon.diaSubida ?? ultimosDias.con,
+    con: progresoCon.diaSubida ?? ultimosDias.con
   };
 
   return {
     atr: progresoAtr.nuevoValor,
     vin: progresoVin.nuevoValor,
     con: progresoCon.nuevoValor,
-    ultimoDiaSubida: nuevoUltimoDiaSubida,
+    ultimoDiaSubida: nuevoUltimoDiaSubida
   };
 }

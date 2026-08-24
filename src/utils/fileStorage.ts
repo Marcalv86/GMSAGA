@@ -6,33 +6,24 @@
  * ocupa bastante, lo que la pone antes en esa cola. Con permiso de persistencia
  * los datos solo se borran si la usuaria lo pide expresamente.
  */
-export async function requestPersistentStorage(): Promise<{
-  persisted: boolean;
-  supported: boolean;
-}> {
-  if (typeof navigator === "undefined" || !navigator.storage?.persist) {
+export async function requestPersistentStorage(): Promise<{ persisted: boolean; supported: boolean }> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.persist) {
     return { persisted: false, supported: false };
   }
   try {
-    const already = navigator.storage.persisted
-      ? await navigator.storage.persisted()
-      : false;
+    const already = navigator.storage.persisted ? await navigator.storage.persisted() : false;
     if (already) return { persisted: true, supported: true };
     const granted = await navigator.storage.persist();
     return { persisted: granted, supported: true };
   } catch (err) {
-    console.warn("No se pudo solicitar almacenamiento persistente:", err);
+    console.warn('No se pudo solicitar almacenamiento persistente:', err);
     return { persisted: false, supported: true };
   }
 }
 
 /** Espacio usado y disponible, para avisar antes de quedarse sin sitio. */
-export async function getStorageEstimate(): Promise<{
-  usage: number;
-  quota: number;
-} | null> {
-  if (typeof navigator === "undefined" || !navigator.storage?.estimate)
-    return null;
+export async function getStorageEstimate(): Promise<{ usage: number; quota: number } | null> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null;
   try {
     const { usage = 0, quota = 0 } = await navigator.storage.estimate();
     return { usage, quota };
@@ -41,11 +32,11 @@ export async function getStorageEstimate(): Promise<{
   }
 }
 
-import { ProjectFile, Project, Chat } from "../types";
+import { ProjectFile, Project, Chat } from '../types';
 
-const DB_NAME = "gmstudio_app_db";
-const FILES_STORE = "project_files";
-const APP_STORE = "app_data";
+const DB_NAME = 'gmstudio_app_db';
+const FILES_STORE = 'project_files';
+const APP_STORE = 'app_data';
 const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -58,16 +49,15 @@ let dbPromise: Promise<IDBDatabase> | null = null;
  */
 function createStores(db: IDBDatabase): void {
   if (!db.objectStoreNames.contains(FILES_STORE)) {
-    db.createObjectStore(FILES_STORE, { keyPath: "id" });
+    db.createObjectStore(FILES_STORE, { keyPath: 'id' });
   }
   if (!db.objectStoreNames.contains(APP_STORE)) {
-    db.createObjectStore(APP_STORE, { keyPath: "key" });
+    db.createObjectStore(APP_STORE, { keyPath: 'key' });
   }
 }
 
 const hasStores = (db: IDBDatabase) =>
-  db.objectStoreNames.contains(FILES_STORE) &&
-  db.objectStoreNames.contains(APP_STORE);
+  db.objectStoreNames.contains(FILES_STORE) && db.objectStoreNames.contains(APP_STORE);
 
 export function getDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
@@ -75,7 +65,7 @@ export function getDB(): Promise<IDBDatabase> {
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = event => {
       createStores((event.target as IDBOpenDBRequest).result);
     };
 
@@ -89,13 +79,12 @@ export function getDB(): Promise<IDBDatabase> {
       // sin almacenes. Así no hay `onupgradeneeded` que valga y nada se guarda
       // nunca. Una base sin almacenes no contiene datos por definición, así que
       // borrarla y rehacerla no pierde nada.
-      console.warn("IndexedDB sin almacenes; se recrea la base.");
+      console.warn('IndexedDB sin almacenes; se recrea la base.');
       db.close();
       const del = indexedDB.deleteDatabase(DB_NAME);
       const retry = () => {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
-        req.onupgradeneeded = (event) =>
-          createStores((event.target as IDBOpenDBRequest).result);
+        req.onupgradeneeded = event => createStores((event.target as IDBOpenDBRequest).result);
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       };
@@ -105,7 +94,7 @@ export function getDB(): Promise<IDBDatabase> {
     };
 
     request.onerror = () => {
-      console.error("IndexedDB open error:", request.error);
+      console.error('IndexedDB open error:', request.error);
       reject(request.error);
     };
   });
@@ -121,62 +110,50 @@ export function cleanupLocalStorageQuota(): void {
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (
-        key &&
-        (key.startsWith("gmstudio_local_files_") ||
-          key.startsWith("gmstudio_temp_"))
-      ) {
+      if (key && (key.startsWith('gmstudio_local_files_') || key.startsWith('gmstudio_temp_'))) {
         keysToRemove.push(key);
       }
     }
-    keysToRemove.forEach((k) => localStorage.removeItem(k));
+    keysToRemove.forEach(k => localStorage.removeItem(k));
 
     // Also sanitize local projects in localStorage to strip any raw image data URLs
-    const projectsRaw = localStorage.getItem("gmstudio_local_projects");
+    const projectsRaw = localStorage.getItem('gmstudio_local_projects');
     if (projectsRaw) {
       const projs: Project[] = JSON.parse(projectsRaw);
       const sanitized = sanitizeProjectsForLocalStorage(projs);
-      localStorage.setItem(
-        "gmstudio_local_projects",
-        JSON.stringify(sanitized),
-      );
+      localStorage.setItem('gmstudio_local_projects', JSON.stringify(sanitized));
     }
   } catch (err) {
-    console.warn("Cleanup localStorage error:", err);
+    console.warn('Cleanup localStorage error:', err);
   }
 }
 
 /**
  * Strips heavy data (like huge raw base64 thumbnails or files) before placing into localStorage
  */
-export function sanitizeProjectsForLocalStorage(
-  projects: Project[],
-): Project[] {
-  return projects.map((p) => ({
+export function sanitizeProjectsForLocalStorage(projects: Project[]): Project[] {
+  return projects.map(p => ({
     ...p,
     files: [], // Do not keep files array inside project in localStorage
     memory: {
       ...p.memory,
-      visual_memory: (p.memory?.visual_memory || []).map((vm) => ({
+      visual_memory: (p.memory?.visual_memory || []).map(vm => ({
         id: vm.id,
         fileId: vm.fileId,
         fileName: vm.fileName,
-        analysis: vm.analysis,
+        analysis: vm.analysis
         // Omit raw thumbnail base64 from localStorage
-      })),
-    },
+      }))
+    }
   }));
 }
 
 // ---------------- FILES (IndexedDB) ----------------
 
-export async function saveFilesToDB(
-  projectId: string,
-  files: ProjectFile[],
-): Promise<void> {
+export async function saveFilesToDB(projectId: string, files: ProjectFile[]): Promise<void> {
   try {
     const db = await getDB();
-    const tx = db.transaction(FILES_STORE, "readwrite");
+    const tx = db.transaction(FILES_STORE, 'readwrite');
     const store = tx.objectStore(FILES_STORE);
 
     store.put({ id: `project_${projectId}`, files });
@@ -186,20 +163,18 @@ export async function saveFilesToDB(
       tx.onerror = () => reject(tx.error);
     });
   } catch (error) {
-    console.error("IndexedDB save files error:", error);
+    console.error('IndexedDB save files error:', error);
   }
 }
 
-export async function loadFilesFromDB(
-  projectId: string,
-): Promise<ProjectFile[]> {
+export async function loadFilesFromDB(projectId: string): Promise<ProjectFile[]> {
   try {
     const db = await getDB();
-    const tx = db.transaction(FILES_STORE, "readonly");
+    const tx = db.transaction(FILES_STORE, 'readonly');
     const store = tx.objectStore(FILES_STORE);
     const request = store.get(`project_${projectId}`);
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       request.onsuccess = () => {
         if (request.result && Array.isArray(request.result.files)) {
           resolve(request.result.files);
@@ -216,16 +191,14 @@ export async function loadFilesFromDB(
   }
 }
 
-export async function deleteProjectFilesFromDB(
-  projectId: string,
-): Promise<void> {
+export async function deleteProjectFilesFromDB(projectId: string): Promise<void> {
   try {
     const db = await getDB();
-    const tx = db.transaction(FILES_STORE, "readwrite");
+    const tx = db.transaction(FILES_STORE, 'readwrite');
     const store = tx.objectStore(FILES_STORE);
     store.delete(`project_${projectId}`);
   } catch (e) {
-    console.error("Error deleting project files from DB:", e);
+    console.error('Error deleting project files from DB:', e);
   }
 }
 
@@ -234,22 +207,22 @@ export async function deleteProjectFilesFromDB(
 export async function saveProjectsToDB(projects: Project[]): Promise<void> {
   try {
     const db = await getDB();
-    const tx = db.transaction(APP_STORE, "readwrite");
+    const tx = db.transaction(APP_STORE, 'readwrite');
     const store = tx.objectStore(APP_STORE);
-    store.put({ key: "projects", data: projects });
+    store.put({ key: 'projects', data: projects });
   } catch (e) {
-    console.error("IndexedDB save projects error:", e);
+    console.error('IndexedDB save projects error:', e);
   }
 }
 
 export async function loadProjectsFromDB(): Promise<Project[] | null> {
   try {
     const db = await getDB();
-    const tx = db.transaction(APP_STORE, "readonly");
+    const tx = db.transaction(APP_STORE, 'readonly');
     const store = tx.objectStore(APP_STORE);
-    const request = store.get("projects");
+    const request = store.get('projects');
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       request.onsuccess = () => {
         if (request.result && Array.isArray(request.result.data)) {
           resolve(request.result.data);
@@ -264,30 +237,25 @@ export async function loadProjectsFromDB(): Promise<Project[] | null> {
   }
 }
 
-export async function saveChatsToDB(
-  projectId: string,
-  chats: Chat[],
-): Promise<void> {
+export async function saveChatsToDB(projectId: string, chats: Chat[]): Promise<void> {
   try {
     const db = await getDB();
-    const tx = db.transaction(APP_STORE, "readwrite");
+    const tx = db.transaction(APP_STORE, 'readwrite');
     const store = tx.objectStore(APP_STORE);
     store.put({ key: `chats_${projectId}`, data: chats });
   } catch (e) {
-    console.error("IndexedDB save chats error:", e);
+    console.error('IndexedDB save chats error:', e);
   }
 }
 
-export async function loadChatsFromDB(
-  projectId: string,
-): Promise<Chat[] | null> {
+export async function loadChatsFromDB(projectId: string): Promise<Chat[] | null> {
   try {
     const db = await getDB();
-    const tx = db.transaction(APP_STORE, "readonly");
+    const tx = db.transaction(APP_STORE, 'readonly');
     const store = tx.objectStore(APP_STORE);
     const request = store.get(`chats_${projectId}`);
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       request.onsuccess = () => {
         if (request.result && Array.isArray(request.result.data)) {
           resolve(request.result.data);
@@ -306,12 +274,12 @@ export async function loadChatsFromDB(
  * Optimizes/downscales an image to prevent massive base64 strings while keeping high detail
  */
 export async function optimizeImageFile(file: File): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = event => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement("canvas");
+        const canvas = document.createElement('canvas');
         const MAX_WIDTH = 1600;
         const MAX_HEIGHT = 1600;
         let width = img.width;
@@ -331,15 +299,10 @@ export async function optimizeImageFile(file: File): Promise<string> {
 
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(
-            canvas.toDataURL(
-              file.type.startsWith("image/png") ? "image/png" : "image/jpeg",
-              0.85,
-            ),
-          );
+          resolve(canvas.toDataURL(file.type.startsWith('image/png') ? 'image/png' : 'image/jpeg', 0.85));
         } else {
           resolve(event.target?.result as string);
         }
@@ -348,8 +311,8 @@ export async function optimizeImageFile(file: File): Promise<string> {
       img.src = event.target?.result as string;
     };
     reader.onerror = () => {
-      console.error("No se pudo leer la imagen:", file.name, reader.error);
-      resolve("");
+      console.error('No se pudo leer la imagen:', file.name, reader.error);
+      resolve('');
     };
     reader.readAsDataURL(file);
   });

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { NPC, ProjectFile } from "../types";
+import React, { useState } from 'react';
+import { NPC, ProjectFile } from '../types';
 import {
   X,
   User,
@@ -14,7 +14,8 @@ import {
   Calendar,
   BookOpen,
   VenetianMask,
-} from "lucide-react";
+  Pencil
+} from 'lucide-react';
 
 interface NpcDossierModalProps {
   npc: NPC;
@@ -22,6 +23,7 @@ interface NpcDossierModalProps {
   vinculosDestapados: Set<string>;
   onToggleDestaparVinculo: (npcId: string) => void;
   onChangePortrait: (npc: NPC) => void;
+  onEdit?: (npc: NPC) => void;
   onClose: () => void;
 }
 
@@ -31,138 +33,48 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
   vinculosDestapados,
   onToggleDestaparVinculo,
   onChangePortrait,
-  onClose,
+  onEdit,
+  onClose
 }) => {
-  const [activeTab, setActiveTab] = useState<"overview" | "notes" | "sheet">(
-    "overview",
-  );
+  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'sheet'>('overview');
 
   // Match portrait file
   const matchingFile = npc.portrait
-    ? allImageFiles.find((f) => f.content === npc.portrait)
+    ? allImageFiles.find(f => f.content === npc.portrait)
     : allImageFiles.find(
-        (f) =>
-          npc.name.length > 2 &&
-          f.name.toLowerCase().includes(npc.name.toLowerCase()),
+        f => npc.name.length > 2 && f.name.toLowerCase().includes(npc.name.toLowerCase())
       );
   const portraitSrc = npc.portrait || matchingFile?.content;
 
   // Helpers for affinity
   const getAtrInfo = (val: number = 0) => {
     const clamped = Math.max(0, Math.min(20, val));
-    if (clamped <= 3)
-      return {
-        label: "Frialdad / Distancia cortés",
-        corazones: 0,
-        gradient: "from-zinc-500 to-zinc-400",
-      };
-    if (clamped <= 7)
-      return {
-        label: "Curiosidad / Chispa leve",
-        corazones: 1,
-        gradient: "from-rose-400 to-pink-400",
-      };
-    if (clamped <= 12)
-      return {
-        label: "Tensión evidente / Atracción mutua",
-        corazones: 2,
-        gradient: "from-rose-500 to-pink-500",
-      };
-    if (clamped <= 16)
-      return {
-        label: "Deseo confesado / Magnetismo intenso",
-        corazones: 3,
-        gradient: "from-rose-600 to-red-500",
-      };
-    if (clamped <= 19)
-      return {
-        label: "Pasión profunda / Devoción",
-        corazones: 4,
-        gradient: "from-rose-600 to-purple-600",
-      };
-    return {
-      label: "Vínculo supremo / Amor inquebrantable",
-      corazones: 5,
-      gradient: "from-purple-600 to-amber-500",
-    };
+    if (clamped <= 3) return { label: 'Frialdad / Distancia cortés', corazones: 0, gradient: 'from-zinc-500 to-zinc-400' };
+    if (clamped <= 7) return { label: 'Curiosidad / Chispa leve', corazones: 1, gradient: 'from-rose-400 to-pink-400' };
+    if (clamped <= 12) return { label: 'Tensión evidente / Atracción mutua', corazones: 2, gradient: 'from-rose-500 to-pink-500' };
+    if (clamped <= 16) return { label: 'Deseo confesado / Magnetismo intenso', corazones: 3, gradient: 'from-rose-600 to-red-500' };
+    if (clamped <= 19) return { label: 'Pasión profunda / Devoción', corazones: 4, gradient: 'from-rose-600 to-purple-600' };
+    return { label: 'Vínculo supremo / Amor inquebrantable', corazones: 5, gradient: 'from-purple-600 to-amber-500' };
   };
 
   const getVinInfo = (val: number = 0) => {
     const clamped = Math.max(0, Math.min(20, val));
-    if (clamped <= 3)
-      return {
-        label: "Desconocidos / Sin lazo previo",
-        destellos: 0,
-        gradient: "from-zinc-500 to-zinc-400",
-      };
-    if (clamped <= 7)
-      return {
-        label: "Compañerismo incipiente / Buen trato",
-        destellos: 1,
-        gradient: "from-teal-400 to-emerald-400",
-      };
-    if (clamped <= 12)
-      return {
-        label: "Camaradería sólida / Confidente de viaje",
-        destellos: 2,
-        gradient: "from-teal-500 to-cyan-500",
-      };
-    if (clamped <= 16)
-      return {
-        label: "Lealtad probada / Hermandad de armas",
-        destellos: 3,
-        gradient: "from-teal-600 to-blue-600",
-      };
-    if (clamped <= 19)
-      return {
-        label: "Lazo inquebrantable / Vida por vida",
-        destellos: 4,
-        gradient: "from-blue-600 to-indigo-600",
-      };
-    return {
-      label: "Pacto de almas / Lealtad eterna",
-      destellos: 5,
-      gradient: "from-indigo-600 to-purple-600",
-    };
+    if (clamped <= 3) return { label: 'Desconocidos / Sin lazo previo', destellos: 0, gradient: 'from-zinc-500 to-zinc-400' };
+    if (clamped <= 7) return { label: 'Compañerismo incipiente / Buen trato', destellos: 1, gradient: 'from-teal-400 to-emerald-400' };
+    if (clamped <= 12) return { label: 'Camaradería sólida / Confidente de viaje', destellos: 2, gradient: 'from-teal-500 to-cyan-500' };
+    if (clamped <= 16) return { label: 'Lealtad probada / Hermandad de armas', destellos: 3, gradient: 'from-teal-600 to-blue-600' };
+    if (clamped <= 19) return { label: 'Lazo inquebrantable / Vida por vida', destellos: 4, gradient: 'from-blue-600 to-indigo-600' };
+    return { label: 'Pacto de almas / Lealtad eterna', destellos: 5, gradient: 'from-indigo-600 to-purple-600' };
   };
 
   const getConInfo = (val: number = 0) => {
     const clamped = Math.max(0, Math.min(20, val));
-    if (clamped <= 3)
-      return {
-        label: "Alerta / Cartas bien tapadas",
-        escudos: 0,
-        gradient: "from-zinc-500 to-zinc-400",
-      };
-    if (clamped <= 7)
-      return {
-        label: "Respeto mutuo / Información justa",
-        escudos: 1,
-        gradient: "from-amber-400 to-yellow-400",
-      };
-    if (clamped <= 12)
-      return {
-        label: "Confianza tácita / Comparte planes",
-        escudos: 2,
-        gradient: "from-amber-500 to-orange-500",
-      };
-    if (clamped <= 16)
-      return {
-        label: "Confidente / Revela vulnerabilidades",
-        escudos: 3,
-        gradient: "from-amber-600 to-rose-600",
-      };
-    if (clamped <= 19)
-      return {
-        label: "Entrega total / Sin máscaras",
-        escudos: 4,
-        gradient: "from-orange-600 to-red-600",
-      };
-    return {
-      label: "Confianza absoluta / Guarda tus secretos más oscuros",
-      escudos: 5,
-      gradient: "from-rose-600 to-amber-500",
-    };
+    if (clamped <= 3) return { label: 'Alerta / Cartas bien tapadas', escudos: 0, gradient: 'from-zinc-500 to-zinc-400' };
+    if (clamped <= 7) return { label: 'Respeto mutuo / Información justa', escudos: 1, gradient: 'from-amber-400 to-yellow-400' };
+    if (clamped <= 12) return { label: 'Confianza tácita / Comparte planes', escudos: 2, gradient: 'from-amber-500 to-orange-500' };
+    if (clamped <= 16) return { label: 'Confidente / Revela vulnerabilidades', escudos: 3, gradient: 'from-amber-600 to-rose-600' };
+    if (clamped <= 19) return { label: 'Entrega total / Sin máscaras', escudos: 4, gradient: 'from-orange-600 to-red-600' };
+    return { label: 'Confianza absoluta / Guarda tus secretos más oscuros', escudos: 5, gradient: 'from-rose-600 to-amber-500' };
   };
 
   const isSecretRevealed = vinculosDestapados.has(npc.id);
@@ -173,18 +85,18 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         onClose();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
   return (
     <div
       className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-3 sm:p-5 backdrop-blur-2xs"
-      onClick={(e) => {
+      onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
@@ -228,8 +140,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                 <div className="flex items-center gap-1.5 text-xs text-[var(--accent)] mb-1.5 font-cinzel font-semibold flex-wrap">
                   {npc.alias && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-[11px]">
-                      <VenetianMask className="w-3 h-3 text-amber-600" /> Alias
-                      conocido: {npc.alias}
+                      <VenetianMask className="w-3 h-3 text-amber-600" /> Alias conocido: {npc.alias}
                     </span>
                   )}
                   {npc.trueIdentity && npc.trueIdentity !== npc.name && (
@@ -247,15 +158,13 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                   </span>
                 )}
                 {npc.status && (
-                  <span
-                    className={`text-[11px] font-cinzel font-semibold px-2 py-0.5 rounded-full border ${
-                      npc.status === "Vivo"
-                        ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
-                        : npc.status === "Fallecido"
-                          ? "bg-red-500/15 border-red-500/30 text-red-800 dark:text-red-300"
-                          : "bg-amber-500/15 border-amber-500/30 text-amber-800 dark:text-amber-300"
-                    }`}
-                  >
+                  <span className={`text-[11px] font-cinzel font-semibold px-2 py-0.5 rounded-full border ${
+                    npc.status === 'Vivo'
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-800 dark:text-emerald-300'
+                      : npc.status === 'Fallecido'
+                      ? 'bg-red-500/15 border-red-500/30 text-red-800 dark:text-red-300'
+                      : 'bg-amber-500/15 border-amber-500/30 text-amber-800 dark:text-amber-300'
+                  }`}>
                     {npc.status}
                   </span>
                 )}
@@ -266,33 +175,46 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                 )}
                 {npc.diasVistos && npc.diasVistos.length > 0 && (
                   <span className="text-[10px] font-cinzel text-[var(--text-secondary)] flex items-center gap-1 px-1.5 py-0.5">
-                    <Calendar className="w-3 h-3 opacity-70" />{" "}
-                    {npc.diasVistos.length}{" "}
-                    {npc.diasVistos.length === 1 ? "encuentro" : "encuentros"}
+                    <Calendar className="w-3 h-3 opacity-70" /> {npc.diasVistos.length} {npc.diasVistos.length === 1 ? 'encuentro' : 'encuentros'}
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)] transition-all cursor-pointer shrink-0"
-            title="Cerrar ficha"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Action buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            {onEdit && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onEdit(npc);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-cinzel font-semibold bg-[var(--surface)] hover:bg-[var(--accent)] text-[var(--accent)] hover:text-[var(--on-accent)] border border-[var(--user-border)] transition-all cursor-pointer shadow-xs"
+                title="Editar todos los campos y datos del PNJ"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Editar PNJ</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)] transition-all cursor-pointer shrink-0"
+              title="Cerrar ficha"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Navigation (Páginas del Dossier) */}
         <div className="flex border-b border-[var(--glass-border)] bg-[var(--surface)] px-4 gap-2">
           <button
-            onClick={() => setActiveTab("overview")}
+            onClick={() => setActiveTab('overview')}
             className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all ${
-              activeTab === "overview"
-                ? "border-[var(--accent)] text-[var(--accent)]"
-                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              activeTab === 'overview'
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <Scroll className="w-4 h-4" />
@@ -300,11 +222,11 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab("notes")}
+            onClick={() => setActiveTab('notes')}
             className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all ${
-              activeTab === "notes"
-                ? "border-[var(--accent)] text-[var(--accent)]"
-                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              activeTab === 'notes'
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <BookOpen className="w-4 h-4" />
@@ -313,11 +235,11 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
 
           {sheet && (
             <button
-              onClick={() => setActiveTab("sheet")}
+              onClick={() => setActiveTab('sheet')}
               className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all ${
-                activeTab === "sheet"
-                  ? "border-[var(--accent)] text-[var(--accent)]"
-                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                activeTab === 'sheet'
+                  ? 'border-[var(--accent)] text-[var(--accent)]'
+                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               <Swords className="w-4 h-4 text-amber-500" />
@@ -329,29 +251,24 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
         {/* Modal Body / Tab Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {/* TAB 1: Overview, Physical Appearance & Affinity */}
-          {activeTab === "overview" && (
+          {activeTab === 'overview' && (
             <div className="space-y-4">
               {/* 1. Physical Appearance Box (Destacada si existe) */}
               {(physicalDesc || matchingFile?.analysis) && (
                 <div className="bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] p-4 rounded-xl border border-[var(--accent)]/30 space-y-1.5 shadow-2xs">
                   <span className="font-cinzel text-xs font-bold text-[var(--accent)] uppercase tracking-wider flex items-center gap-1.5">
-                    <Eye className="w-4 h-4 text-[var(--accent)]" /> Apariencia
-                    Física & Rasgos Distintivos
+                    <Eye className="w-4 h-4 text-[var(--accent)]" /> Apariencia Física & Rasgos Distintivos
                   </span>
                   {physicalDesc && (
                     <p className="text-sm sm:text-base text-[var(--text-primary)] leading-relaxed m-0 whitespace-pre-wrap">
                       {physicalDesc}
                     </p>
                   )}
-                  {matchingFile?.analysis &&
-                    matchingFile.analysis !== physicalDesc && (
-                      <p className="text-xs text-[var(--text-secondary)] italic leading-relaxed m-0 pt-1 border-t border-[var(--user-border)]">
-                        <strong className="not-italic text-[var(--accent)]">
-                          Análisis de Retrato:
-                        </strong>{" "}
-                        {matchingFile.analysis}
-                      </p>
-                    )}
+                  {matchingFile?.analysis && matchingFile.analysis !== physicalDesc && (
+                    <p className="text-xs text-[var(--text-secondary)] italic leading-relaxed m-0 pt-1 border-t border-[var(--user-border)]">
+                      <strong className="not-italic text-[var(--accent)]">Análisis de Retrato:</strong> {matchingFile.analysis}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -371,8 +288,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
               <div className="bg-[var(--surface-soft)] p-4 rounded-xl border border-[var(--accent)]/30 space-y-3.5 shadow-2xs">
                 <div className="flex items-center justify-between border-b border-[var(--accent)]/20 pb-2">
                   <span className="font-cinzel text-xs font-bold text-[var(--accent)] uppercase tracking-wider flex items-center gap-1.5">
-                    <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />{" "}
-                    Ejes de Afinidad & Vínculo
+                    <Heart className="w-4 h-4 text-rose-500 fill-rose-500" /> Ejes de Afinidad & Vínculo
                   </span>
                   {npc.vinculo && (
                     <span className="text-xs font-cinzel font-semibold text-[var(--accent)]">
@@ -393,17 +309,14 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                           <span>ATR (Atracción & Química)</span>
                         </span>
                         <div className="flex items-center gap-2">
-                          <div
-                            className="flex items-center gap-0.5 text-rose-500"
-                            title={`Rango de Atracción: ${atrInfo.corazones}/5`}
-                          >
+                          <div className="flex items-center gap-0.5 text-rose-500" title={`Rango de Atracción: ${atrInfo.corazones}/5`}>
                             {Array.from({ length: 5 }).map((_, idx) => (
                               <Heart
                                 key={idx}
                                 className={`w-3.5 h-3.5 ${
                                   idx < atrInfo.corazones
-                                    ? "fill-rose-500 text-rose-500 drop-shadow-xs"
-                                    : "text-rose-400/30"
+                                    ? 'fill-rose-500 text-rose-500 drop-shadow-xs'
+                                    : 'text-rose-400/30'
                                 }`}
                               />
                             ))}
@@ -438,17 +351,14 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                           <span>VÍN (Vínculo Afectivo & Lealtad)</span>
                         </span>
                         <div className="flex items-center gap-2">
-                          <div
-                            className="flex items-center gap-0.5 text-teal-500"
-                            title={`Rango de Vínculo: ${vinInfo.destellos}/5`}
-                          >
+                          <div className="flex items-center gap-0.5 text-teal-500" title={`Rango de Vínculo: ${vinInfo.destellos}/5`}>
                             {Array.from({ length: 5 }).map((_, idx) => (
                               <Sparkles
                                 key={idx}
                                 className={`w-3.5 h-3.5 ${
                                   idx < vinInfo.destellos
-                                    ? "text-teal-500 fill-teal-500 drop-shadow-xs"
-                                    : "text-teal-400/30"
+                                    ? 'text-teal-500 fill-teal-500 drop-shadow-xs'
+                                    : 'text-teal-400/30'
                                 }`}
                               />
                             ))}
@@ -483,17 +393,14 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                           <span>CON (Confianza Táctica & Secretos)</span>
                         </span>
                         <div className="flex items-center gap-2">
-                          <div
-                            className="flex items-center gap-0.5 text-amber-500"
-                            title={`Rango de Confianza: ${conInfo.escudos}/5`}
-                          >
+                          <div className="flex items-center gap-0.5 text-amber-500" title={`Rango de Confianza: ${conInfo.escudos}/5`}>
                             {Array.from({ length: 5 }).map((_, idx) => (
                               <Shield
                                 key={idx}
                                 className={`w-3.5 h-3.5 ${
                                   idx < conInfo.escudos
-                                    ? "text-amber-500 fill-amber-500 drop-shadow-xs"
-                                    : "text-amber-400/30"
+                                    ? 'text-amber-500 fill-amber-500 drop-shadow-xs'
+                                    : 'text-amber-400/30'
                                 }`}
                               />
                             ))}
@@ -524,8 +431,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                   {npc.aparenta && (
                     <div className="bg-[var(--surface-soft)] p-4 rounded-xl border border-[var(--user-border)] space-y-1">
                       <span className="font-cinzel text-xs font-bold text-[var(--accent)] uppercase tracking-wider flex items-center gap-1.5">
-                        <Eye className="w-3.5 h-3.5" /> Lo que aparenta en
-                        público:
+                        <Eye className="w-3.5 h-3.5" /> Lo que aparenta en público:
                       </span>
                       <p className="text-sm text-[var(--text-primary)] italic leading-relaxed m-0 whitespace-pre-wrap">
                         {npc.aparenta}
@@ -538,8 +444,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                     <div className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-xl space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="font-cinzel text-xs font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
-                          <Lock className="w-3.5 h-3.5" /> Lo que oculta
-                          (Secreto de Trama):
+                          <Lock className="w-3.5 h-3.5" /> Lo que oculta (Secreto de Trama):
                         </span>
                         {isSecretRevealed && (
                           <span className="text-[10px] bg-rose-500/20 text-rose-800 dark:text-rose-300 px-2 py-0.5 rounded font-cinzel font-semibold">
@@ -555,15 +460,13 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                       ) : (
                         <div className="space-y-2">
                           <p className="text-xs text-[var(--text-secondary)] italic m-0">
-                            Este personaje oculta intenciones o secretos que
-                            podrían alterar el curso de la campaña.
+                            Este personaje oculta intenciones o secretos que podrían alterar el curso de la campaña.
                           </p>
                           <button
                             onClick={() => onToggleDestaparVinculo(npc.id)}
                             className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-cinzel text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                           >
-                            <Lock className="w-3.5 h-3.5" /> Romper Sello y
-                            Revelar Secreto
+                            <Lock className="w-3.5 h-3.5" /> Romper Sello y Revelar Secreto
                           </button>
                         </div>
                       )}
@@ -575,15 +478,14 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
               {/* If no data yet */}
               {!npc.description && !npc.notes && !physicalDesc && (
                 <div className="text-center py-8 text-xs text-[var(--text-secondary)] italic">
-                  Este personaje aún no tiene descripción o notas ampliadas.
-                  Puedes añadirlas pulsando en «Editar Datos».
+                  Este personaje aún no tiene descripción o notas ampliadas. Puedes añadirlas pulsando en «Editar Datos».
                 </div>
               )}
             </div>
           )}
 
           {/* TAB 2: Notes & In-depth Story */}
-          {activeTab === "notes" && (
+          {activeTab === 'notes' && (
             <div className="space-y-4">
               {npc.notes && (
                 <div className="bg-[var(--surface-soft)] p-4 rounded-xl border border-[var(--user-border)] space-y-1.5 shadow-2xs">
@@ -599,8 +501,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
               {npc.disguise && (
                 <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl space-y-1.5 shadow-2xs">
                   <span className="font-cinzel text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <VenetianMask className="w-4 h-4" /> Notas de Disfraz /
-                    Tapadera
+                    <VenetianMask className="w-4 h-4" /> Notas de Disfraz / Tapadera
                   </span>
                   <p className="text-sm text-[var(--text-primary)] italic leading-relaxed m-0 whitespace-pre-wrap">
                     {npc.disguise}
@@ -608,7 +509,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                 </div>
               )}
 
-              {!npc.notes && !npc.disguise && (
+              {(!npc.notes && !npc.disguise) && (
                 <div className="text-center py-8 text-xs text-[var(--text-secondary)] italic">
                   No hay notas adicionales de campaña registradas para este PNJ.
                 </div>
@@ -617,40 +518,32 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
           )}
 
           {/* TAB 3: D&D Character Sheet */}
-          {activeTab === "sheet" && sheet && (
+          {activeTab === 'sheet' && sheet && (
             <div className="space-y-4">
               {/* Combat core stats */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div className="bg-[var(--surface-soft)] p-2.5 rounded-lg border border-[var(--user-border)] text-center">
-                  <span className="text-[10px] font-cinzel text-[var(--text-secondary)] block">
-                    Puntos de Golpe
-                  </span>
+                  <span className="text-[10px] font-cinzel text-[var(--text-secondary)] block">Puntos de Golpe</span>
                   <span className="font-mono text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                    {sheet.hp ?? "—"} / {sheet.maxHp ?? "—"}
+                    {sheet.hp ?? '—'} / {sheet.maxHp ?? '—'}
                   </span>
                 </div>
                 <div className="bg-[var(--surface-soft)] p-2.5 rounded-lg border border-[var(--user-border)] text-center">
-                  <span className="text-[10px] font-cinzel text-[var(--text-secondary)] block">
-                    Clase de Armadura
-                  </span>
+                  <span className="text-[10px] font-cinzel text-[var(--text-secondary)] block">Clase de Armadura</span>
                   <span className="font-mono text-base sm:text-lg font-bold text-amber-600 dark:text-amber-400">
-                    {sheet.ac ?? "—"} CA
+                    {sheet.ac ?? '—'} CA
                   </span>
                 </div>
                 <div className="bg-[var(--surface-soft)] p-2.5 rounded-lg border border-[var(--user-border)] text-center">
-                  <span className="text-[10px] font-cinzel text-[var(--text-secondary)] block">
-                    Velocidad
-                  </span>
+                  <span className="text-[10px] font-cinzel text-[var(--text-secondary)] block">Velocidad</span>
                   <span className="font-mono text-sm sm:text-base font-bold text-[var(--text-primary)]">
-                    {sheet.speed ?? "30 pies"}
+                    {sheet.speed ?? '30 pies'}
                   </span>
                 </div>
                 <div className="bg-[var(--surface-soft)] p-2.5 rounded-lg border border-[var(--user-border)] text-center">
-                  <span className="text-[10px] font-cinzel text-[var(--text-secondary)] block">
-                    Iniciativa
-                  </span>
+                  <span className="text-[10px] font-cinzel text-[var(--text-secondary)] block">Iniciativa</span>
                   <span className="font-mono text-sm sm:text-base font-bold text-[var(--text-primary)]">
-                    {sheet.initiative ?? "+0"}
+                    {sheet.initiative ?? '+0'}
                   </span>
                 </div>
               </div>
@@ -662,18 +555,15 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                     const mod = Math.floor(((Number(score) || 10) - 10) / 2);
                     const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
                     const names: Record<string, string> = {
-                      str: "FUE",
-                      dex: "DES",
-                      con: "CON",
-                      int: "INT",
-                      wis: "SAB",
-                      cha: "CAR",
+                      str: 'FUE',
+                      dex: 'DES',
+                      con: 'CON',
+                      int: 'INT',
+                      wis: 'SAB',
+                      cha: 'CAR'
                     };
                     return (
-                      <div
-                        key={attr}
-                        className="text-center p-1.5 rounded bg-[var(--surface)] border border-[var(--user-border)]"
-                      >
+                      <div key={attr} className="text-center p-1.5 rounded bg-[var(--surface)] border border-[var(--user-border)]">
                         <span className="text-[10px] font-cinzel font-bold text-[var(--text-secondary)] block">
                           {names[attr] || attr.toUpperCase()}
                         </span>
@@ -697,21 +587,10 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                   </span>
                   <div className="space-y-2">
                     {sheet.actions.map((act, i) => (
-                      <div
-                        key={i}
-                        className="text-xs bg-[var(--surface)] p-2.5 rounded-lg border border-[var(--user-border)]"
-                      >
-                        <strong className="font-cinzel text-[var(--accent)]">
-                          {act.name}
-                        </strong>
-                        {act.damageOrEffect && (
-                          <span className="text-amber-700 dark:text-amber-400 font-mono ml-2 font-semibold">
-                            ({act.damageOrEffect})
-                          </span>
-                        )}
-                        <p className="text-[var(--text-secondary)] mt-1 m-0">
-                          {act.description}
-                        </p>
+                      <div key={i} className="text-xs bg-[var(--surface)] p-2.5 rounded-lg border border-[var(--user-border)]">
+                        <strong className="font-cinzel text-[var(--accent)]">{act.name}</strong>
+                        {act.damageOrEffect && <span className="text-amber-700 dark:text-amber-400 font-mono ml-2 font-semibold">({act.damageOrEffect})</span>}
+                        <p className="text-[var(--text-secondary)] mt-1 m-0">{act.description}</p>
                       </div>
                     ))}
                   </div>

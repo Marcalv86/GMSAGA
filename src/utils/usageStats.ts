@@ -11,7 +11,7 @@
  * manera de jugar, no del tomo que tengas abierto.
  */
 
-const CLAVE = "gmstudio_uso_modelos";
+const CLAVE = 'gmstudio_uso_modelos';
 
 export interface UsoModelo {
   turnos: number;
@@ -30,7 +30,7 @@ export function leerUso(): RegistroDeUso {
     const raw = localStorage.getItem(CLAVE);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
   }
@@ -53,18 +53,13 @@ function guardar(registro: RegistroDeUso): void {
  */
 export function registrarUso(
   modelo: string,
-  datos: {
-    entrada?: number;
-    cacheados?: number;
-    salida?: number;
-    total?: number;
-  },
+  datos: { entrada?: number; cacheados?: number; salida?: number; total?: number },
   /**
    * Distingue configuraciones del mismo modelo, para poder compararlas: los
    * turnos con búsqueda en documentos y sin ella se acumulan por separado, que es
    * la única manera de saber si compensa sin fiarse de la impresión.
    */
-  variante?: string,
+  variante?: string
 ): void {
   const entrada = Math.max(0, Math.round(datos.entrada || 0));
   const salida = Math.max(0, Math.round(datos.salida || 0));
@@ -77,7 +72,7 @@ export function registrarUso(
     entrada: 0,
     cacheados: 0,
     salida: 0,
-    ultimoTotal: 0,
+    ultimoTotal: 0
   };
 
   registro[clave] = {
@@ -85,7 +80,7 @@ export function registrarUso(
     entrada: previo.entrada + entrada,
     cacheados: previo.cacheados + Math.max(0, Math.round(datos.cacheados || 0)),
     salida: previo.salida + salida,
-    ultimoTotal: Math.round(datos.total || entrada + salida),
+    ultimoTotal: Math.round(datos.total || entrada + salida)
   };
 
   guardar(registro);
@@ -125,9 +120,8 @@ export function resumirUso(registro: RegistroDeUso = leerUso()): ResumenUso[] {
       mediaEntrada: Math.round(u.entrada / u.turnos),
       mediaSalida: Math.round(u.salida / u.turnos),
       mediaTotal: Math.round((u.entrada + u.salida) / u.turnos),
-      porcentajeCache:
-        u.entrada > 0 ? Math.round((u.cacheados / u.entrada) * 100) : 0,
-      ultimoTotal: u.ultimoTotal,
+      porcentajeCache: u.entrada > 0 ? Math.round((u.cacheados / u.entrada) * 100) : 0,
+      ultimoTotal: u.ultimoTotal
     }))
     .sort((a, b) => b.turnos - a.turnos);
 }

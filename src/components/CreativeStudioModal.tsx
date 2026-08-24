@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Sparkles,
   Music,
@@ -17,12 +17,12 @@ import {
   Radio,
   BookOpen,
   ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+  ChevronUp
+} from 'lucide-react';
 
 export interface CreativeStudioModalProps {
   isOpen?: boolean;
-  initialTab?: "music" | "image" | "video" | "voice" | "diary";
+  initialTab?: 'music' | 'image' | 'video' | 'voice' | 'diary';
   sceneText?: string;
   lastSceneText?: string;
   onInsertIntoChat?: (text: string) => void;
@@ -34,7 +34,7 @@ export interface CreativeStudioModalProps {
 class FantasyAudioSynthesizer {
   private ctx: AudioContext | null = null;
   private isPlaying = false;
-  private currentTrack = "";
+  private currentTrack = '';
   private gainNode: GainNode | null = null;
   private activeNodes: (OscillatorNode | AudioBufferSourceNode)[] = [];
 
@@ -42,11 +42,10 @@ class FantasyAudioSynthesizer {
     if (!this.ctx) {
       const AudioCtx =
         window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtx();
     }
-    if (this.ctx.state === "suspended") {
+    if (this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
   }
@@ -63,15 +62,15 @@ class FantasyAudioSynthesizer {
     this.gainNode.gain.setValueAtTime(volume, this.ctx.currentTime);
     this.gainNode.connect(this.ctx.destination);
 
-    if (trackId === "bard_lute") {
+    if (trackId === 'bard_lute') {
       this.playBardLute();
-    } else if (trackId === "tavern") {
+    } else if (trackId === 'tavern') {
       this.playTavernAmbiance();
-    } else if (trackId === "dungeon") {
+    } else if (trackId === 'dungeon') {
       this.playDungeonDrone();
-    } else if (trackId === "battle") {
+    } else if (trackId === 'battle') {
       this.playBattleTension();
-    } else if (trackId === "elven_forest") {
+    } else if (trackId === 'elven_forest') {
       this.playElvenForest();
     }
   }
@@ -90,14 +89,11 @@ class FantasyAudioSynthesizer {
       const noteGain = this.ctx.createGain();
 
       const freq = notes[step % notes.length];
-      osc.type = "triangle";
+      osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
 
       noteGain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-      noteGain.gain.exponentialRampToValueAtTime(
-        0.001,
-        this.ctx.currentTime + 1.2,
-      );
+      noteGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.2);
 
       osc.connect(noteGain);
       noteGain.connect(this.gainNode);
@@ -107,20 +103,18 @@ class FantasyAudioSynthesizer {
       this.activeNodes.push(osc);
 
       const pattern = [0, 2, 4, 3, 5, 4, 2, 1];
-      step =
-        (step + pattern[Math.floor(Math.random() * pattern.length)]) %
-        notes.length;
+      step = (step + pattern[Math.floor(Math.random() * pattern.length)]) % notes.length;
     }, 450);
   }
 
   private playTavernAmbiance() {
     if (!this.ctx || !this.gainNode) return;
     const freqs = [130.81, 164.81, 196.0, 246.94];
-    freqs.forEach((f) => {
+    freqs.forEach(f => {
       if (!this.ctx || !this.gainNode) return;
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
-      osc.type = "sine";
+      osc.type = 'sine';
       osc.frequency.setValueAtTime(f, this.ctx.currentTime);
       g.gain.setValueAtTime(0.12, this.ctx.currentTime);
       osc.connect(g);
@@ -136,14 +130,14 @@ class FantasyAudioSynthesizer {
     const osc2 = this.ctx.createOscillator();
     const g = this.ctx.createGain();
 
-    osc1.type = "sawtooth";
+    osc1.type = 'sawtooth';
     osc1.frequency.setValueAtTime(55, this.ctx.currentTime);
 
-    osc2.type = "sine";
+    osc2.type = 'sine';
     osc2.frequency.setValueAtTime(82.4, this.ctx.currentTime);
 
     const filter = this.ctx.createBiquadFilter();
-    filter.type = "lowpass";
+    filter.type = 'lowpass';
     filter.frequency.setValueAtTime(160, this.ctx.currentTime);
 
     g.gain.setValueAtTime(0.18, this.ctx.currentTime);
@@ -168,7 +162,7 @@ class FantasyAudioSynthesizer {
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
 
-      osc.type = "sawtooth";
+      osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(73.42, this.ctx.currentTime);
 
       g.gain.setValueAtTime(0.25, this.ctx.currentTime);
@@ -190,7 +184,7 @@ class FantasyAudioSynthesizer {
       if (!this.ctx || !this.gainNode) return;
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
-      osc.type = "sine";
+      osc.type = 'sine';
       osc.frequency.setValueAtTime(f, this.ctx.currentTime);
       g.gain.setValueAtTime(0.08 / (idx + 1), this.ctx.currentTime);
       osc.connect(g);
@@ -202,17 +196,14 @@ class FantasyAudioSynthesizer {
 
   public setVolume(vol: number) {
     if (this.gainNode && this.ctx) {
-      this.gainNode.gain.setValueAtTime(
-        Math.max(0, Math.min(1, vol)),
-        this.ctx.currentTime,
-      );
+      this.gainNode.gain.setValueAtTime(Math.max(0, Math.min(1, vol)), this.ctx.currentTime);
     }
   }
 
   public stop() {
     this.isPlaying = false;
-    this.currentTrack = "";
-    this.activeNodes.forEach((node) => {
+    this.currentTrack = '';
+    this.activeNodes.forEach(node => {
       try {
         node.stop();
         node.disconnect();
@@ -241,25 +232,23 @@ const synth = new FantasyAudioSynthesizer();
 function buildImagePromptFromScene(
   cleanText: string,
   archetype: string,
-  modifiers: string[],
+  modifiers: string[]
 ): string {
-  const snippet = cleanText
-    ? cleanText.slice(0, 320)
-    : "A party of fantasy adventurers resting by a campfire";
-  const modStr = modifiers.length > 0 ? `, ${modifiers.join(", ")}` : "";
+  const snippet = cleanText ? cleanText.slice(0, 320) : 'A party of fantasy adventurers resting by a campfire';
+  const modStr = modifiers.length > 0 ? `, ${modifiers.join(', ')}` : '';
 
   switch (archetype) {
-    case "character":
+    case 'character':
       return `Masterpiece character portrait, detailed fantasy hero/NPC from scene: ${snippet}. Intricate facial expression, high fantasy clothing and gear, atmospheric depth of field, dramatic rim lighting${modStr}, octane render, 8k resolution`;
-    case "action":
+    case 'action':
       return `Epic dynamic battle and action sequence, high fantasy combat: ${snippet}. Dynamic perspective angle, spell effects and motion trails, dramatic lighting, intense atmosphere${modStr}, masterpiece concept art, artstation trending`;
-    case "landscape":
+    case 'landscape':
       return `Vast atmospheric fantasy landscape and environment: ${snippet}. Wide panoramic view, breathtaking scenery, detailed architecture and nature, volumetric god rays${modStr}, matte painting masterpiece`;
-    case "grimdark":
+    case 'grimdark':
       return `Grimdark dark fantasy tenebrism painting: ${snippet}. Deep shadows, heavy chiaroscuro lighting, gritty textures, ominous fog, Elden Ring and Witcher inspired atmosphere${modStr}, cinematic lighting`;
-    case "woodcut":
+    case 'woodcut':
       return `Authentic vintage medieval woodcut engraving, parchment texture: ${snippet}. Detailed cross-hatching, antique ink illustration, high fantasy bestiary illustration style${modStr}, monochrome black ink on aged paper`;
-    case "classic":
+    case 'classic':
     default:
       return `Masterpiece fantasy oil painting, highly detailed D&D scene: ${snippet}. Rich atmospheric lighting, deep contrast, evocative mood${modStr}, award-winning fantasy illustration, artstation HQ`;
   }
@@ -268,24 +257,18 @@ function buildImagePromptFromScene(
 /**
  * Generates an optimized cinematic video prompt for a scene
  */
-function buildVideoPromptFromScene(
-  cleanText: string,
-  cameraMove: string,
-): string {
-  const snippet = cleanText
-    ? cleanText.slice(0, 240)
-    : "Ancient fantasy ruins shrouded in mist";
-  let camInstruction = "Slow cinematic camera pan";
+function buildVideoPromptFromScene(cleanText: string, cameraMove: string): string {
+  const snippet = cleanText ? cleanText.slice(0, 240) : 'Ancient fantasy ruins shrouded in mist';
+  let camInstruction = 'Slow cinematic camera pan';
 
-  if (cameraMove === "drone") {
-    camInstruction = "Epic high-angle aerial drone sweep rising above";
-  } else if (cameraMove === "push") {
-    camInstruction = "Dramatic slow push-in tracking shot focusing deeply on";
-  } else if (cameraMove === "firstperson") {
-    camInstruction =
-      "Immersive first-person handheld camera perspective walking through";
-  } else if (cameraMove === "orbit") {
-    camInstruction = "Smooth 360-degree orbital rotation around";
+  if (cameraMove === 'drone') {
+    camInstruction = 'Epic high-angle aerial drone sweep rising above';
+  } else if (cameraMove === 'push') {
+    camInstruction = 'Dramatic slow push-in tracking shot focusing deeply on';
+  } else if (cameraMove === 'firstperson') {
+    camInstruction = 'Immersive first-person handheld camera perspective walking through';
+  } else if (cameraMove === 'orbit') {
+    camInstruction = 'Smooth 360-degree orbital rotation around';
   }
 
   return `${camInstruction} the scene: ${snippet}. Photorealistic 4k cinematic video, atmospheric volumetric lighting, hyper-detailed physics, 24fps motion blur, professional color grading.`;
@@ -295,32 +278,32 @@ function buildVideoPromptFromScene(
  * Generates a condensed diary summary from the scene
  */
 function buildDiarySummaryFromScene(cleanText: string): string {
-  if (!cleanText) return "";
+  if (!cleanText) return '';
   const firstSentences = cleanText
-    .replace(/\s+/g, " ")
+    .replace(/\s+/g, ' ')
     .split(/(?<=[.?!])\s+/)
     .filter(Boolean)
     .slice(0, 3)
-    .join(" ");
+    .join(' ');
   return firstSentences || cleanText.slice(0, 220);
 }
 
 export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
-  initialTab = "image",
-  sceneText = "",
-  lastSceneText = "",
+  initialTab = 'image',
+  sceneText = '',
+  lastSceneText = '',
   onInsertIntoChat,
   onSendToChat,
-  onClose,
+  onClose
 }) => {
-  const [activeTab, setActiveTab] = useState<
-    "music" | "image" | "video" | "diary" | "voice"
-  >(initialTab);
+  const [activeTab, setActiveTab] = useState<'music' | 'image' | 'video' | 'diary' | 'voice'>(
+    initialTab
+  );
   const handleSendToChat = onInsertIntoChat || onSendToChat;
 
   // Scene Context State (Editable so the user can tweak what scene is being illustrated)
   const initialScene = useMemo(() => {
-    return (sceneText || lastSceneText || "").replace(/<[^>]+>/g, "").trim();
+    return (sceneText || lastSceneText || '').replace(/<[^>]+>/g, '').trim();
   }, [sceneText, lastSceneText]);
 
   const [currentScene, setCurrentScene] = useState<string>(initialScene);
@@ -329,41 +312,31 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   // Sync if new scene prop arrives
   useEffect(() => {
     if (sceneText || lastSceneText) {
-      setCurrentScene(
-        (sceneText || lastSceneText || "").replace(/<[^>]+>/g, "").trim(),
-      );
+      setCurrentScene((sceneText || lastSceneText || '').replace(/<[^>]+>/g, '').trim());
     }
   }, [sceneText, lastSceneText]);
 
   // Image generation controls
-  const [imageArchetype, setImageArchetype] = useState<string>("classic");
+  const [imageArchetype, setImageArchetype] = useState<string>('classic');
   const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
-  const [imagePrompt, setImagePrompt] = useState<string>("");
+  const [imagePrompt, setImagePrompt] = useState<string>('');
 
   // Video generation controls
-  const [cameraMove, setCameraMove] = useState<string>("pan");
-  const [videoPrompt, setVideoPrompt] = useState<string>("");
+  const [cameraMove, setCameraMove] = useState<string>('pan');
+  const [videoPrompt, setVideoPrompt] = useState<string>('');
 
   // Diary generation controls
-  const [diarySummary, setDiarySummary] = useState<string>("");
+  const [diarySummary, setDiarySummary] = useState<string>('');
 
   // Audio / Music controls
-  const [activeSoundtrack, setActiveSoundtrack] = useState<string>(
-    synth.getTrack(),
-  );
+  const [activeSoundtrack, setActiveSoundtrack] = useState<string>(synth.getTrack());
   const [volume, setVolume] = useState<number>(0.4);
-  const [customMusicUrl, setCustomMusicUrl] = useState<string>("");
+  const [customMusicUrl, setCustomMusicUrl] = useState<string>('');
   const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
 
   // Auto-update prompts when currentScene, archetype, modifiers or camera move changes
   useEffect(() => {
-    setImagePrompt(
-      buildImagePromptFromScene(
-        currentScene,
-        imageArchetype,
-        selectedModifiers,
-      ),
-    );
+    setImagePrompt(buildImagePromptFromScene(currentScene, imageArchetype, selectedModifiers));
     setVideoPrompt(buildVideoPromptFromScene(currentScene, cameraMove));
     setDiarySummary(buildDiarySummaryFromScene(currentScene));
   }, [currentScene, imageArchetype, selectedModifiers, cameraMove]);
@@ -371,65 +344,40 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   // Ambient tracks
   const ambientTracks = [
     {
-      id: "bard_lute",
-      name: "Laúd de Bardo (Balada Fantasía)",
-      icon: "🎻",
-      desc: "Arpegios continuos en laúd para narraciones de posada, interpretaciones y romance.",
-      tags: ["posada", "charla", "viaje", "laud", "musica", "bardo"],
+      id: 'bard_lute',
+      name: 'Laúd de Bardo (Balada Fantasía)',
+      icon: '🎻',
+      desc: 'Arpegios continuos en laúd para narraciones de posada, interpretaciones y romance.',
+      tags: ['posada', 'charla', 'viaje', 'laud', 'musica', 'bardo']
     },
     {
-      id: "tavern",
-      name: "Posada & Fuego Acogedor",
-      icon: "🍺",
-      desc: "Ambiente cálido y relajante con resonancia armónica para momentos de descanso.",
-      tags: ["taberna", "posada", "fuego", "cerveza", "descanso", "comida"],
+      id: 'tavern',
+      name: 'Posada & Fuego Acogedor',
+      icon: '🍺',
+      desc: 'Ambiente cálido y relajante con resonancia armónica para momentos de descanso.',
+      tags: ['taberna', 'posada', 'fuego', 'cerveza', 'descanso', 'comida']
     },
     {
-      id: "dungeon",
-      name: "Profundidades & Cripta Oscura",
-      icon: "🕯️",
-      desc: "Dron grave y tétrico para exploración subterránea y tensión mágica.",
-      tags: [
-        "cripta",
-        "mazmorra",
-        "cueva",
-        "tumba",
-        "sombra",
-        "monstruo",
-        "muerte",
-      ],
+      id: 'dungeon',
+      name: 'Profundidades & Cripta Oscura',
+      icon: '🕯️',
+      desc: 'Dron grave y tétrico para exploración subterránea y tensión mágica.',
+      tags: ['cripta', 'mazmorra', 'cueva', 'tumba', 'sombra', 'monstruo', 'muerte']
     },
     {
-      id: "battle",
-      name: "Tensión de Combate & Tambores",
-      icon: "⚔️",
-      desc: "Pulsos rítmicos de combate táctico para turnos de iniciativa intensa.",
-      tags: [
-        "combate",
-        "pelea",
-        "lucha",
-        "arma",
-        "espada",
-        "sangre",
-        "enemigo",
-        "ataque",
-      ],
+      id: 'battle',
+      name: 'Tensión de Combate & Tambores',
+      icon: '⚔️',
+      desc: 'Pulsos rítmicos de combate táctico para turnos de iniciativa intensa.',
+      tags: ['combate', 'pelea', 'lucha', 'arma', 'espada', 'sangre', 'enemigo', 'ataque']
     },
     {
-      id: "elven_forest",
-      name: "Bosque Élfico & Misticismo",
-      icon: "🍃",
-      desc: "Armonías etéreas y naturaleza arcana para santuarios y viajes por el bosque.",
-      tags: [
-        "bosque",
-        "elfo",
-        "magia",
-        "naturaleza",
-        "arbol",
-        "santuario",
-        "rio",
-      ],
-    },
+      id: 'elven_forest',
+      name: 'Bosque Élfico & Misticismo',
+      icon: '🍃',
+      desc: 'Armonías etéreas y naturaleza arcana para santuarios y viajes por el bosque.',
+      tags: ['bosque', 'elfo', 'magia', 'naturaleza', 'arbol', 'santuario', 'rio']
+    }
   ];
 
   // Smart ambient recommendation based on scene text
@@ -437,7 +385,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
     if (!currentScene) return null;
     const lower = currentScene.toLowerCase();
     for (const track of ambientTracks) {
-      if (track.tags.some((tag) => lower.includes(tag))) {
+      if (track.tags.some(tag => lower.includes(tag))) {
         return track.id;
       }
     }
@@ -447,7 +395,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   const handleToggleAudio = (trackId: string) => {
     if (activeSoundtrack === trackId) {
       synth.stop();
-      setActiveSoundtrack("");
+      setActiveSoundtrack('');
     } else {
       synth.playTrack(trackId, volume);
       setActiveSoundtrack(trackId);
@@ -460,8 +408,8 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   };
 
   const toggleModifier = (mod: string) => {
-    setSelectedModifiers((prev) =>
-      prev.includes(mod) ? prev.filter((m) => m !== mod) : [...prev, mod],
+    setSelectedModifiers(prev =>
+      prev.includes(mod) ? prev.filter(m => m !== mod) : [...prev, mod]
     );
   };
 
@@ -472,14 +420,14 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   };
 
   const quickModifiers = [
-    "Luz de antorchas y fuego",
-    "Niebla densa y misterio",
-    "Lluvia tormentosa",
-    "Luz de luna llena fría",
-    "Rayos de sol volumétricos",
-    "Destellos arcanos mágicos",
-    "Ángulo dramático contrapicado",
-    "Composición cinematográfica 16:9",
+    'Luz de antorchas y fuego',
+    'Niebla densa y misterio',
+    'Lluvia tormentosa',
+    'Luz de luna llena fría',
+    'Rayos de sol volumétricos',
+    'Destellos arcanos mágicos',
+    'Ángulo dramático contrapicado',
+    'Composición cinematográfica 16:9'
   ];
 
   return (
@@ -496,8 +444,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                 Taller Creativo & Estudio de Escena
               </h3>
               <p className="text-[11px] text-[var(--text-secondary)]">
-                Transforma cualquier escena o acontecimiento en ilustraciones,
-                cinemáticas, música y crónica
+                Transforma cualquier escena o acontecimiento en ilustraciones, cinemáticas, música y crónica
               </p>
             </div>
           </div>
@@ -536,7 +483,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
             <div className="mt-2 space-y-2">
               <textarea
                 value={currentScene}
-                onChange={(e) => setCurrentScene(e.target.value)}
+                onChange={e => setCurrentScene(e.target.value)}
                 rows={3}
                 placeholder="Pega o escribe aquí el texto de la escena o acontecimiento que deseas crear..."
                 className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg p-2.5 text-xs font-lora outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
@@ -545,11 +492,11 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                 <span>
                   {currentScene.length > 0
                     ? `${currentScene.length} caracteres seleccionados`
-                    : "Sin escena seleccionada (se usarán valores por defecto)"}
+                    : 'Sin escena seleccionada (se usarán valores por defecto)'}
                 </span>
                 {currentScene && (
                   <button
-                    onClick={() => setCurrentScene("")}
+                    onClick={() => setCurrentScene('')}
                     className="text-red-500 hover:underline cursor-pointer"
                   >
                     Vaciar escena
@@ -561,7 +508,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
             <p className="text-xs text-[var(--text-secondary)] italic line-clamp-2 mt-1 m-0">
               {currentScene
                 ? `«${currentScene}»`
-                : "Ninguna escena específica seleccionada. Mostrando plantillas de alta fantasía."}
+                : 'Ninguna escena específica seleccionada. Mostrando plantillas de alta fantasía.'}
             </p>
           )}
         </div>
@@ -569,12 +516,12 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
         {/* Navigation Tabs */}
         <div className="flex items-center px-4 pt-2 border-b border-[var(--glass-border)] bg-[var(--surface)] gap-1 overflow-x-auto">
           {[
-            { id: "image", label: "🎨 Ilustración de Escena", icon: ImageIcon },
-            { id: "video", label: "🎬 Cinemática de Video", icon: Film },
-            { id: "music", label: "🎵 Bardo & Música", icon: Music },
-            { id: "diary", label: "📜 Resumen de Diario", icon: BookOpen },
-            { id: "voice", label: "🎤 Voz & Dictado", icon: Mic },
-          ].map((t) => {
+            { id: 'image', label: '🎨 Ilustración de Escena', icon: ImageIcon },
+            { id: 'video', label: '🎬 Cinemática de Video', icon: Film },
+            { id: 'music', label: '🎵 Bardo & Música', icon: Music },
+            { id: 'diary', label: '📜 Resumen de Diario', icon: BookOpen },
+            { id: 'voice', label: '🎤 Voz & Dictado', icon: Mic }
+          ].map(t => {
             const isSel = activeTab === t.id;
             return (
               <button
@@ -582,8 +529,8 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                 onClick={() => setActiveTab(t.id as any)}
                 className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-cinzel font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
                   isSel
-                    ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--glass)] rounded-t-lg shadow-2xs"
-                    : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--glass)] rounded-t-lg shadow-2xs'
+                    : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 <t.icon className="w-3.5 h-3.5" />
@@ -596,7 +543,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* TAB 1: IMAGE PROMPTING (ENRICHED BY SCENE) */}
-          {activeTab === "image" && (
+          {activeTab === 'image' && (
             <div className="space-y-4">
               {/* Archetypes Selector */}
               <div>
@@ -605,44 +552,20 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
-                    {
-                      id: "classic",
-                      label: "🎨 Cuadro Épico (D&D)",
-                      desc: "Óleo clásico, luz dramática",
-                    },
-                    {
-                      id: "character",
-                      label: "👤 Retrato de Personaje",
-                      desc: "Primer plano, expresión e indumentaria",
-                    },
-                    {
-                      id: "action",
-                      label: "⚔️ Acción & Hechizo",
-                      desc: "Movimiento, partículas mágicas y combate",
-                    },
-                    {
-                      id: "landscape",
-                      label: "🗺️ Paisaje Panorámico",
-                      desc: "Gran angular, arquitectura y clima",
-                    },
-                    {
-                      id: "grimdark",
-                      label: "🕯️ Grimdark & Claroscuro",
-                      desc: "Tenebrismo, sombras marcadas, estilo Witcher",
-                    },
-                    {
-                      id: "woodcut",
-                      label: "📜 Grabado Medieval",
-                      desc: "Xilografía clásica en pergamino",
-                    },
-                  ].map((arch) => (
+                    { id: 'classic', label: '🎨 Cuadro Épico (D&D)', desc: 'Óleo clásico, luz dramática' },
+                    { id: 'character', label: '👤 Retrato de Personaje', desc: 'Primer plano, expresión e indumentaria' },
+                    { id: 'action', label: '⚔️ Acción & Hechizo', desc: 'Movimiento, partículas mágicas y combate' },
+                    { id: 'landscape', label: '🗺️ Paisaje Panorámico', desc: 'Gran angular, arquitectura y clima' },
+                    { id: 'grimdark', label: '🕯️ Grimdark & Claroscuro', desc: 'Tenebrismo, sombras marcadas, estilo Witcher' },
+                    { id: 'woodcut', label: '📜 Grabado Medieval', desc: 'Xilografía clásica en pergamino' }
+                  ].map(arch => (
                     <button
                       key={arch.id}
                       onClick={() => setImageArchetype(arch.id)}
                       className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         imageArchetype === arch.id
-                          ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] ring-1 ring-[var(--accent)]"
-                          : "border-[var(--glass-border)] bg-[var(--surface-soft)] hover:border-[var(--accent)]/50"
+                          ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] ring-1 ring-[var(--accent)]'
+                          : 'border-[var(--glass-border)] bg-[var(--surface-soft)] hover:border-[var(--accent)]/50'
                       }`}
                     >
                       <div className="text-xs font-cinzel font-bold text-[var(--text-primary)]">
@@ -662,7 +585,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                   2. Modificadores de Atmósfera (Opcionales):
                 </label>
                 <div className="flex flex-wrap gap-1.5">
-                  {quickModifiers.map((mod) => {
+                  {quickModifiers.map(mod => {
                     const isSelected = selectedModifiers.includes(mod);
                     return (
                       <button
@@ -670,11 +593,11 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                         onClick={() => toggleModifier(mod)}
                         className={`text-[11px] font-cinzel px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
                           isSelected
-                            ? "bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] font-bold shadow-2xs"
-                            : "bg-[var(--surface-soft)] text-[var(--text-secondary)] border-[var(--user-border)] hover:border-[var(--accent)] hover:text-[var(--text-primary)]"
+                            ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] font-bold shadow-2xs'
+                            : 'bg-[var(--surface-soft)] text-[var(--text-secondary)] border-[var(--user-border)] hover:border-[var(--accent)] hover:text-[var(--text-primary)]'
                         }`}
                       >
-                        {isSelected ? "✓ " : "+ "}
+                        {isSelected ? '✓ ' : '+ '}
                         {mod}
                       </button>
                     );
@@ -686,27 +609,24 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
               <div className="p-4 rounded-xl border border-[var(--accent)] bg-[var(--surface-soft)] space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
-                    <Wand2 className="w-3.5 h-3.5" /> Prompt Listo para
-                    Generadores (Midjourney / DALL-E / Imagen 3 / Stable
-                    Diffusion):
+                    <Wand2 className="w-3.5 h-3.5" /> Prompt Listo para Generadores (Midjourney / DALL-E / Imagen 3 / Stable Diffusion):
                   </span>
                 </div>
                 <textarea
                   value={imagePrompt}
-                  onChange={(e) => setImagePrompt(e.target.value)}
+                  onChange={e => setImagePrompt(e.target.value)}
                   rows={4}
                   className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg p-2.5 text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
                 />
 
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   <button
-                    onClick={() => copyToClipboard(imagePrompt, "image_prompt")}
+                    onClick={() => copyToClipboard(imagePrompt, 'image_prompt')}
                     className="px-3 py-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--bg-color)] text-xs font-cinzel font-bold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-1.5 cursor-pointer shadow-2xs"
                   >
-                    {copiedPrompt === "image_prompt" ? (
+                    {copiedPrompt === 'image_prompt' ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />{" "}
-                        ¡Copiado al Portapapeles!
+                        <Check className="w-3.5 h-3.5 text-emerald-600" /> ¡Copiado al Portapapeles!
                       </>
                     ) : (
                       <>
@@ -718,9 +638,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                   {handleSendToChat && (
                     <button
                       onClick={() => {
-                        handleSendToChat(
-                          `🎨 [Ilustración de la Escena]: ${imagePrompt}`,
-                        );
+                        handleSendToChat(`🎨 [Ilustración de la Escena]: ${imagePrompt}`);
                         onClose();
                       }}
                       className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 shadow-2xs hover:bg-[var(--accent-hover)] cursor-pointer"
@@ -734,7 +652,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
           )}
 
           {/* TAB 2: VIDEO CINEMATIC PROMPTING */}
-          {activeTab === "video" && (
+          {activeTab === 'video' && (
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-cinzel font-bold text-[var(--text-primary)] mb-2">
@@ -742,34 +660,18 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    {
-                      id: "pan",
-                      label: "🎥 Barrido Panorámico",
-                      desc: "Movimiento lateral suave",
-                    },
-                    {
-                      id: "drone",
-                      label: "🦅 Travelling Aéreo",
-                      desc: "Toma cenital y elevación",
-                    },
-                    {
-                      id: "push",
-                      label: "🔍 Acercamiento Intenso",
-                      desc: "Push-in dramático a personajes",
-                    },
-                    {
-                      id: "orbit",
-                      label: "🔄 Giro Orbital 360°",
-                      desc: "Rotación cinematográfica",
-                    },
-                  ].map((cam) => (
+                    { id: 'pan', label: '🎥 Barrido Panorámico', desc: 'Movimiento lateral suave' },
+                    { id: 'drone', label: '🦅 Travelling Aéreo', desc: 'Toma cenital y elevación' },
+                    { id: 'push', label: '🔍 Acercamiento Intenso', desc: 'Push-in dramático a personajes' },
+                    { id: 'orbit', label: '🔄 Giro Orbital 360°', desc: 'Rotación cinematográfica' }
+                  ].map(cam => (
                     <button
                       key={cam.id}
                       onClick={() => setCameraMove(cam.id)}
                       className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         cameraMove === cam.id
-                          ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] ring-1 ring-[var(--accent)]"
-                          : "border-[var(--glass-border)] bg-[var(--surface-soft)] hover:border-[var(--accent)]/50"
+                          ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] ring-1 ring-[var(--accent)]'
+                          : 'border-[var(--glass-border)] bg-[var(--surface-soft)] hover:border-[var(--accent)]/50'
                       }`}
                     >
                       <div className="text-xs font-cinzel font-bold text-[var(--text-primary)]">
@@ -786,30 +688,27 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
               {/* Video Prompt Output Box */}
               <div className="p-4 rounded-xl border border-[var(--accent)] bg-[var(--surface-soft)] space-y-3">
                 <span className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
-                  <Film className="w-3.5 h-3.5" /> Prompt Cinemático (Runway
-                  Gen-3 / Luma Dream Machine / Sora / Veo):
+                  <Film className="w-3.5 h-3.5" /> Prompt Cinemático (Runway Gen-3 / Luma Dream Machine / Sora / Veo):
                 </span>
                 <textarea
                   value={videoPrompt}
-                  onChange={(e) => setVideoPrompt(e.target.value)}
+                  onChange={e => setVideoPrompt(e.target.value)}
                   rows={4}
                   className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg p-2.5 text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
                 />
 
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   <button
-                    onClick={() => copyToClipboard(videoPrompt, "video_prompt")}
+                    onClick={() => copyToClipboard(videoPrompt, 'video_prompt')}
                     className="px-3 py-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--bg-color)] text-xs font-cinzel font-bold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-1.5 cursor-pointer shadow-2xs"
                   >
-                    {copiedPrompt === "video_prompt" ? (
+                    {copiedPrompt === 'video_prompt' ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />{" "}
-                        ¡Copiado al Portapapeles!
+                        <Check className="w-3.5 h-3.5 text-emerald-600" /> ¡Copiado al Portapapeles!
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3.5 h-3.5" /> Copiar Prompt
-                        Cinemático
+                        <Copy className="w-3.5 h-3.5" /> Copiar Prompt Cinemático
                       </>
                     )}
                   </button>
@@ -817,9 +716,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                   {handleSendToChat && (
                     <button
                       onClick={() => {
-                        handleSendToChat(
-                          `🎬 [Cinemática de Escena]: ${videoPrompt}`,
-                        );
+                        handleSendToChat(`🎬 [Cinemática de Escena]: ${videoPrompt}`);
                         onClose();
                       }}
                       className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 shadow-2xs hover:bg-[var(--accent-hover)] cursor-pointer"
@@ -833,7 +730,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
           )}
 
           {/* TAB 3: MUSIC & BARDO (WITH SCENE RECOMMENDATION) */}
-          {activeTab === "music" && (
+          {activeTab === 'music' && (
             <div className="space-y-4">
               <div className="bg-[var(--glass)] p-4 rounded-xl border border-[var(--glass-border)]">
                 <div className="flex items-center justify-between mb-2">
@@ -850,13 +747,12 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] mb-3">
-                  Melodías ambientales interactivas que suenan de fondo en
-                  segundo plano mientras juegas, sin consumir cuota.
+                  Melodías ambientales interactivas que suenan de fondo en segundo plano mientras juegas, sin consumir cuota.
                 </p>
 
                 {/* Track list */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {ambientTracks.map((track) => {
+                  {ambientTracks.map(track => {
                     const isPlayingThis = activeSoundtrack === track.id;
                     const isRecommended = recommendedTrackId === track.id;
                     return (
@@ -865,10 +761,10 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                         onClick={() => handleToggleAudio(track.id)}
                         className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between relative ${
                           isPlayingThis
-                            ? "bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-md scale-[1.02]"
+                            ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-md scale-[1.02]'
                             : isRecommended
-                              ? "bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface-soft))] border-[var(--accent)]/60 text-[var(--text-primary)] ring-1 ring-[var(--accent)]/40"
-                              : "bg-[var(--surface-soft)] text-[var(--text-primary)] border-[var(--glass-border)] hover:border-[var(--accent)]"
+                              ? 'bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface-soft))] border-[var(--accent)]/60 text-[var(--text-primary)] ring-1 ring-[var(--accent)]/40'
+                              : 'bg-[var(--surface-soft)] text-[var(--text-primary)] border-[var(--glass-border)] hover:border-[var(--accent)]'
                         }`}
                       >
                         {isRecommended && !isPlayingThis && (
@@ -880,27 +776,17 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                           <span className="text-xl">{track.icon}</span>
                           <button
                             className={`p-1.5 rounded-lg flex items-center justify-center transition-transform ${
-                              isPlayingThis
-                                ? "bg-white/20 text-white"
-                                : "bg-[var(--glass)] text-[var(--accent)]"
+                              isPlayingThis ? 'bg-white/20 text-white' : 'bg-[var(--glass)] text-[var(--accent)]'
                             }`}
                           >
-                            {isPlayingThis ? (
-                              <Pause className="w-3.5 h-3.5" />
-                            ) : (
-                              <Play className="w-3.5 h-3.5" />
-                            )}
+                            {isPlayingThis ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                         <div>
-                          <div className="text-xs font-cinzel font-bold mb-0.5">
-                            {track.name}
-                          </div>
+                          <div className="text-xs font-cinzel font-bold mb-0.5">{track.name}</div>
                           <div
                             className={`text-[11px] line-clamp-2 leading-relaxed ${
-                              isPlayingThis
-                                ? "text-white/90"
-                                : "text-[var(--text-secondary)]"
+                              isPlayingThis ? 'text-white/90' : 'text-[var(--text-secondary)]'
                             }`}
                           >
                             {track.desc}
@@ -914,11 +800,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                 {/* Volume Slider */}
                 <div className="mt-4 pt-3 border-t border-[var(--glass-border)] flex items-center gap-3">
                   <span className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
-                    {volume === 0 ? (
-                      <VolumeX className="w-4 h-4" />
-                    ) : (
-                      <Volume2 className="w-4 h-4" />
-                    )}
+                    {volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                     Volumen:
                   </span>
                   <input
@@ -927,9 +809,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                     max="1"
                     step="0.05"
                     value={volume}
-                    onChange={(e) =>
-                      handleVolumeChange(parseFloat(e.target.value))
-                    }
+                    onChange={e => handleVolumeChange(parseFloat(e.target.value))}
                     className="flex-1 accent-[var(--accent)] cursor-pointer"
                   />
                   <span className="text-xs font-mono w-8 text-right text-[var(--text-secondary)]">
@@ -944,14 +824,12 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                   🎵 Enlace de Música de YouTube / Spotify para la Escena
                 </span>
                 <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                  Si prefieres una pista orquestal de YouTube o Spotify,
-                  introduce el enlace aquí para insertarla en el chat con
-                  reproductor integrado:
+                  Si prefieres una pista orquestal de YouTube o Spotify, introduce el enlace aquí para insertarla en el chat con reproductor integrado:
                 </p>
                 <div className="flex gap-2">
                   <input
                     value={customMusicUrl}
-                    onChange={(e) => setCustomMusicUrl(e.target.value)}
+                    onChange={e => setCustomMusicUrl(e.target.value)}
                     placeholder="https://www.youtube.com/watch?v=... o Spotify URL"
                     className="flex-1 bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[var(--accent)] font-mono"
                   />
@@ -960,7 +838,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                       onClick={() => {
                         if (customMusicUrl.trim()) {
                           handleSendToChat(`🎵 ${customMusicUrl.trim()}`);
-                          setCustomMusicUrl("");
+                          setCustomMusicUrl('');
                           onClose();
                         }
                       }}
@@ -976,23 +854,20 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
           )}
 
           {/* TAB 4: DIARY / CHRONICLE SUMMARY GENERATOR */}
-          {activeTab === "diary" && (
+          {activeTab === 'diary' && (
             <div className="space-y-4">
               <div className="p-4 rounded-xl border border-[var(--accent)] bg-[var(--surface-soft)] space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5" /> Resumen de la Escena
-                    para el Diario / Crónica:
+                    <BookOpen className="w-3.5 h-3.5" /> Resumen de la Escena para el Diario / Crónica:
                   </span>
                 </div>
                 <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                  Este resumen sintético recoge los sucesos clave de la escena
-                  para guardarlos como acontecimiento en la Agenda o añadirlo al
-                  Diario de Campaña:
+                  Este resumen sintético recoge los sucesos clave de la escena para guardarlos como acontecimiento en la Agenda o añadirlo al Diario de Campaña:
                 </p>
                 <textarea
                   value={diarySummary}
-                  onChange={(e) => setDiarySummary(e.target.value)}
+                  onChange={e => setDiarySummary(e.target.value)}
                   rows={4}
                   placeholder="Resumen del acontecimiento..."
                   className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg p-2.5 text-xs font-lora text-[var(--text-primary)] outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
@@ -1000,15 +875,12 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
 
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   <button
-                    onClick={() =>
-                      copyToClipboard(diarySummary, "diary_summary")
-                    }
+                    onClick={() => copyToClipboard(diarySummary, 'diary_summary')}
                     className="px-3 py-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--bg-color)] text-xs font-cinzel font-bold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-1.5 cursor-pointer shadow-2xs"
                   >
-                    {copiedPrompt === "diary_summary" ? (
+                    {copiedPrompt === 'diary_summary' ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />{" "}
-                        ¡Copiado al Portapapeles!
+                        <Check className="w-3.5 h-3.5 text-emerald-600" /> ¡Copiado al Portapapeles!
                       </>
                     ) : (
                       <>
@@ -1020,9 +892,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                   {handleSendToChat && (
                     <button
                       onClick={() => {
-                        handleSendToChat(
-                          `📜 [Acontecimiento de Crónica]: ${diarySummary}`,
-                        );
+                        handleSendToChat(`📜 [Acontecimiento de Crónica]: ${diarySummary}`);
                         onClose();
                       }}
                       className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 shadow-2xs hover:bg-[var(--accent-hover)] cursor-pointer"
@@ -1036,7 +906,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
           )}
 
           {/* TAB 5: VOICE INPUT GUIDELINES */}
-          {activeTab === "voice" && (
+          {activeTab === 'voice' && (
             <div className="space-y-4">
               <div className="bg-[var(--glass)] p-4 rounded-xl border border-[var(--glass-border)] text-center space-y-3">
                 <div className="w-12 h-12 mx-auto rounded-full bg-[var(--accent)] text-[var(--on-accent)] flex items-center justify-center shadow-md">
@@ -1046,26 +916,15 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                   Dictado y Reconocimiento de Voz
                 </h4>
                 <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto leading-relaxed">
-                  Ya puedes hablarle directamente a tu Narrador con el botón del
-                  micrófono integrado en la barra de chat. Tus palabras se
-                  transcribirán en tiempo real.
+                  Ya puedes hablarle directamente a tu Narrador con el botón del micrófono integrado en la barra de chat. Tus palabras se transcribirán en tiempo real.
                 </p>
                 <div className="p-3 bg-[var(--surface-soft)] rounded-lg text-xs text-[var(--text-secondary)] text-left max-w-md mx-auto space-y-1.5 border border-[var(--glass-border)]">
                   <div className="font-bold font-cinzel text-[var(--text-primary)] mb-1">
                     💡 Consejos para rolear por voz:
                   </div>
-                  <div>
-                    • Di <em>«Lanzo mi conjuro de Fuego...»</em> para dictar tu
-                    acción directamente.
-                  </div>
-                  <div>
-                    • Di <em>«Comillas ... comillas»</em> si deseas hablar en
-                    primera persona de diálogo.
-                  </div>
-                  <div>
-                    • Funciona en móviles, tabletas y ordenadores con micrófono
-                    habilitado.
-                  </div>
+                  <div>• Di <em>«Lanzo mi conjuro de Fuego...»</em> para dictar tu acción directamente.</div>
+                  <div>• Di <em>«Comillas ... comillas»</em> si deseas hablar en primera persona de diálogo.</div>
+                  <div>• Funciona en móviles, tabletas y ordenadores con micrófono habilitado.</div>
                 </div>
               </div>
             </div>

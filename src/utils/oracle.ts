@@ -1,4 +1,4 @@
-import { rollDie } from "./rollRequests";
+import { rollDie } from './rollRequests';
 
 /**
  * El oráculo: la parte del juego en solitario que la IA no debe decidir.
@@ -20,20 +20,20 @@ import { rollDie } from "./rollRequests";
  * etiquetas genéricas: la traducción a números la pone el documento de cada cual.
  */
 export const PROBABILIDADES = [
-  "Seguro",
-  "Casi seguro",
-  "Muy probable",
-  "Probable",
-  "50/50 o no se sabe",
-  "Poco probable",
-  "Muy poco probable",
-  "Casi imposible",
-  "Imposible",
+  'Seguro',
+  'Casi seguro',
+  'Muy probable',
+  'Probable',
+  '50/50 o no se sabe',
+  'Poco probable',
+  'Muy poco probable',
+  'Casi imposible',
+  'Imposible'
 ] as const;
 
 export type Probabilidad = (typeof PROBABILIDADES)[number] | string;
 
-export const PROBABILIDAD_POR_DEFECTO: Probabilidad = "50/50 o no se sabe";
+export const PROBABILIDAD_POR_DEFECTO: Probabilidad = '50/50 o no se sabe';
 
 /**
  * Dígitos repetidos: 11, 22, 33… En varios oráculos eso dispara un suceso
@@ -55,22 +55,14 @@ export interface ConsultaOraculo {
   doble: boolean;
 }
 
-export function nuevaConsulta(
-  pregunta: string,
-  probabilidad: Probabilidad,
-): ConsultaOraculo {
+export function nuevaConsulta(pregunta: string, probabilidad: Probabilidad): ConsultaOraculo {
   const resultado = tirarD100();
-  return {
-    pregunta: pregunta.trim(),
-    probabilidad,
-    resultado,
-    doble: esDoble(resultado),
-  };
+  return { pregunta: pregunta.trim(), probabilidad, resultado, doble: esDoble(resultado) };
 }
 
 /** Lo que se manda al Narrador. El dado ya está tirado: él solo lo lee. */
 export function formatoConsulta(c: ConsultaOraculo): string {
-  const doble = c.doble ? " | DÍGITOS REPETIDOS" : "";
+  const doble = c.doble ? ' | DÍGITOS REPETIDOS' : '';
   return `[Oráculo — «${c.pregunta}» | probabilidad: ${c.probabilidad} | d100 = ${c.resultado}${doble}]`;
 }
 
@@ -113,9 +105,9 @@ export function limpiarInvitaciones(texto: string): string {
   if (!texto || !/or[aá]culo/i.test(texto)) return texto;
   INVITACION_RE.lastIndex = 0;
   return texto
-    .replace(INVITACION_RE, "")
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(INVITACION_RE, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

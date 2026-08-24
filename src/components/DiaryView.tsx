@@ -1,19 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import { Project } from "../types";
-import {
-  Eye,
-  EyeOff,
-  NotebookPen,
-  Pencil,
-  RefreshCw,
-  Save,
-  Sparkles,
-  Trash2,
-  Wand2,
-  X,
-} from "lucide-react";
-import { CreativeStudioModal } from "./CreativeStudioModal";
+import React, { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { Project } from '../types';
+import { Eye, EyeOff, NotebookPen, Pencil, Save, Trash2, Wand2, X } from 'lucide-react';
+import { CreativeStudioModal } from './CreativeStudioModal';
 
 /**
  * El diario del Narrador — crónica, estado y notas — como una sección más de
@@ -27,45 +16,37 @@ import { CreativeStudioModal } from "./CreativeStudioModal";
  */
 export const DiaryView: React.FC<{
   project: Project;
-  onUpdateMemory: (
-    updater: (prevMem: Project["memory"]) => Project["memory"],
-  ) => Promise<void>;
-  onTriggerAIUpdate: () => Promise<void>;
-  isGenerating: boolean;
-  hasChats: boolean;
-}> = ({
-  project,
-  onUpdateMemory,
-  onTriggerAIUpdate,
-  isGenerating,
-  hasChats,
-}) => {
+  onUpdateMemory: (updater: (prevMem: Project['memory']) => Project['memory']) => Promise<void>;
+  onTriggerAIUpdate?: () => Promise<void>;
+  isGenerating?: boolean;
+  hasChats?: boolean;
+}> = ({ project, onUpdateMemory }) => {
   const memory = project.memory || {
-    story: "",
+    story: '',
     quests: [],
     npcs: [],
     locations: [],
-    current_status: "",
-    manual_notes: "",
+    current_status: '',
+    manual_notes: ''
   };
 
-  type Seccion = "story" | "status" | "notes";
+  type Seccion = 'story' | 'status' | 'notes';
   const [editing, setEditing] = useState<Seccion | null>(null);
-  const [storyDraft, setStoryDraft] = useState(memory.story || "");
-  const [statusDraft, setStatusDraft] = useState(memory.current_status || "");
-  const [notesDraft, setNotesDraft] = useState(memory.manual_notes || "");
+  const [storyDraft, setStoryDraft] = useState(memory.story || '');
+  const [statusDraft, setStatusDraft] = useState(memory.current_status || '');
+  const [notesDraft, setNotesDraft] = useState(memory.manual_notes || '');
   const [showNotes, setShowNotes] = useState(false);
   const [confirmClear, setConfirmClear] = useState<Seccion | null>(null);
   const [studioModal, setStudioModal] = useState<{
     isOpen: boolean;
-    tab?: "image" | "video" | "music" | "diary";
+    tab?: 'image' | 'video' | 'music' | 'diary';
     sceneText: string;
   } | null>(null);
 
   useEffect(() => {
-    setStoryDraft(memory.story || "");
-    setStatusDraft(memory.current_status || "");
-    setNotesDraft(memory.manual_notes || "");
+    setStoryDraft(memory.story || '');
+    setStatusDraft(memory.current_status || '');
+    setNotesDraft(memory.manual_notes || '');
   }, [project.id, memory.story, memory.current_status, memory.manual_notes]);
 
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -79,38 +60,29 @@ export const DiaryView: React.FC<{
 
   const startEdit = (s: Seccion) => setEditing(s);
   const cancelEdit = () => {
-    setStoryDraft(memory.story || "");
-    setStatusDraft(memory.current_status || "");
-    setNotesDraft(memory.manual_notes || "");
+    setStoryDraft(memory.story || '');
+    setStatusDraft(memory.current_status || '');
+    setNotesDraft(memory.manual_notes || '');
     setEditing(null);
   };
 
   const saveEdit = async (s: Seccion) => {
-    if (s === "story")
-      await onUpdateMemory((mem) => ({ ...mem, story: storyDraft.trim() }));
-    else if (s === "status")
-      await onUpdateMemory((mem) => ({
-        ...mem,
-        current_status: statusDraft.trim(),
-      }));
-    else
-      await onUpdateMemory((mem) => ({
-        ...mem,
-        manual_notes: notesDraft.trim(),
-      }));
+    if (s === 'story') await onUpdateMemory(mem => ({ ...mem, story: storyDraft.trim() }));
+    else if (s === 'status') await onUpdateMemory(mem => ({ ...mem, current_status: statusDraft.trim() }));
+    else await onUpdateMemory(mem => ({ ...mem, manual_notes: notesDraft.trim() }));
     setEditing(null);
   };
 
   const doClear = async (s: Seccion) => {
-    if (s === "story") {
-      setStoryDraft("");
-      await onUpdateMemory((mem) => ({ ...mem, story: "" }));
-    } else if (s === "status") {
-      setStatusDraft("");
-      await onUpdateMemory((mem) => ({ ...mem, current_status: "" }));
+    if (s === 'story') {
+      setStoryDraft('');
+      await onUpdateMemory(mem => ({ ...mem, story: '' }));
+    } else if (s === 'status') {
+      setStatusDraft('');
+      await onUpdateMemory(mem => ({ ...mem, current_status: '' }));
     } else {
-      setNotesDraft("");
-      await onUpdateMemory((mem) => ({ ...mem, manual_notes: "" }));
+      setNotesDraft('');
+      await onUpdateMemory(mem => ({ ...mem, manual_notes: '' }));
     }
     setConfirmClear(null);
     setEditing(null);
@@ -128,41 +100,38 @@ export const DiaryView: React.FC<{
     rows: number;
   }[] = [
     {
-      id: "story",
-      label: "Resumen de la crónica",
-      hint: "Lo acumulado hasta ahora, tal y como lo relee el Narrador para mantener la coherencia.",
-      value: memory.story || "",
+      id: 'story',
+      label: 'Resumen de la crónica',
+      hint: 'Lo acumulado hasta ahora, tal y como lo relee el Narrador para mantener la coherencia.',
+      value: memory.story || '',
       draft: storyDraft,
       setDraft: setStoryDraft,
-      empty:
-        "Aún no hay nada escrito. Pulsa el lápiz para redactarlo, o usa «Sincronizar con IA» para generarlo desde los capítulos jugados.",
-      placeholder:
-        "Escribe la crónica como un resumen en primera o tercera persona: qué ha pasado hasta ahora...",
-      rows: 12,
+      empty: 'Aún no hay nada escrito. Pulsa el lápiz para redactarlo a tu gusto.',
+      placeholder: 'Escribe la crónica como un resumen en primera o tercera persona: qué ha pasado hasta ahora...',
+      rows: 12
     },
     {
-      id: "status",
-      label: "Estado actual",
-      hint: "Dónde están, qué peligros enfrentan, con qué recursos cuentan ahora mismo.",
-      value: memory.current_status || "",
+      id: 'status',
+      label: 'Estado actual',
+      hint: 'Dónde están, qué peligros enfrentan, con qué recursos cuentan ahora mismo.',
+      value: memory.current_status || '',
       draft: statusDraft,
       setDraft: setStatusDraft,
-      empty: "No hay estado actual registrado.",
-      placeholder:
-        "Ubicación, heridas, tensión del grupo, recursos disponibles...",
-      rows: 6,
+      empty: 'No hay estado actual registrado.',
+      placeholder: 'Ubicación, heridas, tensión del grupo, recursos disponibles...',
+      rows: 6
     },
     {
-      id: "notes",
-      label: "Notas manuales",
-      hint: "Secretos, reglas de casa y giros futuros. Prioridad máxima para la IA.",
-      value: memory.manual_notes || "",
+      id: 'notes',
+      label: 'Notas manuales',
+      hint: 'Secretos, reglas de casa y giros futuros. Prioridad máxima para la IA.',
+      value: memory.manual_notes || '',
       draft: notesDraft,
       setDraft: setNotesDraft,
-      empty: "Sin notas por ahora.",
-      placeholder: "Secretos, reglas de casa, revelaciones futuras...",
-      rows: 8,
-    },
+      empty: 'Sin notas por ahora.',
+      placeholder: 'Secretos, reglas de casa, revelaciones futuras...',
+      rows: 8
+    }
   ];
 
   return (
@@ -172,48 +141,19 @@ export const DiaryView: React.FC<{
           <h3 className="font-cinzel text-lg font-bold text-[var(--accent)] m-0 flex items-center gap-2">
             <NotebookPen className="w-4 h-4" /> Diario o resumen del día
           </h3>
-          <button
-            onClick={onTriggerAIUpdate}
-            disabled={isGenerating || !hasChats}
-            title={
-              !hasChats
-                ? "Requiere que haya al menos un mensaje en la crónica para sincronizar"
-                : "Extraer y sincronizar la memoria analizando los capítulos jugados"
-            }
-            className="flex items-center gap-1.5 rounded border border-[var(--user-border)] px-2.5 py-1.5 font-cinzel text-[11px] font-bold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40 cursor-pointer"
-          >
-            {isGenerating ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5" />
-            )}
-            Sincronizar con IA
-          </button>
         </div>
         <p className="text-xs text-[var(--text-secondary)] m-0">
-          La crónica, el estado y las notas que el Narrador relee antes de
-          continuar la historia. Se leen y se corrigen aquí mismo, como una
-          entrada más de la agenda.
+          La crónica, el estado y las notas que el Narrador relee antes de continuar la historia. Se leen y se
+          corrigen aquí mismo, como una entrada más de la agenda.
         </p>
 
         <div className="space-y-5">
           {sections.map((s, idx) => (
-            <div
-              key={s.id}
-              className={
-                idx > 0
-                  ? "pt-5 border-t border-dashed border-[var(--glass-border)]"
-                  : ""
-              }
-            >
+            <div key={s.id} className={idx > 0 ? 'pt-5 border-t border-dashed border-[var(--glass-border)]' : ''}>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <span className="font-cinzel font-bold text-sm">
-                    {s.label}
-                  </span>
-                  <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-0.5">
-                    {s.hint}
-                  </p>
+                  <span className="font-cinzel font-bold text-sm">{s.label}</span>
+                  <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-0.5">{s.hint}</p>
                 </div>
 
                 {editing !== s.id && (
@@ -223,8 +163,8 @@ export const DiaryView: React.FC<{
                         onClick={() =>
                           setStudioModal({
                             isOpen: true,
-                            tab: "image",
-                            sceneText: `${s.label}: ${s.value}`,
+                            tab: 'image',
+                            sceneText: `${s.label}: ${s.value}`
                           })
                         }
                         title={`Taller Creativo: Generar contenido (ilustración, música, video) a partir de ${s.label}`}
@@ -233,14 +173,10 @@ export const DiaryView: React.FC<{
                         <Wand2 className="w-3 h-3" /> Crear contenido
                       </button>
                     )}
-                    {s.id === "notes" && s.value && (
+                    {s.id === 'notes' && s.value && (
                       <button
                         onClick={() => setShowNotes(!showNotes)}
-                        title={
-                          showNotes
-                            ? "Ocultar notas para evitar spoilers"
-                            : "Mostrar notas secretas (Modo Narrador)"
-                        }
+                        title={showNotes ? 'Ocultar notas para evitar spoilers' : 'Mostrar notas secretas (Modo Narrador)'}
                         className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer"
                       >
                         {showNotes ? (
@@ -256,7 +192,7 @@ export const DiaryView: React.FC<{
                     )}
                     <button
                       onClick={() => {
-                        if (s.id === "notes") setShowNotes(true);
+                        if (s.id === 'notes') setShowNotes(true);
                         startEdit(s.id);
                       }}
                       title={`Editar ${s.label}`}
@@ -282,7 +218,7 @@ export const DiaryView: React.FC<{
                   <textarea
                     ref={textAreaRef}
                     value={s.draft}
-                    onChange={(e) => s.setDraft(e.target.value)}
+                    onChange={e => s.setDraft(e.target.value)}
                     rows={s.rows}
                     className="w-full bg-[var(--surface-soft)] border border-[var(--user-border)] focus:border-[var(--accent)] p-3 rounded-lg text-sm font-lora outline-none leading-relaxed resize-y"
                     placeholder={s.placeholder}
@@ -303,7 +239,7 @@ export const DiaryView: React.FC<{
                   </div>
                 </div>
               ) : s.value ? (
-                s.id === "notes" && !showNotes ? (
+                s.id === 'notes' && !showNotes ? (
                   <div
                     onClick={() => setShowNotes(true)}
                     className="p-3 mt-2 rounded-lg border border-dashed border-[var(--glass-border)] bg-[var(--surface-soft)]/20 hover:border-[var(--accent)] text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1 py-3 group"
@@ -313,8 +249,7 @@ export const DiaryView: React.FC<{
                       <span>Notas del Narrador ocultas (Modo Narrador)</span>
                     </div>
                     <p className="text-[11px] text-[var(--text-secondary)] m-0 opacity-80">
-                      Ocultas para evitar spoilers involuntarios. Haz clic para
-                      revelar.
+                      Ocultas para evitar spoilers involuntarios. Haz clic para revelar.
                     </p>
                   </div>
                 ) : (
@@ -329,7 +264,7 @@ export const DiaryView: React.FC<{
                 <p
                   className="text-sm text-[var(--text-secondary)] italic mt-2 cursor-text"
                   onClick={() => {
-                    if (s.id === "notes") setShowNotes(true);
+                    if (s.id === 'notes') setShowNotes(true);
                     startEdit(s.id);
                   }}
                 >
@@ -347,7 +282,7 @@ export const DiaryView: React.FC<{
           <div className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-xl shadow-2xl w-[380px] max-w-full font-lora overflow-hidden">
             <div className="p-4 border-b border-[var(--glass-border)] bg-[var(--sidebar-bg)]">
               <h4 className="font-cinzel text-base text-[var(--accent)] font-bold m-0">
-                Vaciar {sections.find((s) => s.id === confirmClear)?.label}
+                Vaciar {sections.find(s => s.id === confirmClear)?.label}
               </h4>
             </div>
             <div className="p-4">
@@ -376,17 +311,15 @@ export const DiaryView: React.FC<{
       {studioModal?.isOpen && (
         <CreativeStudioModal
           isOpen={studioModal.isOpen}
-          initialTab={studioModal.tab || "image"}
+          initialTab={studioModal.tab || 'image'}
           sceneText={studioModal.sceneText}
           onClose={() => setStudioModal(null)}
-          onInsertIntoChat={async (text) => {
+          onInsertIntoChat={async text => {
             // If user inserts into chat or memory
             if (onUpdateMemory) {
-              await onUpdateMemory((mem) => ({
+              await onUpdateMemory(mem => ({
                 ...mem,
-                manual_notes: mem.manual_notes
-                  ? `${mem.manual_notes}\n\n${text}`
-                  : text,
+                manual_notes: mem.manual_notes ? `${mem.manual_notes}\n\n${text}` : text
               }));
             }
           }}

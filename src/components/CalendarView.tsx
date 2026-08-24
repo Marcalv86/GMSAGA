@@ -1,17 +1,17 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   Project,
   CalendarConfig,
   CampaignDate,
   ProjectFile,
   Chat,
-  TimelineEntry,
-} from "../types";
+  TimelineEntry
+} from '../types';
 import {
   CalendarioDeducido,
   deducirCalendario,
-  describeApiError,
-} from "../utils/geminiHelper";
+  describeApiError
+} from '../utils/geminiHelper';
 import {
   CALENDARIOS_PREDEFINIDOS,
   CALENDARIO_FANTASTICO,
@@ -31,8 +31,8 @@ import {
   iconoDeClima,
   iconoDeHito,
   mesDelDia,
-  obtenerInfoRelacion,
-} from "../utils/campaignCalendar";
+  obtenerInfoRelacion
+} from '../utils/campaignCalendar';
 
 import {
   Calendar,
@@ -56,13 +56,13 @@ import {
   Wand2,
   X,
   Newspaper,
-  Moon,
-} from "lucide-react";
-import { CreativeStudioModal } from "./CreativeStudioModal";
+  Moon
+} from 'lucide-react';
+import { CreativeStudioModal } from './CreativeStudioModal';
 
 /**
  * Vista unificada de Calendario y Diario de Campaña.
- *
+ * 
  * Cada día tiene su propio espacio exclusivo e independiente. El diario o resumen
  * del día vive DENTRO de la página del día que le corresponde, sin duplicidades
  * ni bloques externos.
@@ -71,12 +71,8 @@ export const CalendarView: React.FC<{
   project: Project;
   files?: ProjectFile[];
   chats?: Chat[];
-  onUpdate: (
-    fields: Partial<Project> | ((prev: Project) => Partial<Project>),
-  ) => Promise<void> | void;
-  onUpdateMemory?: (
-    updater: (prevMem: Project["memory"]) => Project["memory"],
-  ) => Promise<void>;
+  onUpdate: (fields: Partial<Project> | ((prev: Project) => Partial<Project>)) => Promise<void> | void;
+  onUpdateMemory?: (updater: (prevMem: Project['memory']) => Project['memory']) => Promise<void>;
   onTriggerAIUpdate?: () => Promise<void>;
   isGenerating?: boolean;
   hasChats?: boolean;
@@ -88,7 +84,7 @@ export const CalendarView: React.FC<{
   onUpdateMemory: _onUpdateMemory,
   onTriggerAIUpdate: _onTriggerAIUpdate,
   isGenerating: _isGenerating = false,
-  hasChats: _hasChats = false,
+  hasChats: _hasChats = false
 }) => {
   const cal = project.calendar;
   const fecha = project.currentDate;
@@ -96,47 +92,40 @@ export const CalendarView: React.FC<{
 
   const [editandoCal, setEditandoCal] = useState(false);
   const [borrador, setBorrador] = useState<CalendarConfig | null>(null);
-  const [anoInicial, setAnoInicial] = useState("1");
+  const [anoInicial, setAnoInicial] = useState('1');
 
   const [propuesta, setPropuesta] = useState<CalendarioDeducido | null>(null);
   const [deduciendo, setDeduciendo] = useState(false);
-  const [errorDeduccion, setErrorDeduccion] = useState("");
+  const [errorDeduccion, setErrorDeduccion] = useState('');
 
   const [corrigiendo, setCorrigiendo] = useState(false);
-  const [mesVisto, setMesVisto] = useState<{
-    year: number;
-    month: number;
-  } | null>(null);
+  const [mesVisto, setMesVisto] = useState<{ year: number; month: number } | null>(null);
 
   // Día seleccionado en la vista (por defecto el día actual de la campaña)
   const hoyAbs = calendarioValido(cal) && fecha ? aDiaAbsoluto(cal, fecha) : 0;
   const [diaSeleccionado, setDiaSeleccionado] = useState<number | null>(null);
 
   // Modo de visualización: 'dia' (solo el día seleccionado) o 'todos' (historial completo de la campaña)
-  const [modoVisualizacion, setModoVisualizacion] = useState<"dia" | "todos">(
-    "dia",
-  );
+  const [modoVisualizacion, setModoVisualizacion] = useState<'dia' | 'todos'>('dia');
 
   // Estado para creación/edición de entradas de la agenda
   const [creandoEntrada, setCreandoEntrada] = useState(false);
-  const [nuevaEntradaResumen, setNuevaEntradaResumen] = useState("");
-  const [nuevaEntradaLugar, setNuevaEntradaLugar] = useState("");
-  const [nuevaEntradaClima, setNuevaEntradaClima] = useState("");
-  const [nuevaEntradaHito, setNuevaEntradaHito] = useState("");
+  const [nuevaEntradaResumen, setNuevaEntradaResumen] = useState('');
+  const [nuevaEntradaLugar, setNuevaEntradaLugar] = useState('');
+  const [nuevaEntradaClima, setNuevaEntradaClima] = useState('');
+  const [nuevaEntradaHito, setNuevaEntradaHito] = useState('');
 
-  const [editandoEntradaId, setEditandoEntradaId] = useState<string | null>(
-    null,
-  );
+  const [editandoEntradaId, setEditandoEntradaId] = useState<string | null>(null);
   const [editEntradaDraft, setEditEntradaDraft] = useState<{
     summary: string;
     lugar: string;
     clima: string;
     hito: string;
-  }>({ summary: "", lugar: "", clima: "", hito: "" });
+  }>({ summary: '', lugar: '', clima: '', hito: '' });
 
   const [studioModal, setStudioModal] = useState<{
     isOpen: boolean;
-    tab?: "image" | "video" | "music" | "diary";
+    tab?: 'image' | 'video' | 'music' | 'diary';
     sceneText: string;
   } | null>(null);
 
@@ -155,13 +144,12 @@ export const CalendarView: React.FC<{
     setShowLimpiezaMenu(false);
     setConfirmDialog({
       isOpen: true,
-      title: "Vaciar toda la cronología",
-      message:
-        "¿Estás seguro de que deseas eliminar TODAS las entradas de diario y acontecimientos registrados en la campaña? El calendario seguirá configurado pero el diario se quedará a cero.",
+      title: 'Vaciar toda la cronología',
+      message: '¿Estás seguro de que deseas eliminar TODAS las entradas de diario y acontecimientos registrados en la campaña? El calendario seguirá configurado pero el diario se quedará a cero.',
       onConfirm: async () => {
         await onUpdate({ timeline: [] });
         setConfirmDialog(null);
-      },
+      }
     });
   };
 
@@ -169,20 +157,19 @@ export const CalendarView: React.FC<{
     setShowLimpiezaMenu(false);
     setConfirmDialog({
       isOpen: true,
-      title: "Reiniciar calendario al Día 1",
-      message:
-        "¿Deseas reiniciar la fecha actual de la campaña al primer día del año y vaciar todas las entradas de la cronología para sincronizar o empezar desde 0?",
+      title: 'Reiniciar calendario al Día 1',
+      message: '¿Deseas reiniciar la fecha actual de la campaña al primer día del año y vaciar todas las entradas de la cronología para sincronizar o empezar desde 0?',
       onConfirm: async () => {
         if (!cal) return;
         const initD = fechaInicial(fecha?.year || 1);
         await onUpdate({
           currentDate: initD,
           timeline: [],
-          threads: [],
+          threads: []
         });
         setDiaSeleccionado(aDiaAbsoluto(cal, initD));
         setConfirmDialog(null);
-      },
+      }
     });
   };
   // ------------------------------------------------------------ activación
@@ -195,7 +182,7 @@ export const CalendarView: React.FC<{
       calendar: conf,
       currentDate: initDate,
       timeline: project.timeline || [],
-      threads: project.threads || [],
+      threads: project.threads || []
     });
     setDiaSeleccionado(aDiaAbsoluto(conf, initDate));
   };
@@ -203,24 +190,23 @@ export const CalendarView: React.FC<{
   const desactivar = async () => {
     setConfirmDialog({
       isOpen: true,
-      title: "Desactivar calendario",
-      message:
-        "¿Seguro que quieres dejar de llevar el tiempo en esta campaña? No se borrarán los textos guardados, pero el Narrador dejará de avanzar días y registrar fechas automáticas.",
+      title: 'Desactivar calendario',
+      message: '¿Seguro que quieres dejar de llevar el tiempo en esta campaña? No se borrarán los textos guardados, pero el Narrador dejará de avanzar días y registrar fechas automáticas.',
       onConfirm: async () => {
         await onUpdate({ calendar: undefined });
         setConfirmDialog(null);
-      },
+      }
     });
   };
 
   const deducir = async () => {
     setDeduciendo(true);
-    setErrorDeduccion("");
+    setErrorDeduccion('');
     setPropuesta(null);
     try {
       const r = await deducirCalendario({ project, files, chats });
       setPropuesta(r);
-      if (!r.encontrado) setErrorDeduccion("");
+      if (!r.encontrado) setErrorDeduccion('');
     } catch (err) {
       setErrorDeduccion(describeApiError(err));
     } finally {
@@ -234,9 +220,7 @@ export const CalendarView: React.FC<{
     let dayOfYear = 1;
     if (propuesta.fecha) {
       const idx = nuevo.months.findIndex(
-        (m) =>
-          m.name.toLowerCase().trim() ===
-          propuesta.fecha!.mes.toLowerCase().trim(),
+        m => m.name.toLowerCase().trim() === propuesta.fecha!.mes.toLowerCase().trim()
       );
       if (idx >= 0) {
         const previos = diasDelMes(nuevo, idx)[0]?.dayOfYear ?? 1;
@@ -247,13 +231,13 @@ export const CalendarView: React.FC<{
     const cDate: CampaignDate = {
       year: propuesta.fecha?.year ?? 1,
       dayOfYear: Math.min(Math.max(1, dayOfYear), diasPorAno(nuevo)),
-      minute: (propuesta.fecha?.hora ?? 8) * 60,
+      minute: (propuesta.fecha?.hora ?? 8) * 60
     };
     await onUpdate({
       calendar: nuevo,
       currentDate: cDate,
       timeline: project.timeline || [],
-      threads: project.threads || [],
+      threads: project.threads || []
     });
     setDiaSeleccionado(aDiaAbsoluto(nuevo, cDate));
     setPropuesta(null);
@@ -261,11 +245,7 @@ export const CalendarView: React.FC<{
 
   // ------------------------------------------------------------ reloj
 
-  const mover = async (delta: {
-    dias?: number;
-    horas?: number;
-    minutos?: number;
-  }) => {
+  const mover = async (delta: { dias?: number; horas?: number; minutos?: number }) => {
     if (!calendarioValido(cal) || !fecha) return;
     const nFecha = avanzar(cal, fecha, delta);
     await onUpdate({ currentDate: nFecha });
@@ -274,19 +254,16 @@ export const CalendarView: React.FC<{
 
   const ponerHora = async (hhmm: string) => {
     if (!calendarioValido(cal) || !fecha) return;
-    const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
+    const [h, m] = hhmm.split(':').map(n => parseInt(n, 10));
     if (!Number.isFinite(h)) return;
-    await onUpdate({
-      currentDate: { ...fecha, minute: h * 60 + (Number.isFinite(m) ? m : 0) },
-    });
+    await onUpdate({ currentDate: { ...fecha, minute: h * 60 + (Number.isFinite(m) ? m : 0) } });
   };
 
-  const ponerFecha = async (campo: "year" | "dayOfYear", valor: string) => {
+  const ponerFecha = async (campo: 'year' | 'dayOfYear', valor: string) => {
     if (!calendarioValido(cal) || !fecha) return;
     const n = parseInt(valor, 10);
     if (!Number.isFinite(n) || n < 1) return;
-    const max =
-      campo === "dayOfYear" ? diasPorAno(cal) : Number.MAX_SAFE_INTEGER;
+    const max = campo === 'dayOfYear' ? diasPorAno(cal) : Number.MAX_SAFE_INTEGER;
     const nFecha: CampaignDate = { ...fecha, [campo]: Math.min(n, max) };
     await onUpdate({ currentDate: nFecha });
     setDiaSeleccionado(aDiaAbsoluto(cal, nFecha));
@@ -299,62 +276,50 @@ export const CalendarView: React.FC<{
   const borrarEntrada = (id: string) => {
     setConfirmDialog({
       isOpen: true,
-      title: "Borrar entrada del diario",
-      message:
-        "¿Deseas eliminar este acontecimiento registrado? Esta acción no se puede deshacer.",
+      title: 'Borrar entrada del diario',
+      message: '¿Deseas eliminar este acontecimiento registrado? Esta acción no se puede deshacer.',
       onConfirm: async () => {
-        await onUpdate((p) => ({
-          timeline: (p.timeline || []).filter((t) => t.id !== id),
+        await onUpdate(p => ({
+          timeline: (p.timeline || []).filter(t => t.id !== id)
         }));
         setConfirmDialog(null);
-      },
+      }
     });
   };
 
   const vaciarDiaCompleto = (absDay: number, fechaStr: string) => {
     setConfirmDialog({
       isOpen: true,
-      title: "Vaciar día completo",
+      title: 'Vaciar día completo',
       message: `¿Eliminar todos los acontecimientos y notas registrados para el ${fechaStr}?`,
       onConfirm: async () => {
-        await onUpdate((p) => ({
-          timeline: (p.timeline || []).filter((t) => t.absDay !== absDay),
+        await onUpdate(p => ({
+          timeline: (p.timeline || []).filter(t => t.absDay !== absDay)
         }));
         setConfirmDialog(null);
-      },
+      }
     });
   };
 
   const consolidarEntradasDia = (absDay: number, fechaStr: string) => {
-    const entradas = (project.timeline || [])
-      .filter((t) => t.absDay === absDay)
-      .sort((a, b) => (a.minute || 0) - (b.minute || 0));
+    const entradas = (project.timeline || []).filter(t => t.absDay === absDay).sort((a, b) => (a.minute || 0) - (b.minute || 0));
     if (entradas.length <= 1) return;
     setConfirmDialog({
       isOpen: true,
-      title: "Consolidar entradas del día",
+      title: 'Consolidar entradas del día',
       message: `¿Deseas fusionar las ${entradas.length} entradas repetidas/intermedias de este día en una única entrada consolidada?`,
       onConfirm: async () => {
         const ultima = entradas[entradas.length - 1];
-        const primerLugar = entradas.find((e) => e.lugar)?.lugar;
-        const primerClima = entradas.find((e) => e.clima)?.clima;
-        const hitos = entradas.map((e) => e.hito).filter(Boolean);
-        const ultimoHito =
-          hitos.length > 0 ? hitos[hitos.length - 1] : undefined;
+        const primerLugar = entradas.find(e => e.lugar)?.lugar;
+        const primerClima = entradas.find(e => e.clima)?.clima;
+        const hitos = entradas.map(e => e.hito).filter(Boolean);
+        const ultimoHito = hitos.length > 0 ? hitos[hitos.length - 1] : undefined;
 
         // Unir los fragmentos evitando frases idénticas duplicadas
         const uniqueSummaries: string[] = [];
-        entradas.forEach((e) => {
-          const s = (e.summary || "").trim();
-          if (
-            s &&
-            !uniqueSummaries.some(
-              (prev) =>
-                prev.toLowerCase() === s.toLowerCase() ||
-                prev.includes(s) ||
-                s.includes(prev),
-            )
-          ) {
+        entradas.forEach(e => {
+          const s = (e.summary || '').trim();
+          if (s && !uniqueSummaries.some(prev => prev.toLowerCase() === s.toLowerCase() || prev.includes(s) || s.includes(prev))) {
             uniqueSummaries.push(s);
           }
         });
@@ -363,10 +328,7 @@ export const CalendarView: React.FC<{
           id: `consolidated_${absDay}_${Date.now()}`,
           absDay,
           date: fechaStr,
-          summary:
-            uniqueSummaries.length > 0
-              ? uniqueSummaries.join(". ")
-              : ultima.summary || "",
+          summary: uniqueSummaries.length > 0 ? uniqueSummaries.join('. ') : (ultima.summary || ''),
           lugar: ultima.lugar || primerLugar,
           clima: ultima.clima || primerClima,
           hito: ultimoHito,
@@ -374,44 +336,44 @@ export const CalendarView: React.FC<{
           tipo: ultima.tipo,
           chatId: ultima.chatId,
           msgId: ultima.msgId,
-          msgIndex: ultima.msgIndex,
+          msgIndex: ultima.msgIndex
         };
 
-        await onUpdate((p) => ({
+        await onUpdate(p => ({
           timeline: [
-            ...(p.timeline || []).filter((t) => t.absDay !== absDay),
-            entradaConsolidada,
-          ],
+            ...(p.timeline || []).filter(t => t.absDay !== absDay),
+            entradaConsolidada
+          ]
         }));
         setConfirmDialog(null);
-      },
+      }
     });
   };
 
   const iniciarEdicionEntrada = (e: TimelineEntry) => {
     setEditandoEntradaId(e.id);
     setEditEntradaDraft({
-      summary: e.summary || "",
-      lugar: e.lugar || "",
-      clima: e.clima || "",
-      hito: e.hito || "",
+      summary: e.summary || '',
+      lugar: e.lugar || '',
+      clima: e.clima || '',
+      hito: e.hito || ''
     });
   };
 
   const guardarEdicionEntrada = async (id: string) => {
     if (!editEntradaDraft.summary.trim()) return;
-    await onUpdate((p) => ({
-      timeline: (p.timeline || []).map((t) =>
+    await onUpdate(p => ({
+      timeline: (p.timeline || []).map(t =>
         t.id === id
           ? {
               ...t,
               summary: editEntradaDraft.summary.trim(),
               lugar: editEntradaDraft.lugar.trim() || undefined,
               clima: editEntradaDraft.clima.trim() || undefined,
-              hito: editEntradaDraft.hito.trim() || undefined,
+              hito: editEntradaDraft.hito.trim() || undefined
             }
-          : t,
-      ),
+          : t
+      )
     }));
     setEditandoEntradaId(null);
   };
@@ -429,17 +391,17 @@ export const CalendarView: React.FC<{
       lugar: nuevaEntradaLugar.trim() || undefined,
       clima: nuevaEntradaClima.trim() || undefined,
       hito: nuevaEntradaHito.trim() || undefined,
-      minute: fecha ? fecha.minute : 8 * 60,
+      minute: fecha ? fecha.minute : 8 * 60
     };
 
-    await onUpdate((p) => ({
-      timeline: [...(p.timeline || []), nueva],
+    await onUpdate(p => ({
+      timeline: [...(p.timeline || []), nueva]
     }));
 
-    setNuevaEntradaResumen("");
-    setNuevaEntradaLugar("");
-    setNuevaEntradaClima("");
-    setNuevaEntradaHito("");
+    setNuevaEntradaResumen('');
+    setNuevaEntradaLugar('');
+    setNuevaEntradaClima('');
+    setNuevaEntradaHito('');
     setCreandoEntrada(false);
   };
 
@@ -452,15 +414,10 @@ export const CalendarView: React.FC<{
       ? mesDelDia(cal, fecha.dayOfYear)
       : 0;
 
-  const celdas =
-    calendarioValido(cal) && cal.months[mesVistoIdx]
-      ? diasDelMes(cal, mesVistoIdx)
-      : [];
+  const celdas = calendarioValido(cal) && cal.months[mesVistoIdx] ? diasDelMes(cal, mesVistoIdx) : [];
 
   const absDeCelda = (dayOfYear: number) =>
-    calendarioValido(cal)
-      ? aDiaAbsoluto(cal, { year: anoVisto, dayOfYear, minute: 0 })
-      : 0;
+    calendarioValido(cal) ? aDiaAbsoluto(cal, { year: anoVisto, dayOfYear, minute: 0 }) : 0;
 
   const irAlMes = (delta: number) => {
     if (!calendarioValido(cal)) return;
@@ -479,9 +436,7 @@ export const CalendarView: React.FC<{
   // ------------------------------------------------------------ agenda por días
 
   const agenda = [...timeline].sort((a, b) => b.absDay - a.absDay);
-  const porDia = agenda.reduce<
-    Record<number, { date: string; entradas: TimelineEntry[] }>
-  >((acc, e) => {
+  const porDia = agenda.reduce<Record<number, { date: string; entradas: TimelineEntry[] }>>((acc, e) => {
     if (!acc[e.absDay]) acc[e.absDay] = { date: e.date, entradas: [] };
     acc[e.absDay].entradas.push(e);
     return acc;
@@ -505,11 +460,9 @@ export const CalendarView: React.FC<{
               <CalendarClock className="w-6 h-6" /> El tiempo de la campaña
             </h2>
             <p className="text-sm text-[var(--text-secondary)] mt-2">
-              Con el calendario en marcha, el Narrador lleva la cuenta de los
-              días y las horas, y puede dejar cosas programadas: una vigilancia
-              que se estrecha, una caravana que llega, una herida que se
-              infecta. Cuando llega el día, ocurren solas, aunque tú te hayas
-              olvidado.
+              Con el calendario en marcha, el Narrador lleva la cuenta de los días y las horas, y puede dejar
+              cosas programadas: una vigilancia que se estrecha, una caravana que llega, una herida que se
+              infecta. Cuando llega el día, ocurren solas, aunque tú te hayas olvidado.
             </p>
           </div>
 
@@ -520,9 +473,8 @@ export const CalendarView: React.FC<{
                   Sacarlo de tu propio material
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
-                  Lee tus documentos y las primeras escenas para averiguar en
-                  qué año y con qué calendario vive tu campaña. Te lo propone;
-                  aplicarlo lo decides tú.
+                  Lee tus documentos y las primeras escenas para averiguar en qué año y con qué calendario
+                  vive tu campaña. Te lo propone; aplicarlo lo decides tú.
                 </p>
               </div>
               <button
@@ -530,11 +482,7 @@ export const CalendarView: React.FC<{
                 disabled={deduciendo}
                 className="flex items-center gap-1.5 rounded bg-[var(--accent)] px-3 py-1.5 font-cinzel text-xs font-bold text-[var(--on-accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 cursor-pointer"
               >
-                {deduciendo ? (
-                  <Loader className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Search className="w-3.5 h-3.5" />
-                )}
+                {deduciendo ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                 Deducir desde la campaña
               </button>
             </div>
@@ -547,8 +495,8 @@ export const CalendarView: React.FC<{
               <div className="pt-3 border-t border-[var(--glass-border)] space-y-2">
                 <div className="text-xs font-cinzel font-bold text-[var(--accent)]">
                   {propuesta.encontrado
-                    ? `Propuesta (${propuesta.confianza === "alta" ? "confianza alta" : propuesta.confianza === "media" ? "confianza media" : "propuesta orientativa"})`
-                    : "No se encontró mención expresa a un calendario"}
+                    ? `Propuesta (${propuesta.confianza === 'alta' ? 'confianza alta' : propuesta.confianza === 'media' ? 'confianza media' : 'propuesta orientativa'})`
+                    : 'No se encontró mención expresa a un calendario'}
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] italic m-0">
                   {propuesta.evidencia}
@@ -559,10 +507,10 @@ export const CalendarView: React.FC<{
                       <strong>{propuesta.calendario.name}</strong>
                       {propuesta.fecha && (
                         <span className="text-[var(--text-secondary)] ml-2">
-                          · Comienzo:{" "}
+                          · Comienzo:{' '}
                           {propuesta.fecha.dia > 0
                             ? `${propuesta.fecha.dia} de ${propuesta.fecha.mes}`
-                            : propuesta.fecha.mes}{" "}
+                            : propuesta.fecha.mes}{' '}
                           de {propuesta.fecha.year}
                         </span>
                       )}
@@ -598,9 +546,7 @@ export const CalendarView: React.FC<{
                   className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)] p-3 flex flex-col justify-between gap-3 hover:border-[var(--accent)] transition-colors"
                 >
                   <div>
-                    <div className="font-cinzel font-bold text-sm text-[var(--accent)]">
-                      {p.name}
-                    </div>
+                    <div className="font-cinzel font-bold text-sm text-[var(--accent)]">{p.name}</div>
                     <div className="text-[11px] text-[var(--text-secondary)] opacity-75 mt-2">
                       {p.months.length} meses · {diasPorAno(p)} días al año
                     </div>
@@ -610,9 +556,7 @@ export const CalendarView: React.FC<{
                       Año inicial
                       <input
                         value={anoInicial}
-                        onChange={(e) =>
-                          setAnoInicial(e.target.value.replace(/\D/g, ""))
-                        }
+                        onChange={e => setAnoInicial(e.target.value.replace(/\D/g, ''))}
                         className="w-14 bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-1.5 py-0.5 text-xs text-center outline-none focus:border-[var(--accent)]"
                       />
                     </label>
@@ -656,6 +600,7 @@ export const CalendarView: React.FC<{
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 font-lora text-[var(--text-primary)]">
       <div className="max-w-3xl mx-auto space-y-6">
+        
         {/* Cabecera general de la fecha actual de la campaña */}
         <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--surface-soft)] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -695,15 +640,11 @@ export const CalendarView: React.FC<{
               >
                 {_isGenerating ? (
                   <>
-                    <Loader className="w-3.5 h-3.5 animate-spin" />{" "}
-                    <span className="hidden sm:inline">Sincronizando...</span>
+                    <Loader className="w-3.5 h-3.5 animate-spin" /> <span className="hidden sm:inline">Sincronizando...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3.5 h-3.5" />{" "}
-                    <span className="hidden sm:inline">
-                      Sincronizar con el Chat
-                    </span>
+                    <Sparkles className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sincronizar con el Chat</span>
                   </>
                 )}
               </button>
@@ -717,8 +658,7 @@ export const CalendarView: React.FC<{
                 title="Editar nombres de meses, festividades y días"
                 aria-label="Editar calendario"
               >
-                <Settings2 className="w-3.5 h-3.5" />{" "}
-                <span className="hidden sm:inline">Editar</span>
+                <Settings2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Editar</span>
               </button>
 
               <div className="relative">
@@ -728,8 +668,7 @@ export const CalendarView: React.FC<{
                   title="Opciones de limpieza y reinicio"
                   aria-label="Opciones de limpieza"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-stone-500" />{" "}
-                  <span className="hidden sm:inline">Opciones</span>
+                  <Trash2 className="w-3.5 h-3.5 text-stone-500" /> <span className="hidden sm:inline">Opciones</span>
                 </button>
 
                 {showLimpiezaMenu && (
@@ -783,8 +722,7 @@ export const CalendarView: React.FC<{
               onClick={() => setCorrigiendo(true)}
               className="mt-3 text-[11px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] underline cursor-pointer inline-flex items-center gap-1"
             >
-              <CalendarClock className="w-3 h-3" /> ¿Se ha despistado el reloj?
-              Ajustar fecha/hora
+              <CalendarClock className="w-3 h-3" /> ¿Se ha despistado el reloj? Ajustar fecha/hora
             </button>
           )}
 
@@ -792,8 +730,7 @@ export const CalendarView: React.FC<{
             <div className="mt-4 pt-4 border-t border-[var(--glass-border)] bg-[var(--sidebar-bg)]/40 p-3 rounded-lg">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <span className="text-[11px] font-cinzel font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                  <CalendarClock className="w-3.5 h-3.5" /> Corregir hora o
-                  fecha de la campaña
+                  <CalendarClock className="w-3.5 h-3.5" /> Corregir hora o fecha de la campaña
                 </span>
                 <button
                   onClick={() => setCorrigiendo(false)}
@@ -805,13 +742,13 @@ export const CalendarView: React.FC<{
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { label: "+1 h", d: { horas: 1 } },
-                  { label: "+8 h", d: { horas: 8 } },
-                  { label: "+1 día", d: { dias: 1 } },
-                  { label: "+1 semana", d: { dias: 7 } },
-                  { label: "−1 h", d: { horas: -1 } },
-                  { label: "−1 día", d: { dias: -1 } },
-                ].map((b) => (
+                  { label: '+1 h', d: { horas: 1 } },
+                  { label: '+8 h', d: { horas: 8 } },
+                  { label: '+1 día', d: { dias: 1 } },
+                  { label: '+1 semana', d: { dias: 7 } },
+                  { label: '−1 h', d: { horas: -1 } },
+                  { label: '−1 día', d: { dias: -1 } }
+                ].map(b => (
                   <button
                     key={b.label}
                     onClick={() => mover(b.d)}
@@ -828,7 +765,7 @@ export const CalendarView: React.FC<{
                   <input
                     type="time"
                     value={horaLegible(fechaSegura.minute)}
-                    onChange={(e) => ponerHora(e.target.value)}
+                    onChange={e => ponerHora(e.target.value)}
                     className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2 py-1 text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                   />
                 </label>
@@ -836,7 +773,7 @@ export const CalendarView: React.FC<{
                   Día del año
                   <input
                     value={fechaSegura.dayOfYear}
-                    onChange={(e) => ponerFecha("dayOfYear", e.target.value)}
+                    onChange={e => ponerFecha('dayOfYear', e.target.value)}
                     className="w-16 bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2 py-1 text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                   />
                   <span className="text-[10px]">/ {diasPorAno(calSeguro)}</span>
@@ -845,7 +782,7 @@ export const CalendarView: React.FC<{
                   Año
                   <input
                     value={fechaSegura.year}
-                    onChange={(e) => ponerFecha("year", e.target.value)}
+                    onChange={e => ponerFecha('year', e.target.value)}
                     className="w-20 bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2 py-1 text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                   />
                 </label>
@@ -859,8 +796,8 @@ export const CalendarView: React.FC<{
           <div className="flex items-center justify-between gap-2 mb-3">
             <h3 className="font-cinzel text-base md:text-lg font-bold text-[var(--accent)] m-0 flex items-center gap-2">
               <CalendarDays className="w-4 h-4" />
-              {calSeguro.months[mesVistoIdx]?.name || "—"} de {anoVisto}
-              {calSeguro.yearSuffix ? ` ${calSeguro.yearSuffix}` : ""}
+              {calSeguro.months[mesVistoIdx]?.name || '—'} de {anoVisto}
+              {calSeguro.yearSuffix ? ` ${calSeguro.yearSuffix}` : ''}
             </h3>
             <div className="flex items-center gap-1">
               <button
@@ -894,11 +831,9 @@ export const CalendarView: React.FC<{
           {(calSeguro.weekdays?.length || 0) > 0 && (
             <div
               className="grid gap-1 text-[10px] font-cinzel text-[var(--text-secondary)] text-center mb-1 font-semibold uppercase tracking-wider"
-              style={{
-                gridTemplateColumns: `repeat(${calSeguro.weekdays!.length}, minmax(0, 1fr))`,
-              }}
+              style={{ gridTemplateColumns: `repeat(${calSeguro.weekdays!.length}, minmax(0, 1fr))` }}
             >
-              {calSeguro.weekdays!.map((d) => (
+              {calSeguro.weekdays!.map(d => (
                 <div key={d} className="truncate" title={d}>
                   {d.slice(0, 3)}
                 </div>
@@ -909,7 +844,7 @@ export const CalendarView: React.FC<{
           <div
             className="grid gap-1"
             style={{
-              gridTemplateColumns: `repeat(${calSeguro.weekdays?.length || 10}, minmax(0, 1fr))`,
+              gridTemplateColumns: `repeat(${calSeguro.weekdays?.length || 10}, minmax(0, 1fr))`
             }}
           >
             {/* Hueco inicial para alinear con el día de la semana */}
@@ -917,15 +852,14 @@ export const CalendarView: React.FC<{
               celdas.length > 0 &&
               Array.from({
                 length:
-                  ((absDeCelda(celdas[0].dayOfYear) %
-                    calSeguro.weekdays!.length) +
+                  ((absDeCelda(celdas[0].dayOfYear) % calSeguro.weekdays!.length) +
                     calSeguro.weekdays!.length) %
-                  calSeguro.weekdays!.length,
+                  calSeguro.weekdays!.length
               }).map((_, i) => <div key={`hueco-${i}`} />)}
 
             {celdas
-              .filter((c) => !c.esFestival)
-              .map((c) => {
+              .filter(c => !c.esFestival)
+              .map(c => {
                 const abs = absDeCelda(c.dayOfYear);
                 const esHoy = abs === hoyAbs;
                 const esSeleccionado = diaActivo === abs;
@@ -937,24 +871,21 @@ export const CalendarView: React.FC<{
                     key={c.dayOfYear}
                     onClick={() => {
                       setDiaSeleccionado(abs);
-                      setModoVisualizacion("dia");
+                      setModoVisualizacion('dia');
                     }}
                     className={`relative min-h-[44px] py-1.5 px-1 rounded-lg border text-xs font-cinzel flex flex-col items-center justify-between transition-all cursor-pointer ${
                       esSeleccionado
-                        ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30 bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] font-bold text-[var(--accent)]"
+                        ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/30 bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] font-bold text-[var(--accent)]'
                         : esHoy
-                          ? "border-[var(--accent)]/60 bg-[color-mix(in_srgb,var(--accent)_6%,transparent)] text-[var(--accent)] font-semibold"
-                          : "border-[var(--glass-border)] hover:border-[var(--accent)]/40 hover:bg-[var(--surface-soft)] text-[var(--text-primary)]"
+                          ? 'border-[var(--accent)]/60 bg-[color-mix(in_srgb,var(--accent)_6%,transparent)] text-[var(--accent)] font-semibold'
+                          : 'border-[var(--glass-border)] hover:border-[var(--accent)]/40 hover:bg-[var(--surface-soft)] text-[var(--text-primary)]'
                     }`}
-                    title={`${c.etiqueta} de ${calSeguro.months[mesVistoIdx]?.name}${esHoy ? " (Hoy)" : ""}${numEntradas ? ` · ${numEntradas} entrada(s)` : ""}`}
+                    title={`${c.etiqueta} de ${calSeguro.months[mesVistoIdx]?.name}${esHoy ? ' (Hoy)' : ''}${numEntradas ? ` · ${numEntradas} entrada(s)` : ''}`}
                   >
                     <span className="flex items-center justify-center w-full">
                       {c.etiqueta}
                       {esHoy && (
-                        <span
-                          className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] ml-1"
-                          title="Día actual"
-                        />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] ml-1" title="Día actual" />
                       )}
                     </span>
                     <span className="flex items-center gap-1 h-2">
@@ -971,11 +902,11 @@ export const CalendarView: React.FC<{
           </div>
 
           {/* Festivales intercalares */}
-          {celdas.some((c) => c.esFestival) && (
+          {celdas.some(c => c.esFestival) && (
             <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-dashed border-[var(--glass-border)]">
               {celdas
-                .filter((c) => c.esFestival)
-                .map((c) => {
+                .filter(c => c.esFestival)
+                .map(c => {
                   const abs = absDeCelda(c.dayOfYear);
                   const esHoy = abs === hoyAbs;
                   const esSeleccionado = diaActivo === abs;
@@ -985,14 +916,14 @@ export const CalendarView: React.FC<{
                       key={c.dayOfYear}
                       onClick={() => {
                         setDiaSeleccionado(abs);
-                        setModoVisualizacion("dia");
+                        setModoVisualizacion('dia');
                       }}
                       className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-cinzel cursor-pointer transition-colors ${
                         esSeleccionado
-                          ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30 bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] font-bold text-[var(--accent)]"
+                          ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/30 bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] font-bold text-[var(--accent)]'
                           : esHoy
-                            ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] font-bold"
-                            : "border-[var(--glass-border)] hover:border-[var(--accent)]"
+                            ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] font-bold'
+                            : 'border-[var(--glass-border)] hover:border-[var(--accent)]'
                       }`}
                     >
                       <PartyPopper className="w-3.5 h-3.5 text-amber-500" />
@@ -1009,12 +940,10 @@ export const CalendarView: React.FC<{
           <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-[var(--text-secondary)] mt-3 pt-2 border-t border-[var(--glass-border)]">
             <div className="flex flex-wrap gap-4">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[var(--accent)]" /> Hay
-                acontecimientos escritos
+                <span className="w-2 h-2 rounded-full bg-[var(--accent)]" /> Hay acontecimientos escritos
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-red-500" /> Vence un
-                hilo programado
+                <span className="w-2 h-2 rounded-full bg-red-500" /> Vence un hilo programado
               </span>
             </div>
             <div className="text-[11px] italic font-cinzel">
@@ -1027,33 +956,33 @@ export const CalendarView: React.FC<{
             ESPACIO DEL DÍA / DIARIO INTEGRADO
             ========================================================================= */}
         <div className="pt-6 border-t border-[var(--glass-border)] space-y-4">
+          
           {/* Barra superior de cambio de vista (Día seleccionado vs Historial completo) */}
           <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setModoVisualizacion("dia")}
+                onClick={() => setModoVisualizacion('dia')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-colors cursor-pointer ${
-                  modoVisualizacion === "dia"
-                    ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-xs"
-                    : "border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
+                  modoVisualizacion === 'dia'
+                    ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
+                    : 'border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]'
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" /> Espacio del día
               </button>
               <button
-                onClick={() => setModoVisualizacion("todos")}
+                onClick={() => setModoVisualizacion('todos')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-colors cursor-pointer ${
-                  modoVisualizacion === "todos"
-                    ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-xs"
-                    : "border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
+                  modoVisualizacion === 'todos'
+                    ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
+                    : 'border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]'
                 }`}
               >
-                <History className="w-3.5 h-3.5" /> Crónica completa (
-                {diasAgenda.length} {diasAgenda.length === 1 ? "día" : "días"})
+                <History className="w-3.5 h-3.5" /> Crónica completa ({diasAgenda.length} {diasAgenda.length === 1 ? 'día' : 'días'})
               </button>
             </div>
 
-            {modoVisualizacion === "dia" && (
+            {modoVisualizacion === 'dia' && (
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => irADiaRelativo(-1)}
@@ -1064,7 +993,7 @@ export const CalendarView: React.FC<{
                 </button>
                 <button
                   onClick={() => setDiaSeleccionado(hoyAbs)}
-                  className={`px-2 py-1 text-[11px] font-cinzel rounded border ${esHoyActivo ? "border-[var(--accent)] text-[var(--accent)] font-bold" : "border-[var(--user-border)] hover:border-[var(--accent)]"} cursor-pointer`}
+                  className={`px-2 py-1 text-[11px] font-cinzel rounded border ${esHoyActivo ? 'border-[var(--accent)] text-[var(--accent)] font-bold' : 'border-[var(--user-border)] hover:border-[var(--accent)]'} cursor-pointer`}
                 >
                   Hoy
                 </button>
@@ -1080,17 +1009,14 @@ export const CalendarView: React.FC<{
           </div>
 
           {/* VISTA 1: ESPACIO DEL DÍA SELECCIONADO (DIARIO Y RESUMEN DE ESE DÍA) */}
-          {modoVisualizacion === "dia" && (
+          {modoVisualizacion === 'dia' && (
             <div className="bg-[var(--bg-color)]/60 border-2 border-[var(--glass-border)] rounded-xl p-4 sm:p-6 space-y-5">
               {/* Cabecera del día seleccionado */}
               <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-[var(--glass-border)]">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-base font-cinzel font-bold text-[var(--accent)]">
-                      <span title={estacionActivo.nombre}>
-                        {estacionActivo.icono}
-                      </span>{" "}
-                      {nombreDiaActivo}
+                      <span title={estacionActivo.nombre}>{estacionActivo.icono}</span> {nombreDiaActivo}
                     </span>
                     {diaSemanaActivo && (
                       <span className="text-xs font-cinzel text-[var(--text-secondary)]">
@@ -1111,16 +1037,14 @@ export const CalendarView: React.FC<{
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setCreandoEntrada((prev) => !prev)}
+                    onClick={() => setCreandoEntrada(prev => !prev)}
                     className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2.5 py-1 text-xs font-cinzel font-bold text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" /> Añadir nota
                   </button>
                   {entradasDiaActivo.length > 0 && (
                     <button
-                      onClick={() =>
-                        vaciarDiaCompleto(diaActivo, nombreDiaActivo)
-                      }
+                      onClick={() => vaciarDiaCompleto(diaActivo, nombreDiaActivo)}
                       className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-1 text-xs font-cinzel text-red-500 hover:border-red-500 hover:bg-red-500/10 cursor-pointer"
                       title="Borrar todas las entradas de este día"
                     >
@@ -1135,8 +1059,7 @@ export const CalendarView: React.FC<{
                 <div className="p-3.5 rounded-lg border border-[var(--accent)]/40 bg-[var(--surface-soft)] space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="font-cinzel text-xs font-bold text-[var(--accent)] flex items-center gap-1">
-                      <NotebookPen className="w-3.5 h-3.5" /> Nueva entrada para{" "}
-                      {nombreDiaActivo}
+                      <NotebookPen className="w-3.5 h-3.5" /> Nueva entrada para {nombreDiaActivo}
                     </span>
                     <button
                       onClick={() => setCreandoEntrada(false)}
@@ -1147,7 +1070,7 @@ export const CalendarView: React.FC<{
                   </div>
                   <textarea
                     value={nuevaEntradaResumen}
-                    onChange={(e) => setNuevaEntradaResumen(e.target.value)}
+                    onChange={e => setNuevaEntradaResumen(e.target.value)}
                     rows={3}
                     placeholder="¿Qué aconteció o qué notas quieres registrar en este día?"
                     className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md p-2.5 text-sm font-lora outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
@@ -1155,19 +1078,19 @@ export const CalendarView: React.FC<{
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                     <input
                       value={nuevaEntradaLugar}
-                      onChange={(e) => setNuevaEntradaLugar(e.target.value)}
+                      onChange={e => setNuevaEntradaLugar(e.target.value)}
                       placeholder="📍 Lugar (opcional)"
                       className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2.5 py-1.5 outline-none focus:border-[var(--accent)]"
                     />
                     <input
                       value={nuevaEntradaClima}
-                      onChange={(e) => setNuevaEntradaClima(e.target.value)}
+                      onChange={e => setNuevaEntradaClima(e.target.value)}
                       placeholder="⛅ Clima (opcional)"
                       className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2.5 py-1.5 outline-none focus:border-[var(--accent)]"
                     />
                     <input
                       value={nuevaEntradaHito}
-                      onChange={(e) => setNuevaEntradaHito(e.target.value)}
+                      onChange={e => setNuevaEntradaHito(e.target.value)}
                       placeholder="⚔️ Hito o suceso clave"
                       className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2.5 py-1.5 outline-none focus:border-[var(--accent)]"
                     />
@@ -1202,38 +1125,32 @@ export const CalendarView: React.FC<{
                         onClick={() => {
                           const fullScene = entradasDiaActivo
                             .map(
-                              (e) =>
-                                `${e.lugar ? `[${e.lugar}] ` : ""}${e.summary}${e.hito ? ` (${e.hito})` : ""}`,
+                              e =>
+                                `${e.lugar ? `[${e.lugar}] ` : ''}${e.summary}${e.hito ? ` (${e.hito})` : ''}`
                             )
-                            .join(". ");
+                            .join('. ');
                           setStudioModal({
                             isOpen: true,
-                            tab: "image",
-                            sceneText: `Acontecimientos del ${nombreDiaActivo}: ${fullScene}`,
+                            tab: 'image',
+                            sceneText: `Acontecimientos del ${nombreDiaActivo}: ${fullScene}`
                           });
                         }}
                         className="text-[11px] font-cinzel font-bold text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/40 border border-amber-500/50 hover:bg-amber-200 dark:hover:bg-amber-900/60 px-2.5 py-1 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors"
                         title="Taller Creativo: Generar ilustración, música o cinemática con todos los acontecimientos de este día"
                       >
-                        <Wand2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />{" "}
-                        Taller Creativo del Día
+                        <Wand2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" /> Taller Creativo del Día
                       </button>
                       {entradasDiaActivo.length > 1 && (
                         <button
-                          onClick={() =>
-                            consolidarEntradasDia(diaActivo, nombreDiaActivo)
-                          }
+                          onClick={() => consolidarEntradasDia(diaActivo, nombreDiaActivo)}
                           className="text-[11px] font-cinzel font-semibold text-[var(--accent)] hover:underline cursor-pointer flex items-center gap-1"
                           title="Fusionar las entradas de este día en una sola"
                         >
-                          <Sparkles className="w-3 h-3" /> Consolidar en 1
-                          entrada
+                          <Sparkles className="w-3 h-3" /> Consolidar en 1 entrada
                         </button>
                       )}
                       <button
-                        onClick={() =>
-                          vaciarDiaCompleto(diaActivo, nombreDiaActivo)
-                        }
+                        onClick={() => vaciarDiaCompleto(diaActivo, nombreDiaActivo)}
                         className="text-[11px] font-cinzel text-red-400 hover:text-red-500 hover:underline cursor-pointer flex items-center gap-1"
                         title="Eliminar todas las entradas de este día"
                       >
@@ -1246,13 +1163,10 @@ export const CalendarView: React.FC<{
                 {entradasDiaActivo.length === 0 ? (
                   <div className="py-5 px-4 rounded-lg bg-[var(--surface-soft)]/30 border border-dashed border-[var(--glass-border)] text-center text-sm text-[var(--text-secondary)] space-y-1.5">
                     <p className="italic m-0">
-                      No hay acontecimientos registrados para el{" "}
-                      {nombreDiaActivo}.
+                      No hay acontecimientos registrados para el {nombreDiaActivo}.
                     </p>
                     <p className="text-xs opacity-75 m-0">
-                      El Narrador anotará lo que ocurra durante las sesiones de
-                      juego, o puedes pulsar «Añadir nota» para escribir un
-                      apunte a mano.
+                      El Narrador anotará lo que ocurra durante las sesiones de juego, o puedes pulsar «Añadir nota» para escribir un apunte a mano.
                     </p>
                   </div>
                 ) : (
@@ -1271,11 +1185,8 @@ export const CalendarView: React.FC<{
                             </span>
                             <textarea
                               value={editEntradaDraft.summary}
-                              onChange={(e) =>
-                                setEditEntradaDraft((prev) => ({
-                                  ...prev,
-                                  summary: e.target.value,
-                                }))
+                              onChange={e =>
+                                setEditEntradaDraft(prev => ({ ...prev, summary: e.target.value }))
                               }
                               rows={3}
                               className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md p-2 text-sm font-lora outline-none focus:border-[var(--accent)] leading-relaxed"
@@ -1283,33 +1194,24 @@ export const CalendarView: React.FC<{
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                               <input
                                 value={editEntradaDraft.lugar}
-                                onChange={(e) =>
-                                  setEditEntradaDraft((prev) => ({
-                                    ...prev,
-                                    lugar: e.target.value,
-                                  }))
+                                onChange={e =>
+                                  setEditEntradaDraft(prev => ({ ...prev, lugar: e.target.value }))
                                 }
                                 placeholder="📍 Lugar"
                                 className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2 py-1 outline-none"
                               />
                               <input
                                 value={editEntradaDraft.clima}
-                                onChange={(e) =>
-                                  setEditEntradaDraft((prev) => ({
-                                    ...prev,
-                                    clima: e.target.value,
-                                  }))
+                                onChange={e =>
+                                  setEditEntradaDraft(prev => ({ ...prev, clima: e.target.value }))
                                 }
                                 placeholder="⛅ Clima"
                                 className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2 py-1 outline-none"
                               />
                               <input
                                 value={editEntradaDraft.hito}
-                                onChange={(e) =>
-                                  setEditEntradaDraft((prev) => ({
-                                    ...prev,
-                                    hito: e.target.value,
-                                  }))
+                                onChange={e =>
+                                  setEditEntradaDraft(prev => ({ ...prev, hito: e.target.value }))
                                 }
                                 placeholder="⚔️ Hito"
                                 className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2 py-1 outline-none"
@@ -1323,9 +1225,7 @@ export const CalendarView: React.FC<{
                                 Cancelar
                               </button>
                               <button
-                                onClick={() =>
-                                  guardarEdicionEntrada(entrada.id)
-                                }
+                                onClick={() => guardarEdicionEntrada(entrada.id)}
                                 className="px-3 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] cursor-pointer flex items-center gap-1"
                               >
                                 <Save className="w-3 h-3" /> Guardar
@@ -1336,29 +1236,23 @@ export const CalendarView: React.FC<{
                       }
 
                       const isInconsciencia =
-                        entrada.tipo === "inconsciencia" ||
+                        entrada.tipo === 'inconsciencia' ||
                         (entrada.timeSkipDays && entrada.timeSkipDays > 0) ||
-                        (entrada.hito &&
-                          /inconscien|coma|desmay|recuperaci[oó]n/i.test(
-                            entrada.hito,
-                          ));
+                        (entrada.hito && /inconscien|coma|desmay|recuperaci[oó]n/i.test(entrada.hito));
                       const isNoticia =
-                        entrada.tipo === "noticia" ||
-                        entrada.tipo === "rumor" ||
-                        (entrada.hito &&
-                          /noticia|rumor|pregonero|tabl[oó]n|gaceta|bando/i.test(
-                            entrada.hito,
-                          ));
+                        entrada.tipo === 'noticia' ||
+                        entrada.tipo === 'rumor' ||
+                        (entrada.hito && /noticia|rumor|pregonero|tabl[oó]n|gaceta|bando/i.test(entrada.hito));
 
                       return (
                         <div
                           key={entrada.id}
                           className={`group relative p-3.5 rounded-lg border transition-colors space-y-1.5 ${
                             isInconsciencia
-                              ? "border-indigo-500/40 bg-indigo-950/15 ring-1 ring-indigo-500/20"
+                              ? 'border-indigo-500/40 bg-indigo-950/15 ring-1 ring-indigo-500/20'
                               : isNoticia
-                                ? "border-amber-500/40 bg-amber-950/15 ring-1 ring-amber-500/20"
-                                : "border-[var(--glass-border)] bg-[var(--surface-soft)]/50 hover:bg-[var(--surface-soft)]"
+                                ? 'border-amber-500/40 bg-amber-950/15 ring-1 ring-amber-500/20'
+                                : 'border-[var(--glass-border)] bg-[var(--surface-soft)]/50 hover:bg-[var(--surface-soft)]'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -1366,10 +1260,7 @@ export const CalendarView: React.FC<{
                               {isInconsciencia && (
                                 <span className="inline-flex items-center gap-1 font-cinzel font-bold text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-500/30">
                                   <Moon className="w-3 h-3 text-indigo-400" />
-                                  Salto Temporal / Inconsciencia{" "}
-                                  {entrada.timeSkipDays
-                                    ? `(+${entrada.timeSkipDays} d)`
-                                    : ""}
+                                  Salto Temporal / Inconsciencia {entrada.timeSkipDays ? `(+${entrada.timeSkipDays} d)` : ''}
                                 </span>
                               )}
                               {isNoticia && (
@@ -1380,8 +1271,7 @@ export const CalendarView: React.FC<{
                               )}
                               {entrada.minute !== undefined && (
                                 <span className="font-cinzel font-semibold text-[var(--accent)]">
-                                  {horaLegible(entrada.minute)} ·{" "}
-                                  {franjaDelDia(entrada.minute)}
+                                  {horaLegible(entrada.minute)} · {franjaDelDia(entrada.minute)}
                                 </span>
                               )}
                               {entrada.lugar && <span>📍 {entrada.lugar}</span>}
@@ -1396,20 +1286,18 @@ export const CalendarView: React.FC<{
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 onClick={() => {
-                                  const sceneText = `${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ""}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ""}`;
+                                  const sceneText = `${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ''}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ''}`;
                                   setStudioModal({
                                     isOpen: true,
-                                    tab: "image",
-                                    sceneText,
+                                    tab: 'image',
+                                    sceneText
                                   });
                                 }}
                                 className="px-1.5 py-0.5 rounded text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer flex items-center gap-1 text-[10px] font-cinzel font-semibold shadow-2xs"
                                 title="Taller Creativo: Crear ilustración, música o cinemática para este acontecimiento"
                               >
                                 <Wand2 className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-                                <span className="hidden sm:inline">
-                                  Crear contenido
-                                </span>
+                                <span className="hidden sm:inline">Crear contenido</span>
                               </button>
                               <button
                                 onClick={() => iniciarEdicionEntrada(entrada)}
@@ -1436,37 +1324,21 @@ export const CalendarView: React.FC<{
                             <div className="pt-1.5 flex flex-wrap items-center gap-1.5">
                               {(() => {
                                 const icono = iconoDeHito(entrada.hito);
-                                const esRelacion =
-                                  /rivalidad|rival|amistad|amigo|romance|amor|cortej|declaraci|insinuaci|enemistad|enemigo|alianza|mentor/i.test(
-                                    entrada.hito,
-                                  );
-                                const esReloj =
-                                  /reloj|semilla|hilo|plazo/i.test(
-                                    entrada.hito,
-                                  );
-                                const esConsecuencia =
-                                  /consecuencia|repercusi|secuela|gremio|familia|zona/i.test(
-                                    entrada.hito,
-                                  );
+                                const esRelacion = /rivalidad|rival|amistad|amigo|romance|amor|cortej|declaraci|insinuaci|enemistad|enemigo|alianza|mentor/i.test(entrada.hito);
+                                const esReloj = /reloj|semilla|hilo|plazo/i.test(entrada.hito);
+                                const esConsecuencia = /consecuencia|repercusi|secuela|gremio|familia|zona/i.test(entrada.hito);
 
-                                let styleClass =
-                                  "border-[var(--accent)]/40 bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)]";
+                                let styleClass = 'border-[var(--accent)]/40 bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)]';
                                 if (esRelacion) {
-                                  styleClass = obtenerInfoRelacion(
-                                    entrada.hito,
-                                  ).badgeClass;
+                                  styleClass = obtenerInfoRelacion(entrada.hito).badgeClass;
                                 } else if (esReloj) {
-                                  styleClass =
-                                    "border-amber-500/40 bg-amber-950/30 text-amber-300";
+                                  styleClass = 'border-amber-500/40 bg-amber-950/30 text-amber-300';
                                 } else if (esConsecuencia) {
-                                  styleClass =
-                                    "border-purple-500/40 bg-purple-950/30 text-purple-300";
+                                  styleClass = 'border-purple-500/40 bg-purple-950/30 text-purple-300';
                                 }
 
                                 return (
-                                  <span
-                                    className={`inline-flex items-center gap-1.5 text-xs font-cinzel font-semibold px-2.5 py-0.5 rounded-md border shadow-2xs ${styleClass}`}
-                                  >
+                                  <span className={`inline-flex items-center gap-1.5 text-xs font-cinzel font-semibold px-2.5 py-0.5 rounded-md border shadow-2xs ${styleClass}`}>
                                     <span className="text-sm">{icono}</span>
                                     <span>{entrada.hito}</span>
                                   </span>
@@ -1484,22 +1356,11 @@ export const CalendarView: React.FC<{
           )}
 
           {/* VISTA 2: CRÓNICA COMPLETA DE TODOS LOS DÍAS */}
-          {modoVisualizacion === "todos" && (
+          {modoVisualizacion === 'todos' && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-[var(--surface-soft)] border border-[var(--glass-border)]">
                 <div className="text-xs text-[var(--text-secondary)]">
-                  <strong className="text-[var(--text-primary)] font-cinzel">
-                    {diasAgenda.length}
-                  </strong>{" "}
-                  {diasAgenda.length === 1
-                    ? "día con registros"
-                    : "días con registros"}{" "}
-                  ·{" "}
-                  <strong className="text-[var(--text-primary)] font-cinzel">
-                    {timeline.length}
-                  </strong>{" "}
-                  {timeline.length === 1 ? "acontecimiento" : "acontecimientos"}{" "}
-                  en total
+                  <strong className="text-[var(--text-primary)] font-cinzel">{diasAgenda.length}</strong> {diasAgenda.length === 1 ? 'día con registros' : 'días con registros'} · <strong className="text-[var(--text-primary)] font-cinzel">{timeline.length}</strong> {timeline.length === 1 ? 'acontecimiento' : 'acontecimientos'} en total
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1536,10 +1397,7 @@ export const CalendarView: React.FC<{
                     Aún no hay días registrados en la cronología.
                   </p>
                   <p className="text-xs text-[var(--text-secondary)] m-0">
-                    Puedes pulsar{" "}
-                    <strong>«Sincronizar cronología con el Chat ahora»</strong>{" "}
-                    para que el Narrador analice tus capítulos jugados y ordene
-                    todos los sucesos temporalmente.
+                    Puedes pulsar <strong>«Sincronizar cronología con el Chat ahora»</strong> para que el Narrador analice tus capítulos jugados y ordene todos los sucesos temporalmente.
                   </p>
                   <button
                     onClick={() => _onTriggerAIUpdate?.()}
@@ -1572,22 +1430,20 @@ export const CalendarView: React.FC<{
                           <div className="flex items-center justify-center my-2">
                             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-dashed border-[var(--glass-border)] text-xs font-cinzel text-[var(--text-secondary)]">
                               <Moon className="w-3.5 h-3.5 text-amber-500" />
-                              <span>
-                                ⏳ Salto de {gap - 1}{" "}
-                                {gap - 1 === 1 ? "día" : "días"} sin incidentes
-                                registrados
-                              </span>
+                              <span>⏳ Salto de {gap - 1} {gap - 1 === 1 ? 'día' : 'días'} sin incidentes registrados</span>
                             </div>
                           </div>
                         )}
 
-                        <div className="bg-[var(--bg-color)]/60 border border-[var(--glass-border)] rounded-xl p-4 sm:p-5 space-y-3">
+                        <div
+                          className="bg-[var(--bg-color)]/60 border border-[var(--glass-border)] rounded-xl p-4 sm:p-5 space-y-3"
+                        >
                           <div className="flex flex-wrap items-baseline justify-between gap-2 pb-2 border-b border-[var(--glass-border)]">
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => {
                                   setDiaSeleccionado(dia);
-                                  setModoVisualizacion("dia");
+                                  setModoVisualizacion('dia');
                                 }}
                                 className="font-cinzel text-sm font-bold text-[var(--accent)] hover:underline cursor-pointer flex items-center gap-1.5"
                                 title="Ver espacio exclusivo de este día"
@@ -1604,16 +1460,14 @@ export const CalendarView: React.FC<{
                               <button
                                 onClick={() => {
                                   setDiaSeleccionado(dia);
-                                  setModoVisualizacion("dia");
+                                  setModoVisualizacion('dia');
                                 }}
                                 className="text-[11px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
                               >
                                 Ver celda →
                               </button>
                               <button
-                                onClick={() =>
-                                  vaciarDiaCompleto(dia, porDia[dia].date)
-                                }
+                                onClick={() => vaciarDiaCompleto(dia, porDia[dia].date)}
                                 className="text-[11px] font-cinzel text-red-500 hover:underline cursor-pointer flex items-center gap-0.5"
                                 title="Vaciar este día"
                               >
@@ -1623,9 +1477,8 @@ export const CalendarView: React.FC<{
                           </div>
 
                           <div className="space-y-2">
-                            {entradas.map((entrada) => {
-                              const isEditing =
-                                editandoEntradaId === entrada.id;
+                            {entradas.map(entrada => {
+                              const isEditing = editandoEntradaId === entrada.id;
 
                               if (isEditing) {
                                 return (
@@ -1635,28 +1488,21 @@ export const CalendarView: React.FC<{
                                   >
                                     <textarea
                                       value={editEntradaDraft.summary}
-                                      onChange={(e) =>
-                                        setEditEntradaDraft((prev) => ({
-                                          ...prev,
-                                          summary: e.target.value,
-                                        }))
+                                      onChange={e =>
+                                        setEditEntradaDraft(prev => ({ ...prev, summary: e.target.value }))
                                       }
                                       rows={2}
                                       className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md p-2 text-sm font-lora outline-none focus:border-[var(--accent)] leading-relaxed"
                                     />
                                     <div className="flex justify-end gap-2">
                                       <button
-                                        onClick={() =>
-                                          setEditandoEntradaId(null)
-                                        }
+                                        onClick={() => setEditandoEntradaId(null)}
                                         className="px-2 py-0.5 text-xs font-cinzel border border-[var(--user-border)] rounded cursor-pointer"
                                       >
                                         Cancelar
                                       </button>
                                       <button
-                                        onClick={() =>
-                                          guardarEdicionEntrada(entrada.id)
-                                        }
+                                        onClick={() => guardarEdicionEntrada(entrada.id)}
                                         className="px-3 py-0.5 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded cursor-pointer"
                                       >
                                         Guardar
@@ -1667,30 +1513,23 @@ export const CalendarView: React.FC<{
                               }
 
                               const isInconsciencia =
-                                entrada.tipo === "inconsciencia" ||
-                                (entrada.timeSkipDays &&
-                                  entrada.timeSkipDays > 0) ||
-                                (entrada.hito &&
-                                  /inconscien|coma|desmay|recuperaci[oó]n/i.test(
-                                    entrada.hito,
-                                  ));
+                                entrada.tipo === 'inconsciencia' ||
+                                (entrada.timeSkipDays && entrada.timeSkipDays > 0) ||
+                                (entrada.hito && /inconscien|coma|desmay|recuperaci[oó]n/i.test(entrada.hito));
                               const isNoticia =
-                                entrada.tipo === "noticia" ||
-                                entrada.tipo === "rumor" ||
-                                (entrada.hito &&
-                                  /noticia|rumor|pregonero|tabl[oó]n|gaceta|bando/i.test(
-                                    entrada.hito,
-                                  ));
+                                entrada.tipo === 'noticia' ||
+                                entrada.tipo === 'rumor' ||
+                                (entrada.hito && /noticia|rumor|pregonero|tabl[oó]n|gaceta|bando/i.test(entrada.hito));
 
                               return (
                                 <div
                                   key={entrada.id}
                                   className={`flex items-start justify-between gap-3 text-sm p-2.5 rounded transition-colors ${
                                     isInconsciencia
-                                      ? "bg-indigo-950/20 border border-indigo-500/30"
+                                      ? 'bg-indigo-950/20 border border-indigo-500/30'
                                       : isNoticia
-                                        ? "bg-amber-950/20 border border-amber-500/30"
-                                        : "hover:bg-[var(--surface-soft)]/50"
+                                        ? 'bg-amber-950/20 border border-amber-500/30'
+                                        : 'hover:bg-[var(--surface-soft)]/50'
                                   }`}
                                 >
                                   <div className="space-y-1 flex-1">
@@ -1698,10 +1537,7 @@ export const CalendarView: React.FC<{
                                       {isInconsciencia && (
                                         <span className="inline-flex items-center gap-1 font-cinzel font-bold text-indigo-400 bg-indigo-950/50 px-1.5 py-0.2 rounded border border-indigo-500/30">
                                           <Moon className="w-3 h-3 text-indigo-400" />
-                                          Salto / Convalecencia{" "}
-                                          {entrada.timeSkipDays
-                                            ? `(+${entrada.timeSkipDays} d)`
-                                            : ""}
+                                          Salto / Convalecencia {entrada.timeSkipDays ? `(+${entrada.timeSkipDays} d)` : ''}
                                         </span>
                                       )}
                                       {isNoticia && (
@@ -1711,63 +1547,36 @@ export const CalendarView: React.FC<{
                                         </span>
                                       )}
                                       {entrada.minute !== undefined && (
-                                        <span>
-                                          {horaLegible(entrada.minute)}
-                                        </span>
+                                        <span>{horaLegible(entrada.minute)}</span>
                                       )}
-                                      {entrada.lugar && (
-                                        <span>📍 {entrada.lugar}</span>
-                                      )}
+                                      {entrada.lugar && <span>📍 {entrada.lugar}</span>}
                                       {entrada.clima && (
                                         <span>
-                                          {iconoDeClima(entrada.clima)}{" "}
-                                          {entrada.clima}
+                                          {iconoDeClima(entrada.clima)} {entrada.clima}
                                         </span>
                                       )}
                                     </div>
-                                    <p className="m-0 text-[var(--text-primary)] leading-relaxed">
-                                      {entrada.summary}
-                                    </p>
+                                    <p className="m-0 text-[var(--text-primary)] leading-relaxed">{entrada.summary}</p>
                                     {entrada.hito && (
                                       <div className="pt-1 flex flex-wrap items-center gap-1.5">
                                         {(() => {
-                                          const icono = iconoDeHito(
-                                            entrada.hito,
-                                          );
-                                          const esRelacion =
-                                            /rivalidad|rival|amistad|amigo|romance|amor|cortej|declaraci|insinuaci|enemistad|enemigo|alianza|mentor/i.test(
-                                              entrada.hito,
-                                            );
-                                          const esReloj =
-                                            /reloj|semilla|hilo|plazo/i.test(
-                                              entrada.hito,
-                                            );
-                                          const esConsecuencia =
-                                            /consecuencia|repercusi|secuela|gremio|familia|zona/i.test(
-                                              entrada.hito,
-                                            );
+                                          const icono = iconoDeHito(entrada.hito);
+                                          const esRelacion = /rivalidad|rival|amistad|amigo|romance|amor|cortej|declaraci|insinuaci|enemistad|enemigo|alianza|mentor/i.test(entrada.hito);
+                                          const esReloj = /reloj|semilla|hilo|plazo/i.test(entrada.hito);
+                                          const esConsecuencia = /consecuencia|repercusi|secuela|gremio|familia|zona/i.test(entrada.hito);
 
-                                          let styleClass =
-                                            "border-[var(--accent)]/40 bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)]";
+                                          let styleClass = 'border-[var(--accent)]/40 bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent)]';
                                           if (esRelacion) {
-                                            styleClass = obtenerInfoRelacion(
-                                              entrada.hito,
-                                            ).badgeClass;
+                                            styleClass = obtenerInfoRelacion(entrada.hito).badgeClass;
                                           } else if (esReloj) {
-                                            styleClass =
-                                              "border-amber-500/40 bg-amber-950/30 text-amber-300";
+                                            styleClass = 'border-amber-500/40 bg-amber-950/30 text-amber-300';
                                           } else if (esConsecuencia) {
-                                            styleClass =
-                                              "border-purple-500/40 bg-purple-950/30 text-purple-300";
+                                            styleClass = 'border-purple-500/40 bg-purple-950/30 text-purple-300';
                                           }
 
                                           return (
-                                            <span
-                                              className={`inline-flex items-center gap-1.5 text-xs font-cinzel font-semibold px-2 py-0.5 rounded-md border shadow-2xs ${styleClass}`}
-                                            >
-                                              <span className="text-sm">
-                                                {icono}
-                                              </span>
+                                            <span className={`inline-flex items-center gap-1.5 text-xs font-cinzel font-semibold px-2 py-0.5 rounded-md border shadow-2xs ${styleClass}`}>
+                                              <span className="text-sm">{icono}</span>
                                               <span>{entrada.hito}</span>
                                             </span>
                                           );
@@ -1778,25 +1587,21 @@ export const CalendarView: React.FC<{
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button
                                       onClick={() => {
-                                        const sceneText = `${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ""}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ""}`;
+                                        const sceneText = `${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ''}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ''}`;
                                         setStudioModal({
                                           isOpen: true,
-                                          tab: "image",
-                                          sceneText,
+                                          tab: 'image',
+                                          sceneText
                                         });
                                       }}
                                       className="px-1.5 py-0.5 rounded text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer flex items-center gap-1 text-[10px] font-cinzel font-semibold shadow-2xs"
                                       title="Taller Creativo: Crear contenido para este acontecimiento"
                                     >
                                       <Wand2 className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-                                      <span className="hidden sm:inline">
-                                        Crear
-                                      </span>
+                                      <span className="hidden sm:inline">Crear</span>
                                     </button>
                                     <button
-                                      onClick={() =>
-                                        iniciarEdicionEntrada(entrada)
-                                      }
+                                      onClick={() => iniciarEdicionEntrada(entrada)}
                                       className="text-[var(--text-secondary)] hover:text-[var(--accent)] p-1 cursor-pointer"
                                       title="Editar"
                                     >
@@ -1842,9 +1647,7 @@ export const CalendarView: React.FC<{
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[150] p-4">
           <div className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-xl shadow-2xl max-w-lg w-full max-h-[88vh] flex flex-col overflow-hidden">
             <div className="p-4 border-b border-[var(--glass-border)] flex justify-between items-center bg-[var(--sidebar-bg)]">
-              <h3 className="font-cinzel text-lg text-[var(--accent)] font-bold m-0">
-                Editar calendario
-              </h3>
+              <h3 className="font-cinzel text-lg text-[var(--accent)] font-bold m-0">Editar calendario</h3>
               <button
                 onClick={() => setEditandoCal(false)}
                 className="text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
@@ -1858,9 +1661,7 @@ export const CalendarView: React.FC<{
                 Nombre
                 <input
                   value={borrador.name}
-                  onChange={(e) =>
-                    setBorrador({ ...borrador, name: e.target.value })
-                  }
+                  onChange={e => setBorrador({ ...borrador, name: e.target.value })}
                   className="mt-1 w-full bg-[var(--surface-soft)] border border-[var(--user-border)] rounded px-2 py-1.5 font-lora text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                 />
               </label>
@@ -1868,10 +1669,8 @@ export const CalendarView: React.FC<{
               <label className="block text-xs font-cinzel font-bold text-[var(--text-secondary)]">
                 Sufijo del año (DR, ABY, d. C.…)
                 <input
-                  value={borrador.yearSuffix || ""}
-                  onChange={(e) =>
-                    setBorrador({ ...borrador, yearSuffix: e.target.value })
-                  }
+                  value={borrador.yearSuffix || ''}
+                  onChange={e => setBorrador({ ...borrador, yearSuffix: e.target.value })}
                   className="mt-1 w-32 block bg-[var(--surface-soft)] border border-[var(--user-border)] rounded px-2 py-1.5 font-lora text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                 />
               </label>
@@ -1885,7 +1684,7 @@ export const CalendarView: React.FC<{
                     <div key={i} className="flex gap-2">
                       <input
                         value={m.name}
-                        onChange={(e) => {
+                        onChange={e => {
                           const months = [...borrador.months];
                           months[i] = { ...months[i], name: e.target.value };
                           setBorrador({ ...borrador, months });
@@ -1894,16 +1693,10 @@ export const CalendarView: React.FC<{
                       />
                       <input
                         value={m.days}
-                        onChange={(e) => {
-                          const dias = parseInt(
-                            e.target.value.replace(/\D/g, ""),
-                            10,
-                          );
+                        onChange={e => {
+                          const dias = parseInt(e.target.value.replace(/\D/g, ''), 10);
                           const months = [...borrador.months];
-                          months[i] = {
-                            ...months[i],
-                            days: Number.isFinite(dias) ? dias : 0,
-                          };
+                          months[i] = { ...months[i], days: Number.isFinite(dias) ? dias : 0 };
                           setBorrador({ ...borrador, months });
                         }}
                         className="w-14 bg-[var(--surface-soft)] border border-[var(--user-border)] rounded px-2 py-1 text-sm text-center outline-none focus:border-[var(--accent)]"
@@ -1914,12 +1707,8 @@ export const CalendarView: React.FC<{
                             ...borrador,
                             months: borrador.months.filter((_, j) => j !== i),
                             festivals: (borrador.festivals || [])
-                              .filter((f) => f.afterMonth !== i)
-                              .map((f) =>
-                                f.afterMonth > i
-                                  ? { ...f, afterMonth: f.afterMonth - 1 }
-                                  : f,
-                              ),
+                              .filter(f => f.afterMonth !== i)
+                              .map(f => (f.afterMonth > i ? { ...f, afterMonth: f.afterMonth - 1 } : f))
                           })
                         }
                         className="text-red-500 hover:opacity-70 cursor-pointer px-1"
@@ -1934,10 +1723,7 @@ export const CalendarView: React.FC<{
                   onClick={() =>
                     setBorrador({
                       ...borrador,
-                      months: [
-                        ...borrador.months,
-                        { name: "Mes nuevo", days: 30 },
-                      ],
+                      months: [...borrador.months, { name: 'Mes nuevo', days: 30 }]
                     })
                   }
                   className="mt-2 text-xs font-cinzel text-[var(--accent)] hover:underline cursor-pointer flex items-center gap-1"
@@ -1948,32 +1734,25 @@ export const CalendarView: React.FC<{
 
               <div>
                 <div className="text-xs font-cinzel font-bold text-[var(--text-secondary)] mb-1.5">
-                  Festivales intercalares (días sueltos que no pertenecen a
-                  ningún mes)
+                  Festivales intercalares (días sueltos que no pertenecen a ningún mes)
                 </div>
                 <div className="space-y-1.5">
                   {(borrador.festivals || []).map((f, i) => (
                     <div key={i} className="flex gap-2">
                       <input
                         value={f.name}
-                        onChange={(e) => {
+                        onChange={e => {
                           const festivals = [...(borrador.festivals || [])];
-                          festivals[i] = {
-                            ...festivals[i],
-                            name: e.target.value,
-                          };
+                          festivals[i] = { ...festivals[i], name: e.target.value };
                           setBorrador({ ...borrador, festivals });
                         }}
                         className="flex-1 bg-[var(--surface-soft)] border border-[var(--user-border)] rounded px-2 py-1 text-sm outline-none focus:border-[var(--accent)]"
                       />
                       <select
                         value={f.afterMonth}
-                        onChange={(e) => {
+                        onChange={e => {
                           const festivals = [...(borrador.festivals || [])];
-                          festivals[i] = {
-                            ...festivals[i],
-                            afterMonth: parseInt(e.target.value, 10),
-                          };
+                          festivals[i] = { ...festivals[i], afterMonth: parseInt(e.target.value, 10) };
                           setBorrador({ ...borrador, festivals });
                         }}
                         className="bg-[var(--surface-soft)] border border-[var(--user-border)] rounded px-2 py-1 text-xs outline-none focus:border-[var(--accent)] max-w-[130px]"
@@ -1988,9 +1767,7 @@ export const CalendarView: React.FC<{
                         onClick={() =>
                           setBorrador({
                             ...borrador,
-                            festivals: (borrador.festivals || []).filter(
-                              (_, j) => j !== i,
-                            ),
+                            festivals: (borrador.festivals || []).filter((_, j) => j !== i)
                           })
                         }
                         className="text-red-500 hover:opacity-70 cursor-pointer px-1"
@@ -2006,11 +1783,8 @@ export const CalendarView: React.FC<{
                       ...borrador,
                       festivals: [
                         ...(borrador.festivals || []),
-                        {
-                          name: "Festival",
-                          afterMonth: Math.max(0, borrador.months.length - 1),
-                        },
-                      ],
+                        { name: 'Festival', afterMonth: Math.max(0, borrador.months.length - 1) }
+                      ]
                     })
                   }
                   className="mt-2 text-xs font-cinzel text-[var(--accent)] hover:underline cursor-pointer flex items-center gap-1"
@@ -2033,10 +1807,7 @@ export const CalendarView: React.FC<{
                   const max = diasPorAno(borrador);
                   await onUpdate({
                     calendar: borrador,
-                    currentDate: {
-                      ...fechaSegura,
-                      dayOfYear: Math.min(fechaSegura.dayOfYear, max),
-                    },
+                    currentDate: { ...fechaSegura, dayOfYear: Math.min(fechaSegura.dayOfYear, max) }
                   });
                   setEditandoCal(false);
                 }}
@@ -2084,23 +1855,23 @@ export const CalendarView: React.FC<{
       {studioModal?.isOpen && (
         <CreativeStudioModal
           isOpen={studioModal.isOpen}
-          initialTab={studioModal.tab || "image"}
+          initialTab={studioModal.tab || 'image'}
           sceneText={studioModal.sceneText}
           onClose={() => setStudioModal(null)}
-          onInsertIntoChat={async (text) => {
+          onInsertIntoChat={async text => {
             // Guardar en notas del narrador si se solicita
             if (onUpdate) {
-              const prevNotes = project.memory?.manual_notes || "";
+              const prevNotes = project.memory?.manual_notes || '';
               await onUpdate({
                 memory: {
                   ...project.memory,
-                  story: project.memory?.story || "",
+                  story: project.memory?.story || '',
                   quests: project.memory?.quests || [],
                   npcs: project.memory?.npcs || [],
                   locations: project.memory?.locations || [],
-                  current_status: project.memory?.current_status || "",
-                  manual_notes: prevNotes ? `${prevNotes}\n\n${text}` : text,
-                },
+                  current_status: project.memory?.current_status || '',
+                  manual_notes: prevNotes ? `${prevNotes}\n\n${text}` : text
+                }
               });
             }
           }}
