@@ -862,24 +862,24 @@ export const ApiKeyModal: React.FC<{
 
                 {[
                   {
-                    id: 'AUTO',
-                    title: 'Automático (Recomendado)',
-                    desc: 'El modelo equilibra dinámicamente el razonamiento según la complejidad de la acción o misterio.'
-                  },
-                  {
-                    id: 'HIGH',
-                    title: 'Pensamiento Profundo (HIGH)',
-                    desc: 'Máxima introspección y análisis exhaustivo de lore, tácticas de combate y consecuencias antes de escribir.'
+                    id: 'MINIMAL',
+                    title: '⚡ Sin Pensamiento / Instantáneo (MINIMAL - 0 tokens)',
+                    desc: 'Desactiva el razonamiento previo para obtener la mínima latencia y arranque inmediato de respuesta.'
                   },
                   {
                     id: 'LOW',
-                    title: 'Pensamiento Rápido (LOW)',
+                    title: 'Pensamiento Rápido (LOW - 1024 tokens)',
                     desc: 'Razonamiento ligero para agilizar combates y mantener diálogos dinámicos.'
                   },
                   {
-                    id: 'MINIMAL',
-                    title: 'Sin Pensamiento / Mínimo (MINIMAL)',
-                    desc: 'Respuesta directa inmediata con mínima latencia de procesamiento.'
+                    id: 'HIGH',
+                    title: 'Pensamiento Profundo (HIGH - 4096 tokens)',
+                    desc: 'Máxima introspección y análisis exhaustivo de lore, tácticas de combate y consecuencias antes de escribir.'
+                  },
+                  {
+                    id: 'AUTO',
+                    title: 'Automático (Dinámico)',
+                    desc: 'El modelo decide automáticamente la cantidad de razonamiento según la complejidad.'
                   }
                 ].map(th => {
                   const isSelected = thinkingLevel === th.id;

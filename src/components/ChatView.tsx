@@ -4,6 +4,7 @@ import { Project, Chat, PlayerCharacter } from '../types';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
 import { CombatHud } from './CombatHud';
+import { CreativeStudioModal } from './CreativeStudioModal';
 import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
 import { parseMessageRolls, RollBadgeCard } from './RollBadge';
@@ -33,7 +34,11 @@ import {
   Swords,
   Trash2,
   X,
-  Zap
+  Zap,
+  Mic,
+  MicOff,
+  Music,
+  Wand2
 } from 'lucide-react';
 interface ChatMessageItemProps {
   m: { role: 'user' | 'model'; content: string };
@@ -57,6 +62,7 @@ interface ChatMessageItemProps {
   setPreguntaOraculo: (p: string) => void;
   setOraculoAbierto: (open: boolean) => void;
   handleRollRequestClick: (req: RollRequest) => void;
+  onOpenStudio?: (tab: 'music' | 'image' | 'video' | 'voice', sceneText?: string) => void;
 }
 
 const ChatMessageItem = React.memo<ChatMessageItemProps>(({
@@ -80,7 +86,8 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   setDeleteModal,
   setPreguntaOraculo,
   setOraculoAbierto,
-  handleRollRequestClick
+  handleRollRequestClick,
+  onOpenStudio
 }) => {
   const isModel = m.role === 'model';
   const rollRequests = isModel ? parseRollRequests(m.content) : [];
@@ -179,6 +186,18 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> Rehacer
                 </button>
+                {onOpenStudio && (
+                  <>
+                    <span className="text-[var(--glass-border)]">•</span>
+                    <button
+                      onClick={() => onOpenStudio('image', m.content)}
+                      className="hover:text-[var(--accent)] p-0.5 text-[11px] cursor-pointer transition-colors"
+                      title="Ilustrar esta escena con el taller creativo"
+                    >
+                      <Wand2 className="w-3.5 h-3.5" /> Ilustrar
+                    </button>
+                  </>
+                )}
               </>
             )}
             <span className="text-[var(--glass-border)]">•</span>
@@ -406,6 +425,15 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
               >
                 <Play className="w-3.5 h-3.5" /> Continuar
               </button>
+              {onOpenStudio && (
+                <button
+                  onClick={() => onOpenStudio('image', m.content)}
+                  className="px-2.5 py-1 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-amber-100 dark:hover:bg-amber-900/30 border border-[var(--user-border)] rounded text-[11px] text-[var(--accent)] hover:text-[var(--accent)] font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title="Generar ilustración de esta escena o retrato"
+                >
+                  <Wand2 className="w-3.5 h-3.5" /> Ilustrar
+                </button>
+              )}
               <button
                 onClick={() => handleStartEditing(idx, m.content)}
                 disabled={isGenerating}
@@ -552,6 +580,87 @@ export const ChatView: React.FC<{
     role: 'user' | 'model';
     isLast: boolean;
   } | null>(null);
+
+  // Modal de Estudio Creativo (Bardo / Imagen / Video / Voz)
+  const [studioModal, setStudioModal] = useState<{
+    isOpen: boolean;
+    tab: 'music' | 'image' | 'video' | 'voice';
+    sceneText?: string;
+  } | null>(null);
+
+  // Reconocimiento y Dictado por Voz en tiempo real
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleSpeechRecognition = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRec =
+      (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).SpeechRecognition ||
+      (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).webkitSpeechRecognition;
+
+    if (!SpeechRec) {
+      alert('Tu navegador no soporta reconocimiento de voz nativo en esta ventana. Por favor prueba con Google Chrome, Edge o Safari.');
+      return;
+    }
+
+    try {
+      const rec = new SpeechRec();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'es-ES';
+
+      let accumulated = '';
+
+      rec.onstart = () => {
+        setIsListening(true);
+      };
+
+      rec.onresult = (event: any) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            accumulated += event.results[i][0].transcript + ' ';
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        setInputText(prev => {
+          const base = prev.trim();
+          const spoken = (accumulated || interim).trim();
+          if (!base) return spoken;
+          if (base.endsWith(spoken)) return base;
+          return `${base} ${spoken}`;
+        });
+      };
+
+      rec.onerror = (event: any) => {
+        console.warn('Speech recognition error/warning:', event.error);
+        if (event.error === 'not-allowed') {
+          alert('Permiso de micrófono denegado. Permite el acceso al micrófono en el navegador para dictar tus acciones de rol.');
+        }
+        setIsListening(false);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = rec;
+      rec.start();
+    } catch (err) {
+      console.error('Error starting speech recognition:', err);
+      setIsListening(false);
+    }
+  };
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -841,6 +950,9 @@ export const ChatView: React.FC<{
                     setPreguntaOraculo={setPreguntaOraculo}
                     setOraculoAbierto={setOraculoAbierto}
                     handleRollRequestClick={handleRollRequestClick}
+                    onOpenStudio={(tab, sceneText) =>
+                      setStudioModal({ isOpen: true, tab, sceneText })
+                    }
                   />
                 );
               })
@@ -1024,6 +1136,27 @@ export const ChatView: React.FC<{
                 {d.label}
               </button>
             ))}
+
+            {/* Separador de herramientas creativas */}
+            <span className="hidden sm:inline border-r border-[var(--glass-border)] h-5 my-auto mx-1" />
+
+            {/* Botón de Música & Bardo */}
+            <button
+              onClick={() => setStudioModal({ isOpen: true, tab: 'music' })}
+              className="rounded-lg px-3 py-1 text-xs font-cinzel font-semibold border border-purple-400/50 bg-purple-500/15 text-purple-700 dark:text-purple-300 hover:bg-purple-500/30 hover:scale-105 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              title="Música ambiental, sintetizador de laúd/taberna, canciones de YouTube y Spotify"
+            >
+              <Music className="w-3.5 h-3.5" /> Bardo & Música
+            </button>
+
+            {/* Botón de Taller Creativo (Imágenes y Video) */}
+            <button
+              onClick={() => setStudioModal({ isOpen: true, tab: 'image' })}
+              className="rounded-lg px-3 py-1 text-xs font-cinzel font-semibold border border-amber-400/50 bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/30 hover:scale-105 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              title="Taller multimedia: Generar ilustraciones de escenas, retratos de personajes y videos cinemáticos"
+            >
+              <Wand2 className="w-3.5 h-3.5" /> Taller Creativo
+            </button>
           </div>
         </div>
 
@@ -1049,6 +1182,21 @@ export const ChatView: React.FC<{
           >
             <Paperclip className="w-4 h-4" />
           </label>
+
+          {/* Botón de dictado por voz (Micrófono) */}
+          <button
+            type="button"
+            onClick={toggleSpeechRecognition}
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+              isListening
+                ? 'bg-red-600 text-white animate-pulse shadow-md shadow-red-500/40 ring-2 ring-red-400'
+                : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] active:scale-95'
+            }`}
+            title={isListening ? 'Detener dictado por voz' : 'Dictar tu acción por voz (Micrófono en vivo)'}
+          >
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+
           <textarea
             value={inputText}
             onChange={e => {
@@ -1064,7 +1212,7 @@ export const ChatView: React.FC<{
                 onSendMessage();
               }
             }}
-            placeholder="¿Qué hace tu personaje?"
+            placeholder={isListening ? '🎙️ Escuchando... habla con normalidad...' : '¿Qué hace tu personaje? (Escribe o pulsa el micrófono para dictar)'}
             className="flex-1 bg-transparent border-none text-[var(--text-primary)] text-sm sm:text-base md:text-lg outline-none resize-none min-h-[38px] max-h-[140px] md:max-h-[220px] py-2 px-1 font-lora leading-normal placeholder:text-[var(--text-secondary)] placeholder:opacity-60 overflow-y-auto"
             rows={1}
           />
@@ -1143,6 +1291,19 @@ export const ChatView: React.FC<{
             </div>
           </div>
         </div>
+      )}
+
+      {/* Creative Studio Modal (Bardo, Música, Imagen, Video, Voz) */}
+      {studioModal?.isOpen && (
+        <CreativeStudioModal
+          isOpen={studioModal.isOpen}
+          initialTab={studioModal.tab}
+          sceneText={studioModal.sceneText}
+          onClose={() => setStudioModal(null)}
+          onInsertIntoChat={(text: string) => {
+            setInputText(prev => (prev ? `${prev}\n\n${text}` : text));
+          }}
+        />
       )}
     </div>
   );

@@ -198,11 +198,15 @@ export function setStoredThinkingLevel(level: ThinkingLevelSetting): void {
   localStorage.setItem('gemini_thinking_level', level);
 }
 
-export function getThinkingBudgetConfig(thinkingSetting: ThinkingLevelSetting) {
+export function getThinkingBudgetConfig(thinkingSetting: ThinkingLevelSetting, modelId?: string) {
+  // Models in Gemini 2.5 and Gemma series do not support thinkingConfig
+  if (modelId && !modelId.includes('3.7') && !modelId.includes('3.1') && !modelId.includes('gemini-3')) {
+    return undefined;
+  }
   if (thinkingSetting === 'HIGH') return { thinkingBudget: 4096 };
   if (thinkingSetting === 'LOW') return { thinkingBudget: 1024 };
   if (thinkingSetting === 'MINIMAL') return { thinkingBudget: 0 };
-  return { thinkingBudget: 1024 };
+  return undefined; // AUTO: let Gemini 3 model dynamically determine reasoning budget
 }
 
 /**
@@ -957,7 +961,7 @@ export async function generateStoryTurnStream({
             ...(abierto ? {} : { safetySettings: buildSafetySettings(safetySetting) })
           };
 
-          const thinkingBudget = getThinkingBudgetConfig(thinkingSetting);
+          const thinkingBudget = getThinkingBudgetConfig(thinkingSetting, currentModel);
           if (thinkingBudget && !abierto) {
             config.thinkingConfig = thinkingBudget;
           }
