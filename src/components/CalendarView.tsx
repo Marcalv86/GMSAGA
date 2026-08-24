@@ -5,7 +5,6 @@ import {
   CampaignDate,
   ProjectFile,
   Chat,
-  ScheduledThread,
   TimelineEntry
 } from '../types';
 import {
@@ -44,10 +43,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  EyeOff,
   History,
-  Hourglass,
   Loader,
   NotebookPen,
   PartyPopper,
@@ -320,36 +316,6 @@ export const CalendarView: React.FC<{
     setDiaSeleccionado(aDiaAbsoluto(cal, nFecha));
   };
 
-  // ------------------------------------------------------------ hilos
-
-  const fechaSeguraOCero: CampaignDate = fecha || { year: 1, dayOfYear: 1, minute: 0 };
-  const hilos = project.threads || [];
-  const pendientes = hilos.filter(h => h.status === 'pending').sort((a, b) => a.dueAbsDay - b.dueAbsDay);
-  const cumplidos = hilos
-    .filter(h => h.status === 'fired')
-    .slice(-12)
-    .reverse();
-
-  const cambiarHilo = async (id: string, cambios: Partial<ScheduledThread>) => {
-    await onUpdate(p => ({
-      threads: (p.threads || []).map(h => (h.id === id ? { ...h, ...cambios } : h))
-    }));
-  };
-
-  const borrarHilo = async (id: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Borrar hilo programado',
-      message: '¿Estás seguro de que deseas eliminar este hilo de consecuencias?',
-      onConfirm: async () => {
-        await onUpdate(p => ({
-          threads: (p.threads || []).filter(h => h.id !== id)
-        }));
-        setConfirmDialog(null);
-      }
-    });
-  };
-
   // ------------------------------------------------------------ entradas de timeline (agenda)
 
   const timeline = project.timeline || [];
@@ -488,7 +454,7 @@ export const CalendarView: React.FC<{
 
   // ------------------------------------------------------------ rejilla mensual
 
-  const anoVisto = mesVisto?.year ?? fechaSeguraOCero.year;
+  const anoVisto = mesVisto?.year ?? (fecha?.year || 1);
   const mesVistoIdx = mesVisto
     ? mesVisto.month
     : calendarioValido(cal) && fecha
@@ -671,7 +637,6 @@ export const CalendarView: React.FC<{
   const estacionActivo = estacionDelDia(calSeguro, fechaObjActivo.dayOfYear);
   const nombreDiaActivo = fechaLegible(calSeguro, fechaObjActivo);
   const entradasDiaActivo = porDia[diaActivo]?.entradas || [];
-  const hilosDiaActivo = pendientes.filter(h => h.dueAbsDay === diaActivo);
   const esHoyActivo = diaActivo === hoyAbs;
 
   const irADiaRelativo = (delta: number) => {
@@ -969,7 +934,6 @@ export const CalendarView: React.FC<{
                 const esSeleccionado = diaActivo === abs;
                 const conAgenda = (porDia[abs]?.entradas.length || 0) > 0;
                 const numEntradas = porDia[abs]?.entradas.length || 0;
-                const vencimientos = pendientes.filter(h => h.dueAbsDay === abs);
 
                 return (
                   <button
@@ -998,12 +962,6 @@ export const CalendarView: React.FC<{
                         <span
                           className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"
                           title={`${numEntradas} acontecimiento(s) anotado(s)`}
-                        />
-                      )}
-                      {vencimientos.length > 0 && (
-                        <span
-                          className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"
-                          title={`${vencimientos.length} hilo(s) vence(n) este día`}
                         />
                       )}
                     </span>
@@ -1221,37 +1179,6 @@ export const CalendarView: React.FC<{
                       <Save className="w-3 h-3" /> Guardar en este día
                     </button>
                   </div>
-                </div>
-              )}
-
-              {/* Hilos que vencen en este día */}
-              {hilosDiaActivo.length > 0 && (
-                <div className="p-3 rounded-lg border border-red-500/40 bg-red-950/10 space-y-1.5">
-                  <div className="font-cinzel text-xs font-bold text-red-500 flex items-center gap-1.5">
-                    <Hourglass className="w-3.5 h-3.5" /> Consecuencias / Hilos programados que vencen hoy
-                  </div>
-                  {hilosDiaActivo.map(h => (
-                    <div key={h.id} className="text-xs flex items-baseline justify-between gap-2 pt-1">
-                      <div>
-                        <strong>{h.title}</strong>
-                        {!h.hidden && h.effect !== h.title && ` — ${h.effect}`}
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => cambiarHilo(h.id, { hidden: !h.hidden })}
-                          className="text-[10px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
-                        >
-                          {h.hidden ? 'Revelar' : 'Ocultar'}
-                        </button>
-                        <button
-                          onClick={() => borrarHilo(h.id)}
-                          className="text-[10px] text-red-500 hover:underline cursor-pointer"
-                        >
-                          Borrar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
 
@@ -1765,96 +1692,8 @@ export const CalendarView: React.FC<{
         </div>
 
         {/* =========================================================================
-            HILOS EN MARCHA
+            PIE / DESACTIVAR
             ========================================================================= */}
-        <div className="pt-8 border-t border-[var(--glass-border)] space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-cinzel text-lg font-bold text-[var(--accent)] m-0 flex items-center gap-2">
-              <Hourglass className="w-4 h-4" /> Hilos en marcha ({pendientes.length})
-            </h3>
-          </div>
-          <p className="text-xs text-[var(--text-secondary)] m-0">
-            Consecuencias con fecha prevista: el mundo actuando por su cuenta. El Narrador los escribe según
-            juegas cuando queda algo pendiente en el tiempo.
-          </p>
-
-          {pendientes.length === 0 && (
-            <p className="text-sm text-[var(--text-secondary)] italic m-0">
-              Nada programado todavía. Aparecerán según juegues y se fijen plazos en la historia.
-            </p>
-          )}
-
-          <div className="space-y-3">
-            {pendientes.map(h => {
-              const faltan = h.dueAbsDay - hoyAbs;
-              const urgente = faltan <= 1;
-              return (
-                <div
-                  key={h.id}
-                  className={`p-3 rounded-lg border bg-[var(--surface-soft)]/50 ${urgente ? 'border-[var(--accent)]' : 'border-[var(--glass-border)]'}`}
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-cinzel font-bold text-sm text-[var(--text-primary)]">
-                      {h.title}
-                    </span>
-                    <span
-                      className={`text-xs font-cinzel ${urgente ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)]'}`}
-                    >
-                      {distanciaEnDias(faltan)} · {h.dueDate}
-                    </span>
-                  </div>
-                  {!h.hidden && h.effect !== h.title && (
-                    <p className="text-xs text-[var(--text-secondary)] m-0 mt-1">{h.effect}</p>
-                  )}
-                  {h.hidden && (
-                    <p className="text-xs text-[var(--text-secondary)] italic m-0 mt-1">
-                      Oculto: solo lo sabe el Narrador.
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    <button
-                      onClick={() => cambiarHilo(h.id, { hidden: !h.hidden })}
-                      className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel hover:border-[var(--accent)] cursor-pointer"
-                      title={h.hidden ? 'Revelármelo' : 'Ocultármelo'}
-                    >
-                      {h.hidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                      {h.hidden ? 'Ver' : 'Ocultar'}
-                    </button>
-                    <button
-                      onClick={() => cambiarHilo(h.id, { status: 'cancelled' })}
-                      className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel hover:border-[var(--accent)] cursor-pointer"
-                    >
-                      <X className="w-3 h-3" /> Cancelar
-                    </button>
-                    <button
-                      onClick={() => borrarHilo(h.id)}
-                      className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel text-red-500 hover:border-red-500 cursor-pointer"
-                    >
-                      <Trash2 className="w-3 h-3" /> Borrar
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {cumplidos.length > 0 && (
-            <details className="text-xs text-[var(--text-secondary)] pt-2">
-              <summary className="cursor-pointer font-cinzel font-bold hover:text-[var(--accent)]">
-                Ya ocurrieron ({cumplidos.length})
-              </summary>
-              <ul className="mt-2 space-y-1 pl-4 list-disc">
-                {cumplidos.map(h => (
-                  <li key={h.id}>
-                    <Check className="inline w-3 h-3 mr-1 text-emerald-500" />
-                    <strong>{h.title}</strong> — {h.dueDate}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-
         <div className="pt-4 text-center border-t border-[var(--glass-border)]">
           <button
             onClick={desactivar}
