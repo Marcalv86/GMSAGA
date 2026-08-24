@@ -47,6 +47,7 @@ import {
   Settings,
   Shield,
   ShieldAlert,
+  Sparkles,
   X,
   Zap,
   Plus,
@@ -583,94 +584,31 @@ export const ApiKeyModal: React.FC<{
           {/* TAB: MEMORY SYNC & QUOTA OPTIMIZATION */}
           {activeSettingsTab === 'sync' && (
             <div className="space-y-4">
-              <div className="bg-amber-50/90 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 p-3 rounded-lg flex items-start gap-2.5 text-amber-950 dark:text-amber-200">
-                <Brain className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="bg-emerald-50/90 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 p-3 rounded-lg flex items-start gap-2.5 text-emerald-950 dark:text-emerald-200">
+                <Brain className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <div className="font-cinzel font-bold text-xs">
-                    Optimización de Cuota & Sincronización Inteligente
+                    Sincronización de Memoria Manual (Cero Gasto Automático)
                   </div>
-                  <p className="text-[11px] text-amber-900 dark:text-amber-300 m-0 leading-relaxed">
-                    Controla cuántos tokens y llamadas a la API de Google AI Studio se consumen automáticamente en segundo plano para mantener vivas las fichas, PNJs y eventos de la partida.
+                  <p className="text-[11px] text-emerald-900 dark:text-emerald-300 m-0 leading-relaxed">
+                    La sincronización de la memoria viva (diario, estado, fichas, PNJs, tramas y cronología) funciona exclusivamente a petición manual mediante el botón <strong>«Sincronizar»</strong>. Mientras se ejecuta, se procesa en segundo plano para que puedas seguir roleando sin interrupciones ni bloqueos de pantalla.
                   </p>
                 </div>
               </div>
 
-              {/* Memory Sync Granularity Selector */}
-              <div className="space-y-2">
-                <label className="font-cinzel font-bold text-[var(--text-primary)] block">
-                  Nivel de Detalle & Frecuencia de Sincronización:
-                </label>
-
-                {[
-                  {
-                    id: 'smart_lite',
-                    title: '⚡ Optimizado / Esencial (Recomendado)',
-                    badge: '~70% Ahorro Tokens',
-                    badgeColor: 'bg-emerald-700',
-                    desc: 'Extrae y actualiza solo el estado inmediato, peligros vitales y PNJs cruciales con prompts ultra-compactos. Máximo rendimiento y protección de tu cuota de Google AI Studio.'
-                  },
-                  {
-                    id: 'batch',
-                    title: '⏳ Por Lotes (Cada 20 turnos)',
-                    badge: '-95% Llamadas API',
-                    badgeColor: 'bg-purple-700',
-                    desc: 'Acumula los turnos recientes y actualiza la memoria viva únicamente cada 20 mensajes. Ideal para jugar sesiones completas sin apenas consumir peticiones en segundo plano.'
-                  },
-                  {
-                    id: 'full',
-                    title: '📜 Completo / Cada Turno',
-                    badge: 'Análisis Total',
-                    badgeColor: 'bg-blue-700',
-                    desc: 'Sincroniza y actualiza exhaustivamente todas las tramas secundarias, PNJs, estados de relación y lugares tras cada turno.'
-                  },
-                  {
-                    id: 'off',
-                    title: '🛑 Manual Únicamente (Máximo Ahorro)',
-                    badge: '0 Peticiones en 2º Plano',
-                    badgeColor: 'bg-stone-600',
-                    desc: 'Desactiva por completo la sincronización automática. La memoria solo se actualizará cuando pulses manualmente el botón «Sincronizar Memoria» en el panel lateral.'
-                  }
-                ].map(item => {
-                  const isSelected = memorySyncGranularity === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => setMemorySyncGranularity(item.id as MemorySyncGranularity)}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                        isSelected
-                          ? 'border-[var(--accent)] bg-[var(--glass)] shadow-xs ring-1 ring-[var(--accent)]'
-                          : 'border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[color-mix(in_srgb,var(--surface)_80%,transparent)]'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="memory_sync_level"
-                            checked={isSelected}
-                            onChange={() => setMemorySyncGranularity(item.id as MemorySyncGranularity)}
-                            className="accent-[var(--accent)]"
-                          />
-                          {item.title}
-                        </span>
-                        <span
-                          className={`text-[10px] font-cinzel font-semibold px-2 py-0.5 rounded-full text-white ${item.badgeColor}`}
-                        >
-                          {item.badge}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)] pl-5 m-0 leading-relaxed">
-                        {item.desc}
-                      </p>
-                    </div>
-                  );
-                })}
+              <div className="bg-[var(--glass)] p-3 rounded-lg border border-[var(--glass-border)] space-y-2">
+                <div className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" /> Control Total & Máxima Fluidez
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                  No se realizan peticiones ocultas turno a turno. Cuando consideres oportuno consolidar los acontecimientos transcurridos, pulsa el botón <strong>«Sincronizar»</strong> en la barra superior o en cualquiera de las pestañas de Memoria, Estado o Calendario. La IA leerá los chats y actualizará todos los registros.
+                </p>
               </div>
 
               {/* Modelo de Segundo Plano (Background Model) */}
               <div className="pt-3 border-t border-[var(--glass-border)] space-y-2">
                 <label className="font-cinzel font-bold text-[var(--text-primary)] block">
-                  Modelo Asignado a Tareas en Segundo Plano (Memoria & Compendio):
+                  Modelo Asignado al Pulsar Sincronizar / Extracciones:
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[

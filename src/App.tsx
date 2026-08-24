@@ -8,6 +8,7 @@ import {
   Moon,
   Paperclip,
   Plus,
+  RefreshCw,
   Save,
   Scroll,
   ScrollText,
@@ -67,7 +68,6 @@ import {
   generateStoryTurnStream,
   TiempoReportado,
   syncMemoryFromChats,
-  syncMemoryDeltaIncremental,
   resincronizarCronologiaDesdeChat,
   analyzeUploadedImage,
   extractPlayerCharacterFromDocument,
@@ -92,7 +92,6 @@ import {
   setStoredTopP,
   setStoredAutoFailover,
   setStoredKeyRotationMode,
-  getStoredMemorySyncGranularity,
   setStoredMemorySyncGranularity
 } from './utils/geminiHelper';
 import { applyInventoryReport, expireTemporaryItems } from './utils/inventoryParser';
@@ -173,7 +172,6 @@ export default function App() {
     label?: string;
     type?: 'upload' | 'sync' | 'analysis' | 'general';
   }>({ active: false });
-  const turnsSinceSyncRef = useRef<number>(0);
 
   // Protección del almacenamiento: sin esto el navegador puede borrar la campaña
   // por su cuenta cuando anda justo de espacio.
@@ -921,8 +919,6 @@ export default function App() {
       const controller = new AbortController();
       generationAbortRef.current = controller;
 
-      let lastStoryResponse = '';
-
       await generateStoryTurnStream({
         project: currentProject,
         currentChatId,
@@ -958,7 +954,6 @@ export default function App() {
         // que hace que la narración se escriba ante ti en vez de aparecer a saltos.
         // El guardado en disco sigue limitado dentro de geminiHelper.
         onChunk: (fullText: string) => {
-          lastStoryResponse = fullText;
           setCurrentChats(prev =>
             prev.map(c => {
               if (c.id !== currentChatId) return c;
@@ -982,44 +977,6 @@ export default function App() {
           });
         }
       });
-
-      // Sincronización inteligente de memoria en segundo plano optimizada por cuota
-      const syncGranularity = getStoredMemorySyncGranularity();
-      if (hasConfiguredApiKey() && lastStoryResponse && syncGranularity !== 'off') {
-        let shouldRunSync = true;
-        if (syncGranularity === 'batch') {
-          turnsSinceSyncRef.current += 1;
-          if (turnsSinceSyncRef.current < 20) {
-            shouldRunSync = false;
-          } else {
-            turnsSinceSyncRef.current = 0;
-          }
-        }
-
-        if (shouldRunSync) {
-          setTimeout(async () => {
-            try {
-              setIsBackgroundSyncingMemory(true);
-              const deltaMem = await syncMemoryDeltaIncremental({
-                project: currentProject,
-                lastUserAction: userPrompt,
-                lastModelResponse: lastStoryResponse,
-                granularity: syncGranularity
-              });
-              if (deltaMem) {
-                await handleUpdateMemory(prev => ({
-                  ...prev,
-                  ...deltaMem
-                }));
-              }
-            } catch (err) {
-              console.warn('Silent background memory sync error:', err);
-            } finally {
-              setIsBackgroundSyncingMemory(false);
-            }
-          }, 300);
-        }
-      }
     } catch (error: any) {
       console.error('Error generating AI story:', error);
       // Limpiar el mensaje de placeholder "Tirando dados..." si falló la llamada
@@ -1962,6 +1919,7 @@ export default function App() {
 
   const handleTriggerAISyncMemory = async () => {
     if (!currentProject || !currentPId) return;
+    if (isBackgroundSyncingMemory) return;
 
     if (!hasConfiguredApiKey()) {
       setIsApiKeyModalOpen(true);
@@ -1988,11 +1946,10 @@ export default function App() {
       return;
     }
 
-    setIsGenerating(true);
-    setLoadingText('Sincronizando memoria y cronología desde todas las sesiones...');
+    setIsBackgroundSyncingMemory(true);
     setTopProgress({
       active: true,
-      label: 'Sincronizando la partida completa...',
+      label: 'Sincronizando memoria viva, fichas y cronología...',
       type: 'sync'
     });
     try {
@@ -2020,7 +1977,7 @@ export default function App() {
         isOpen: true,
         title: 'Sincronización Completada',
         message:
-          'La memoria viva (estado, tramas, PNJs) y la cronología (agenda y tiempos) se han actualizado con éxito en un solo paso a partir de tus partidas.'
+          'La memoria viva (estado, tramas, fichas, PNJs) y la cronología se han sincronizado con éxito a partir de tus partidas.'
       });
     } catch (error: any) {
       console.error('Error syncing project:', error);
@@ -2034,8 +1991,7 @@ export default function App() {
         message: errMsg
       });
     } finally {
-      setIsGenerating(false);
-      setLoadingText('');
+      setIsBackgroundSyncingMemory(false);
       setTopProgress({ active: false });
     }
   };
@@ -2783,7 +2739,7 @@ export default function App() {
               <button
                 onClick={handleTriggerAISyncMemory}
                 disabled={
-                  isGenerating ||
+                  isBackgroundSyncingMemory ||
                   !currentChats.some(c =>
                     (c.messages || []).some(
                       m =>
@@ -2798,8 +2754,17 @@ export default function App() {
                 title="Sincronizar memoria viva, fichas, PNJs, tramas y cronología de toda la partida"
                 aria-label="Sincronizar con IA"
               >
-                <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden md:inline">Sincronizar</span>
+                {isBackgroundSyncingMemory ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span className="hidden md:inline">Sincronizando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span className="hidden md:inline">Sincronizar</span>
+                  </>
+                )}
               </button>
             )}
 
@@ -2879,7 +2844,7 @@ export default function App() {
               onUpdate={handleUpdateProjectField}
               onUpdateMemory={handleUpdateMemory}
               onTriggerAIUpdate={handleTriggerAISyncMemory}
-              isGenerating={isGenerating}
+              isGenerating={isBackgroundSyncingMemory || isGenerating}
               hasChats={currentChats.some(c =>
                 (c.messages || []).some(
                   m =>
@@ -2905,7 +2870,7 @@ export default function App() {
               onOpenMap={file => setSelectedMapFile(file)}
               onAutoClassifyAll={handleAutoClassifyAll}
               onUploadEntityImage={handleUploadEntityImage}
-              isGenerating={isGenerating}
+              isGenerating={isBackgroundSyncingMemory || isGenerating}
               hasChats={currentChats.some(c =>
                 (c.messages || []).some(
                   m =>
@@ -2926,7 +2891,7 @@ export default function App() {
               onUpdate={handleUpdateProjectField}
               onUpdateMemory={handleUpdateMemory}
               onTriggerAIUpdate={handleTriggerAISyncMemory}
-              isGenerating={isGenerating}
+              isGenerating={isBackgroundSyncingMemory || isGenerating}
               hasChats={currentChats.some(c =>
                 (c.messages || []).some(
                   m =>
