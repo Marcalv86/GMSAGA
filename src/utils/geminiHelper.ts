@@ -1061,6 +1061,14 @@ export async function generateStoryTurnStream({
             const now = Date.now();
             if (now - lastSaveTime > 1500 && fullText.length > 0) {
               lastSaveTime = now;
+              await saveStreamedMessage(
+                currentChat,
+                fullText,
+                onSaveMessage,
+                onStateReported,
+                onTimeReported,
+                false
+              );
             }
           }
 
@@ -1082,12 +1090,28 @@ export async function generateStoryTurnStream({
 
           // Guardado final completo
           if (fullText.trim().length > 0) {
+            await saveStreamedMessage(
+              currentChat,
+              fullText.trim(),
+              onSaveMessage,
+              onStateReported,
+              onTimeReported,
+              true
+            );
           }
           success = true;
           break; // Salir del bucle si fue exitoso
         } catch (e: any) {
           if (signal?.aborted || e?.name === 'AbortError') {
             if (fullText.trim().length > 0) {
+              await saveStreamedMessage(
+                currentChat,
+                fullText.trim(),
+                onSaveMessage,
+                onStateReported,
+                onTimeReported,
+                true
+              );
             }
             success = true;
             return;

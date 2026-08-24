@@ -118,6 +118,25 @@ export default function App() {
   const [currentChats, setCurrentChats] = useState<Chat[]>([]);
   const [currentFiles, setCurrentFiles] = useState<ProjectFile[]>([]);
 
+  // Refs siempre sincronizados para garantizar persistencia síncrona al cerrar/ocultar el navegador
+  const projectsRef = useRef(projects);
+  const currentPIdRef = useRef(currentPId);
+  const currentChatsRef = useRef(currentChats);
+  const currentFilesRef = useRef(currentFiles);
+
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+  useEffect(() => {
+    currentPIdRef.current = currentPId;
+  }, [currentPId]);
+  useEffect(() => {
+    currentChatsRef.current = currentChats;
+  }, [currentChats]);
+  useEffect(() => {
+    currentFilesRef.current = currentFiles;
+  }, [currentFiles]);
+
   const [activeTab, setActiveTab] = useState<
     'chat' | 'novel' | 'instructions' | 'files' | 'status' | 'memory' | 'calendar'
   >('chat');
@@ -226,6 +245,47 @@ export default function App() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
+  }, []);
+
+  // 0. Auto-flush inmediato en cierre de navegador, cambio de pestaña o background móvil
+  useEffect(() => {
+    const flushCurrentState = () => {
+      const projs = projectsRef.current;
+      const pId = currentPIdRef.current;
+      const chs = currentChatsRef.current;
+      if (projs && projs.length > 0) {
+        try {
+          const sanitized = sanitizeProjectsForLocalStorage(projs);
+          localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(sanitized));
+        } catch (e) {
+          // ignore quota
+        }
+      }
+      if (pId && chs && chs.length > 0) {
+        try {
+          localStorage.setItem(`${LOCAL_CHATS_PREFIX}${pId}`, JSON.stringify(chs));
+        } catch (e) {
+          // ignore quota
+        }
+        saveChatsToDB(pId, chs).catch(() => {});
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushCurrentState();
+      }
+    };
+
+    window.addEventListener('beforeunload', flushCurrentState);
+    window.addEventListener('pagehide', flushCurrentState);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', flushCurrentState);
+      window.removeEventListener('pagehide', flushCurrentState);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
