@@ -38,6 +38,7 @@ import {
 } from './campaignCalendar';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 import { logError, logWarn, logInfo } from './logger';
+import { sanitizePlayerCharacter } from './sanitizers';
 
 // In-app API key & model management (stored locally in the user's browser)
 export interface AIModelOption {
@@ -1584,14 +1585,16 @@ ${historyToAnalyze}`;
     ...parsedPcEvents.filter((ne: any) => !existingEvents.some(oe => oe.title.toLowerCase().trim() === ne.title.toLowerCase().trim()))
   ];
 
-  const updatedPc: PlayerCharacter = {
-    ...(prevPc || { name: 'Protagonista' }),
-    name: prevPc?.name || 'Protagonista',
+  const candidatePc: PlayerCharacter = {
+    ...(prevPc || { name: 'Aryendell' }),
+    name: prevPc?.name || 'Aryendell',
     title: prevPc?.title,
     summary: parsed.player_summary || prevPc?.summary || '',
     events: mergedEvents,
     portrait: prevPc?.portrait
   };
+
+  const updatedPc = sanitizePlayerCharacter(candidatePc, 'Aryendell');
 
   return {
     story: parsed.story || project.memory?.story || '',

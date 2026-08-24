@@ -45,6 +45,7 @@ import { LocalStorageModal } from './components/LocalStorageModal';
 import { ImportCampaignModal } from './components/ImportCampaignModal';
 import { Logger } from './components/Logger';
 import { logError } from './utils/logger';
+import { sanitizeProjectMemory } from './utils/sanitizers';
 import { ExtractedCampaignResult } from './utils/campaignImporter';
 import { writeCampaignToDisk } from './utils/diskBackup';
 import {
@@ -362,7 +363,7 @@ export default function App() {
             const limpios = deduplicarListaNpcs(p.memory.npcs);
             if (limpios.length !== p.memory.npcs.length) {
               modified = true;
-              return {
+              p = {
                 ...p,
                 memory: {
                   ...p.memory,
@@ -370,6 +371,16 @@ export default function App() {
                 }
               };
             }
+          }
+
+          // Higienización de ficha de personaje (OC) y memoria viva contra textos corruptos
+          const sanitizedMem = sanitizeProjectMemory(p.memory);
+          if (JSON.stringify(sanitizedMem) !== JSON.stringify(p.memory)) {
+            modified = true;
+            return {
+              ...p,
+              memory: sanitizedMem
+            };
           }
 
           return p;
@@ -757,15 +768,17 @@ export default function App() {
   const handleUpdateMemory = async (updater: (prev: Project['memory']) => Project['memory']) => {
     if (!currentProject || !currentPId) return;
     await handleUpdateProjectField(p => ({
-      memory: updater(
-        p.memory || {
-          story: '',
-          quests: [],
-          npcs: [],
-          locations: [],
-          current_status: '',
-          manual_notes: ''
-        }
+      memory: sanitizeProjectMemory(
+        updater(
+          p.memory || {
+            story: '',
+            quests: [],
+            npcs: [],
+            locations: [],
+            current_status: '',
+            manual_notes: ''
+          }
+        )
       )
     }));
   };
@@ -1538,10 +1551,10 @@ export default function App() {
     try {
       const updatedMemory = await syncMemoryFromChats(currentProject, currentChats);
       await handleUpdateProjectField(p => ({
-        memory: {
+        memory: sanitizeProjectMemory({
           ...(p.memory || {}),
           ...updatedMemory
-        }
+        })
       }));
       setAlertConfig({
         isOpen: true,
@@ -1550,6 +1563,9 @@ export default function App() {
       });
     } catch (err: any) {
       console.error('Error al sincronizar memoria con IA:', err);
+      logError('memory_sync', 'Error al sincronizar memoria viva con IA', err, {
+        projectName: currentProject.name
+      });
       setAlertConfig({
         isOpen: true,
         title: 'Error de Sincronización',

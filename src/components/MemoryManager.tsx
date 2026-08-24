@@ -6,6 +6,7 @@ import {
   obtenerInfoRelacion
 } from '../utils/campaignCalendar';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
+import { sanitizePlayerCharacter } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
 import { NpcDossierModal } from './NpcDossierModal';
 import { LocationDossierModal } from './LocationDossierModal';
@@ -430,13 +431,15 @@ export const MemoryManager: React.FC<{
 
   // Protagonist (OC) Handlers
   const handleSaveOcHeader = async () => {
+    const rawPc = {
+      ...(memory.player_character || { name: 'Aryendell' }),
+      name: ocNameDraft.trim() || 'Aryendell',
+      title: ocTitleDraft.trim() || undefined
+    };
+    const sanitized = sanitizePlayerCharacter(rawPc, 'Aryendell');
     await onUpdateMemory(mem => ({
       ...mem,
-      player_character: {
-        ...(mem.player_character || { name: 'Protagonista' }),
-        name: ocNameDraft.trim() || 'Protagonista',
-        title: ocTitleDraft.trim() || undefined
-      }
+      player_character: sanitized
     }));
     setIsEditingOcName(false);
   };
@@ -839,18 +842,20 @@ export const MemoryManager: React.FC<{
       </div>
 
       {/* Tab: Protagonist (OC) */}
-      {activeTab === 'character' && (
+      {activeTab === 'character' && (() => {
+        const cleanPc = sanitizePlayerCharacter(memory.player_character, 'Aryendell');
+        return (
         <div className="flex flex-col gap-6">
           {/* Identity & Portrait Card */}
           <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-4 sm:p-6 rounded-xl shadow-sm flex flex-col md:flex-row gap-5 items-start">
             {/* Portrait Box */}
             <div className="flex flex-col items-center gap-2 shrink-0 self-center md:self-start">
               <div className="w-36 h-48 sm:w-40 sm:h-52 rounded-xl border-2 border-[var(--accent)]/40 shadow-md overflow-hidden relative group bg-[var(--surface)] flex items-center justify-center">
-                {memory.player_character?.portrait ? (
+                {cleanPc.portrait ? (
                   <>
                     <img
-                      src={memory.player_character.portrait}
-                      alt={memory.player_character?.name || 'Protagonista'}
+                      src={cleanPc.portrait}
+                      alt={cleanPc.name || 'Protagonista'}
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
@@ -860,8 +865,8 @@ export const MemoryManager: React.FC<{
                           setTargetForPortraitPicker({
                             type: 'player',
                             id: 'oc_portrait',
-                            name: memory.player_character?.name || 'Protagonista',
-                            desc: memory.player_character?.title || 'Personaje Jugador'
+                            name: cleanPc.name || 'Aryendell',
+                            desc: cleanPc.title || 'Personaje Jugador'
                           })
                         }
                         className="px-2.5 py-1 text-xs bg-[var(--accent)] text-[var(--on-accent)] font-cinzel rounded-md hover:scale-105 transition-transform flex items-center gap-1 cursor-pointer font-bold shadow"
@@ -885,8 +890,8 @@ export const MemoryManager: React.FC<{
                         setTargetForPortraitPicker({
                           type: 'player',
                           id: 'oc_portrait',
-                          name: memory.player_character?.name || 'Protagonista',
-                          desc: memory.player_character?.title || 'Personaje Jugador'
+                          name: cleanPc.name || 'Aryendell',
+                          desc: cleanPc.title || 'Personaje Jugador'
                         })
                       }
                       className="px-2.5 py-1 text-[11px] font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded-md hover:scale-105 transition-all flex items-center gap-1 cursor-pointer font-bold shadow-xs mt-1"
@@ -905,11 +910,11 @@ export const MemoryManager: React.FC<{
                   {!isEditingOcName ? (
                     <div>
                       <h2 className="font-cinzel text-xl sm:text-2xl font-bold text-[var(--accent)] m-0 flex items-center gap-2">
-                        {memory.player_character?.name || 'Protagonista (OC)'}
+                        {cleanPc.name || 'Aryendell'}
                       </h2>
-                      {memory.player_character?.title && (
+                      {cleanPc.title && (
                         <p className="text-sm font-lora italic text-[var(--text-secondary)] mt-0.5 m-0">
-                          {memory.player_character.title}
+                          {cleanPc.title}
                         </p>
                       )}
                     </div>
@@ -950,8 +955,8 @@ export const MemoryManager: React.FC<{
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          setOcNameDraft(memory.player_character?.name || '');
-                          setOcTitleDraft(memory.player_character?.title || '');
+                          setOcNameDraft(cleanPc.name || 'Aryendell');
+                          setOcTitleDraft(cleanPc.title || '');
                           setIsEditingOcName(true);
                         }}
                         className="px-2.5 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded-md hover:bg-[var(--glass)] hover:text-[var(--accent)] transition-colors flex items-center gap-1 text-[var(--text-secondary)] cursor-pointer"
@@ -1025,8 +1030,8 @@ export const MemoryManager: React.FC<{
               />
             ) : (
               <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-5 rounded-lg shadow-sm text-base leading-relaxed markdown-body min-h-[100px]">
-                {memory.player_character?.summary ? (
-                  <ReactMarkdown>{memory.player_character.summary}</ReactMarkdown>
+                {cleanPc.summary ? (
+                  <ReactMarkdown>{cleanPc.summary}</ReactMarkdown>
                 ) : (
                   <span className="text-[var(--text-secondary)] italic font-lora">
                     Aún no hay un resumen narrativo para el protagonista. Haz clic en "Editar Resumen" o pulsa "Sincronizar con IA" para que se genere a partir de la partida.
@@ -1041,7 +1046,7 @@ export const MemoryManager: React.FC<{
             <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
               <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
-                Acontecimientos Importantes y Memoria del OC ({memory.player_character?.events?.length || 0}):
+                Acontecimientos Importantes y Memoria del OC ({cleanPc.events?.length || 0}):
               </span>
               <button
                 onClick={() => {
@@ -1054,7 +1059,7 @@ export const MemoryManager: React.FC<{
               </button>
             </div>
 
-            {(!memory.player_character?.events || memory.player_character.events.length === 0) ? (
+            {(!cleanPc.events || cleanPc.events.length === 0) ? (
               <div className="bg-[var(--surface-soft)] border border-dashed border-[var(--glass-border)] p-8 rounded-xl text-center flex flex-col items-center justify-center gap-2">
                 <Sparkles className="w-8 h-8 text-[var(--accent)] opacity-40" />
                 <p className="text-sm font-cinzel text-[var(--text-secondary)] m-0">
@@ -1066,7 +1071,7 @@ export const MemoryManager: React.FC<{
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {memory.player_character.events.map((ev) => (
+                {cleanPc.events.map((ev) => (
                   <div
                     key={ev.id}
                     className="bg-[var(--surface)] border border-[var(--glass-border)] hover:border-[var(--accent)]/50 p-4 rounded-xl shadow-xs transition-all flex flex-col justify-between gap-3"
@@ -1120,7 +1125,8 @@ export const MemoryManager: React.FC<{
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Tab: Diary & Agenda (Diario, Agenda con Día Vista, Selector de Calendario y Relojes) */}
       {activeTab === 'diary' && (

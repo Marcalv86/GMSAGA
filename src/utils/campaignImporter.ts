@@ -1,6 +1,7 @@
 import { Project, Chat, NPC, Quest, Location, PlayerCharacter, Memory } from '../types';
 import { generateContentWithFailover } from './geminiHelper';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
+import { sanitizePlayerCharacter, sanitizeProjectMemory } from './sanitizers';
 
 export interface ExtractedCampaignResult {
   sourceType: 'pdf' | 'text' | 'markdown' | 'json' | 'notebooklm';
@@ -81,7 +82,8 @@ REQUISITOS DE EXTRACCIÓN:
 1. **name**: Título de la campaña / aventura (ej: "${preferredTitle || 'El Asedio de Luskan'}"). Si no está explícito, inventa uno evocador basado en los acontecimientos.
 2. **description**: Resumen de 2-3 frases de la ambientación, premisa y estado de la trama.
 3. **character**: Ficha del personaje protagonista (si se menciona o juega como PJ).
-   - name, race, class, level (ej: "5"), hp, maxHp, ac, background, alignment.
+   - name: Nombre propio corto y claro del personaje (ej: "Aryendell"). ⚠️ ¡ESTÁ PROHIBIDO poner frases, oraciones, notas o descripciones largas en el campo "name"! Si hay notas sobre el personaje, ponlas en "notes", "backstory" o "personality".
+   - race, class, level (ej: "5"), hp, maxHp, ac, background, alignment.
    - attributes: { str: 10-20, dex: 10-20, con: 10-20, int: 10-20, wis: 10-20, cha: 10-20 }.
    - personality, backstory, appearance, notes.
 4. **chapters**: Lista de capítulos.
@@ -288,10 +290,10 @@ function formatParsedDataToCampaign(
 
   // Ficha de Protagonista
   const rawChar = parsed.character || {};
-  const playerCharacter: PlayerCharacter = {
-    name: rawChar.name || 'Protagonista',
-    race: rawChar.race || 'Humano',
-    class: rawChar.class || 'Aventurero',
+  const rawPlayerCharacter: PlayerCharacter = {
+    name: rawChar.name || 'Aryendell',
+    race: rawChar.race || 'Elfa de la Luna',
+    class: rawChar.class || 'Druida / Maga',
     level: String(rawChar.level || '1'),
     hp: typeof rawChar.hp === 'number' ? rawChar.hp : 25,
     maxHp: typeof rawChar.maxHp === 'number' ? rawChar.maxHp : 25,
@@ -306,6 +308,7 @@ function formatParsedDataToCampaign(
     inventory: Array.isArray(rawChar.inventory) ? rawChar.inventory : [],
     currencies: rawChar.currencies || { cp: 0, sp: 0, ep: 0, gp: 25, pp: 0 }
   };
+  const playerCharacter = sanitizePlayerCharacter(rawPlayerCharacter, 'Aryendell');
 
   // Capítulos y Mensajes
   const rawChapters = Array.isArray(parsed.chapters) && parsed.chapters.length > 0 ? parsed.chapters : [];
@@ -399,7 +402,7 @@ function formatParsedDataToCampaign(
       }))
     : [];
 
-  const memory: Memory = {
+  const rawMemory: Memory = {
     story: parsed.storySynopsis || '',
     quests,
     npcs,
@@ -408,6 +411,7 @@ function formatParsedDataToCampaign(
     manual_notes: parsed.manualNotes || `Documento importado (${rawText.length} caracteres).`,
     player_character: playerCharacter
   };
+  const memory = sanitizeProjectMemory(rawMemory);
 
   const project: Project = {
     id: projectId,
