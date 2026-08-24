@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Project, Chat } from '../types';
-import { exportChronicleToPDF } from '../utils/pdfExport';
 import { stripRollRequests, stripStateTag } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
 import { Swords, Shield, FileDown, BookOpen } from 'lucide-react';
@@ -89,6 +88,7 @@ export const NovelReaderView: React.FC<{
     if (!activeChat) return;
     setIsExporting(true);
     try {
+      const { exportChronicleToPDF } = await import('../utils/pdfExport');
       await exportChronicleToPDF(project, activeChat, () => {});
     } catch (err) {
       console.error('Error exporting PDF:', err);

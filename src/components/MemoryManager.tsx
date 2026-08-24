@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, NPC, Quest, Location, ProjectFile, PlayerCharacter } from '../types';
+import { Project, NPC, Quest, Location, ProjectFile } from '../types';
 import { classifyFileAuto } from '../utils/geminiHelper';
 import { obtenerInfoRelacion } from '../utils/campaignCalendar';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
-import { CharacterSheetView } from './CharacterSheetView';
-import { CharacterEditModal } from './CharacterEditModal';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
 import { NpcDossierModal } from './NpcDossierModal';
 import { LocationDossierModal } from './LocationDossierModal';
@@ -19,7 +17,6 @@ import {
   ChevronDown,
   ChevronUp,
   Compass,
-  Crown,
   Eye,
   EyeOff,
   FileText,
@@ -143,7 +140,7 @@ export function tieneAfinidadActiva(npc: NPC): boolean {
 }
 
 export type SeccionMemoria =
-  'character' | 'npcs' | 'locs' | 'visual' | 'quests' | 'story' | 'status' | 'notes';
+  'npcs' | 'locs' | 'visual' | 'quests' | 'story' | 'status' | 'notes';
 
 export const MemoryManager: React.FC<{
   project: Project;
@@ -180,7 +177,7 @@ export const MemoryManager: React.FC<{
    */
   const seccionesVisibles: SeccionMemoria[] = secciones?.length
     ? secciones
-    : ['character', 'npcs', 'locs', 'visual', 'quests', 'story', 'status', 'notes'];
+    : ['npcs', 'locs', 'visual', 'quests', 'story', 'status', 'notes'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
 
@@ -189,10 +186,6 @@ export const MemoryManager: React.FC<{
     if (!seccionesVisibles.includes(activeTab)) setActiveTab(seccionesVisibles[0]);
   }, [secciones]);
 
-  // Protagonist (OC) Form Modal state
-  const [isPcModalOpen, setIsPcModalOpen] = useState(false);
-  const [editingPc, setEditingPc] = useState<PlayerCharacter | null>(null);
-
   // NPC Edit Modal state
   const [isNpcModalOpen, setIsNpcModalOpen] = useState(false);
   const [editingNpc, setEditingNpc] = useState<Partial<NPC> | null>(null);
@@ -200,9 +193,6 @@ export const MemoryManager: React.FC<{
   // Location Edit Modal state
   const [isLocModalOpen, setIsLocModalOpen] = useState(false);
   const [editingLoc, setEditingLoc] = useState<Partial<Location> | null>(null);
-
-  // File input refs for direct entity image uploads
-  const pcDirectFileInputRef = useRef<HTMLInputElement>(null);
 
   // Story & Status Editing States
   const [isEditingStory, setIsEditingStory] = useState(false);
@@ -316,57 +306,6 @@ export const MemoryManager: React.FC<{
     setLocalNotes(project.memory?.manual_notes || '');
   }, [project.id, project.memory]);
 
-  // Protagonist (OC) Handlers
-  const handleSavePc = async (pc: PlayerCharacter) => {
-    await onUpdateMemory(mem => ({
-      ...mem,
-      player_character: pc
-    }));
-    setIsPcModalOpen(false);
-    setEditingPc(null);
-  };
-
-  const handleClearPc = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Vaciar Ficha de Protagonista',
-      message: '¿Estás seguro de que deseas vaciar los datos del protagonista de la memoria?',
-      onConfirm: async () => {
-        await onUpdateMemory(mem => ({
-          ...mem,
-          player_character: undefined
-        }));
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
-
-  const handleSavePcPortrait = async (portraitDataUrl: string) => {
-    await onUpdateMemory(mem => ({
-      ...mem,
-      player_character: {
-        ...(mem.player_character || { name: 'Protagonista' }),
-        portrait: portraitDataUrl
-      }
-    }));
-    if (editingPc) {
-      setEditingPc({ ...editingPc, portrait: portraitDataUrl });
-    }
-  };
-
-  const handleDirectUploadForPcSheet = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    let url = '';
-    if (onUploadEntityImage) {
-      url = await onUploadEntityImage(file, 'portrait_pj');
-    }
-    if (url) {
-      await handleSavePcPortrait(url);
-    }
-    e.target.value = '';
-  };
-
   // Story Handlers
   const handleSaveStory = async () => {
     await onUpdateMemory(mem => ({ ...mem, story: storyDraft.trim() }));
@@ -463,18 +402,7 @@ export const MemoryManager: React.FC<{
   const handleAssignPortraitDirectly = async (imageContent: string) => {
     if (!targetForPortraitPicker) return;
     const { type, id } = targetForPortraitPicker;
-    if (type === 'player') {
-      await onUpdateMemory(mem => ({
-        ...mem,
-        player_character: {
-          ...(mem.player_character || { name: 'Protagonista' }),
-          portrait: imageContent
-        }
-      }));
-      if (editingPc) {
-        setEditingPc({ ...editingPc, portrait: imageContent });
-      }
-    } else if (type === 'npc') {
+    if (type === 'npc') {
       await onUpdateMemory(mem => {
         const npcs = (mem.npcs || []).map(n => (n.id === id ? { ...n, portrait: imageContent } : n));
         return { ...mem, npcs };
@@ -683,20 +611,11 @@ export const MemoryManager: React.FC<{
 
   return (
     <div className="flex-1 overflow-y-auto px-2.5 sm:px-4 md:px-[5%] py-3 md:py-8 font-lora w-full max-w-full overflow-x-hidden">
-      {/* Hidden file input for direct protagonist portrait upload */}
-      <input
-        type="file"
-        ref={pcDirectFileInputRef}
-        accept="image/*"
-        className="hidden"
-        onChange={handleDirectUploadForPcSheet}
-      />
 
       {/* Top Nav & AI Action Button */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 md:mb-6 border-b border-[var(--glass-border)] pb-3 md:pb-4 gap-3 md:gap-4 w-full">
         <div className="flex gap-1 sm:gap-2 md:gap-3 flex-wrap w-full lg:w-auto">
           {[
-            { id: 'character', label: 'Protagonista (OC)', shortLabel: 'PJ', icon: User, count: memory.player_character?.name ? '' : '' },
             { id: 'npcs', label: 'PNJs', shortLabel: 'PNJs', icon: Users, count: memory.npcs?.length ? `(${memory.npcs.length})` : '' },
             {
               id: 'locs',
@@ -759,123 +678,6 @@ export const MemoryManager: React.FC<{
           </button>
         </div>
       </div>
-
-      {/* Tab: Protagonist (Ficha Canónica del Protagonista / OC) */}
-      {activeTab === 'character' && (
-        <div className="flex flex-col gap-4">
-          {memory.player_character ? (
-            <CharacterSheetView
-              character={memory.player_character}
-              onUpdateCharacter={async (updater) => {
-                await onUpdateMemory(mem => ({
-                  ...mem,
-                  player_character: updater(mem.player_character || { name: 'Protagonista' })
-                }));
-              }}
-              onClearCharacter={handleClearPc}
-              onOpenPortraitPicker={() =>
-                setTargetForPortraitPicker({
-                  type: 'player',
-                  id: 'pc',
-                  name: memory.player_character?.name || 'Protagonista',
-                  desc: [
-                    memory.player_character?.race,
-                    memory.player_character?.class,
-                    memory.player_character?.gender,
-                    memory.player_character?.appearance,
-                    memory.player_character?.notes
-                  ].filter(Boolean).join(' ')
-                })
-              }
-              onOpenEditModal={() => {
-                setEditingPc({ ...memory.player_character! });
-                setIsPcModalOpen(true);
-              }}
-            />
-          ) : (
-            <div className="bg-[var(--surface-soft)] border-2 border-dashed border-[var(--accent)]/40 p-8 md:p-12 rounded-2xl text-center flex flex-col items-center justify-center gap-3">
-              <Crown className="w-12 h-12 text-[var(--accent)] opacity-50" strokeWidth={1.5} />
-              <h3 className="font-cinzel font-bold text-xl text-[var(--accent)] m-0">
-                Crea tu Ficha de Personaje (Dungeons & Dragons)
-              </h3>
-              <p className="text-xs md:text-sm text-[var(--text-secondary)] max-w-lg leading-relaxed m-0">
-                Registra a tu protagonista para disponer de ficha interactiva, inventario con monedas y peso, tiradas de salvación y estadísticas de combate que el Narrador tendrá en cuenta en cada turno.
-              </p>
-              <button
-                onClick={() => {
-                  setEditingPc({
-                    name: 'Protagonista',
-                    race: 'Humano',
-                    class: 'Guerrero',
-                    level: 'Nivel 1',
-                    hp: 25,
-                    maxHp: 25,
-                    ac: 14,
-                    speed: '30 pies',
-                    initiative: '+0',
-                    proficiencyBonus: 2,
-                    attributes: { str: 14, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
-                    currencies: { cp: 0, sp: 0, ep: 0, gp: 50, pp: 0 },
-                    inventory: [
-                      {
-                        id: 'item_1',
-                        name: 'Espada Larga',
-                        category: 'weapon',
-                        quantity: 1,
-                        weight: 3,
-                        equipped: true,
-                        damageOrAc: '1d8+2 cortante (versátil 1d10)',
-                        rarity: 'common',
-                        description: 'Arma marcial de filo reluciente forjada en acero templado.'
-                      },
-                      {
-                        id: 'item_2',
-                        name: 'Cota de Malla',
-                        category: 'armor',
-                        quantity: 1,
-                        weight: 55,
-                        equipped: true,
-                        damageOrAc: 'CA 16',
-                        rarity: 'common',
-                        description: 'Armadura pesada de anillas entrelazadas.'
-                      },
-                      {
-                        id: 'item_3',
-                        name: 'Poción de Curación',
-                        category: 'potion',
-                        quantity: 2,
-                        weight: 0.5,
-                        damageOrAc: 'Cura 2d4+2 PG',
-                        rarity: 'common',
-                        description: 'Frasco de cristal con líquido carmesí brillante que sana heridas al beberse.'
-                      },
-                      {
-                        id: 'item_4',
-                        name: 'Mochila de Aventurero',
-                        category: 'equipment',
-                        quantity: 1,
-                        weight: 5,
-                        rarity: 'common',
-                        description: 'Contiene saco de dormir, yesquero, 10 antorchas y 5 días de raciones de viaje.'
-                      }
-                    ],
-                    appearance: '',
-                    backstory: '',
-                    personality: '',
-                    sheetText: '',
-                    notes: '',
-                    portrait: ''
-                  });
-                  setIsPcModalOpen(true);
-                }}
-                className="mt-3 bg-[var(--accent)] text-[var(--on-accent)] px-6 py-2.5 rounded-xl font-cinzel text-xs hover:bg-[var(--accent-hover)] transition-all cursor-pointer font-bold shadow-md flex items-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" /> + Crear Ficha de Protagonista D&D
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Tab: Story (Crónica General) */}
       {activeTab === 'story' && (
@@ -1945,36 +1747,6 @@ export const MemoryManager: React.FC<{
             </div>
           </div>
         </div>
-      )}
-
-      {/* Protagonist (OC) Modal */}
-      {isPcModalOpen && editingPc && (
-        <CharacterEditModal
-          isOpen={isPcModalOpen}
-          character={editingPc}
-          onClose={() => {
-            setIsPcModalOpen(false);
-            setEditingPc(null);
-          }}
-          onSave={async (updated) => {
-            await handleSavePc(updated);
-          }}
-          allImageFiles={allImageFiles}
-          onOpenPortraitPicker={() =>
-            setTargetForPortraitPicker({
-              type: 'player',
-              id: 'pc',
-              name: editingPc.name || 'Protagonista',
-              desc: [
-                editingPc.race,
-                editingPc.class,
-                editingPc.gender,
-                editingPc.appearance,
-                editingPc.notes
-              ].filter(Boolean).join(' ')
-            })
-          }
-        />
       )}
 
       {/* NPC Full Dossier Modal ("Página que se abre") */}

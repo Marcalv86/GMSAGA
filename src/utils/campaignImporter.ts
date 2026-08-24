@@ -1,8 +1,6 @@
 import { Project, Chat, NPC, Quest, Location, PlayerCharacter, Memory } from '../types';
-import { extractPdfText } from './pdfText';
 import { generateContentWithFailover } from './geminiHelper';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
-import { parseDndSheetText } from './characterSheetParser';
 
 export interface ExtractedCampaignResult {
   sourceType: 'pdf' | 'text' | 'markdown' | 'json' | 'notebooklm';
@@ -31,6 +29,7 @@ export async function readRawFileText(file: File): Promise<{ text: string; isPdf
 
   if (isPdf) {
     const arrayBuffer = await file.arrayBuffer();
+    const { extractPdfText } = await import('./pdfText');
     const pdfText = await extractPdfText(arrayBuffer);
     return { text: pdfText, isPdf: true, isJson: false };
   }
@@ -230,25 +229,6 @@ export function importCampaignLocalFallback(
   // 1. Extraer mensajes y turnos si se parece a un chat
   const { chapters, messagesCount } = extractChatsDeterministically(lines);
 
-  // 2. Extraer ficha si existe
-  const parsedSheet = parseDndSheetText(cleaned);
-  const protagonist: PlayerCharacter = {
-    name: parsedSheet.name || 'Protagonista',
-    class: parsedSheet.class || 'Aventurero',
-    race: parsedSheet.race || 'Humano',
-    level: parsedSheet.level || '1',
-    hp: parsedSheet.hp || 20,
-    maxHp: parsedSheet.maxHp || 20,
-    ac: parsedSheet.ac || 12,
-    attributes: parsedSheet.attributes || { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-    inventory: parsedSheet.inventory || [],
-    currencies: parsedSheet.currencies || { cp: 0, sp: 0, ep: 0, gp: 10, pp: 0 },
-    backstory: parsedSheet.backstory || '',
-    personality: parsedSheet.personality || '',
-    appearance: parsedSheet.appearance || '',
-    notes: 'Importado de cuaderno / transcripción externa.'
-  };
-
   // 3. Extraer PNJs básicos por viñetas
   const npcs = extractNpcsDeterministically(lines);
 
@@ -264,7 +244,7 @@ export function importCampaignLocalFallback(
     locations,
     current_status: 'Continuación de partida importada.',
     manual_notes: `Texto original importado (${cleaned.length} caracteres).`,
-    player_character: protagonist
+    
   };
 
   const project: Project = {
@@ -285,9 +265,7 @@ export function importCampaignLocalFallback(
     chats: chapters,
     summary: {
       title: campaignName,
-      protagonistName: protagonist.name,
-      protagonistClass: protagonist.class,
-      protagonistLevel: protagonist.level,
+      protagonistName: "Desconocido",
       chaptersCount: chapters.length,
       messagesCount,
       npcsCount: npcs.length,
@@ -450,8 +428,6 @@ function formatParsedDataToCampaign(
     summary: {
       title: name,
       protagonistName: playerCharacter.name,
-      protagonistClass: playerCharacter.class,
-      protagonistLevel: playerCharacter.level,
       chaptersCount: chats.length,
       messagesCount: totalMessages,
       npcsCount: npcs.length,

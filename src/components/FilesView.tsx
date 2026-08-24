@@ -35,8 +35,6 @@ export const FilesView: React.FC<{
   /** Deja de una hoja de oráculo solo las tablas y las reglas. */
   onDistillOracle?: (file: ProjectFile) => Promise<void>;
   onAutoClassifyAll?: () => Promise<void>;
-  onExtractPlayerCharacter?: (file: ProjectFile) => Promise<void>;
-  onExtractCompanion?: (file: ProjectFile) => Promise<void>;
   onExtractNpc?: (file: ProjectFile) => Promise<void>;
   onCreateNpcFromImage?: (file: ProjectFile) => Promise<void>;
   onUsePortraitAsPc?: (file: ProjectFile) => Promise<void>;
@@ -55,8 +53,6 @@ export const FilesView: React.FC<{
   onToggleOnDemand,
   onDistillOracle,
   onAutoClassifyAll,
-  onExtractPlayerCharacter,
-  onExtractCompanion,
   onExtractNpc,
   onCreateNpcFromImage,
   onUsePortraitAsPc,
@@ -702,44 +698,6 @@ export const FilesView: React.FC<{
                         {/* Igual que en las imágenes: la acción sigue a la categoría.
                             Una muestra de estilo o un documento de lore no ofrecen
                             extraer la ficha del protagonista. */}
-                        {onExtractPlayerCharacter && (currentCat === 'sheet_pj' || currentCat === 'document') && (
-                          <button
-                            onClick={() => onExtractPlayerCharacter(f)}
-                            disabled={extractingFileIds.includes(f.id)}
-                            className="px-2 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer disabled:opacity-60 font-bold flex items-center gap-1.5"
-                            title="Leer esta ficha y registrar al protagonista de la campaña en segundo plano"
-                          >
-                            {extractingFileIds.includes(f.id) ? (
-                              <>
-                                <span className="inline-block w-3 h-3 border-2 border-amber-800 border-t-transparent rounded-full animate-spin" />
-                                <span>Leyendo ficha...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Star className="w-3.5 h-3.5" /> {currentCat === 'sheet_pj' ? 'Extraer Ficha Protagonista' : 'Ficha Protagonista (OC)'}
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {onExtractCompanion && (currentCat === 'sheet_companion' || currentCat === 'document') && (
-                          <button
-                            onClick={() => onExtractCompanion(f)}
-                            disabled={extractingFileIds.includes(f.id)}
-                            className="px-2 py-1 bg-purple-50 text-purple-900 border border-purple-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-purple-600 hover:text-white transition-colors cursor-pointer disabled:opacity-60 font-bold flex items-center gap-1.5"
-                            title="Extraer ficha como Familiar, Montura o Compañero Animal en segundo plano"
-                          >
-                            {extractingFileIds.includes(f.id) ? (
-                              <>
-                                <span className="inline-block w-3 h-3 border-2 border-purple-800 border-t-transparent rounded-full animate-spin" />
-                                <span>Extrayendo compañero...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="w-3.5 h-3.5" /> {currentCat === 'sheet_companion' ? 'Extraer Familiar / Compañero' : 'Ficha Familiar'}
-                              </>
-                            )}
-                          </button>
-                        )}
                         {onExtractNpc && (currentCat === 'sheet_npc' || currentCat === 'document') && (
                           <button
                             onClick={() => onExtractNpc(f)}
@@ -870,16 +828,6 @@ export const FilesView: React.FC<{
                             title="Usar esta imagen como retrato del protagonista"
                           >
                             <Star className="w-3.5 h-3.5" /> Retrato del PJ
-                          </button>
-                        )}
-                        {onExtractPlayerCharacter && currentCat === 'sheet_pj' && (
-                          <button
-                            onClick={() => onExtractPlayerCharacter(f)}
-                            disabled={isGenerating}
-                            className="px-2 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer disabled:opacity-50 font-bold flex items-center gap-1"
-                            title="Leer esta ficha y registrar al protagonista"
-                          >
-                            <Star className="w-3.5 h-3.5" /> Extraer ficha
                           </button>
                         )}
                       </>

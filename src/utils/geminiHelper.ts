@@ -5,20 +5,14 @@ import {
   ProjectFile,
   Memory,
   FileCategory,
-  PlayerCharacter,
   NPC,
   CalendarConfig,
-  PlayerAttributes,
-  InventoryItem,
-  PlayerCurrencies,
   CampaignDate,
   TimelineEntry,
   ScheduledThread
 } from '../types';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import { registrarUso } from './usageStats';
-import { parseInventoryTags, InventoryChangeReport } from './inventoryParser';
-import { parseDndSheetText, refineAndDeduplicateInventory, validateCharacterEquipment } from './characterSheetParser';
 import {
   aDiaAbsoluto,
   desdeDiaAbsoluto,
@@ -928,7 +922,6 @@ export async function generateStoryTurnStream({
   signal,
   onStateReported,
   onTimeReported,
-  onInventoryReported,
   setLoadingText,
   onSaveMessage
 }: {
@@ -945,7 +938,6 @@ export async function generateStoryTurnStream({
   /** El Narrador informa de cuánto tiempo ha pasado y de qué queda en marcha. */
   onTimeReported?: (t: TiempoReportado) => void;
   /** El Narrador informa de cambios en el inventario o monedas del protagonista. */
-  onInventoryReported?: (invReport: InventoryChangeReport) => void;
   setLoadingText: (text: string) => void;
   onSaveMessage?: (updatedChat: Chat) => Promise<void> | void;
 }) {
@@ -1043,7 +1035,6 @@ export async function generateStoryTurnStream({
             const now = Date.now();
             if (now - lastSaveTime > 1500 && fullText.length > 0) {
               lastSaveTime = now;
-              await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, undefined, onInventoryReported);
             }
           }
 
@@ -1065,14 +1056,12 @@ export async function generateStoryTurnStream({
 
           // Guardado final completo
           if (fullText.trim().length > 0) {
-            await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, onTimeReported, onInventoryReported, true);
           }
           success = true;
           break; // Salir del bucle si fue exitoso
         } catch (e: any) {
           if (signal?.aborted || e?.name === 'AbortError') {
             if (fullText.trim().length > 0) {
-              await saveStreamedMessage(currentChat, fullText, onSaveMessage, onStateReported, onTimeReported, onInventoryReported, true);
             }
             success = true;
             return;
@@ -1113,7 +1102,6 @@ export async function generateStoryTurnStream({
               onSaveMessage,
               onStateReported,
               onTimeReported,
-              onInventoryReported,
               true
             );
             success = true;
@@ -1187,7 +1175,6 @@ async function saveStreamedMessage(
   onSaveMessage?: (updatedChat: Chat) => Promise<void> | void,
   onStateReported?: (state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] }) => void,
   onTimeReported?: (t: TiempoReportado) => void,
-  onInventoryReported?: (invReport: InventoryChangeReport) => void,
   /**
    * Los guardados intermedios del flujo van con `false`. El estado es idempotente
    * y puede reaplicarse, pero el tiempo se acumula: si se reportara en cada
@@ -1237,12 +1224,6 @@ async function saveStreamedMessage(
     }
   }
 
-  // Parsear y limpiar etiquetas de inventario y monedas
-  const { cleaned: cleanedInv, report: invReport } = parseInventoryTags(cleanedText);
-  cleanedText = cleanedInv;
-  if (definitivo && invReport && onInventoryReported) {
-    onInventoryReported(invReport);
-  }
 
   const { cleaned, state } = parseStateTag(cleanedText);
   cleanedText = cleaned;
@@ -2388,98 +2369,6 @@ export function looksLikeNpcSheet(file: ProjectFile): boolean {
 /**
  * Extrae de forma estructurada un familiar o compañero desde un documento.
  */
-export async function extractCompanionFromDocument(file: ProjectFile): Promise<PlayerCharacter> {
-  if (!file.isImage && !(file.content || '').trim()) {
-    throw new Error(`"${file.name}" no contiene texto legible.`);
-  }
-
-  const instructions = `Analiza este documento y extrae la ficha del Familiar, Compañero Animal, Montura o Invocación de forma exhaustiva y fiel.
-Determina:
-- "name": Nombre del familiar o criatura (ej: "Cuervo Familiar", "Corvus", "Kaelen el Sabueso")
-- "companionType": "Familiar" | "Montura" | "Compañero Animal" | "Invocación" | "Aliado"
-- "race": Especie o tipo de criatura (ej: "Espíritu Familiar (Cuervo)", "Pseudodragón", "Caballo de Guerra")
-- "hp": Puntos de golpe numéricos
-- "maxHp": Puntos de golpe máximos
-- "ac": Clase de armadura numérico
-- "speed": Velocidad (ej: "10 pies, volar 50 pies")
-- "hitDice": Dados de golpe si los tiene
-- "attributes": { "str": number, "dex": number, "con": number, "int": number, "wis": number, "cha": number }
-- "traits": Lista de rasgos especiales (ej: "Vuelo sigiloso", "Conexión telepática", "Mimetismo", "Sentidos agudos")
-- "actions": Lista de ataques o acciones en rasgos/notas
-- "notes": Descripción, apariencia o vínculo con el amo
-
-Responde ÚNICAMENTE con un objeto JSON válido con la estructura de PlayerCharacter:
-{
-  "name": "...",
-  "characterType": "companion",
-  "companionType": "Familiar",
-  "race": "...",
-  "hp": 2,
-  "maxHp": 2,
-  "ac": 12,
-  "speed": "10 pies, volar 50 pies",
-  "attributes": { "str": 2, "dex": 14, "con": 8, "int": 2, "wis": 12, "cha": 6 },
-  "traits": [
-    { "name": "Vuelo Sigiloso", "description": "No provoca ataques de oportunidad al volar..." }
-  ],
-  "notes": "..."
-}`;
-
-  let contents: any;
-  if (file.isImage && file.content) {
-    const base64 = file.content.includes(',') ? file.content.split(',')[1] : file.content;
-    contents = [
-      {
-        role: 'user',
-        parts: [
-          { inlineData: { mimeType: file.mime || 'image/jpeg', data: base64 } },
-          { text: `${instructions}\n\nLee la imagen adjunta y extrae la ficha del familiar/compañero.` }
-        ]
-      }
-    ];
-  } else {
-    contents = `${instructions}\n\nDocumento:\n${(file.content || '').slice(0, 40000)}`;
-  }
-
-  const response = await generateContentWithFailover({
-    primaryModel: getBackgroundTaskModel(),
-    contents,
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.1
-    }
-  });
-
-  const cleanJson = (response.text || '{}').replace(/```json/gi, '').replace(/```/g, '').trim();
-  let parsed: any = {};
-  try {
-    parsed = JSON.parse(cleanJson);
-  } catch (e) {
-    console.error('Error parsing companion JSON:', e);
-  }
-
-  return {
-    id: 'comp_' + Date.now() + '_' + Math.random().toString(36).substring(7),
-    characterType: 'companion',
-    companionType: parsed.companionType || 'Familiar',
-    name: parsed.name || file.name.replace(/\.[^/.]+$/, ''),
-    race: parsed.race || 'Criatura',
-    hp: typeof parsed.hp === 'number' ? parsed.hp : 2,
-    maxHp: typeof parsed.maxHp === 'number' ? parsed.maxHp : (parsed.hp || 2),
-    ac: typeof parsed.ac === 'number' ? parsed.ac : 10,
-    speed: parsed.speed || '30 pies',
-    attributes: parsed.attributes || { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-    traits: parsed.traits || [],
-    spells: parsed.spells || [],
-    inventory: parsed.inventory || [],
-    notes: parsed.notes || '',
-    sheetText: !file.isImage ? file.content : undefined
-  };
-}
-
-/**
- * Extrae de forma estructurada un PNJ o monstruo desde un documento.
- */
 export async function extractNpcFromDocument(file: ProjectFile): Promise<NPC> {
   if (!file.isImage && !(file.content || '').trim()) {
     throw new Error(`"${file.name}" no contiene texto legible.`);
@@ -2570,327 +2459,6 @@ Responde ÚNICAMENTE con un JSON:
       traits: parsed.sheet.traits || []
     } : undefined
   };
-}
-
-export async function extractPlayerCharacterFromDocument(file: ProjectFile): Promise<PlayerCharacter> {
-  // Un PDF escaneado o hecho de imágenes no deja texto al extraerlo, y entonces no
-  // hay nada que analizar. Conviene decirlo con claridad en vez de fallar luego.
-  if (!file.isImage && !(file.content || '').trim()) {
-    throw new Error(
-      `"${file.name}" no contiene texto legible. Si es un PDF escaneado o hecho de imágenes, hazle una captura de pantalla y súbela como imagen: así puedo leerla mirándola.`
-    );
-  }
-
-  const rawContent = file.content || '';
-
-  // Parser determinista para extraer bloques estándar de D&D y rol (por si el modelo omite campos)
-  const regexExtractions: Partial<PlayerCharacter> = {};
-
-  if (!file.isImage && rawContent) {
-    // 1. PG / HP y Dados de Golpe
-    const pgMatch = rawContent.match(/(?:\*\*PG\*\*|\bPG\b|\bHP\b|\bPuntos de Golpe\b)\s*[:·]*\s*(\d+)(?:\s*\(([^)]+)\))?/i);
-    if (pgMatch) {
-      regexExtractions.hp = parseInt(pgMatch[1], 10);
-      regexExtractions.maxHp = parseInt(pgMatch[1], 10);
-      if (pgMatch[2]) regexExtractions.hitDice = pgMatch[2].trim();
-    }
-
-    // 2. CA / AC
-    const caMatch = rawContent.match(/(?:\*\*CA\*\*|\bCA\b|\bAC\b|\bClase de Armadura\b)\s*[:·]*\s*(\d+)/i);
-    if (caMatch) {
-      regexExtractions.ac = parseInt(caMatch[1], 10);
-    }
-
-    // 3. Velocidad
-    const velMatch = rawContent.match(/(?:\*\*Vel\.\*\*|\bVel\.\b|\bVelocidad\b|\bSpeed\b)\s*[:·]*\s*([^·\n,]+)/i);
-    if (velMatch) {
-      regexExtractions.speed = velMatch[1].trim();
-    }
-
-    // 4. Iniciativa
-    const inicMatch = rawContent.match(/(?:\*\*Inic\.\*\*|\bInic\.\b|\bIniciativa\b|\bInitiative\b)\s*[:·]*\s*([+\-]?\d+)/i);
-    if (inicMatch) {
-      regexExtractions.initiative = inicMatch[1].trim();
-    }
-
-    // 5. Bono de competencia
-    const compMatch = rawContent.match(/(?:\*\*Comp\.\*\*|\bComp\.\b|\bCompetencia\b|\bBono de Comp\b|\bProficiency\b)\s*[:·]*\s*([+\-]?\d+)/i);
-    if (compMatch) {
-      regexExtractions.proficiencyBonus = parseInt(compMatch[1].replace('+', ''), 10);
-    }
-
-    // 6. Tabla de Atributos D&D (ej: | SAB | INT | CAR | CON | DES | FUE | o | FUE | DES | CON | INT | SAB | CAR |)
-    const lines = rawContent.split('\n');
-    for (let i = 0; i < lines.length - 2; i++) {
-      const headerLine = lines[i];
-      const sepLine = lines[i + 1];
-      const valLine = lines[i + 2];
-      if (headerLine.includes('|') && sepLine.includes('|') && sepLine.includes('-') && valLine.includes('|')) {
-        const headers = headerLine.split('|').map(s => s.trim().toUpperCase()).filter(Boolean);
-        const vals = valLine.split('|').map(s => s.trim()).filter(Boolean);
-        if (headers.length >= 6 && vals.length >= 6) {
-          const isAttrTable = headers.some(h => ['FUE', 'STR', 'DES', 'DEX', 'CON', 'INT', 'SAB', 'WIS', 'CAR', 'CHA'].includes(h));
-          if (isAttrTable) {
-            const attrObj: PlayerAttributes = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
-            headers.forEach((h, idx) => {
-              const vStr = vals[idx] || '10';
-              const numMatch = vStr.match(/\d+/);
-              const num = numMatch ? parseInt(numMatch[0], 10) : 10;
-              if (h === 'FUE' || h === 'STR') attrObj.str = num;
-              else if (h === 'DES' || h === 'DEX') attrObj.dex = num;
-              else if (h === 'CON') attrObj.con = num;
-              else if (h === 'INT') attrObj.int = num;
-              else if (h === 'SAB' || h === 'WIS') attrObj.wis = num;
-              else if (h === 'CAR' || h === 'CHA') attrObj.cha = num;
-            });
-            regexExtractions.attributes = attrObj;
-            break;
-          }
-        }
-      }
-    }
-
-    // 7. Salvaciones con competencia
-    const salvMatch = rawContent.match(/(?:Salvaciones(?:\s+con\s+competencia)?|Tiradas\s+de\s+salvaci[oó]n)\s*[:*]*\s*([^\n]+)/i);
-    if (salvMatch) {
-      const rawS = salvMatch[1];
-      const found: string[] = [];
-      ['SAB', 'INT', 'CAR', 'CON', 'DES', 'FUE', 'WIS', 'CHA', 'STR', 'DEX'].forEach(stat => {
-        if (new RegExp(`\\b${stat}\\b`, 'i').test(rawS)) {
-          let normalized = stat.toUpperCase();
-          if (normalized === 'WIS') normalized = 'SAB';
-          if (normalized === 'CHA') normalized = 'CAR';
-          if (normalized === 'STR') normalized = 'FUE';
-          if (normalized === 'DEX') normalized = 'DES';
-          if (!found.includes(normalized)) found.push(normalized);
-        }
-      });
-      if (found.length) regexExtractions.savingThrowProficiencies = found;
-    }
-  }
-
-  const instructions = `Analiza esta ficha, trasfondo o documento de personaje de rol (D&D 5e u otro sistema) y extrae de forma EXHAUSTIVA, ESTRUCTURADA y RIGUROSAMENTE FIEL todos los datos del protagonista / Personaje Jugador (OC).
-
-REGLAS CRÍTICAS DE EXTRACCIÓN Y COHERENCIA:
-1. NO INVENTAR OBJETOS NI ESCUDOS: NO agregues equipo inicial por defecto ni escudos de madera genéricos. Si el documento no lista explícitamente un escudo en las posesiones del personaje, NO incluyas ningún escudo en el inventario.
-2. DEDUPLICACIÓN DE EQUIPO: Si el trasfondo menciona un objeto genérico (ej: "bastón de viajero", "bastón común", "ropa de viaje") y el personaje tiene un arma/objeto personalizado con nombre propio (ej: "Bastón de Cedro Lunar"), son el MISMO objeto. NO dupliques objetos. Mantén el nombre personalizado y no agregues versiones genéricas duplicadas.
-3. ORÁCULOS Y RELIQUIAS vs ESCUDOS DE COMBATE: Objetos rituales o adivinatorios como "Escudo de Fionn", "Ramas de Ogham", "Tablillas oraculares", amuletos o focos druídicos NO son armaduras de combate (+2 CA). Categorízalos como "magic" o "equipment", nunca como "armor", déjalos sin equipar como armadura defensiva y NO alteres la CA base del personaje.
-4. REGLAS DE EMPUÑAR / DOS MANOS vs ESCUDO: Si el personaje empuña un arma a dos manos o un bastón a dos manos (o si no tiene escudo de combate), ningún escudo debe estar equipado ni activo.
-5. EXACTITUD NUMÉRICA: Los valores numéricos (PG, CA, Velocidad, Bono de Competencia, Atributos FUE/DES/CON/INT/SAB/CAR, Tiradas de Salvación y CD de conjuros) deben coincidir exactamente con los que figuren en el documento. Si no se especifican monedas, pon 0 en todas.
-
-Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura:
-{
-  "name": "Nombre del personaje",
-  "race": "Raza / Linaje",
-  "class": "Clase principal",
-  "subclass": "Subclase si la tiene",
-  "level": "Nivel numérico (ej: 1, 3)",
-  "background": "Trasfondo",
-  "alignment": "Alineamiento",
-  "hp": 10,
-  "maxHp": 10,
-  "hitDice": "Dados de golpe (ej: 1d8)",
-  "ac": 10,
-  "speed": "30 pies",
-  "initiative": "+0",
-  "proficiencyBonus": 2,
-  "attributes": {
-    "str": 10,
-    "dex": 10,
-    "con": 10,
-    "int": 10,
-    "wis": 10,
-    "cha": 10
-  },
-  "savingThrowProficiencies": ["SAB", "CAR"],
-  "skillProficiencies": ["Percepción", "Naturaleza", "Medicina"],
-  "languages": ["Común", "Drúidico", "Silvano"],
-  "proficienciesAndLanguages": "Armaduras ligeras, bastones, herramientas de herboristería...",
-  "conditions": [],
-  "traits": [
-    {
-      "name": "Nombre del Rasgo o Dote",
-      "type": "class",
-      "source": "Druida Nvl 1",
-      "description": "Descripción completa de lo que hace...",
-      "uses": { "max": 2, "current": 2, "recovery": "short_rest" }
-    }
-  ],
-  "spells": [
-    {
-      "name": "Nombre del Conjuro o Truco",
-      "level": 0,
-      "school": "Transmutación",
-      "castingTime": "1 acción",
-      "range": "Toque",
-      "duration": "1 minuto",
-      "description": "Efecto detallado...",
-      "isRitual": false,
-      "damageOrEffect": "1d8 mágico"
-    }
-  ],
-  "inventory": [
-    {
-      "name": "Nombre del objeto / arma",
-      "category": "weapon",
-      "quantity": 1,
-      "damageOrAc": "1d8 contundente (versátil 1d8 a dos manos)",
-      "equipped": true,
-      "description": "Descripción detallada",
-      "rarity": "common"
-    }
-  ],
-  "currencies": {
-    "cp": 0,
-    "sp": 0,
-    "ep": 0,
-    "gp": 0,
-    "pp": 0
-  },
-  "spellcasting": {
-    "ability": "Sabiduría",
-    "saveDc": 13,
-    "attackBonus": 5
-  },
-  "appearance": "Descripción física, vestimenta, ojos, cabello...",
-  "personality": "Rasgos de personalidad y actitud",
-  "ideals": "Ideales y principios éticos",
-  "bonds": "Vínculos con personas, lugares o naturaleza",
-  "flaws": "Defectos o vulnerabilidades emocionales",
-  "backstory": "Historia de origen y motivación",
-  "notes": "Secretos o notas adicionales",
-  "sheetText": "Texto íntegro formateado"
-}`;
-
-  let contents: any;
-  if (file.isImage && file.content) {
-    const base64 = file.content.includes(',') ? file.content.split(',')[1] : file.content;
-    contents = [
-      {
-        role: 'user',
-        parts: [
-          { inlineData: { mimeType: file.mime || 'image/jpeg', data: base64 } },
-          {
-            text: `${instructions}\n\nLa ficha está en la imagen adjunta ("${file.name}"). Lee todo el texto y extrae absolutamente todos los atributos, estadísticas y objetos reales sin inventar equipo adicional.`
-          }
-        ]
-      }
-    ];
-  } else {
-    contents = `${instructions}\n\nDocumento "${file.name}":\n${(file.content || '').substring(0, 90000)}`;
-  }
-
-  let parsedJson: any = {};
-  try {
-    const response = await generateContentWithFailover({
-      primaryModel: getBackgroundTaskModel(),
-      contents,
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.1
-      }
-    });
-
-    const rawText = response.text || '{}';
-    let cleanText = rawText.trim();
-    if (cleanText.startsWith('```')) {
-      cleanText = cleanText
-        .replace(/^```(?:json)?\n?/, '')
-        .replace(/\n?```$/, '')
-        .trim();
-    }
-    const firstBrace = cleanText.indexOf('{');
-    const lastBrace = cleanText.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
-      cleanText = cleanText.substring(firstBrace, lastBrace + 1);
-    }
-    parsedJson = JSON.parse(cleanText);
-  } catch (e) {
-    console.warn('LLM Character extraction warning/fallback:', e);
-  }
-
-  // Extracción determinista complementaria desde el texto
-  const deterministicParsed = !file.isImage && rawContent ? parseDndSheetText(rawContent) : {};
-
-  // Fusión inteligente de LLM, regex determinista y parseo directo sin inventar datos
-  const finalAttributes: PlayerAttributes = {
-    str: parsedJson.attributes?.str ?? deterministicParsed.attributes?.str ?? regexExtractions.attributes?.str ?? 10,
-    dex: parsedJson.attributes?.dex ?? deterministicParsed.attributes?.dex ?? regexExtractions.attributes?.dex ?? 10,
-    con: parsedJson.attributes?.con ?? deterministicParsed.attributes?.con ?? regexExtractions.attributes?.con ?? 10,
-    int: parsedJson.attributes?.int ?? deterministicParsed.attributes?.int ?? regexExtractions.attributes?.int ?? 10,
-    wis: parsedJson.attributes?.wis ?? deterministicParsed.attributes?.wis ?? regexExtractions.attributes?.wis ?? 10,
-    cha: parsedJson.attributes?.cha ?? deterministicParsed.attributes?.cha ?? regexExtractions.attributes?.cha ?? 10
-  };
-
-  const rawInventory: InventoryItem[] = Array.isArray(parsedJson.inventory) && parsedJson.inventory.length > 0
-    ? parsedJson.inventory.map((item: any, idx: number) => ({
-        id: item.id || `inv_${Date.now()}_${idx}_${Math.random().toString(36).substring(7)}`,
-        name: String(item.name || 'Objeto').trim(),
-        category: ['weapon', 'armor', 'potion', 'scroll', 'magic', 'equipment', 'treasure', 'other'].includes(item.category) ? item.category : 'equipment',
-        quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
-        weight: typeof item.weight === 'number' ? item.weight : undefined,
-        equipped: Boolean(item.equipped),
-        attuned: Boolean(item.attuned),
-        description: item.description ? String(item.description).trim() : undefined,
-        damageOrAc: item.damageOrAc ? String(item.damageOrAc).trim() : undefined,
-        rarity: item.rarity || 'common',
-        cost: item.cost ? String(item.cost).trim() : undefined,
-        durationNote: item.durationNote ? String(item.durationNote).trim() : undefined
-      }))
-    : (deterministicParsed.inventory && deterministicParsed.inventory.length > 0 ? deterministicParsed.inventory : []);
-
-  // Deduplicación y refinamiento con reglas oficiales (dos manos, oráculos, descarte de genéricos duplicados)
-  const refinedInventory = refineAndDeduplicateInventory(rawInventory, rawContent);
-
-  const finalCurrencies: PlayerCurrencies = {
-    cp: Math.max(0, parseInt(parsedJson.currencies?.cp, 10) || deterministicParsed.currencies?.cp || 0),
-    sp: Math.max(0, parseInt(parsedJson.currencies?.sp, 10) || deterministicParsed.currencies?.sp || 0),
-    ep: Math.max(0, parseInt(parsedJson.currencies?.ep, 10) || deterministicParsed.currencies?.ep || 0),
-    gp: Math.max(0, parseInt(parsedJson.currencies?.gp, 10) || deterministicParsed.currencies?.gp || 0),
-    pp: Math.max(0, parseInt(parsedJson.currencies?.pp, 10) || deterministicParsed.currencies?.pp || 0)
-  };
-
-  const hpVal = typeof parsedJson.hp === 'number' ? parsedJson.hp : deterministicParsed.hp ?? regexExtractions.hp ?? 10;
-  const maxHpVal = typeof parsedJson.maxHp === 'number' ? parsedJson.maxHp : deterministicParsed.maxHp ?? regexExtractions.maxHp ?? hpVal;
-
-  const rawPc: PlayerCharacter = {
-    name: parsedJson.name || deterministicParsed.name || file.name.replace(/\.[^/.]+$/, ''),
-    race: parsedJson.race || deterministicParsed.race || '',
-    class: parsedJson.class || deterministicParsed.class || '',
-    subclass: parsedJson.subclass || deterministicParsed.subclass || '',
-    level: parsedJson.level ? String(parsedJson.level) : deterministicParsed.level ? String(deterministicParsed.level) : '1',
-    background: parsedJson.background || deterministicParsed.background || '',
-    alignment: parsedJson.alignment || deterministicParsed.alignment || '',
-    hp: hpVal,
-    maxHp: maxHpVal,
-    hitDice: parsedJson.hitDice || deterministicParsed.hitDice || regexExtractions.hitDice || '1d8',
-    ac: typeof parsedJson.ac === 'number' ? parsedJson.ac : deterministicParsed.ac ?? regexExtractions.ac ?? 10,
-    speed: parsedJson.speed || deterministicParsed.speed || regexExtractions.speed || '30 pies',
-    initiative: parsedJson.initiative || deterministicParsed.initiative || regexExtractions.initiative || '+0',
-    proficiencyBonus: typeof parsedJson.proficiencyBonus === 'number' ? parsedJson.proficiencyBonus : deterministicParsed.proficiencyBonus ?? regexExtractions.proficiencyBonus ?? 2,
-    attributes: finalAttributes,
-    savingThrowProficiencies: parsedJson.savingThrowProficiencies || deterministicParsed.savingThrowProficiencies || regexExtractions.savingThrowProficiencies || [],
-    skillProficiencies: parsedJson.skillProficiencies || deterministicParsed.skillProficiencies || [],
-    conditions: parsedJson.conditions || [],
-    inventory: refinedInventory,
-    currencies: finalCurrencies,
-    spellcasting: parsedJson.spellcasting || deterministicParsed.spellcasting,
-    traits: Array.isArray(parsedJson.traits) && parsedJson.traits.length > 0 ? parsedJson.traits : undefined,
-    spells: Array.isArray(parsedJson.spells) && parsedJson.spells.length > 0 ? parsedJson.spells : undefined,
-    languages: Array.isArray(parsedJson.languages) && parsedJson.languages.length > 0 ? parsedJson.languages : undefined,
-    proficienciesAndLanguages: parsedJson.proficienciesAndLanguages || deterministicParsed.proficienciesAndLanguages || '',
-    featuresAndTraits: parsedJson.featuresAndTraits || deterministicParsed.featuresAndTraits || '',
-    appearance: parsedJson.appearance || '',
-    personality: parsedJson.personality || '',
-    ideals: parsedJson.ideals || '',
-    bonds: parsedJson.bonds || '',
-    flaws: parsedJson.flaws || '',
-    backstory: parsedJson.backstory || '',
-    notes: parsedJson.notes || '',
-    sheetText: rawContent || parsedJson.sheetText || deterministicParsed.sheetText || ''
-  };
-
-  return validateCharacterEquipment(rawPc);
 }
 
 export async function analyzeUploadedImage(file: ProjectFile, base64: string): Promise<string> {

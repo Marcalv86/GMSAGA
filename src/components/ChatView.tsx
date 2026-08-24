@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, Chat, PlayerCharacter } from '../types';
+import { Chat, PlayerCharacter } from '../types';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
-import { CombatHud } from './CombatHud';
 import { CreativeStudioModal } from './CreativeStudioModal';
 import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
@@ -481,7 +480,6 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
 });
 
 export const ChatView: React.FC<{
-  project: Project;
   chat?: Chat;
   chapterIndex: number;
   inputText: string;
@@ -512,7 +510,6 @@ export const ChatView: React.FC<{
   onOpenNovelReader?: () => void;
   isBackgroundSyncing?: boolean;
 }> = ({
-  project,
   chat,
   chapterIndex,
   inputText,
@@ -881,7 +878,6 @@ export const ChatView: React.FC<{
           personaje se mantiene como franja plegable sobre la narración. */}
       {onUpdatePlayerCharacter && (
         <div className="md:hidden">
-          <CombatHud project={project} onOpenNovelReader={onOpenNovelReader} />
         </div>
       )}
 

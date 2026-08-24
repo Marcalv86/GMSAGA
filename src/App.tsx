@@ -31,7 +31,6 @@ import {
 } from './types';
 import { ChatView } from './components/ChatView';
 import { ContextUsageWidget } from './components/ContextUsageWidget';
-import { CombatHud } from './components/CombatHud';
 import { Modals, PromptConfig, ConfirmConfig, AlertConfig, ApiKeyModal } from './components/Modals';
 
 import { MemoryManager } from './components/MemoryManager';
@@ -66,8 +65,6 @@ import {
   generateStoryTurnStream,
   TiempoReportado,
   analyzeUploadedImage,
-  extractPlayerCharacterFromDocument,
-  extractCompanionFromDocument,
   extractNpcFromDocument,
   describeApiError,
   destilarTablaOraculo,
@@ -87,7 +84,6 @@ import {
   setStoredKeyRotationMode,
   setStoredMemorySyncGranularity
 } from './utils/geminiHelper';
-import { applyInventoryReport, expireTemporaryItems } from './utils/inventoryParser';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie, formatRollResult } from './utils/rollRequests';
 import { Probabilidad, formatoConsulta, formatoSignificado, nuevaConsulta } from './utils/oracle';
@@ -550,16 +546,6 @@ export default function App() {
       // la cuenta de los días o no. Se actualizan aunque el reloj esté apagado.
       if (!calendarioValido(cal) || !fecha) {
         let mem = conVinculos(p, 0);
-        if (t.minutos > 0 && mem?.player_character?.inventory?.length) {
-          const { updatedInventory } = expireTemporaryItems(mem.player_character.inventory, t.minutos);
-          mem = {
-            ...mem,
-            player_character: {
-              ...mem.player_character,
-              inventory: updatedInventory
-            }
-          };
-        }
         return { memory: mem };
       }
 
@@ -625,16 +611,6 @@ export default function App() {
       ].slice(-500);
 
       let mem = conVinculos(p, hoyAbs);
-      if (t.minutos > 0 && mem?.player_character?.inventory?.length) {
-        const { updatedInventory } = expireTemporaryItems(mem.player_character.inventory, t.minutos);
-        mem = {
-          ...mem,
-          player_character: {
-            ...mem.player_character,
-            inventory: updatedInventory
-          }
-        };
-      }
 
       return { currentDate: nuevaFecha, threads, timeline, memory: mem };
     });
@@ -927,13 +903,6 @@ export default function App() {
               ...(state.ac !== undefined ? { ac: state.ac } : {}),
               ...(state.conditions !== undefined ? { conditions: state.conditions } : {})
             }
-          }));
-        },
-        // El inventario y dinero los administra exclusivamente el Narrador a través del roleplay.
-        onInventoryReported: invReport => {
-          void handleUpdateMemory(mem => ({
-            ...mem,
-            player_character: applyInventoryReport(mem?.player_character || { name: 'Protagonista' }, invReport)
           }));
         },
         onTimeReported: t => {
@@ -1528,7 +1497,6 @@ export default function App() {
       if (memoryModified) {
         await handleUpdateMemory(mem => ({
           ...mem,
-          player_character: updatedPc,
           npcs: updatedNpcs,
           locations: updatedLocs
         }));
@@ -1549,22 +1517,6 @@ export default function App() {
     } finally {
       setTopProgress({ active: false });
     }
-  };
-
-  const handleUsePortraitAsPc = async (file: ProjectFile) => {
-    if (!currentProject || !currentPId) return;
-    await handleUpdateMemory(mem => ({
-      ...mem,
-      player_character: {
-        ...(mem.player_character || { name: 'Protagonista' }),
-        portrait: file.content
-      }
-    }));
-    setAlertConfig({
-      isOpen: true,
-      title: 'Retrato asignado',
-      message: `"${file.name}" es ahora el retrato del protagonista.`
-    });
   };
 
   const handleCreateNpcFromImage = async (file: ProjectFile) => {
@@ -1643,135 +1595,6 @@ export default function App() {
     } catch (err) {
       console.error('Error uploading entity image:', err);
       return '';
-    }
-  };
-
-  const handleExtractPlayerCharacter = async (file: ProjectFile) => {
-    if (!currentProject || !currentPId) return;
-    if (extractingFileIds.includes(file.id)) return;
-
-    setExtractingFileIds(prev => [...prev, file.id]);
-    setTopProgress({
-      active: true,
-      label: `Extrayendo ficha de protagonista (${file.name}) en 2º plano...`,
-      type: 'sync'
-    });
-    try {
-      const pc = await extractPlayerCharacterFromDocument(file);
-
-      // Search for any matching image in files as portrait
-      const refreshedFiles = await loadFilesFromDB(currentPId);
-      const matchingPortrait = refreshedFiles.find(f => {
-        if (!f.isImage || !f.content) return false;
-        const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
-        const cleanPcName = pc.name.toLowerCase().trim();
-        return (
-          f.category === 'portrait_pj' ||
-          (cleanPcName.length > 2 && (cleanName.includes(cleanPcName) || cleanPcName.includes(cleanName)))
-        );
-      });
-
-      if (matchingPortrait && !pc.portrait) {
-        pc.portrait = matchingPortrait.content;
-      }
-
-      // Update file category to sheet_pj
-      await handleUpdateFileCategory(file.id, 'sheet_pj');
-
-      // Update memory
-      await handleUpdateMemory(mem => ({
-        ...mem,
-        player_character: {
-          ...pc,
-          portrait: pc.portrait || mem.player_character?.portrait
-        }
-      }));
-
-      setTopProgress({
-        active: true,
-        percent: 100,
-        label: `Ficha de "${pc.name}" registrada con éxito`,
-        type: 'sync'
-      });
-      setTimeout(() => {
-        setTopProgress(p => (p.label?.includes(pc.name) ? { active: false } : p));
-      }, 4000);
-    } catch (error) {
-      console.error('Error extracting player character:', error);
-      setTopProgress({
-        active: true,
-        label: `Error al leer la ficha de "${file.name}"`,
-        type: 'sync'
-      });
-      setTimeout(() => {
-        setTopProgress(p => (p.label?.includes('Error al leer') ? { active: false } : p));
-      }, 4000);
-    } finally {
-      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
-    }
-  };
-
-  const handleExtractCompanion = async (file: ProjectFile) => {
-    if (!currentProject || !currentPId) return;
-    if (extractingFileIds.includes(file.id)) return;
-
-    setExtractingFileIds(prev => [...prev, file.id]);
-    setTopProgress({
-      active: true,
-      label: `Extrayendo ficha de compañero (${file.name}) en 2º plano...`,
-      type: 'sync'
-    });
-    try {
-      const companion = await extractCompanionFromDocument(file);
-
-      // Search for any matching image in files as portrait
-      const refreshedFiles = await loadFilesFromDB(currentPId);
-      const matchingPortrait = refreshedFiles.find(f => {
-        if (!f.isImage || !f.content) return false;
-        const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
-        const cleanCompName = companion.name.toLowerCase().trim();
-        return (
-          f.category === 'portrait_npc' ||
-          (cleanCompName.length > 2 && (cleanName.includes(cleanCompName) || cleanCompName.includes(cleanName)))
-        );
-      });
-
-      if (matchingPortrait && !companion.portrait) {
-        companion.portrait = matchingPortrait.content;
-      }
-
-      await handleUpdateFileCategory(file.id, 'sheet_companion');
-
-      await handleUpdateMemory(mem => {
-        const existing = mem.companions || [];
-        const filtered = existing.filter(c => c.name.toLowerCase() !== companion.name.toLowerCase());
-        return {
-          ...mem,
-          companions: [...filtered, companion]
-        };
-      });
-
-      setTopProgress({
-        active: true,
-        percent: 100,
-        label: `Compañero "${companion.name}" registrado con éxito`,
-        type: 'sync'
-      });
-      setTimeout(() => {
-        setTopProgress(p => (p.label?.includes(companion.name) ? { active: false } : p));
-      }, 4000);
-    } catch (error) {
-      console.error('Error extracting companion:', error);
-      setTopProgress({
-        active: true,
-        label: `Error al leer la ficha de compañero de "${file.name}"`,
-        type: 'sync'
-      });
-      setTimeout(() => {
-        setTopProgress(p => (p.label?.includes('Error al leer') ? { active: false } : p));
-      }, 4000);
-    } finally {
-      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
     }
   };
 
@@ -2072,8 +1895,7 @@ export default function App() {
           locations: mergedLocs,
           story: currentProject.memory.story
             ? `${currentProject.memory.story}\n\n[Continuación de material importado]:\n${importedProject.memory.story}`
-            : importedProject.memory.story,
-          player_character: currentProject.memory.player_character || importedProject.memory.player_character
+            : importedProject.memory.story
         }
       };
 
@@ -2479,7 +2301,6 @@ export default function App() {
             barra lateral, para no robarle altura a la narración. */}
         {currentProject && (
           <div className="hidden md:block">
-            <CombatHud project={currentProject} variant="sidebar" />
           </div>
         )}
 
@@ -2566,25 +2387,6 @@ export default function App() {
         <Suspense fallback={<ViewLoader />}>
           {activeTab === 'chat' && (
             <ChatView
-              project={
-                currentProject || {
-                  id: '',
-                  name: '',
-                  instructions: '',
-                  system: '',
-                  style: '',
-                  memory: {
-                    story: '',
-                    quests: [],
-                    npcs: [],
-                    locations: [],
-                    current_status: '',
-                    manual_notes: ''
-                  },
-                  chats: [],
-                  files: []
-                }
-              }
               chat={currentChat}
               chapterIndex={currentChapterIndex >= 0 ? currentChapterIndex : 0}
               inputText={inputText}
@@ -2611,8 +2413,8 @@ export default function App() {
           )}
 
           {activeTab === 'novel' && currentProject && (
-            <NovelReaderView
-              project={currentProject}
+            <NovelReaderView project={currentProject}
+              
               chats={currentChats}
               currentChatId={currentChatId}
               onSelectChat={id => setCurrentChatId(id)}
@@ -2621,8 +2423,8 @@ export default function App() {
           )}
 
           {activeTab === 'status' && currentProject && (
-            <StatusView
-              project={currentProject}
+            <StatusView project={currentProject}
+              
               files={currentFiles}
               chats={currentChats}
               onUpdate={handleUpdateProjectField}
@@ -2631,9 +2433,9 @@ export default function App() {
           )}
 
           {activeTab === 'memory' && currentProject && (
-            <MemoryManager
-              secciones={['character', 'npcs', 'locs', 'visual', 'quests']}
-              project={currentProject}
+            <MemoryManager project={currentProject}
+              secciones={['npcs', 'locs', 'visual', 'quests']}
+              
               files={currentFiles}
               onUpdateMemory={handleUpdateMemory}
               onAnalyzeImageFile={handleAnalyzeImageFile}
@@ -2656,8 +2458,8 @@ export default function App() {
           )}
 
           {activeTab === 'calendar' && currentProject && (
-            <CalendarView
-              project={currentProject}
+            <CalendarView project={currentProject}
+              
               files={currentFiles}
               chats={currentChats}
               onUpdate={handleUpdateProjectField}
@@ -2676,8 +2478,8 @@ export default function App() {
           )}
 
           {activeTab === 'files' && currentProject && (
-            <FilesView
-              project={currentProject}
+            <FilesView project={currentProject}
+              
               files={currentFiles}
               onUpload={handleFilesUpload}
               onDeleteFile={handleDeleteFile}
@@ -2689,19 +2491,16 @@ export default function App() {
               onToggleOnDemand={handleToggleOnDemand}
               onDistillOracle={handleDistillOracle}
               onAutoClassifyAll={handleAutoClassifyAll}
-              onExtractPlayerCharacter={handleExtractPlayerCharacter}
-              onExtractCompanion={handleExtractCompanion}
               onExtractNpc={handleExtractNpc}
               onCreateNpcFromImage={handleCreateNpcFromImage}
-              onUsePortraitAsPc={handleUsePortraitAsPc}
               isGenerating={isGenerating}
               extractingFileIds={extractingFileIds}
             />
           )}
 
           {activeTab === 'instructions' && currentProject && (
-            <InstructionsView
-              project={currentProject}
+            <InstructionsView project={currentProject}
+              
               onUpdate={handleUpdateProjectField}
               onRequestConfirm={(message, onConfirm) => {
                 setConfirmConfig({

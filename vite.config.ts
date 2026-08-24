@@ -12,15 +12,24 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 3000,
-      host: '0.0.0.0'
+      host: '0.0.0.0',
+      allowedHosts: true
     },
     preview: {
       port: 3000,
-      host: '0.0.0.0'
+      host: '0.0.0.0',
+      allowedHosts: true
     },
     build: {
       target: 'es2022',
-      chunkSizeWarningLimit: 1500
+      chunkSizeWarningLimit: 2500,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            pdf: ['pdfjs-dist', 'jspdf', 'html2canvas']
+          }
+        }
+      }
     }
   };
 });
