@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import {
   BookOpen,
+  Check,
   Compass,
   FolderSync,
   Menu,
   Moon,
   Paperclip,
   Plus,
+  Save,
   Scroll,
   ScrollText,
   Sliders,
   Smartphone,
+  Sparkles,
   Sun,
   Swords,
   Trash2,
@@ -175,6 +178,28 @@ export default function App() {
   // Protección del almacenamiento: sin esto el navegador puede borrar la campaña
   // por su cuenta cuando anda justo de espacio.
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const [isManuallySaved, setIsManuallySaved] = useState(false);
+
+  const handleManualSaveCampaign = async () => {
+    try {
+      if (projects.length > 0) {
+        saveLocalProjects(projects);
+      }
+      if (currentPId) {
+        saveLocalChats(currentPId, currentChats);
+        await saveFilesToDB(currentPId, currentFiles);
+      }
+      if (currentProject) {
+        await writeCampaignToDisk(currentProject, currentChats, currentFiles).catch(() => {});
+      }
+      setIsManuallySaved(true);
+      setTimeout(() => {
+        setIsManuallySaved(false);
+      }, 2500);
+    } catch (e) {
+      console.error('Error al guardar manualmente la campaña:', e);
+    }
+  };
 
 
   useEffect(() => {
@@ -2454,31 +2479,51 @@ export default function App() {
         } fixed md:relative inset-y-0 left-0 z-40 md:z-30 transition-all duration-300 ease-in-out bg-[var(--sidebar-bg)] border-r border-[var(--glass-border)] flex flex-col shrink-0 overflow-hidden shadow-2xl md:shadow-lg`}
       >
         {/* Sidebar Header */}
-        <div className="p-3.5 md:p-4 border-b border-[var(--glass-border)] flex justify-between items-center bg-[var(--glass)]">
+        <div className="p-3 border-b border-[var(--glass-border)] flex justify-between items-center bg-[var(--glass)]">
           <h1 className="font-cinzel text-lg md:text-xl text-[var(--accent)] font-bold tracking-wider m-0">
             GM STUDIO
           </h1>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <button
+              onClick={handleManualSaveCampaign}
+              className={`text-xs font-cinzel transition-all cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border ${
+                isManuallySaved
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs'
+                  : 'text-[var(--accent)] hover:underline border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]'
+              }`}
+              title="Guardar manualmente el progreso de la campaña activa"
+              aria-label="Guardar campaña"
+            >
+              {isManuallySaved ? (
+                <Check className="w-3.5 h-3.5 text-white shrink-0" />
+              ) : (
+                <Save className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              )}
+              <span className="hidden sm:inline">{isManuallySaved ? 'Guardado' : 'Guardar'}</span>
+            </button>
             <button
               onClick={() => setIsImportCampaignModalOpen(true)}
-              className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
+              className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
               title="Importar campaña desde PDF, Gemini, NotebookLM o JSON"
+              aria-label="Importar campaña"
             >
-              <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Importar</span>
+              <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="hidden sm:inline">Importar</span>
             </button>
             <button
               onClick={() => setIsLocalStorageModalOpen(true)}
-              className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
+              className="text-xs text-[var(--accent)] hover:underline font-cinzel transition-colors cursor-pointer px-2 sm:px-2.5 py-1 flex items-center gap-1.5 rounded border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]"
               title="Copias de Seguridad y Almacenamiento Local"
+              aria-label="Copias de seguridad"
             >
-              <FolderSync className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Copias</span>
+              <FolderSync className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="hidden sm:inline">Copias</span>
             </button>
             <button
               onClick={() => setIsSidebarOpen(false)}
               className="md:hidden text-base text-[var(--text-secondary)] hover:text-[var(--accent)] p-1 cursor-pointer"
               title="Cerrar menú"
+              aria-label="Cerrar menú"
             >
               <X className="w-4 h-4" />
             </button>
@@ -2733,6 +2778,30 @@ export default function App() {
                 </button>
               );
             })}
+
+            {currentProject && (
+              <button
+                onClick={handleTriggerAISyncMemory}
+                disabled={
+                  isGenerating ||
+                  !currentChats.some(c =>
+                    (c.messages || []).some(
+                      m =>
+                        m.content &&
+                        m.content.trim().length > 0 &&
+                        m.content !== 'Pensando...' &&
+                        m.content !== 'Tirando dados...'
+                    )
+                  )
+                }
+                className="flex items-center gap-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
+                title="Sincronizar memoria viva, fichas, PNJs, tramas y cronología de toda la partida"
+                aria-label="Sincronizar con IA"
+              >
+                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden md:inline">Sincronizar</span>
+              </button>
+            )}
 
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
