@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Chat, PlayerCharacter, Project, ProjectFile } from '../types';
 import { YouTubePreview } from './YouTubePreview';
@@ -807,6 +807,66 @@ export const ChatView: React.FC<{
     }
   };
 
+  /**
+   * Acciones de los mensajes con identidad fija.
+   *
+   * `ChatMessageItem` está envuelto en React.memo, pero el memo no servía de
+   * nada: estos manejadores se creaban de nuevo en cada render, así que todas
+   * sus props cambiaban de identidad y ningún mensaje se libraba de repintarse.
+   * Mientras el Narrador escribe llega un fragmento cada pocos milisegundos, y
+   * en cada uno se volvía a convertir a markdown el capítulo ENTERO. De ahí el
+   * tirón en las escenas largas.
+   *
+   * La identidad se congela; el contenido no. Cada función de aquí no hace más
+   * que reenviar a la última versión guardada en la referencia, que sí se
+   * actualiza en cada render. Congelar las funciones de verdad habría sido peor
+   * que el tirón: se quedarían mirando un estado viejo y regenerar un mensaje
+   * trabajaría sobre una conversación que ya no existe.
+   */
+  const ultimasAcciones = useRef({
+    handleCopyMessage,
+    handleStartEditing,
+    handleCancelEditing,
+    handleSaveEditOnly,
+    handleSaveAndRegenerate,
+    handleRollRequestClick,
+    onContinueNarrative,
+    onRegenerateMessage,
+    onOpenStudio: (tab: 'music' | 'image' | 'video' | 'voice', sceneText?: string) =>
+      setStudioModal({ isOpen: true, tab, sceneText })
+  });
+  ultimasAcciones.current = {
+    handleCopyMessage,
+    handleStartEditing,
+    handleCancelEditing,
+    handleSaveEditOnly,
+    handleSaveAndRegenerate,
+    handleRollRequestClick,
+    onContinueNarrative,
+    onRegenerateMessage,
+    onOpenStudio: (tab: 'music' | 'image' | 'video' | 'voice', sceneText?: string) =>
+      setStudioModal({ isOpen: true, tab, sceneText })
+  };
+
+  const acciones = useMemo(
+    () => ({
+      handleCopyMessage: (idx: number, content: string) =>
+        ultimasAcciones.current.handleCopyMessage(idx, content),
+      handleStartEditing: (idx: number, content: string) =>
+        ultimasAcciones.current.handleStartEditing(idx, content),
+      handleCancelEditing: () => ultimasAcciones.current.handleCancelEditing(),
+      handleSaveEditOnly: (idx: number) => ultimasAcciones.current.handleSaveEditOnly(idx),
+      handleSaveAndRegenerate: (idx: number) => ultimasAcciones.current.handleSaveAndRegenerate(idx),
+      handleRollRequestClick: (req: RollRequest) => ultimasAcciones.current.handleRollRequestClick(req),
+      onContinueNarrative: (fromIndex?: number) => ultimasAcciones.current.onContinueNarrative(fromIndex),
+      onRegenerateMessage: (index: number, updatedUserPrompt?: string) =>
+        ultimasAcciones.current.onRegenerateMessage(index, updatedUserPrompt),
+      onOpenStudio: (tab: 'music' | 'image' | 'video' | 'voice', sceneText?: string) =>
+        ultimasAcciones.current.onOpenStudio(tab, sceneText)
+    }),
+    []
+  );
+
   return (
     <div
       onDragOver={handleDragOver}
@@ -989,27 +1049,28 @@ export const ChatView: React.FC<{
                     m={m}
                     idx={idx}
                     isEditing={isEditing}
-                    editDraft={editDraft}
+                    // Solo el mensaje en edición necesita el borrador. Pasárselo a
+                    // todos los repintaba a cada tecla pulsada.
+                    editDraft={isEditing ? editDraft : ''}
                     setEditDraft={setEditDraft}
                     isLastMessage={isLastMessage}
                     isGenerating={isGenerating}
                     hasOracle={Boolean(hasOracle)}
                     isSearchHit={isSearchHit}
-                    copiedIndex={copiedIndex}
-                    handleCopyMessage={handleCopyMessage}
-                    handleStartEditing={handleStartEditing}
-                    handleCancelEditing={handleCancelEditing}
-                    handleSaveEditOnly={handleSaveEditOnly}
-                    handleSaveAndRegenerate={handleSaveAndRegenerate}
-                    onContinueNarrative={onContinueNarrative}
-                    onRegenerateMessage={onRegenerateMessage}
+                    // Solo cambia para el mensaje que se acaba de copiar.
+                    copiedIndex={copiedIndex === idx ? idx : null}
+                    handleCopyMessage={acciones.handleCopyMessage}
+                    handleStartEditing={acciones.handleStartEditing}
+                    handleCancelEditing={acciones.handleCancelEditing}
+                    handleSaveEditOnly={acciones.handleSaveEditOnly}
+                    handleSaveAndRegenerate={acciones.handleSaveAndRegenerate}
+                    onContinueNarrative={acciones.onContinueNarrative}
+                    onRegenerateMessage={acciones.onRegenerateMessage}
                     setDeleteModal={setDeleteModal}
                     setPreguntaOraculo={setPreguntaOraculo}
                     setOraculoAbierto={setOraculoAbierto}
-                    handleRollRequestClick={handleRollRequestClick}
-                    onOpenStudio={(tab, sceneText) =>
-                      setStudioModal({ isOpen: true, tab, sceneText })
-                    }
+                    handleRollRequestClick={acciones.handleRollRequestClick}
+                    onOpenStudio={acciones.onOpenStudio}
                   />
                 );
               })

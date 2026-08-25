@@ -147,6 +147,9 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   // Controlador de la generación en curso, para poder detenerla desde la interfaz.
   const generationAbortRef = useRef<AbortController | null>(null);
+  // El texto que aún no se ha pintado, y el repintado ya pedido al navegador.
+  const textoPendienteRef = useRef<string | null>(null);
+  const repintadoPedidoRef = useRef<number | null>(null);
   // Un turno de narración NO bloquea la pantalla: hay que poder leer cómo se
   // escribe. El velo se reserva para tareas que sí impiden seguir (subidas,
   // exportar a PDF).
@@ -1007,21 +1010,37 @@ export default function App() {
         // Refresco de pantalla en CADA fragmento: es solo estado en memoria y es lo
         // que hace que la narración se escriba ante ti en vez de aparecer a saltos.
         // El guardado en disco sigue limitado dentro de geminiHelper.
+        // Google manda fragmentos cada pocos milisegundos, muchos de una sola
+        // palabra. Pintar cada uno obligaba a rehacer el markdown de la escena
+        // entera decenas de veces por segundo para un cambio que el ojo no
+        // llega a distinguir. Se acumulan y se vuelca uno por fotograma: el
+        // texto sigue apareciendo según se escribe, pero sin ahogar al
+        // navegador. El último fragmento nunca se queda sin pintar porque
+        // `onSaveMessage` cierra el turno con el texto completo.
         onChunk: (fullText: string) => {
-          const visible = limpiarParaMostrar(fullText);
-          setCurrentChats(prev =>
-            prev.map(c => {
-              if (c.id !== currentChatId) return c;
-              const msgs = [...c.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'model') {
-                msgs[msgs.length - 1] = { ...last, content: visible };
-              } else {
-                msgs.push({ role: 'model', content: visible });
-              }
-              return { ...c, messages: msgs };
-            })
-          );
+          textoPendienteRef.current = fullText;
+          if (repintadoPedidoRef.current !== null) return;
+          repintadoPedidoRef.current = requestAnimationFrame(() => {
+            repintadoPedidoRef.current = null;
+            const pendiente = textoPendienteRef.current;
+            if (pendiente === null) return;
+            textoPendienteRef.current = null;
+            const visible = limpiarParaMostrar(pendiente);
+            setCurrentChats(prev =>
+              prev.map(c => {
+                if (c.id !== currentChatId) return c;
+                const msgs = [...c.messages];
+                const last = msgs[msgs.length - 1];
+                if (last && last.role === 'model') {
+                  if (last.content === visible) return c;
+                  msgs[msgs.length - 1] = { ...last, content: visible };
+                } else {
+                  msgs.push({ role: 'model', content: visible });
+                }
+                return { ...c, messages: msgs };
+              })
+            );
+          });
         },
         setLoadingText,
         onSaveMessage: (updatedChat: Chat) => {
@@ -1068,6 +1087,11 @@ export default function App() {
           currentFiles
         ).catch(() => {});
       }
+      if (repintadoPedidoRef.current !== null) {
+        cancelAnimationFrame(repintadoPedidoRef.current);
+        repintadoPedidoRef.current = null;
+      }
+      textoPendienteRef.current = null;
       generationAbortRef.current = null;
       setIsStreamingTurn(false);
       setIsGenerating(false);
