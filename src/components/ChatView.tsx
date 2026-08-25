@@ -24,6 +24,7 @@ import {
   Paperclip,
   Pencil,
   Play,
+  Plus,
   RefreshCw,
   Save,
   Scissors,
@@ -589,7 +590,25 @@ export const ChatView: React.FC<{
 
   // Ventana rápida de emojis temáticos
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Cerrar menú de opciones al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(event.target as Node)) {
+        setIsActionsMenuOpen(false);
+      }
+    };
+    if (isActionsMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isActionsMenuOpen]);
 
   const handleInsertEmoji = (emoji: string) => {
     const textarea = textareaRef.current;
@@ -1242,6 +1261,7 @@ export const ChatView: React.FC<{
 
           <div className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded-xl px-2.5 sm:px-3.5 md:px-4 py-1.5 md:py-2 flex items-center gap-1.5 sm:gap-2 md:gap-3 shadow-inner focus-within:border-[var(--accent)] focus-within:shadow-md transition-all">
             <input
+              ref={fileInputRef}
               type="file"
               multiple
               accept=".txt,.md,.pdf,.json,image/*,audio/*"
@@ -1254,42 +1274,145 @@ export const ChatView: React.FC<{
               className="hidden"
               id="chat-file-upload"
             />
-            <label
-              htmlFor="chat-file-upload"
-              className="text-[var(--accent)] w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 hover:bg-[var(--glass)] active:scale-95 transition-all cursor-pointer text-base"
-              title="Adjuntar múltiples documentos, imágenes o audios a la campaña"
-            >
-              <Paperclip className="w-4 h-4" />
-            </label>
 
-            {/* Botón de selector rápido de emojis en el input */}
-            <button
-              type="button"
-              onClick={() => setIsEmojiPickerOpen(prev => !prev)}
-              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 transition-all cursor-pointer ${
-                isEmojiPickerOpen
-                  ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-105'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] active:scale-95'
-              }`}
-              title="Abrir ventana rápida de emojis (Rol, Expresiones, Magia y Combate)"
-              aria-label="Selector de emojis"
-            >
-              <Smile className="w-4 h-4" />
-            </button>
+            {/* Botón único de opciones y herramientas de entrada */}
+            <div className="relative shrink-0" ref={actionsMenuRef}>
+              {isListening ? (
+                <button
+                  type="button"
+                  onClick={toggleSpeechRecognition}
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 transition-all cursor-pointer bg-red-600 text-white animate-pulse shadow-md shadow-red-500/40 ring-2 ring-red-400"
+                  title="Detener dictado por voz"
+                  aria-label="Detener dictado por voz"
+                >
+                  <MicOff className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsActionsMenuOpen(prev => !prev)}
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                    isActionsMenuOpen
+                      ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-105'
+                      : 'text-[var(--accent)] hover:text-[var(--accent-hover)] hover:bg-[var(--glass)] active:scale-95'
+                  }`}
+                  title="Opciones de entrada: adjuntar archivos, emojis, dictado por voz..."
+                  aria-label="Opciones de entrada"
+                >
+                  <Plus className={`w-4 h-4 transition-transform duration-200 ${isActionsMenuOpen ? 'rotate-45' : ''}`} />
+                </button>
+              )}
 
-            {/* Botón de dictado por voz (Micrófono) */}
-            <button
-              type="button"
-              onClick={toggleSpeechRecognition}
-              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 transition-all cursor-pointer ${
-                isListening
-                  ? 'bg-red-600 text-white animate-pulse shadow-md shadow-red-500/40 ring-2 ring-red-400'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] active:scale-95'
-              }`}
-              title={isListening ? 'Detener dictado por voz' : 'Dictar tu acción por voz (Micrófono en vivo)'}
-            >
-              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </button>
+              {/* Menú flotante de opciones */}
+              {isActionsMenuOpen && (
+                <div className="absolute bottom-full left-0 mb-2 w-64 sm:w-72 bg-[var(--bg-color)] border border-[var(--glass-border)] rounded-xl shadow-2xl backdrop-blur-md p-1.5 z-40 animate-in fade-in slide-in-from-bottom-2 duration-150 font-lora">
+                  <div className="px-2.5 py-1 text-[10px] font-cinzel font-bold text-[var(--text-secondary)] tracking-wider border-b border-[var(--glass-border)] mb-1 flex items-center justify-between">
+                    <span>OPCIONES DE ENTRADA</span>
+                    <span className="text-[9px] opacity-60">Acciones rápidas</span>
+                  </div>
+
+                  <div className="flex flex-col gap-0.5">
+                    {/* Opción 1: Adjuntar Archivo */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        fileInputRef.current?.click();
+                      }}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <Paperclip className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                          Adjuntar Archivo / Lore
+                        </div>
+                        <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                          Imágenes, PDFs, audios o textos
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Opción 2: Selector de Emojis */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        setIsEmojiPickerOpen(true);
+                      }}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <Smile className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                          Emojis y Símbolos
+                        </div>
+                        <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                          Rol, dados, combate y magia
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Opción 3: Dictado por Voz */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        toggleSpeechRecognition();
+                      }}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group"
+                    >
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                        isListening
+                          ? 'bg-red-500 text-white'
+                          : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20'
+                      }`}>
+                        {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors flex items-center justify-between">
+                          <span>Dictado por Voz</span>
+                          {isListening && (
+                            <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.2 rounded-full animate-pulse font-sans">
+                              Grabando
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                          {isListening ? 'Pulsa para detener' : 'Habla para escribir tu acción'}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Opción 4: Taller Creativo */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
+                        setStudioModal({ isOpen: true, tab: 'image', sceneText: lastModelMsg });
+                      }}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group border-t border-[var(--glass-border)]/60 mt-0.5 pt-1.5"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <Wand2 className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                          Taller Creativo & Multimedia
+                        </div>
+                        <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                          Ilustrar escenas, retratos y música
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <textarea
               ref={textareaRef}
