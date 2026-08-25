@@ -139,13 +139,13 @@ export const NovelReaderView: React.FC<{
             <button
               onClick={onBackToChat}
               className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
-              title="Volver a la vista de Crónica / Chat interactivo"
-              aria-label="Volver a Crónica"
+              title="Volver al modo de juego: escribes y el Narrador responde"
+              aria-label="Volver al modo de juego"
             >
-              <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Crónica</span>
+              <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Jugar</span>
             </button>
-            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo Novela">
-              <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
+            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Leer el capítulo como una novela">
+              <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Leer</span>
             </span>
           </div>
 

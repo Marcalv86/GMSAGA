@@ -905,17 +905,23 @@ export const ChatView: React.FC<{
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           {/* Selector de modo de lectura integrado: idéntico en Crónica y Novela */}
           <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-0.5 text-xs font-cinzel shadow-2xs shrink-0">
-            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo Crónica / Juego">
-              <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Crónica</span>
+            {/*
+              Este par cambia cómo se lee el capítulo, no de sección. Llamarlo
+              «Crónica» lo hacía chocar con la pestaña «Crónica» de la barra de
+              arriba: el mismo nombre en dos sitios para dos cosas distintas.
+              «Jugar» y «Leer» dicen lo que hace cada uno.
+            */}
+            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo de juego: escribes y el Narrador responde">
+              <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Jugar</span>
             </span>
             {onOpenNovelReader && (
               <button
                 onClick={onOpenNovelReader}
                 className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
-                title="Cambiar a la vista de lectura inmersiva tipo Novela / Tomo Antiguo"
-                aria-label="Modo Novela"
+                title="Leer el capítulo como una novela, sin la interfaz de juego"
+                aria-label="Modo lectura"
               >
-                <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
+                <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Leer</span>
               </button>
             )}
           </div>
@@ -1250,54 +1256,31 @@ export const ChatView: React.FC<{
               </button>
             )}
 
+            {/*
+              Los dados iban cada uno de un color —ámbar, morado, azul, verde,
+              rosa, naranja, turquesa— y esa fila de arcoíris era lo más
+              llamativo de una pantalla que por lo demás imita un pergamino.
+              Ahora comparten el tono del resto de la interfaz y solo destaca el
+              d20, que es el que se toca en casi todas las tiradas; los demás se
+              distinguen por su etiqueta, que para eso está en negrita.
+            */}
             {[
-              {
-                sides: 20,
-                label: 'd20',
-                theme:
-                  'border-amber-700/60 dark:border-amber-400/60 text-amber-950 dark:text-amber-200 bg-amber-100/90 dark:bg-amber-950/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 shadow-amber-950/10'
-              },
-              {
-                sides: 12,
-                label: 'd12',
-                theme:
-                  'border-purple-700/60 dark:border-purple-400/60 text-purple-950 dark:text-purple-200 bg-purple-100/90 dark:bg-purple-950/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 shadow-purple-950/10'
-              },
-              {
-                sides: 10,
-                label: 'd10',
-                theme:
-                  'border-blue-700/60 dark:border-blue-400/60 text-blue-950 dark:text-blue-200 bg-blue-100/90 dark:bg-blue-950/40 hover:bg-blue-200 dark:hover:bg-blue-900/60 shadow-blue-950/10'
-              },
-              {
-                sides: 8,
-                label: 'd8',
-                theme:
-                  'border-emerald-700/60 dark:border-emerald-400/60 text-emerald-950 dark:text-emerald-200 bg-emerald-100/90 dark:bg-emerald-950/40 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 shadow-emerald-950/10'
-              },
-              {
-                sides: 6,
-                label: 'd6',
-                theme:
-                  'border-rose-700/60 dark:border-rose-400/60 text-rose-950 dark:text-rose-200 bg-rose-100/90 dark:bg-rose-950/40 hover:bg-rose-200 dark:hover:bg-rose-900/60 shadow-rose-950/10'
-              },
-              {
-                sides: 4,
-                label: 'd4',
-                theme:
-                  'border-orange-700/60 dark:border-orange-400/60 text-orange-950 dark:text-orange-200 bg-orange-100/90 dark:bg-orange-950/40 hover:bg-orange-200 dark:hover:bg-orange-900/60 shadow-orange-950/10'
-              },
-              {
-                sides: 100,
-                label: 'd100',
-                theme:
-                  'border-teal-700/60 dark:border-teal-400/60 text-teal-950 dark:text-teal-200 bg-teal-100/90 dark:bg-teal-950/40 hover:bg-teal-200 dark:hover:bg-teal-900/60 shadow-teal-950/10'
-              }
+              { sides: 20, label: 'd20', heroe: true },
+              { sides: 12, label: 'd12' },
+              { sides: 10, label: 'd10' },
+              { sides: 8, label: 'd8' },
+              { sides: 6, label: 'd6' },
+              { sides: 4, label: 'd4' },
+              { sides: 100, label: 'd100' }
             ].map(d => (
               <button
                 key={d.sides}
                 onClick={() => handleDieClick(d.sides)}
-                className={`shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer hover:scale-105 active:scale-95 ${d.theme}`}
+                className={`shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer hover:scale-105 active:scale-95 ${
+                  d.heroe
+                    ? 'border-[var(--accent)] text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent)_20%,transparent)]'
+                    : 'border-[var(--user-border)] text-[var(--text-primary)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-[var(--glass)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                }`}
                 title={`Tirar dado de ${d.sides} caras y añadir al mensaje`}
                 aria-label={d.label}
               >
@@ -1314,7 +1297,7 @@ export const ChatView: React.FC<{
                 const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
                 setStudioModal({ isOpen: true, tab: 'music', sceneText: lastModelMsg });
               }}
-              className="shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-purple-700/60 dark:border-purple-400/60 bg-purple-100/90 dark:bg-purple-950/50 text-purple-950 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)] hover:bg-[var(--glass)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
               title="Música ambiental, sintetizador de laúd/taberna, canciones de YouTube y Spotify"
               aria-label="Bardo & Música"
             >
@@ -1327,7 +1310,7 @@ export const ChatView: React.FC<{
                 const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
                 setStudioModal({ isOpen: true, tab: 'image', sceneText: lastModelMsg });
               }}
-              className="shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-amber-700/60 dark:border-amber-400/60 bg-amber-100/90 dark:bg-amber-950/50 text-amber-950 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/60 hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)] hover:bg-[var(--glass)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
               title="Taller multimedia: Generar ilustraciones de escenas, retratos de personajes y videos cinemáticos a partir de la escena"
               aria-label="Taller Creativo"
             >
