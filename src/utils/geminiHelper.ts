@@ -56,34 +56,16 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     desc: 'Modelo insignia con razonamiento adaptativo, narración fluida y detección precisa de mecánicas de rol.'
   },
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    badge: 'Rápido y fluido',
-    desc: 'Alta velocidad, gran ventana de contexto y cuota amplia.'
-  },
-  {
     id: 'gemini-3.1-flash-lite',
     name: 'Gemini 3.1 Flash Lite',
     badge: 'Ultra Ligero · Ahorro de cuota',
-    desc: 'Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para tareas en segundo plano.'
-  },
-  {
-    id: 'gemini-2.5-flash-lite',
-    name: 'Gemini 2.5 Flash Lite',
-    badge: 'Económico y veloz',
-    desc: 'Baja latencia y ahorro de cuota para sesiones continuas.'
+    desc: 'Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para sesiones continuas.'
   },
   {
     id: 'gemini-3.1-pro-preview',
     name: 'Gemini 3.1 Pro',
     badge: 'Máxima Inteligencia · Prosa rica',
     desc: 'El modelo superior para razonamiento profundo, prosa literaria exquisita y coherencia impecable en tramas complejas.'
-  },
-  {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    badge: 'Pro · Gran Capacidad',
-    desc: 'Excelente precisión deductiva y consistencia en el seguimiento de reglas.'
   }
 ];
 
@@ -97,6 +79,7 @@ export function isModelDeprecated(modelId: string): boolean {
   return (
     m.includes('1.5') ||
     m.includes('2.0') ||
+    m.includes('2.5') ||
     m === 'gemini-pro' ||
     m === 'gemini-flash' ||
     m.includes('thinking-exp') ||
@@ -105,7 +88,7 @@ export function isModelDeprecated(modelId: string): boolean {
 }
 
 export const DEFAULT_MODEL_ID = 'gemini-3.7-flash';
-export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-2.5-flash';
+export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.1-flash-lite';
 export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.1-flash-lite';
 
 export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODEL_ID): string {
@@ -125,19 +108,15 @@ export function setStoredAutoFailover(enabled: boolean): void {
 
 /**
  * Cadena de modelos de respaldo en cascada ante saturación o fallos de servidores de Google.
- * Si el modelo principal está ocupado (503/429) o no disponible en la clave (404), la app
- * salta automáticamente al siguiente de forma transparente para que la partida nunca se detenga.
+ * Si el modelo principal está ocupado (503/429), la app salta automáticamente al siguiente
+ * de forma transparente para que la partida nunca se detenga.
  */
 export function getModelFailoverChain(initialModel: string): string[] {
   const safeInitial = sanitizeModelId(initialModel, DEFAULT_MODEL_ID);
   const standardFallbacks = [
     'gemini-3.7-flash',
-    'gemini-2.5-flash',
     'gemini-3.1-flash-lite',
-    'gemini-2.5-flash-lite',
-    'gemini-3.1-pro-preview',
-    'gemini-2.5-pro',
-    'gemini-flash-latest'
+    'gemini-3.1-pro-preview'
   ];
   if (!getStoredAutoFailover()) {
     return [safeInitial, ...standardFallbacks.filter(m => m !== safeInitial && !isModelDeprecated(m))];
