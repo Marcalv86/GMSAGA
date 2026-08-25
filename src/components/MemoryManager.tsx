@@ -745,6 +745,26 @@ export const MemoryManager: React.FC<{
   return (
     <div className="flex-1 overflow-y-auto px-2.5 sm:px-4 md:px-[5%] py-3 md:py-8 font-lora w-full max-w-full overflow-x-hidden">
 
+      {/* Banner de Memoria Viva Autónoma / Modo Supervisión */}
+      <div className="mb-4 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 p-3 sm:p-3.5 rounded-xl shadow-xs flex items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 shrink-0">
+            <Sparkles className="w-4 h-4 animate-pulse" />
+          </div>
+          <div className="min-w-0">
+            <p className="font-cinzel font-bold text-indigo-900 dark:text-indigo-200 m-0">
+              Memoria Viva Autónoma en Tiempo Real (Solo Lectura)
+            </p>
+            <p className="text-[11px] text-indigo-800/80 dark:text-indigo-300/80 m-0 truncate">
+              La IA actualiza y preserva secretos, PNJs, lugares, tramas y notas en cada respuesta sin consumir llamadas extra.
+            </p>
+          </div>
+        </div>
+        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-cinzel font-bold bg-indigo-200/80 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-200 shrink-0">
+          ● En Vivo
+        </span>
+      </div>
+
       {/* Top Nav & AI Action Button */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 md:mb-6 border-b border-[var(--glass-border)] pb-3 md:pb-4 gap-3 md:gap-4 w-full">
         <div className="flex gap-1 sm:gap-2 md:gap-3 flex-wrap w-full lg:w-auto">
