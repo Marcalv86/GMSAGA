@@ -838,7 +838,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                 onClick={() => openNewEntryModal('diario')}
                 className="px-3.5 py-1.5 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
               >
-                <Plus className="w-3.5 h-3.5" /> + Añadir Entrada
+                <Plus className="w-3.5 h-3.5" /> + Añadir Acontecimiento
               </button>
 
               {entradasDiaActivo.length > 0 && (

@@ -13,8 +13,7 @@ import {
   Scroll,
   Calendar,
   BookOpen,
-  VenetianMask,
-  Pencil
+  VenetianMask
 } from 'lucide-react';
 
 interface NpcDossierModalProps {
@@ -23,7 +22,6 @@ interface NpcDossierModalProps {
   vinculosDestapados: Set<string>;
   onToggleDestaparVinculo: (npcId: string) => void;
   onChangePortrait: (npc: NPC) => void;
-  onEdit?: (npc: NPC) => void;
   onClose: () => void;
 }
 
@@ -33,7 +31,6 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
   vinculosDestapados,
   onToggleDestaparVinculo,
   onChangePortrait,
-  onEdit,
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'sheet'>('overview');
@@ -184,19 +181,6 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
 
           {/* Action buttons */}
           <div className="flex items-center gap-1 shrink-0">
-            {onEdit && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onEdit(npc);
-                }}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-cinzel font-semibold bg-[var(--surface)] hover:bg-[var(--accent)] text-[var(--accent)] hover:text-[var(--on-accent)] border border-[var(--user-border)] transition-all cursor-pointer shadow-xs"
-                title="Editar todos los campos y datos del PNJ"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Editar PNJ</span>
-              </button>
-            )}
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)] transition-all cursor-pointer shrink-0"

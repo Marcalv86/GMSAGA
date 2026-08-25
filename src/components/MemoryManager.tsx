@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, NPC, Quest, Location, ProjectFile, PlayerEvent } from '../types';
+import { Project, NPC, Location, ProjectFile } from '../types';
 import { classifyFileAuto } from '../utils/geminiHelper';
 import {
   obtenerInfoRelacion
@@ -10,17 +10,18 @@ import { sanitizePlayerCharacter } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
 import { NpcDossierModal } from './NpcDossierModal';
 import { LocationDossierModal } from './LocationDossierModal';
-import { NpcEditModal } from './NpcEditModal';
-import { LocationEditModal } from './LocationEditModal';
 import { DailyAgendaDiary } from './DailyAgendaDiary';
 
 import {
   BookOpen,
+  Calendar,
   CalendarClock,
   Camera,
   Castle,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
+  Clock,
   Compass,
   Eye,
   EyeOff,
@@ -40,8 +41,7 @@ import {
   Sparkles,
   Trash2,
   User,
-  Users,
-  X
+  Users
 } from 'lucide-react';
 
 export function getAtrInfo(val?: number) {
@@ -205,32 +205,7 @@ export const MemoryManager: React.FC<{
   }, [secciones]);
 
   // Protagonist (OC) State
-  const [isEditingOcName, setIsEditingOcName] = useState(false);
-  const [ocNameDraft, setOcNameDraft] = useState('');
-  const [ocTitleDraft, setOcTitleDraft] = useState('');
-
-  const [isEditingOcSummary, setIsEditingOcSummary] = useState(false);
-  const [ocSummaryDraft, setOcSummaryDraft] = useState('');
-
-  const [isOcEventModalOpen, setIsOcEventModalOpen] = useState(false);
-  const [editingOcEvent, setEditingOcEvent] = useState<Partial<PlayerEvent> | null>(null);
-
   const [isSyncingAI, setIsSyncingAI] = useState(false);
-
-  // NPC Edit Modal state
-  const [isNpcModalOpen, setIsNpcModalOpen] = useState(false);
-  const [editingNpc, setEditingNpc] = useState<Partial<NPC> | null>(null);
-
-  // Location Edit Modal state
-  const [isLocModalOpen, setIsLocModalOpen] = useState(false);
-  const [editingLoc, setEditingLoc] = useState<Partial<Location> | null>(null);
-
-  // Story & Status Editing States
-  const [isEditingStory, setIsEditingStory] = useState(false);
-  const [storyDraft, setStoryDraft] = useState('');
-
-  const [isEditingStatus, setIsEditingStatus] = useState(false);
-  const [statusDraft, setStatusDraft] = useState('');
 
   // Visual Analysis Editing Modal State
   const [editingVisualFile, setEditingVisualFile] = useState<ProjectFile | null>(null);
@@ -272,10 +247,6 @@ export const MemoryManager: React.FC<{
    * interruptor que se queda encendido y te va destripando la campaña.
    */
   const [vinculosDestapados, setVinculosDestapados] = useState<Set<string>>(new Set());
-
-  // Quest Form Modal state
-  const [editingQuest, setEditingQuest] = useState<Quest | null>(null);
-  const [isQuestModalOpen, setIsQuestModalOpen] = useState(false);
 
   // Confirmation state
   const [confirmModal, setConfirmModal] = useState<{
@@ -331,52 +302,6 @@ export const MemoryManager: React.FC<{
     };
   }, []);
 
-  useEffect(() => {
-    setStoryDraft(project.memory?.story || '');
-    setStatusDraft(project.memory?.current_status || '');
-    setLocalNotes(project.memory?.manual_notes || '');
-  }, [project.id, project.memory]);
-
-  // Story Handlers
-  const handleSaveStory = async () => {
-    await onUpdateMemory(mem => ({ ...mem, story: storyDraft.trim() }));
-    setIsEditingStory(false);
-  };
-
-  const handleClearStory = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Borrar Resumen de Crónica',
-      message: '¿Estás seguro de que deseas vaciar el texto de la crónica acumulada?',
-      onConfirm: async () => {
-        setStoryDraft('');
-        await onUpdateMemory(mem => ({ ...mem, story: '' }));
-        setIsEditingStory(false);
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
-
-  // Status Handlers
-  const handleSaveStatus = async () => {
-    await onUpdateMemory(mem => ({ ...mem, current_status: statusDraft.trim() }));
-    setIsEditingStatus(false);
-  };
-
-  const handleClearStatus = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Borrar Estado Actual',
-      message: '¿Deseas vaciar el estado actual de la compañía?',
-      onConfirm: async () => {
-        setStatusDraft('');
-        await onUpdateMemory(mem => ({ ...mem, current_status: '' }));
-        setIsEditingStatus(false);
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
-
   // Notes Handlers
   const handleNotesChange = (val: string) => {
     setLocalNotes(val);
@@ -429,90 +354,7 @@ export const MemoryManager: React.FC<{
     });
   };
 
-  // Protagonist (OC) Handlers
-  const handleSaveOcHeader = async () => {
-    const rawPc = {
-      ...(memory.player_character || { name: 'Aryendell' }),
-      name: ocNameDraft.trim() || 'Aryendell',
-      title: ocTitleDraft.trim() || undefined
-    };
-    const sanitized = sanitizePlayerCharacter(rawPc, 'Aryendell');
-    await onUpdateMemory(mem => ({
-      ...mem,
-      player_character: sanitized
-    }));
-    setIsEditingOcName(false);
-  };
-
-  const handleSaveOcSummary = async () => {
-    await onUpdateMemory(mem => ({
-      ...mem,
-      player_character: {
-        ...(mem.player_character || { name: 'Protagonista' }),
-        summary: ocSummaryDraft.trim()
-      }
-    }));
-    setIsEditingOcSummary(false);
-  };
-
-  const handleSaveOcEvent = async (e: { id?: string; title: string; description: string; dateOrTime?: string }) => {
-    if (!e.title.trim()) return;
-    await onUpdateMemory(mem => {
-      const pc = mem.player_character || { name: 'Protagonista' };
-      const events = pc.events || [];
-      let updatedEvents: PlayerEvent[];
-      if (e.id) {
-        updatedEvents = events.map(item =>
-          item.id === e.id
-            ? { ...item, title: e.title.trim(), description: e.description.trim(), dateOrTime: e.dateOrTime?.trim() }
-            : item
-        );
-      } else {
-        const newEvent: PlayerEvent = {
-          id: 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(7),
-          title: e.title.trim(),
-          description: e.description.trim(),
-          dateOrTime: e.dateOrTime?.trim(),
-          createdAt: Date.now()
-        };
-        updatedEvents = [newEvent, ...events];
-      }
-      return {
-        ...mem,
-        player_character: {
-          ...pc,
-          events: updatedEvents
-        }
-      };
-    });
-    setIsOcEventModalOpen(false);
-    setEditingOcEvent(null);
-  };
-
-  const handleDeleteOcEvent = async (eventId: string) => {
-    await onUpdateMemory(mem => {
-      const pc = mem.player_character || { name: 'Protagonista' };
-      return {
-        ...mem,
-        player_character: {
-          ...pc,
-          events: (pc.events || []).filter(ev => ev.id !== eventId)
-        }
-      };
-    });
-    setConfirmModal(prev => ({ ...prev, isOpen: false }));
-  };
-
-  const handleRemoveOcPortrait = async () => {
-    await onUpdateMemory(mem => ({
-      ...mem,
-      player_character: {
-        ...(mem.player_character || { name: 'Protagonista' }),
-        portrait: undefined
-      }
-    }));
-  };
-
+  // AI Sync Handler
   const handleSyncWithAI = async () => {
     if (!onTriggerAIUpdate || isSyncingAI) return;
     setIsSyncingAI(true);
@@ -523,7 +365,18 @@ export const MemoryManager: React.FC<{
     }
   };
 
-  // NPC Handlers
+  // Protagonist (OC) Handlers
+  const handleRemoveOcPortrait = async () => {
+    await onUpdateMemory(mem => ({
+      ...mem,
+      player_character: {
+        ...(mem.player_character || { name: 'Protagonista' }),
+        portrait: undefined
+      }
+    }));
+  };
+
+  // NPC & Location Portrait Assignment Handlers
   const handleAssignPortraitDirectly = async (imageContent: string) => {
     if (!targetForPortraitPicker) return;
     const { type, id } = targetForPortraitPicker;
@@ -541,9 +394,6 @@ export const MemoryManager: React.FC<{
         return { ...mem, npcs };
       });
       setSelectedNpcForDossier(prev => (prev && prev.id === id ? { ...prev, portrait: imageContent } : prev));
-      if (editingNpc) {
-        setEditingNpc({ ...editingNpc, portrait: imageContent });
-      }
     } else if (type === 'location') {
       await onUpdateMemory(mem => {
         const locations = (mem.locations || []).map(l =>
@@ -552,74 +402,8 @@ export const MemoryManager: React.FC<{
         return { ...mem, locations };
       });
       setSelectedLocForDossier(prev => (prev && prev.id === id ? { ...prev, portrait: imageContent } : prev));
-      if (editingLoc) {
-        setEditingLoc({ ...editingLoc, portrait: imageContent });
-      }
     }
     setTargetForPortraitPicker(null);
-  };
-
-  const handleSaveNpc = async (npcToSave: NPC) => {
-    await onUpdateMemory(mem => {
-      const existing = mem.npcs || [];
-      const index = existing.findIndex(n => n.id === npcToSave.id);
-      let updatedNpcs: NPC[];
-      if (index >= 0) {
-        updatedNpcs = [...existing];
-        updatedNpcs[index] = npcToSave;
-      } else {
-        updatedNpcs = [...existing, npcToSave];
-      }
-      return { ...mem, npcs: updatedNpcs };
-    });
-    if (selectedNpcForDossier && selectedNpcForDossier.id === npcToSave.id) {
-      setSelectedNpcForDossier(npcToSave);
-    }
-  };
-
-  const handleSaveLoc = async (locToSave: Location) => {
-    await onUpdateMemory(mem => {
-      const existing = mem.locations || [];
-      const index = existing.findIndex(l => l.id === locToSave.id);
-      let updatedLocs: Location[];
-      if (index >= 0) {
-        updatedLocs = [...existing];
-        updatedLocs[index] = locToSave;
-      } else {
-        updatedLocs = [...existing, locToSave];
-      }
-      return { ...mem, locations: updatedLocs };
-    });
-    if (selectedLocForDossier && selectedLocForDossier.id === locToSave.id) {
-      setSelectedLocForDossier(locToSave);
-    }
-  };
-
-  const handleDeleteNpc = async (id: string, name: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Eliminar Personaje',
-      message: `¿Eliminar al PNJ "${name}"de la memoria permanente?`,
-      onConfirm: async () => {
-        await onUpdateMemory(mem => ({
-          ...mem,
-          npcs: (mem.npcs || []).filter(n => n.id !== id)
-        }));
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
-
-  const handleClearAllNpcs = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Borrar Todos los PNJs',
-      message: '¿Estás seguro de que deseas eliminar todos los personajes no jugadores de la memoria?',
-      onConfirm: async () => {
-        await onUpdateMemory(mem => ({ ...mem, npcs: [] }));
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
   };
 
   const handleDeduplicateNpcs = async () => {
@@ -645,79 +429,6 @@ export const MemoryManager: React.FC<{
     }
   };
 
-  // Quest Handlers
-  const handleSaveQuest = async (quest: Quest) => {
-    if (!quest.title.trim()) return;
-    await onUpdateMemory(mem => {
-      const existing = mem.quests || [];
-      const index = existing.findIndex(q => q.id === quest.id);
-      if (index >= 0) {
-        const updated = [...existing];
-        updated[index] = quest;
-        return { ...mem, quests: updated };
-      } else {
-        return { ...mem, quests: [...existing, quest] };
-      }
-    });
-    setIsQuestModalOpen(false);
-    setEditingQuest(null);
-  };
-
-  const handleDeleteQuest = async (id: string, title: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Eliminar Trama',
-      message: `¿Eliminar la misión "${title}"de la memoria?`,
-      onConfirm: async () => {
-        await onUpdateMemory(mem => ({
-          ...mem,
-          quests: (mem.quests || []).filter(q => q.id !== id)
-        }));
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
-
-  const handleClearAllQuests = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Borrar Todas las Tramas',
-      message: '¿Estás seguro de que deseas eliminar todas las misiones registradas?',
-      onConfirm: async () => {
-        await onUpdateMemory(mem => ({ ...mem, quests: [] }));
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
-
-  // Location Handlers
-  const handleDeleteLoc = async (id: string, name: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Eliminar Lugar',
-      message: `¿Eliminar el lugar "${name}"de la memoria?`,
-      onConfirm: async () => {
-        await onUpdateMemory(mem => ({
-          ...mem,
-          locations: (mem.locations || []).filter(l => l.id !== id)
-        }));
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
-
-  const handleClearAllLocs = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Borrar Todos los Lugares',
-      message: '¿Estás seguro de que deseas eliminar todos los lugares registrados?',
-      onConfirm: async () => {
-        await onUpdateMemory(mem => ({ ...mem, locations: [] }));
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
-
   // Wipe Entire Memory
   const handleWipeEntireMemory = () => {
     setConfirmModal({
@@ -735,8 +446,6 @@ export const MemoryManager: React.FC<{
           locations: [],
           visual_memory: []
         }));
-        setStoryDraft('');
-        setStatusDraft('');
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -927,78 +636,31 @@ export const MemoryManager: React.FC<{
             <div className="flex-1 flex flex-col justify-between w-full min-w-0">
               <div>
                 <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
-                  {!isEditingOcName ? (
-                    <div>
-                      <h2 className="font-cinzel text-xl sm:text-2xl font-bold text-[var(--accent)] m-0 flex items-center gap-2">
-                        {cleanPc.name || 'Aryendell'}
-                      </h2>
-                      {cleanPc.title && (
-                        <p className="text-sm font-lora italic text-[var(--text-secondary)] mt-0.5 m-0">
-                          {cleanPc.title}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2 w-full max-w-md">
-                      <input
-                        type="text"
-                        value={ocNameDraft}
-                        onChange={e => setOcNameDraft(e.target.value)}
-                        placeholder="Nombre del OC (ej. Aryendell)"
-                        className="bg-[var(--bg-color)] border border-[var(--glass-border)] rounded px-3 py-1 text-base font-cinzel font-bold text-[var(--accent)] outline-none focus:border-[var(--accent)]"
-                      />
-                      <input
-                        type="text"
-                        value={ocTitleDraft}
-                        onChange={e => setOcTitleDraft(e.target.value)}
-                        placeholder="Concepto o Título (ej. Maga Elfa de la Luna | Discípula de Auron)"
-                        className="bg-[var(--bg-color)] border border-[var(--glass-border)] rounded px-3 py-1 text-xs font-lora italic text-[var(--text-secondary)] outline-none focus:border-[var(--accent)]"
-                      />
-                      <div className="flex gap-2 mt-1">
-                        <button
-                          onClick={handleSaveOcHeader}
-                          className="px-3 py-1 text-xs font-cinzel font-bold bg-emerald-700 text-white rounded hover:bg-emerald-800 transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <Save className="w-3 h-3" /> Guardar
-                        </button>
-                        <button
-                          onClick={() => setIsEditingOcName(false)}
-                          className="px-2.5 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] text-[var(--text-secondary)] transition-colors cursor-pointer"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <h2 className="font-cinzel text-xl sm:text-2xl font-bold text-[var(--accent)] m-0 flex items-center gap-2">
+                      {cleanPc.name || 'Aryendell'}
+                    </h2>
+                    {cleanPc.title && (
+                      <p className="text-sm font-lora italic text-[var(--text-secondary)] mt-0.5 m-0">
+                        {cleanPc.title}
+                      </p>
+                    )}
+                  </div>
 
-                  {!isEditingOcName && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setOcNameDraft(cleanPc.name || 'Aryendell');
-                          setOcTitleDraft(cleanPc.title || '');
-                          setIsEditingOcName(true);
-                        }}
-                        className="px-2.5 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded-md hover:bg-[var(--glass)] hover:text-[var(--accent)] transition-colors flex items-center gap-1 text-[var(--text-secondary)] cursor-pointer"
-                      >
-                        <Pencil className="w-3 h-3" /> Editar Identidad
-                      </button>
-                      {onTriggerAIUpdate && (
-                        <button
-                          onClick={handleSyncWithAI}
-                          disabled={isGenerating || isSyncingAI}
-                          className="px-3 py-1 text-xs font-cinzel bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-100 border border-amber-500/50 rounded-md transition-all flex items-center gap-1.5 font-bold shadow-xs cursor-pointer disabled:opacity-50"
-                        >
-                          <Sparkles className={`w-3.5 h-3.5 text-amber-600 dark:text-amber-400 ${isSyncingAI ? 'animate-spin' : ''}`} />
-                          <span>{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
-                        </button>
-                      )}
-                    </div>
+                  {onTriggerAIUpdate && (
+                    <button
+                      onClick={handleSyncWithAI}
+                      disabled={isGenerating || isSyncingAI}
+                      className="px-3 py-1 text-xs font-cinzel bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-100 border border-amber-500/50 rounded-md transition-all flex items-center gap-1.5 font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 text-amber-600 dark:text-amber-400 ${isSyncingAI ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
+                    </button>
                   )}
                 </div>
 
                 <div className="mt-3 text-xs text-[var(--text-secondary)] bg-[var(--surface)]/70 p-3 rounded-lg border border-[var(--glass-border)] font-lora leading-relaxed">
-                  Aquí se registran los acontecimientos, evolución personal y hechos trascendentales que le van sucediendo a tu personaje. Puedes añadir entradas manualmente cuando lo desees o pulsar <strong>"Sincronizar con IA"</strong> para que el Narrador actualice la memoria viva a partir de la crónica de juego.
+                  Aquí se registran de forma automática los acontecimientos, evolución personal y hechos trascendentales que le van sucediendo a tu personaje. La IA actualiza la memoria viva en cada respuesta a partir de la crónica de juego.
                 </div>
               </div>
             </div>
@@ -1011,87 +673,101 @@ export const MemoryManager: React.FC<{
                 <BookOpen className="w-3.5 h-3.5 text-[var(--accent)]" />
                 Resumen de lo que le va sucediendo al Protagonista:
               </span>
-              <div className="flex gap-2">
-                {!isEditingOcSummary ? (
-                  <button
-                    onClick={() => {
-                      setOcSummaryDraft(memory.player_character?.summary || '');
-                      setIsEditingOcSummary(true);
-                    }}
-                    className="px-3 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1"
-                  >
-                    <Pencil className="w-3.5 h-3.5" /> Editar Resumen
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleSaveOcSummary}
-                      className="px-3 py-1 text-xs font-cinzel bg-emerald-700 text-white rounded hover:bg-emerald-800 transition-all cursor-pointer font-bold flex items-center gap-1"
-                    >
-                      <Save className="w-3.5 h-3.5" /> Guardar
-                    </button>
-                    <button
-                      onClick={() => setIsEditingOcSummary(false)}
-                      className="px-3 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] transition-all cursor-pointer"
-                    >
-                      Cancelar
-                    </button>
-                  </>
-                )}
-              </div>
             </div>
 
-            {isEditingOcSummary ? (
-              <textarea
-                value={ocSummaryDraft}
-                onChange={e => setOcSummaryDraft(e.target.value)}
-                placeholder="Escribe o edita el resumen de las vivencias, estado emocional y situación del protagonista..."
-                className="w-full h-48 bg-[var(--surface)] border-2 border-[var(--accent)] p-4 rounded-lg text-base font-lora outline-none leading-relaxed shadow-inner"
-              />
-            ) : (
-              <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-5 rounded-lg shadow-sm text-base leading-relaxed markdown-body min-h-[100px]">
-                {cleanPc.summary ? (
-                  <ReactMarkdown>{cleanPc.summary}</ReactMarkdown>
-                ) : (
-                  <span className="text-[var(--text-secondary)] italic font-lora">
-                    Aún no hay un resumen narrativo para el protagonista. Haz clic en "Editar Resumen" o pulsa "Sincronizar con IA" para que se genere a partir de la partida.
-                  </span>
-                )}
-              </div>
-            )}
+            <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-5 rounded-lg shadow-sm text-base leading-relaxed markdown-body min-h-[100px]">
+              {cleanPc.summary ? (
+                <ReactMarkdown>{cleanPc.summary}</ReactMarkdown>
+              ) : (
+                <span className="text-[var(--text-secondary)] italic font-lora">
+                  Aún no hay un resumen narrativo para el protagonista. Se generará automáticamente durante la partida a medida que avance la aventura.
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Key Events & Hitos List */}
+          {/* Key Events & Hitos sincronizados con el Diario & Agenda */}
           <div className="flex flex-col gap-3">
-            <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
-              <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
-                Acontecimientos Importantes y Memoria del OC ({cleanPc.events?.length || 0}):
-              </span>
-              <button
-                onClick={() => {
-                  setEditingOcEvent({ title: '', description: '', dateOrTime: '' });
-                  setIsOcEventModalOpen(true);
-                }}
-                className="px-3 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1 shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" /> + Añadir Acontecimiento / Nota
-              </button>
+            <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <CalendarClock className="w-4 h-4 text-[var(--accent)]" />
+                <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
+                  Acontecimientos e Hitos en el Diario & Agenda ({(project.timeline || []).length}):
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveTab('diary')}
+                  className="px-3 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  title="Abrir la pestaña de Diario & Agenda con el calendario completo"
+                >
+                  <Calendar className="w-3.5 h-3.5" /> Abrir Diario & Agenda
+                </button>
+              </div>
             </div>
 
-            {(!cleanPc.events || cleanPc.events.length === 0) ? (
-              <div className="bg-[var(--surface-soft)] border border-dashed border-[var(--glass-border)] p-8 rounded-xl text-center flex flex-col items-center justify-center gap-2">
-                <Sparkles className="w-8 h-8 text-[var(--accent)] opacity-40" />
-                <p className="text-sm font-cinzel text-[var(--text-secondary)] m-0">
-                  No hay acontecimientos registrados para el protagonista todavía.
+            {/* Si no hay acontecimientos en el timeline ni en la ficha */}
+            {(!project.timeline || project.timeline.length === 0) && (!cleanPc.events || cleanPc.events.length === 0) ? (
+              <div className="bg-[var(--surface-soft)] border border-dashed border-[var(--glass-border)] p-8 rounded-xl text-center flex flex-col items-center justify-center gap-2.5">
+                <CalendarClock className="w-9 h-9 text-[var(--accent)] opacity-40" />
+                <p className="text-sm font-cinzel text-[var(--text-secondary)] m-0 font-bold">
+                  Los acontecimientos se registran día a día en el Diario & Agenda
                 </p>
-                <p className="text-xs text-[var(--text-secondary)] font-lora italic m-0 max-w-md">
-                  Puedes registrar momentos clave, acuerdos, pérdidas o revelaciones usando el botón "+ Añadir Acontecimiento / Nota" o sincronizar bajo demanda con la IA.
+                <p className="text-xs text-[var(--text-secondary)] font-lora italic m-0 max-w-md leading-relaxed">
+                  Cada suceso, pacto, revelación o combate que vive el protagonista queda fechado automáticamente en su día correspondiente del calendario de Faerûn.
                 </p>
+                <button
+                  onClick={() => setActiveTab('diary')}
+                  className="mt-2 px-4 py-1.5 text-xs font-cinzel font-bold bg-[var(--surface)] hover:bg-[var(--glass)] border border-[var(--accent)]/50 text-[var(--accent)] rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Calendar className="w-3.5 h-3.5" /> Ir al Diario de Campaña
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {cleanPc.events.map((ev) => (
+                {/* Entradas del Timeline de la Campaña (Diario & Agenda) */}
+                {(project.timeline || []).slice(-6).reverse().map(tl => (
+                  <div
+                    key={tl.id}
+                    onClick={() => setActiveTab('diary')}
+                    className="bg-[var(--surface)] border border-[var(--glass-border)] hover:border-[var(--accent)]/50 p-4 rounded-xl shadow-xs transition-all flex flex-col justify-between gap-2.5 cursor-pointer group"
+                    title="Haz clic para ver este día en el Diario & Agenda"
+                  >
+                    <div>
+                      <div className="flex justify-between items-start gap-2 mb-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-cinzel px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 font-bold">
+                            <Clock className="w-3 h-3" /> {tl.date || 'Día de campaña'}
+                          </span>
+                          {tl.lugar && (
+                            <span className="text-[10px] text-[var(--text-secondary)] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface-soft)]">
+                              📍 {tl.lugar}
+                            </span>
+                          )}
+                        </div>
+                        {tl.mood && <span className="text-base leading-none">{tl.mood}</span>}
+                      </div>
+
+                      {tl.title && (
+                        <h4 className="font-cinzel font-bold text-sm text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors m-0 mb-1">
+                          {tl.title}
+                        </h4>
+                      )}
+
+                      <p className="text-xs sm:text-sm font-lora text-[var(--text-primary)] leading-relaxed m-0 line-clamp-3">
+                        {tl.summary}
+                      </p>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-[var(--glass-border)] text-[11px] font-cinzel text-[var(--accent)]">
+                      <span>Ver día completo en la Agenda</span>
+                      <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                ))}
+
+                {/* Eventos directos del PC si existen */}
+                {(cleanPc.events || []).map(ev => (
                   <div
                     key={ev.id}
                     className="bg-[var(--surface)] border border-[var(--glass-border)] hover:border-[var(--accent)]/50 p-4 rounded-xl shadow-xs transition-all flex flex-col justify-between gap-3"
@@ -1101,32 +777,6 @@ export const MemoryManager: React.FC<{
                         <h4 className="font-cinzel font-bold text-sm sm:text-base text-[var(--accent)] m-0">
                           {ev.title}
                         </h4>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => {
-                              setEditingOcEvent(ev);
-                              setIsOcEventModalOpen(true);
-                            }}
-                            className="p-1 rounded hover:bg-[var(--glass)] text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
-                            title="Editar Acontecimiento"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setConfirmModal({
-                                isOpen: true,
-                                title: 'Eliminar Acontecimiento',
-                                message: `¿Seguro que deseas eliminar "${ev.title}" de la memoria del protagonista?`,
-                                onConfirm: () => handleDeleteOcEvent(ev.id)
-                              });
-                            }}
-                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 transition-colors cursor-pointer"
-                            title="Eliminar Acontecimiento"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
                       </div>
 
                       {ev.dateOrTime && (
@@ -1170,66 +820,19 @@ export const MemoryManager: React.FC<{
         <div className="flex flex-col gap-3">
           <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
             <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
-              Resumen Acumulado de la Historia (Leído por el Narrador para mantener coherencia):
+              Resumen Acumulado de la Historia (Actualizado de forma continua por la IA):
             </span>
-            <div className="flex gap-2">
-              {!isEditingStory ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setStoryDraft(memory.story || '');
-                      setIsEditingStory(true);
-                    }}
-                    className="px-3 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] transition-all cursor-pointer"
-                  >
-                    <Pencil className="w-3.5 h-3.5" /> Editar Texto
-                  </button>
-                  {memory.story && (
-                    <button
-                      onClick={handleClearStory}
-                      className="px-2.5 py-1 text-xs font-cinzel text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 transition-all cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Vaciar
-                    </button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={handleSaveStory}
-                    className="px-3 py-1 text-xs font-cinzel bg-emerald-700 text-white rounded hover:bg-emerald-800 transition-all cursor-pointer font-bold"
-                  >
-                    <Save className="w-3.5 h-3.5" /> Guardar
-                  </button>
-                  <button
-                    onClick={() => setIsEditingStory(false)}
-                    className="px-3 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] transition-all cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                </>
-              )}
-            </div>
           </div>
 
-          {isEditingStory ? (
-            <textarea
-              value={storyDraft}
-              onChange={e => setStoryDraft(e.target.value)}
-              placeholder="Escribe o edita el resumen histórico de lo acontecido en la campaña..."
-              className="w-full h-[400px] bg-[var(--surface)] border-2 border-[var(--accent)] p-4 rounded-lg text-base font-lora outline-none leading-relaxed shadow-inner"
-            />
-          ) : (
-            <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-6 rounded-lg shadow-sm text-base md:text-lg leading-relaxed markdown-body min-h-[160px]">
-              {memory.story ? (
-                <ReactMarkdown>{memory.story}</ReactMarkdown>
-              ) : (
-                <span className="text-[var(--text-secondary)] italic">
-                  La crónica está vacía. Haz clic en "Editar Texto" para redactar manualmente los acontecimientos de la campaña.
-                </span>
-              )}
-            </div>
-          )}
+          <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-6 rounded-lg shadow-sm text-base md:text-lg leading-relaxed markdown-body min-h-[160px]">
+            {memory.story ? (
+              <ReactMarkdown>{memory.story}</ReactMarkdown>
+            ) : (
+              <span className="text-[var(--text-secondary)] italic">
+                La crónica acumulada se va nutriendo automáticamente a medida que se desarrollan las escenas de la campaña.
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -1238,66 +841,19 @@ export const MemoryManager: React.FC<{
         <div className="flex flex-col gap-3">
           <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
             <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
-              Situación actual (dónde están, qué peligros enfrentan, con qué recursos):
+              Situación actual de la compañía (dónde están, qué peligros enfrentan, recursos):
             </span>
-            <div className="flex gap-2">
-              {!isEditingStatus ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setStatusDraft(memory.current_status || '');
-                      setIsEditingStatus(true);
-                    }}
-                    className="px-3 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] transition-all cursor-pointer"
-                  >
-                    <Pencil className="w-3.5 h-3.5" /> Editar Estado
-                  </button>
-                  {memory.current_status && (
-                    <button
-                      onClick={handleClearStatus}
-                      className="px-2.5 py-1 text-xs font-cinzel text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 transition-all cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Vaciar
-                    </button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={handleSaveStatus}
-                    className="px-3 py-1 text-xs font-cinzel bg-emerald-700 text-white rounded hover:bg-emerald-800 transition-all cursor-pointer font-bold"
-                  >
-                    <Save className="w-3.5 h-3.5" /> Guardar
-                  </button>
-                  <button
-                    onClick={() => setIsEditingStatus(false)}
-                    className="px-3 py-1 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] transition-all cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                </>
-              )}
-            </div>
           </div>
 
-          {isEditingStatus ? (
-            <textarea
-              value={statusDraft}
-              onChange={e => setStatusDraft(e.target.value)}
-              placeholder="Describe el estado de ánimo, heridas, ubicación actual o tensión del grupo..."
-              className="w-full h-[300px] bg-[var(--surface)] border-2 border-[var(--accent)] p-4 rounded-lg text-base font-lora outline-none leading-relaxed shadow-inner"
-            />
-          ) : (
-            <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-6 rounded-lg shadow-sm text-base md:text-lg leading-relaxed markdown-body min-h-[140px]">
-              {memory.current_status ? (
-                <ReactMarkdown>{memory.current_status}</ReactMarkdown>
-              ) : (
-                <span className="text-[var(--text-secondary)] italic">
-                  No hay estado actual registrado. Haz clic en "Editar Estado"para definirlo libremente.
-                </span>
-              )}
-            </div>
-          )}
+          <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-6 rounded-lg shadow-sm text-base md:text-lg leading-relaxed markdown-body min-h-[140px]">
+            {memory.current_status ? (
+              <ReactMarkdown>{memory.current_status}</ReactMarkdown>
+            ) : (
+              <span className="text-[var(--text-secondary)] italic">
+                El estado actual de la compañía se actualiza automáticamente con cada respuesta del Narrador.
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -1550,33 +1106,6 @@ export const MemoryManager: React.FC<{
             <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
               Tramas y Misiones Activas ({memory.quests?.length || 0})
             </span>
-            <div className="flex gap-2">
-              {memory.quests && memory.quests.length > 0 && (
-                <button
-                  onClick={handleClearAllQuests}
-                  className="px-2.5 py-1 text-xs font-cinzel text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 transition-all cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Borrar Todas
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  setEditingQuest({
-                    id: 'quest_' + Date.now() + '_' + Math.random().toString(36).substring(7),
-                    title: '',
-                    type: 'Principal',
-                    origin: '',
-                    objective: '',
-                    progress: '',
-                    status: 'Activa'
-                  });
-                  setIsQuestModalOpen(true);
-                }}
-                className="bg-[var(--accent)] text-[var(--on-accent)] px-3 py-1.5 rounded font-cinzel text-xs hover:bg-[var(--accent-hover)] transition-all cursor-pointer font-bold shadow-xs"
-              >
-                + Nueva Trama
-              </button>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
@@ -1646,30 +1175,12 @@ export const MemoryManager: React.FC<{
                         </button>
                       )}
                     </div>
-
-                    <div className="flex md:flex-col justify-end gap-2 shrink-0">
-                      <button
-                        onClick={() => {
-                          setEditingQuest(q);
-                          setIsQuestModalOpen(true);
-                        }}
-                        className="px-3 py-1.5 text-xs border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] rounded hover:bg-[var(--sidebar-bg)] font-cinzel cursor-pointer transition-all flex items-center gap-1"
-                      >
-                        <Pencil className="w-3.5 h-3.5" /> Editar
-                      </button>
-                      <button
-                        onClick={() => handleDeleteQuest(q.id, q.title)}
-                        className="px-3 py-1.5 text-xs text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 font-cinzel cursor-pointer transition-all flex items-center gap-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Borrar
-                      </button>
-                    </div>
                   </div>
                 );
               })
             ) : (
               <div className="text-[var(--text-secondary)] italic py-8 px-6 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] max-w-2xl mx-auto shadow-2xs leading-relaxed text-xs md:text-sm">
-                No hay tramas registradas. Puedes añadir misiones libremente con el botón "+ Nueva Trama".
+                No hay tramas registradas. Las misiones y objetivos se registran y actualizan automáticamente conforme avanza la historia.
               </div>
             )}
           </div>
@@ -1689,15 +1200,6 @@ export const MemoryManager: React.FC<{
               </span>
             </div>
             <div className="flex gap-2 flex-wrap items-center">
-              <button
-                onClick={() => {
-                  setEditingNpc({});
-                  setIsNpcModalOpen(true);
-                }}
-                className="px-2.5 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] transition-all cursor-pointer font-bold flex items-center gap-1 shadow-xs"
-              >
-                <Plus className="w-3.5 h-3.5" /> + Nuevo PNJ
-              </button>
               {memory.npcs && memory.npcs.length > 1 && (
                 <button
                   onClick={handleDeduplicateNpcs}
@@ -1715,14 +1217,6 @@ export const MemoryManager: React.FC<{
                   title="Sincronizar y vincular retratos de archivos con la lista de PNJs"
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> Vincular Retratos
-                </button>
-              )}
-              {memory.npcs && memory.npcs.length > 0 && (
-                <button
-                  onClick={handleClearAllNpcs}
-                  className="px-2.5 py-1 text-xs font-cinzel text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 transition-all cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Borrar Todos
                 </button>
               )}
             </div>
@@ -1897,33 +1391,13 @@ export const MemoryManager: React.FC<{
                           <Camera className="w-3 h-3" /> {portraitSrc ? 'Retrato' : '+ Retrato'}
                         </button>
                       </div>
-
-                      <div className="flex gap-1 shrink-0 items-center">
-                        <button
-                          onClick={() => {
-                            setEditingNpc(n);
-                            setIsNpcModalOpen(true);
-                          }}
-                          className="px-2 py-0.5 text-xs border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] rounded hover:bg-[var(--sidebar-bg)] font-cinzel cursor-pointer transition-all flex items-center gap-1"
-                          title="Editar datos del PNJ"
-                        >
-                          <Pencil className="w-3 h-3" /> Editar
-                        </button>
-                        <button
-                          onClick={() => handleDeleteNpc(n.id, n.name)}
-                          className="px-2 py-0.5 text-xs text-red-700 hover:text-red-900 border border-red-200 dark:border-red-900/40 rounded hover:bg-red-50 dark:hover:bg-red-950 font-cinzel cursor-pointer transition-all flex items-center gap-1"
-                          title="Borrar PNJ"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
                     </div>
                   </div>
                 );
               })
             ) : (
               <div className="col-span-full text-[var(--text-secondary)] italic py-8 px-6 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] max-w-2xl mx-auto shadow-2xs leading-relaxed text-xs md:text-sm">
-                No hay PNJs registrados en la memoria. Puedes crear y añadir nuevos personajes manualmente con el botón "+ Nuevo PNJ".
+                No hay PNJs registrados en la memoria. Los personajes con los que interactúes se añadirán automáticamente aquí.
               </div>
             )}
           </div>
@@ -1941,25 +1415,6 @@ export const MemoryManager: React.FC<{
               <span className="text-[11px] text-[var(--text-secondary)] opacity-80">
                 Fortalezas, ciudades, tabernas y mazmorras con sus mapas asociados.
               </span>
-            </div>
-            <div className="flex gap-2 flex-wrap items-center">
-              <button
-                onClick={() => {
-                  setEditingLoc({});
-                  setIsLocModalOpen(true);
-                }}
-                className="px-2.5 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] transition-all cursor-pointer font-bold flex items-center gap-1 shadow-xs"
-              >
-                <Plus className="w-3.5 h-3.5" /> + Nuevo Lugar
-              </button>
-              {memory.locations && memory.locations.length > 0 && (
-                <button
-                  onClick={handleClearAllLocs}
-                  className="px-2.5 py-1 text-xs font-cinzel text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 transition-all cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Borrar Todos
-                </button>
-              )}
             </div>
           </div>
 
@@ -2058,32 +1513,13 @@ export const MemoryManager: React.FC<{
                           {mapSrc ? 'Cambiar Mapa' : '+ Asignar Mapa'}
                         </button>
                       </div>
-
-                      <div className="flex gap-1.5 shrink-0 items-center">
-                        <button
-                          onClick={() => {
-                            setEditingLoc(l);
-                            setIsLocModalOpen(true);
-                          }}
-                          className="px-2 py-0.5 text-xs border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] rounded hover:bg-[var(--sidebar-bg)] font-cinzel cursor-pointer transition-all flex items-center gap-1"
-                          title="Editar datos del lugar"
-                        >
-                          <Pencil className="w-3 h-3" /> Editar
-                        </button>
-                        <button
-                          onClick={() => handleDeleteLoc(l.id, l.name)}
-                          className="px-2.5 py-1 text-xs text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 font-cinzel cursor-pointer transition-all flex items-center gap-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Borrar
-                        </button>
-                      </div>
                     </div>
                   </div>
                 );
               })
             ) : (
               <div className="col-span-full text-[var(--text-secondary)] italic py-8 px-6 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] max-w-2xl mx-auto shadow-2xs leading-relaxed text-xs md:text-sm">
-                No hay lugares registrados en la memoria. Puedes crear y añadir nuevos lugares manualmente con el botón "+ Nuevo Lugar".
+                No hay lugares registrados en la memoria. Las ciudades, asentamientos y ruinas se irán registrando conforme los descubras.
               </div>
             )}
           </div>
@@ -2127,114 +1563,6 @@ export const MemoryManager: React.FC<{
         </div>
       )}
 
-      {/* Quest Modal */}
-      {isQuestModalOpen && editingQuest && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--bg-color)] p-6 rounded-lg shadow-2xl border border-[var(--glass-border)] w-[480px] max-w-full font-lora">
-            <h4 className="font-cinzel text-xl text-[var(--accent)] mb-4 font-bold">
-              {editingQuest.title ? 'Editar Trama' : 'Nueva Trama'}
-            </h4>
-            <div className="flex flex-col gap-3 text-sm">
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Título de la Misión
-                </label>
-                <input
-                  type="text"
-                  value={editingQuest.title}
-                  onChange={e => setEditingQuest({ ...editingQuest, title: e.target.value })}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)]"
-                  placeholder="Título de la trama"
-                />
-              </div>
-              <div className="flex gap-3">
-                <div className="w-1/2">
-                  <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                    Tipo
-                  </label>
-                  <select
-                    value={editingQuest.type}
-                    onChange={e => setEditingQuest({ ...editingQuest, type: e.target.value })}
-                    className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none"
-                  >
-                    <option value="Principal">Principal</option>
-                    <option value="Secundaria">Secundaria</option>
-                    <option value="Personal">Personal</option>
-                    <option value="Rumor">Rumor</option>
-                  </select>
-                </div>
-                <div className="w-1/2">
-                  <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                    Estado
-                  </label>
-                  <select
-                    value={editingQuest.status || 'Activa'}
-                    onChange={e => setEditingQuest({ ...editingQuest, status: e.target.value })}
-                    className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none"
-                  >
-                    <option value="Activa">Activa</option>
-                    <option value="Completada">Completada</option>
-                    <option value="En Pausa">En Pausa</option>
-                    <option value="Fallida">Fallida</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Origen / Quién la dio
-                </label>
-                <input
-                  type="text"
-                  value={editingQuest.origin || ''}
-                  onChange={e => setEditingQuest({ ...editingQuest, origin: e.target.value })}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)]"
-                  placeholder="Quién o qué la puso en marcha"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Objetivo
-                </label>
-                <textarea
-                  value={editingQuest.objective}
-                  onChange={e => setEditingQuest({ ...editingQuest, objective: e.target.value })}
-                  rows={2}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] resize-none"
-                  placeholder="Qué hay que conseguir"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  Progreso / Pistas Actuales
-                </label>
-                <textarea
-                  value={editingQuest.progress}
-                  onChange={e => setEditingQuest({ ...editingQuest, progress: e.target.value })}
-                  rows={2}
-                  className="w-full p-2 bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] border border-[var(--user-border)] rounded outline-none focus:border-[var(--accent)] resize-none"
-                  placeholder="Por dónde va ahora mismo"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setIsQuestModalOpen(false)}
-                className="px-4 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)]"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => handleSaveQuest(editingQuest)}
-                disabled={!editingQuest.title.trim()}
-                className="px-4 py-1.5 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] disabled:opacity-50 font-bold"
-              >
-                Guardar Trama
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* NPC Full Dossier Modal ("Página que se abre") */}
       {selectedNpcForDossier && (
         <NpcDossierModal
@@ -2244,10 +1572,6 @@ export const MemoryManager: React.FC<{
           onToggleDestaparVinculo={npcId =>
             setVinculosDestapados(prev => new Set(prev).add(npcId))
           }
-          onEdit={n => {
-            setEditingNpc(n);
-            setIsNpcModalOpen(true);
-          }}
           onChangePortrait={n => {
             setTargetForPortraitPicker({
               type: 'npc',
@@ -2273,10 +1597,6 @@ export const MemoryManager: React.FC<{
         <LocationDossierModal
           location={selectedLocForDossier}
           allImageFiles={allImageFiles}
-          onEdit={loc => {
-            setEditingLoc(loc);
-            setIsLocModalOpen(true);
-          }}
           onChangeMap={loc => {
             setTargetForPortraitPicker({
               type: 'location',
@@ -2289,63 +1609,6 @@ export const MemoryManager: React.FC<{
         />
       )}
 
-      {/* NPC Edit Modal */}
-      {isNpcModalOpen && (
-        <NpcEditModal
-          isOpen={isNpcModalOpen}
-          npc={editingNpc}
-          allImageFiles={allImageFiles}
-          onClose={() => {
-            setIsNpcModalOpen(false);
-            setEditingNpc(null);
-          }}
-          onSave={async (updatedNpc) => {
-            await handleSaveNpc(updatedNpc);
-          }}
-          onOpenPortraitPicker={() =>
-            setTargetForPortraitPicker({
-              type: 'npc',
-              id: editingNpc?.id || 'npc_temp',
-              name: editingNpc?.name || 'Personaje',
-              desc: [
-                editingNpc?.characterSheet?.race,
-                editingNpc?.characterSheet?.class,
-                editingNpc?.characterSheet?.gender,
-                editingNpc?.appearance,
-                editingNpc?.characterSheet?.appearance,
-                editingNpc?.description,
-                editingNpc?.notes,
-                editingNpc?.relation
-              ].filter(Boolean).join(' ')
-            })
-          }
-        />
-      )}
-
-      {/* Location Edit Modal */}
-      {isLocModalOpen && (
-        <LocationEditModal
-          isOpen={isLocModalOpen}
-          location={editingLoc}
-          allImageFiles={allImageFiles}
-          onClose={() => {
-            setIsLocModalOpen(false);
-            setEditingLoc(null);
-          }}
-          onSave={async (updatedLoc) => {
-            await handleSaveLoc(updatedLoc);
-          }}
-          onOpenPortraitPicker={() =>
-            setTargetForPortraitPicker({
-              type: 'location',
-              id: editingLoc?.id || 'loc_temp',
-              name: editingLoc?.name || 'Lugar',
-              desc: [editingLoc?.desc, editingLoc?.notes].filter(Boolean).join(' ')
-            })
-          }
-        />
-      )}
-
       {/* Quick Portrait & Location/Map Linker Modal */}
       {targetForPortraitPicker && (
         <ImagePickerModal
@@ -2355,98 +1618,6 @@ export const MemoryManager: React.FC<{
           onUploadFile={onUploadEntityImage}
           onClose={() => setTargetForPortraitPicker(null)}
         />
-      )}
-
-      {/* OC Event Modal */}
-      {isOcEventModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[var(--surface)] border border-[var(--glass-border)] rounded-xl w-full max-w-lg shadow-2xl p-5 md:p-6 flex flex-col gap-4">
-            <div className="flex justify-between items-center border-b border-[var(--glass-border)] pb-3">
-              <h3 className="font-cinzel text-base md:text-lg font-bold text-[var(--accent)] flex items-center gap-2 m-0">
-                <Sparkles className="w-4 h-4" />
-                {editingOcEvent?.id ? 'Editar Acontecimiento del OC' : 'Nuevo Acontecimiento o Hito del OC'}
-              </h3>
-              <button
-                onClick={() => {
-                  setIsOcEventModalOpen(false);
-                  setEditingOcEvent(null);
-                }}
-                className="p-1 rounded hover:bg-[var(--glass)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">
-                  Título del Acontecimiento o Suceso: *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: El pacto con el corsario, El secreto de Luskan, La visión de Auron..."
-                  value={editingOcEvent?.title || ''}
-                  onChange={e => setEditingOcEvent(prev => ({ ...(prev || {}), title: e.target.value }))}
-                  className="w-full bg-[var(--bg-color)] border border-[var(--glass-border)] rounded-lg px-3 py-2 text-sm font-cinzel text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">
-                  Momento / Fecha (Opcional):
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: 15 de Marpenoth, Capítulo 2, Noche en alta mar..."
-                  value={editingOcEvent?.dateOrTime || ''}
-                  onChange={e => setEditingOcEvent(prev => ({ ...(prev || {}), dateOrTime: e.target.value }))}
-                  className="w-full bg-[var(--bg-color)] border border-[var(--glass-border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">
-                  Descripción y Repercusión para el Personaje: *
-                </label>
-                <textarea
-                  rows={4}
-                  placeholder="Describe qué ocurrió, cómo afectó al personaje, qué descubrió o qué decisión importante tomó..."
-                  value={editingOcEvent?.description || ''}
-                  onChange={e => setEditingOcEvent(prev => ({ ...(prev || {}), description: e.target.value }))}
-                  className="w-full bg-[var(--bg-color)] border border-[var(--glass-border)] rounded-lg p-3 text-sm font-lora text-[var(--text-primary)] outline-none focus:border-[var(--accent)] resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 border-t border-[var(--glass-border)] pt-3">
-              <button
-                onClick={() => {
-                  setIsOcEventModalOpen(false);
-                  setEditingOcEvent(null);
-                }}
-                className="px-3 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded-lg hover:bg-[var(--surface)] text-[var(--text-secondary)] transition-colors cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  if (editingOcEvent && editingOcEvent.title?.trim()) {
-                    handleSaveOcEvent({
-                      id: editingOcEvent.id,
-                      title: editingOcEvent.title,
-                      description: editingOcEvent.description || '',
-                      dateOrTime: editingOcEvent.dateOrTime
-                    });
-                  }
-                }}
-                disabled={!editingOcEvent?.title?.trim()}
-                className="px-4 py-1.5 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm cursor-pointer"
-              >
-                <Save className="w-3.5 h-3.5" /> Guardar Acontecimiento
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Generic Confirmation Modal */}
@@ -2475,3 +1646,4 @@ export const MemoryManager: React.FC<{
     </div>
   );
 };
+

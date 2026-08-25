@@ -5,15 +5,13 @@ import {
   Castle,
   MapPin,
   Camera,
-  Eye,
-  Pencil
+  Eye
 } from 'lucide-react';
 
 interface LocationDossierModalProps {
   location: Location;
   allImageFiles: ProjectFile[];
   onChangeMap: (loc: Location) => void;
-  onEdit?: (loc: Location) => void;
   onClose: () => void;
 }
 
@@ -21,7 +19,6 @@ export const LocationDossierModal: React.FC<LocationDossierModalProps> = ({
   location,
   allImageFiles,
   onChangeMap,
-  onEdit,
   onClose
 }) => {
   React.useEffect(() => {
@@ -75,19 +72,6 @@ export const LocationDossierModal: React.FC<LocationDossierModalProps> = ({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {onEdit && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onEdit(location);
-                }}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-cinzel font-semibold bg-[var(--surface)] hover:bg-[var(--accent)] text-[var(--accent)] hover:text-[var(--on-accent)] border border-[var(--user-border)] transition-all cursor-pointer shadow-xs"
-                title="Editar datos del lugar"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Editar Lugar</span>
-              </button>
-            )}
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)] transition-all cursor-pointer shrink-0"
