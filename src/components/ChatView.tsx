@@ -165,6 +165,19 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
         {/* Quick action buttons on hover / top bar */}
         {!isEditing && (
           <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 bg-[var(--bg-color)]/95 px-1.5 py-0.5 rounded-lg border border-[var(--user-border)] shadow-2xs opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 transition-opacity max-w-full">
+            {/*
+              En el móvil no hay ratón, así que esta barra —pensada para
+              aparecer al pasar por encima— se queda fija. En los mensajes del
+              Narrador eso dejaba Copiar, Editar, Rehacer e Ilustrar por
+              duplicado: aquí arriba y otra vez en la fila de abajo, que además
+              se lee mejor porque lleva las palabras enteras. En pantalla
+              pequeña se enseña solo lo que la de abajo no trae.
+            */}
+            <div
+              className={`items-center gap-0.5 sm:gap-1 ${
+                isModel ? 'hidden sm:flex' : 'flex'
+              }`}
+            >
             <button
               onClick={() => handleCopyMessage(idx, m.content)}
               className="hover:text-[var(--accent)] px-1 py-0.5 text-[11px] cursor-pointer transition-colors"
@@ -206,7 +219,8 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                 )}
               </>
             )}
-            <span className="text-[var(--glass-border)]">•</span>
+            </div>
+            <span className={`text-[var(--glass-border)] ${isModel ? 'hidden sm:inline' : ''}`}>•</span>
             <button
               onClick={() =>
                 setDeleteModal({
@@ -453,7 +467,6 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                 className="px-2.5 py-1 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-amber-100 border border-[var(--user-border)] rounded text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1 ml-auto"
                 title="Copiar texto"
               >
-                <span>{copiedIndex === idx ? '' : ''}</span>
                 <span>{copiedIndex === idx ? 'Copiado' : 'Copiar'}</span>
               </button>
             </div>
@@ -465,15 +478,15 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
               <button
                 onClick={() => handleStartEditing(idx, m.content)}
                 disabled={isGenerating}
-                className="hover:underline text-[var(--accent)] cursor-pointer disabled:opacity-40"
+                className="inline-flex items-center gap-1 hover:underline text-[var(--accent)] cursor-pointer disabled:opacity-40"
               >
                 <Pencil className="w-3.5 h-3.5" /> Editar pregunta
               </button>
-              <span>•</span>
+              <span className="leading-none">•</span>
               <button
                 onClick={() => onRegenerateMessage(idx)}
                 disabled={isGenerating}
-                className="hover:underline text-[var(--accent)] cursor-pointer disabled:opacity-40"
+                className="inline-flex items-center gap-1 hover:underline text-[var(--accent)] cursor-pointer disabled:opacity-40"
                 title="Re-ejecutar esta acción y generar nueva respuesta"
               >
                 <RefreshCw className="w-3.5 h-3.5" /> Re-tirar desde aquí
@@ -1503,7 +1516,10 @@ export const ChatView: React.FC<{
                   onSendMessage();
                 }
               }}
-              placeholder={isListening ? '🎙️ Escuchando... habla con normalidad...' : '¿Qué hace tu personaje? (Escribe o pulsa el micrófono para dictar)'}
+              // El cajón mide 38px de alto y el texto de ayuda ocupaba dos
+              // líneas en el móvil, así que se veía cortado por la mitad. Lo
+              // del micrófono ya lo cuenta el propio botón del micrófono.
+              placeholder={isListening ? '🎙️ Escuchando...' : '¿Qué hace tu personaje?'}
               className="flex-1 bg-transparent border-none text-[var(--text-primary)] text-sm sm:text-base md:text-lg outline-none resize-none min-h-[38px] max-h-[140px] md:max-h-[220px] py-2 px-1 font-lora leading-normal placeholder:text-[var(--text-secondary)] placeholder:opacity-60 overflow-y-auto"
               rows={1}
             />

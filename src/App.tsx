@@ -2141,20 +2141,6 @@ export default function App() {
       )}
 
       {/* Loading Overlay */}
-      {storageWarning && (
-        <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[120] max-w-[560px] w-[calc(100%-1.5rem)] bg-amber-50 border border-amber-300 text-amber-950 rounded-lg shadow-lg px-3.5 py-2.5 flex items-start gap-2.5 text-xs font-lora">
-          <TriangleAlert className="w-4 h-4 shrink-0 mt-0.5 text-amber-700" />
-          <span className="flex-1">{storageWarning}</span>
-          <button
-            onClick={() => setStorageWarning(null)}
-            className="shrink-0 text-amber-800 hover:text-amber-950 cursor-pointer"
-            title="Entendido"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
       {isGenerating && !isStreamingTurn && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[100] animate-[fadeIn_0.2s_ease]">
           <div className="bg-[var(--surface)] px-6 py-5 rounded-xl shadow-2xl border-2 border-[var(--accent)] flex items-center gap-4 max-w-lg mx-4">
@@ -2501,6 +2487,25 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg-color)]">
+        {/*
+          El aviso de almacenamiento iba flotando con `fixed bottom-3`, y en el
+          móvil aterrizaba justo encima del cajón de escribir y de la fila de
+          dados: no se podía ni teclear hasta cerrarlo. Ahora va en el flujo,
+          debajo de la barra: empuja la escena hacia abajo en vez de taparla.
+        */}
+        {storageWarning && (
+          <div className="shrink-0 border-b border-amber-300 bg-amber-50 text-amber-950 px-3 py-2 flex items-start gap-2.5 text-xs font-lora">
+            <TriangleAlert className="w-4 h-4 shrink-0 mt-0.5 text-amber-700" />
+            <span className="flex-1">{storageWarning}</span>
+            <button
+              onClick={() => setStorageWarning(null)}
+              className="shrink-0 text-amber-800 hover:text-amber-950 cursor-pointer"
+              title="Entendido"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         {/* Top Navbar */}
         <div className="h-13 md:h-14 border-b border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--bg-color)_85%,transparent)] backdrop-blur-xs flex justify-between items-center px-2.5 md:px-4 shrink-0 shadow-xs gap-2">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
