@@ -440,6 +440,30 @@ export const InstructionsView: React.FC<{
                 Genera el panel interactivo de tirada de dados para el jugador.
               </p>
             </div>
+
+            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
+              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
+                <Hourglass className="w-3.5 h-3.5" /> Travesías y Altamar (Anti-Fast Travel)
+              </div>
+              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
+                [TIEMPO: +1d] · Mar de las Espadas (8-12 días a puerto)
+              </code>
+              <p className="text-[11px] text-[var(--text-secondary)] m-0">
+                El motor calcula millas marítimas reales desde el origen y avanza día a día.
+              </p>
+            </div>
+
+            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
+              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
+                <Scroll className="w-3.5 h-3.5" /> Diarios y Pertenencias Íntimas
+              </div>
+              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
+                Consulta directa de contenido antes de registrar
+              </code>
+              <p className="text-[11px] text-[var(--text-secondary)] m-0">
+                Si un PNJ abre diarios o cartas del PJ, pregunta a la jugadora antes de inventar el texto.
+              </p>
+            </div>
           </div>
         )}
       </div>
