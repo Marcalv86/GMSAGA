@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Project, NPC, Location, ProjectFile } from '../types';
-import { classifyFileAuto } from '../utils/geminiHelper';
 import {
   obtenerInfoRelacion
 } from '../utils/campaignCalendar';
@@ -28,14 +27,10 @@ import {
   FileText,
   GitMerge,
   Heart,
-  Image,
   Lock,
-  Map,
   MapPin,
-  Pencil,
   Plus,
   RefreshCw,
-  Save,
   Scroll,
   Shield,
   Sparkles,
@@ -150,7 +145,6 @@ export type SeccionMemoria =
   | 'diary'
   | 'npcs'
   | 'locs'
-  | 'visual'
   | 'quests'
   | 'story'
   | 'status'
@@ -162,10 +156,6 @@ export const MemoryManager: React.FC<{
   onUpdateMemory: (updater: (prevMem: Project['memory']) => Project['memory']) => Promise<void>;
   onUpdateProject?: (updater: (prev: Project) => Partial<Project>) => Promise<void>;
   onTriggerAIUpdate?: () => Promise<void>;
-  onAnalyzeImageFile?: (file: ProjectFile) => Promise<void>;
-  onUpdateFileAnalysis?: (fileId: string, analysis: string) => Promise<void>;
-  onDeleteFileAnalysis?: (fileId: string) => Promise<void>;
-  onOpenMap?: (file: ProjectFile) => void;
   onAutoClassifyAll?: () => Promise<void>;
   onUploadEntityImage?: (file: File, category?: any) => Promise<string>;
   isGenerating?: boolean;
@@ -178,10 +168,6 @@ export const MemoryManager: React.FC<{
   onUpdateMemory,
   onUpdateProject,
   onTriggerAIUpdate,
-  onAnalyzeImageFile,
-  onUpdateFileAnalysis,
-  onDeleteFileAnalysis,
-  onOpenMap,
   onAutoClassifyAll,
   onUploadEntityImage,
   isGenerating = false,
@@ -195,7 +181,7 @@ export const MemoryManager: React.FC<{
    */
   const seccionesVisibles: SeccionMemoria[] = secciones?.length
     ? secciones
-    : ['character', 'diary', 'npcs', 'locs', 'visual', 'quests', 'story', 'status', 'notes'];
+    : ['character', 'diary', 'npcs', 'locs', 'quests', 'story', 'status', 'notes'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
 
@@ -206,11 +192,6 @@ export const MemoryManager: React.FC<{
 
   // Protagonist (OC) State
   const [isSyncingAI, setIsSyncingAI] = useState(false);
-
-  // Visual Analysis Editing Modal State
-  const [editingVisualFile, setEditingVisualFile] = useState<ProjectFile | null>(null);
-  const [visualDraft, setVisualDraft] = useState('');
-  const [isVisualModalOpen, setIsVisualModalOpen] = useState(false);
 
   // Portrait Linker Modal state
   const [targetForPortraitPicker, setTargetForPortraitPicker] = useState<ImagePickerTarget | null>(null);
@@ -271,14 +252,7 @@ export const MemoryManager: React.FC<{
     visual_memory: []
   };
 
-  const isNpcOrPjPortrait = (f: ProjectFile) => {
-    const cat = f.category && f.category !== 'other' ? f.category : classifyFileAuto(f, project.memory);
-    return cat === 'portrait_npc' || cat === 'portrait_pj';
-  };
-
   const allImageFiles = files.filter(f => f.isImage);
-  const visualFiles = files.filter(f => f.isImage && !isNpcOrPjPortrait(f));
-  const analyzedCount = visualFiles.filter(f => Boolean(f.analysis?.trim())).length;
 
   const [localNotes, setLocalNotes] = useState(memory.manual_notes || '');
   const [showNarratorNotes, setShowNarratorNotes] = useState(false);
@@ -322,36 +296,6 @@ export const MemoryManager: React.FC<{
     }
     pendingNotesRef.current = null;
     onUpdateMemory(mem => ({ ...mem, manual_notes: localNotes }));
-  };
-
-  // Visual Analysis Handlers
-  const handleOpenEditVisual = (file: ProjectFile) => {
-    setEditingVisualFile(file);
-    setVisualDraft(file.analysis || '');
-    setIsVisualModalOpen(true);
-  };
-
-  const handleSaveVisualAnalysis = async () => {
-    if (!editingVisualFile) return;
-    if (onUpdateFileAnalysis) {
-      await onUpdateFileAnalysis(editingVisualFile.id, visualDraft.trim());
-    }
-    setIsVisualModalOpen(false);
-    setEditingVisualFile(null);
-  };
-
-  const handleDeleteVisualAnalysis = (file: ProjectFile) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Borrar Análisis Visual',
-      message: `¿Eliminar el análisis descriptivo de "${file.name}"? La imagen se conservará.`,
-      onConfirm: async () => {
-        if (onDeleteFileAnalysis) {
-          await onDeleteFileAnalysis(file.id);
-        }
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      }
-    });
   };
 
   // AI Sync Handler
@@ -501,13 +445,6 @@ export const MemoryManager: React.FC<{
               shortLabel: 'Lugares',
               icon: MapPin,
               count: memory.locations?.length ? `(${memory.locations.length})` : ''
-            },
-            {
-              id: 'visual',
-              label: 'Mapas y Visual',
-              shortLabel: 'Visual',
-              icon: Image,
-              count: visualFiles.length ? `(${analyzedCount}/${visualFiles.length})` : ''
             },
             {
               id: 'quests',
@@ -854,171 +791,6 @@ export const MemoryManager: React.FC<{
               </span>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Tab: Visual (Análisis de Mapas e Ilustraciones de Escenarios en Memoria) */}
-      {activeTab === 'visual' && (
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] flex-wrap gap-2">
-            <div>
-              <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold block">
-                Memoria Visual y Mapas de la Campaña ({visualFiles.length} mapas e ilustraciones,{' '}
-                {analyzedCount} analizadas)
-              </span>
-              <span className="text-[11px] text-[var(--text-secondary)] opacity-80">
-                El Narrador consulta estas descripciones visuales para mantener coherencia geográfica,
-                arquitectónica y táctica en mapas y escenas.
-              </span>
-            </div>
-            {onAutoClassifyAll && (
-              <button
-                onClick={onAutoClassifyAll}
-                disabled={isGenerating}
-                className="px-3 py-1.5 bg-amber-100 text-amber-900 border border-amber-300 rounded font-cinzel text-xs font-bold hover:bg-amber-200 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 shadow-2xs"
-                title="Sincroniza y vincula automáticamente mapas e ilustraciones con la memoria"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Sincronizar Mapas y Escenarios
-              </button>
-            )}
-          </div>
-
-          {visualFiles.length === 0 ? (
-            <div className="text-[var(--text-secondary)] italic py-8 px-6 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] max-w-2xl mx-auto shadow-2xs leading-relaxed text-xs md:text-sm">
-              No hay mapas ni ilustraciones de escenarios en la Base de Conocimiento. Sube mapas o escenarios
-              desde la pestaña "Archivos" para analizarlos y guardarlos en la memoria.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-5">
-              {visualFiles.map(file => {
-                const linkedLoc = memory.locations?.find(
-                  l =>
-                    l.portrait === file.content ||
-                    (l.name.length > 2 && file.name.toLowerCase().includes(l.name.toLowerCase()))
-                );
-
-                return (
-                  <div
-                    key={file.id}
-                    className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-4 md:p-5 rounded-lg shadow-sm flex flex-col md:flex-row gap-5 hover:border-[var(--accent)] transition-all"
-                  >
-                    {/* Thumbnail */}
-                    <div className="w-full md:w-56 shrink-0 flex flex-col gap-2">
-                      <div
-                        className="w-full h-40 bg-black/5 rounded-lg overflow-hidden border border-[var(--glass-border)] cursor-pointer relative group flex items-center justify-center"
-                        onClick={() => onOpenMap && onOpenMap(file)}
-                        title="Clic para abrir como Mapa Táctico"
-                      >
-                        <img
-                          src={file.content}
-                          alt={file.name}
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-cinzel font-bold">
-                          <Map className="w-3.5 h-3.5" /> Ver Mapa
-                        </div>
-                      </div>
-                      <div
-                        className="text-xs font-cinzel font-bold text-[var(--text-primary)] truncate"
-                        title={file.name}
-                      >
-                        {file.name}
-                      </div>
-
-                      {/* Linking Badges */}
-                      {linkedLoc && (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] bg-blue-100 text-blue-900 border border-blue-300 px-2 py-0.5 rounded font-cinzel font-bold truncate">
-                            Lugar: {linkedLoc.name}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Analysis Content */}
-                    <div className="flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-[var(--glass-border)] flex-wrap gap-2">
-                          <span className="text-xs font-cinzel font-bold text-[var(--accent)] uppercase tracking-wider">
-                            {file.analysis ? 'Análisis Visual en Memoria' : 'Sin Análisis en Memoria'}
-                          </span>
-                          <div className="flex gap-1.5 flex-wrap">
-                            {file.analysis ? (
-                              <>
-                                <button
-                                  onClick={() => handleOpenEditVisual(file)}
-                                  className="px-2.5 py-1 text-xs font-cinzel bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-[var(--surface)] border border-[var(--user-border)] rounded text-[var(--accent)] transition-colors cursor-pointer"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" /> Editar
-                                </button>
-                                {onAnalyzeImageFile && (
-                                  <button
-                                    onClick={() => onAnalyzeImageFile(file)}
-                                    disabled={isGenerating}
-                                    className="px-2.5 py-1 text-xs font-cinzel bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-[var(--surface)] border border-[var(--user-border)] rounded text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-50"
-                                    title="Re-analizar imagen con Gemini"
-                                  >
-                                    <Sparkles className="w-3.5 h-3.5" /> Re-analizar
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleDeleteVisualAnalysis(file)}
-                                  className="px-2.5 py-1 text-xs font-cinzel text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 transition-colors cursor-pointer"
-                                  title="Borrar este análisis de la memoria"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" /> Borrar
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                {onAnalyzeImageFile && (
-                                  <button
-                                    onClick={() => onAnalyzeImageFile(file)}
-                                    disabled={isGenerating}
-                                    className="px-3 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] rounded font-bold transition-all cursor-pointer disabled:opacity-50 shadow-xs"
-                                  >
-                                    <Sparkles className="w-3.5 h-3.5" /> Analizar con IA
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleOpenEditVisual(file)}
-                                  className="px-2.5 py-1 text-xs font-cinzel bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-[var(--surface)] border border-[var(--user-border)] rounded text-[var(--text-secondary)] transition-colors cursor-pointer"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" /> Escribir Manualmente
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        {file.analysis ? (
-                          <div className="text-sm text-[var(--text-primary)] leading-relaxed markdown-body max-h-48 overflow-y-auto pr-2">
-                            <ReactMarkdown>{file.analysis}</ReactMarkdown>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-[var(--text-secondary)] italic my-3">
-                            Este mapa o ilustración aún no tiene un análisis registrado en la memoria. Pulsa
-                            "Analizar con IA"o "Escribir Manualmente"para que el Narrador reconozca sus
-                            detalles geográficos durante la partida.
-                          </p>
-                        )}
-                      </div>
-
-                      {file.markers && file.markers.length > 0 && (
-                        <div className="mt-3 pt-2 border-t border-[var(--glass-border)] text-xs text-[var(--text-secondary)]">
-                          <strong>
-                            <MapPin className="w-3.5 h-3.5" /> Chinchetas Tácticas:
-                          </strong>{' '}
-                          {file.markers.length} puntos de interés marcados.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
 
@@ -1522,43 +1294,6 @@ export const MemoryManager: React.FC<{
                 No hay lugares registrados en la memoria. Las ciudades, asentamientos y ruinas se irán registrando conforme los descubras.
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Visual Analysis Edit Modal */}
-      {isVisualModalOpen && editingVisualFile && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--bg-color)] p-6 rounded-lg shadow-2xl border border-[var(--glass-border)] w-[580px] max-w-full font-lora flex flex-col max-h-[90vh]">
-            <h4 className="font-cinzel text-lg text-[var(--accent)] mb-2 font-bold flex items-center gap-2">
-              <Image className="w-3.5 h-3.5" /> Editar Análisis Visual: {editingVisualFile.name}
-            </h4>
-            <p className="text-xs text-[var(--text-secondary)] mb-3">
-              Modifica la descripción del mapa o imagen que leerá el Narrador IA para mantener coherencia en
-              las escenas.
-            </p>
-            <div className="flex-1 overflow-y-auto mb-4">
-              <textarea
-                value={visualDraft}
-                onChange={e => setVisualDraft(e.target.value)}
-                placeholder="Describe qué se ve en este mapa o ilustración (zonas, ríos, puertas, enemigos, ambiente)..."
-                className="w-full h-64 bg-[var(--surface)] border border-[var(--user-border)] p-3 rounded-lg text-sm font-lora outline-none focus:border-[var(--accent)] leading-relaxed shadow-inner"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--glass-border)]">
-              <button
-                onClick={() => setIsVisualModalOpen(false)}
-                className="px-4 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveVisualAnalysis}
-                className="px-4 py-1.5 text-xs font-cinzel bg-emerald-700 text-white rounded hover:bg-emerald-800 font-bold cursor-pointer"
-              >
-                <Save className="w-3.5 h-3.5" /> Guardar en Memoria
-              </button>
-            </div>
           </div>
         </div>
       )}

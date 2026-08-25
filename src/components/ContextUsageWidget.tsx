@@ -94,12 +94,8 @@ export const ContextUsageWidget: React.FC<{
 
   const mediaCount = files.filter(f => f.isImage || f.isAudio).length;
 
-  // Las imágenes no viajan, pero su análisis escrito sí, y eso hasta ahora no se
-  // contaba en ninguna parte.
-  const visualChars = files.reduce(
-    (acc, f) => acc + (f.isImage && f.analysis ? f.analysis.length + f.name.length + 40 : 0),
-    0
-  );
+  // Las imágenes y mapas son decorativos / retratos y ya no viajan ni consumen tokens.
+  const visualChars = 0;
 
   // Los mismos topes que aplica `buildTurnPayload` al enviar. Antes se sumaban
   // TODOS los mensajes de TODOS los capítulos, así que en una campaña larga la
@@ -233,13 +229,7 @@ export const ContextUsageWidget: React.FC<{
                         label: 'Archivos que viajan enteros',
                         chars: filesChars,
                         Icon: Paperclip,
-                        extra: mediaCount > 0 ? `${mediaCount} imágenes o audios aparte` : undefined
-                      },
-                      {
-                        label: 'Análisis de imágenes y mapas',
-                        chars: visualChars,
-                        Icon: Image,
-                        extra: undefined
+                        extra: mediaCount > 0 ? `${mediaCount} imágenes o audios (decorativos, no consumen tokens)` : undefined
                       },
                       {
                         label: 'Capítulos (solo el tramo reciente)',

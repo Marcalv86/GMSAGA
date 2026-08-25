@@ -2557,10 +2557,6 @@ export default function App() {
               onUpdateMemory={handleUpdateMemory}
               onUpdateProject={handleUpdateProjectField}
               onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
-              onAnalyzeImageFile={handleAnalyzeImageFile}
-              onUpdateFileAnalysis={handleUpdateFileAnalysis}
-              onDeleteFileAnalysis={handleDeleteFileAnalysis}
-              onOpenMap={file => setSelectedMapFile(file)}
               onAutoClassifyAll={handleAutoClassifyAll}
               onUploadEntityImage={handleUploadEntityImage}
               isGenerating={isGenerating}

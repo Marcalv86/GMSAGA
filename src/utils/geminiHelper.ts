@@ -522,15 +522,6 @@ export function buildTurnPayload({
   }
   const allPreviousHistory = trozos.join('');
 
-  const visualFilesText = files
-    .filter(f => f.isImage && f.analysis)
-    .map(f => `=== IMAGEN / MAPA CANÓNICO: ${f.name} ===\nAnálisis Visual:\n${f.analysis}`)
-    .join('\n\n');
-
-  const visualMemoryText = (project.memory?.visual_memory || [])
-    .map(v => `- [${v.fileName}]: ${v.analysis}`)
-    .join('\n');
-
   const memoryContext = project.memory
     ? `
 HISTORIA HASTA AHORA:
@@ -564,9 +555,6 @@ ${
 
 LUGARES CLAVE:
 ${(project.memory.locations || []).map(l => `- ${l.name}: ${l.desc}`).join('\n') || 'Sin lugares clave.'}
-
-REGISTRO VISUAL Y MAPAS EN MEMORIA:
-${visualMemoryText || (visualFilesText ? 'Registrados en la base de archivos visuales.' : 'Sin registros visuales.')}
 
 NOTAS DIRECTAS DEL MAESTRO:
 ${project.memory.manual_notes || 'Sin notas adicionales.'}
@@ -789,8 +777,6 @@ ${pjSection}
 ### BASE DE CONOCIMIENTO (DOCUMENTOS, FICHAS Y MATERIAL ADJUNTO)
 Los siguientes archivos forman parte del canon íntegro del mundo y debes utilizarlos como fuente de verdad sobre PNJs, lugares, eventos pasados, reglas, oráculos y ambientación:
 ${filesText || 'No hay documentos de texto adicionales adjuntos.'}
-
-${visualFilesText ? `### CONOCIMIENTO VISUAL Y MAPAS DE LA CAMPAÑA (INSPECCIÓN VISUAL)\n${visualFilesText}\n` : ''}
 
 ### CONOCIMIENTO DE LA CAMPAÑA (MEMORIA VIVA)
 ${memoryContext}
