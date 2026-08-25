@@ -570,47 +570,47 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
         {/* View Mode Switcher & Actions */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start md:justify-end">
           {/* View Mode Switcher Pills */}
-          <div className="flex items-center gap-1 bg-[var(--surface)] p-1 rounded-xl border border-[var(--glass-border)] shadow-2xs flex-wrap w-full sm:w-auto justify-start">
+          <div className="flex flex-wrap items-center gap-1 bg-[var(--surface)] p-1 rounded-xl border border-[var(--glass-border)] shadow-2xs w-full sm:w-auto justify-start">
             <button
               onClick={() => setViewMode('dia')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer whitespace-nowrap ${
                 viewMode === 'dia'
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
               }`}
             >
-              <Calendar className="w-3.5 h-3.5" /> Día Vista
+              <Calendar className="w-3.5 h-3.5" /> <span>Día Vista</span>
             </button>
             <button
               onClick={() => setViewMode('galeria')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer whitespace-nowrap ${
                 viewMode === 'galeria'
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
               }`}
               title="Ver galería de fotos e ilustraciones organizadas por día"
             >
-              <ImageIcon className="w-3.5 h-3.5" /> Galería Media ({mediaGalleryItems.length})
+              <ImageIcon className="w-3.5 h-3.5" /> <span>Galería ({mediaGalleryItems.length})</span>
             </button>
             <button
               onClick={() => setViewMode('todos')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer whitespace-nowrap ${
                 viewMode === 'todos'
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
               }`}
             >
-              <History className="w-3.5 h-3.5" /> Crónica ({timeline.length})
+              <History className="w-3.5 h-3.5" /> <span>Crónica ({timeline.length})</span>
             </button>
             <button
               onClick={() => setViewMode('relojes')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer whitespace-nowrap ${
                 viewMode === 'relojes'
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
               }`}
             >
-              <Clock className="w-3.5 h-3.5" /> Relojes ({activeThreads.length})
+              <Clock className="w-3.5 h-3.5" /> <span>Relojes ({activeThreads.length})</span>
             </button>
           </div>
 
@@ -619,7 +619,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
             <button
               onClick={() => onTriggerAIUpdate()}
               disabled={isGenerating || !hasChats}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer disabled:opacity-50 shadow-xs w-full sm:w-auto"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer disabled:opacity-50 shadow-xs w-full sm:w-auto shrink-0"
               title="Extraer sucesos de la conversación actual e incorporarlos al diario"
             >
               {isGenerating ? (
@@ -886,29 +886,29 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
             </div>
 
             {/* Quick Day Stepper & Actions */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center border border-[var(--user-border)] rounded-lg bg-[var(--surface)] p-0.5">
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <div className="flex items-center border border-[var(--user-border)] rounded-lg bg-[var(--surface)] p-0.5 shrink-0">
                 <button
                   onClick={() => irADiaRelativo(-1)}
-                  className="px-2.5 py-1 text-xs font-cinzel hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] rounded transition-colors cursor-pointer flex items-center gap-1"
+                  className="px-2 sm:px-2.5 py-1 text-xs font-cinzel hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] rounded transition-colors cursor-pointer flex items-center gap-1"
                   title="Día anterior"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" /> Anterior
+                  <ChevronLeft className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Anterior</span>
                 </button>
                 <button
                   onClick={() => irADiaRelativo(1)}
-                  className="px-2.5 py-1 text-xs font-cinzel hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] rounded transition-colors cursor-pointer flex items-center gap-1"
+                  className="px-2 sm:px-2.5 py-1 text-xs font-cinzel hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] rounded transition-colors cursor-pointer flex items-center gap-1"
                   title="Día siguiente"
                 >
-                  Siguiente <ChevronRight className="w-3.5 h-3.5" />
+                  <span className="hidden xs:inline">Siguiente</span> <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
               <button
                 onClick={() => openNewEntryModal('diario')}
-                className="px-3.5 py-1.5 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                className="px-3 py-1.5 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shadow-xs shrink-0"
               >
-                <Plus className="w-3.5 h-3.5" /> + Añadir Acontecimiento
+                <Plus className="w-3.5 h-3.5" /> <span>+ <span className="hidden sm:inline">Añadir </span>Acontecimiento</span>
               </button>
 
               {entradasDiaActivo.length > 0 && (
@@ -926,7 +926,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                       sceneText: `Acontecimientos del ${nombreDiaActivo}: ${fullScene}`
                     });
                   }}
-                  className="px-3 py-1.5 text-xs font-cinzel font-bold text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/40 border border-amber-500/50 hover:bg-amber-200 dark:hover:bg-amber-900/60 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  className="px-2.5 sm:px-3 py-1.5 text-xs font-cinzel font-bold text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/40 border border-amber-500/50 hover:bg-amber-200 dark:hover:bg-amber-900/60 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs shrink-0"
                   title="Taller Creativo: Generar ilustración o música para el día"
                 >
                   <Wand2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
@@ -937,7 +937,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
               {entradasDiaActivo.length > 0 && (
                 <button
                   onClick={() => handleClearDay(diaSeleccionado)}
-                  className="p-2 text-red-500 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-red-500/30"
+                  className="p-1.5 sm:p-2 text-red-500 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-red-500/30 shrink-0"
                   title="Vaciar todas las entradas de este día"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -1503,32 +1503,32 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[170] p-3 sm:p-4">
           <div className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 font-lora">
             {/* Modal Header with Toolbar: ✕, 📷, 😊, 🪄, GUARDAR */}
-            <div className="p-3.5 sm:p-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-[var(--sidebar-bg)]">
-              <div className="flex items-center gap-3">
+            <div className="p-3 sm:p-4 border-b border-[var(--glass-border)] flex flex-wrap items-center justify-between gap-2 bg-[var(--sidebar-bg)]">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <button
                   onClick={() => setIsEntryEditorOpen(false)}
-                  className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)] transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)] transition-colors cursor-pointer shrink-0"
                   title="Cerrar"
                 >
                   <X className="w-5 h-5" />
                 </button>
-                <span className="font-cinzel text-base sm:text-lg font-bold text-[var(--accent)]">
+                <span className="font-cinzel text-sm sm:text-base md:text-lg font-bold text-[var(--accent)] truncate">
                   {editingEntryId ? 'Editar Entrada de Diario' : 'Nueva Entrada de Diario'}
                 </span>
               </div>
 
               {/* Action Icons & Save Button */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
                 <button
                   onClick={() => setShowImagePickerInModal(prev => !prev)}
-                  className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] transition-colors cursor-pointer"
+                  className="p-1.5 sm:p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] transition-colors cursor-pointer"
                   title="Adjuntar Imagen / Ilustración"
                 >
                   <ImageIcon className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setShowMoodPickerInModal(prev => !prev)}
-                  className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] transition-colors cursor-pointer"
+                  className="p-1.5 sm:p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] transition-colors cursor-pointer"
                   title="Cambiar Ánimo / Mood"
                 >
                   <Smile className="w-4 h-4" />
@@ -1541,7 +1541,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                       sceneText: `${entryDraft.title ? `${entryDraft.title}: ` : ''}${entryDraft.summary}`
                     })
                   }
-                  className="p-2 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                  className="p-1.5 sm:p-2 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 transition-colors cursor-pointer"
                   title="Taller Creativo (Generar con IA)"
                 >
                   <Wand2 className="w-4 h-4" />
@@ -1549,7 +1549,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                 <button
                   onClick={handleSaveEntry}
                   disabled={!entryDraft.title.trim() && !entryDraft.summary.trim()}
-                  className="px-4 py-1.5 rounded-xl font-cinzel text-xs font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                  className="px-3 sm:px-4 py-1.5 rounded-xl font-cinzel text-xs font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                 >
                   <Save className="w-3.5 h-3.5" /> GUARDAR
                 </button>

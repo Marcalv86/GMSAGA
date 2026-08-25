@@ -748,21 +748,21 @@ export const InstructionsView: React.FC<{
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => saveChanges()}
               disabled={saveStatus === 'saved'}
-              className="bg-[var(--accent)] text-[var(--on-accent)] rounded px-3 py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent-hover)] transition-all shadow-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              className="bg-[var(--accent)] text-[var(--on-accent)] rounded px-3 py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent-hover)] transition-all shadow-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
               title="Guardar cambios manualmente"
             >
               <Save className="w-3.5 h-3.5" /> Guardar
             </button>
             <button
               onClick={handleRestoreMasterInstructions}
-              className="bg-[var(--msg-user)] text-[var(--accent)] border border-[var(--user-border)] rounded px-3 py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="bg-[var(--msg-user)] text-[var(--accent)] border border-[var(--user-border)] rounded px-3 py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-all shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
               title="Restaurar las directivas y reglas por defecto de la campaña"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Restaurar directivas por defecto
+              <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Restaurar directivas por defecto</span><span className="sm:hidden">Restaurar</span>
             </button>
           </div>
         </div>

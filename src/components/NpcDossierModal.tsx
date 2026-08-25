@@ -192,10 +192,10 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
         </div>
 
         {/* Tab Navigation (Páginas del Dossier) */}
-        <div className="flex border-b border-[var(--glass-border)] bg-[var(--surface)] px-4 gap-2">
+        <div className="flex border-b border-[var(--glass-border)] bg-[var(--surface)] px-4 gap-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all ${
+            className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all shrink-0 whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-[var(--accent)] text-[var(--accent)]'
                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -207,7 +207,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
 
           <button
             onClick={() => setActiveTab('notes')}
-            className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all ${
+            className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all shrink-0 whitespace-nowrap ${
               activeTab === 'notes'
                 ? 'border-[var(--accent)] text-[var(--accent)]'
                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -220,7 +220,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
           {sheet && (
             <button
               onClick={() => setActiveTab('sheet')}
-              className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all ${
+              className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all shrink-0 whitespace-nowrap ${
                 activeTab === 'sheet'
                   ? 'border-[var(--accent)] text-[var(--accent)]'
                   : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'

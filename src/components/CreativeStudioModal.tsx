@@ -21,7 +21,6 @@ import {
   Upload,
   Calendar,
   BookmarkPlus,
-  ExternalLink,
   Plus
 } from 'lucide-react';
 import { Project, ProjectFile, TimelineEntry, CalendarConfig, CampaignDate } from '../types';
@@ -386,7 +385,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
 
   // Available image files from campaign
   const campaignImageFiles = useMemo(() => {
-    return files.filter(f => f.isImage || (f.url && f.url.startsWith('data:image')));
+    return files.filter(f => f.isImage || (f.content && f.content.startsWith('data:image')));
   }, [files]);
 
   // Handle direct file upload
@@ -796,6 +795,128 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Vincular Ilustración a la Cronología / Diario */}
+              <div className="p-4 rounded-xl border border-[var(--glass-border)] bg-[var(--surface-soft)] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-cinzel font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                    <BookmarkPlus className="w-3.5 h-3.5 text-[var(--accent)]" /> Guardar / Vincular Ilustración al Diario de Campaña ({fechaLegibleStr})
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={customSceneTitle}
+                      onChange={e => setCustomSceneTitle(e.target.value)}
+                      placeholder="Título de la escena ilustrada (opcional)..."
+                      className="flex-1 bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+
+                  {/* Imagen adjunta o seleccionada */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingImage}
+                      className="px-3 py-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--bg-color)] text-xs font-cinzel font-bold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <Upload className="w-3.5 h-3.5" /> {isUploadingImage ? 'Subiendo...' : 'Subir Imagen Local'}
+                    </button>
+
+                    {campaignImageFiles.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowImagePicker(!showImagePicker)}
+                        className="px-3 py-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--bg-color)] text-xs font-cinzel font-bold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5" /> Elegir de Archivos ({campaignImageFiles.length})
+                      </button>
+                    )}
+
+                    {attachedImageUrl && (
+                      <div className="flex items-center gap-2 bg-[var(--glass)] px-2.5 py-1 rounded-lg border border-[var(--glass-border)] text-xs">
+                        <img
+                          src={attachedImageUrl}
+                          alt="Miniatura"
+                          className="w-5 h-5 object-cover rounded"
+                          referrerPolicy="no-referrer"
+                        />
+                        <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-bold">Imagen vinculada</span>
+                        <button
+                          type="button"
+                          onClick={() => setAttachedImageUrl('')}
+                          className="text-red-500 hover:text-red-700 ml-1 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {showImagePicker && campaignImageFiles.length > 0 && (
+                    <div className="p-2 border border-[var(--glass-border)] rounded-lg bg-[var(--bg-color)] max-h-36 overflow-y-auto grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {campaignImageFiles.map(imgFile => (
+                        <div
+                          key={imgFile.id}
+                          onClick={() => {
+                            setAttachedImageUrl(imgFile.content);
+                            setShowImagePicker(false);
+                          }}
+                          className="relative group aspect-square rounded-lg overflow-hidden border border-[var(--user-border)] hover:border-[var(--accent)] cursor-pointer"
+                        >
+                          <img
+                            src={imgFile.content}
+                            alt={imgFile.name}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={handleLinkSceneToDiary}
+                      className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 shadow-2xs hover:bg-[var(--accent-hover)] cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Vincular Escena Ilustrada al Diario
+                    </button>
+                  </div>
+                </div>
+
+                {linkedSuccessMsg && (
+                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-200">
+                    <span>{linkedSuccessMsg.text}</span>
+                    {onNavigateToDiary && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onNavigateToDiary(linkedSuccessMsg.absDay);
+                          onClose();
+                        }}
+                        className="font-bold underline ml-2 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Calendar className="w-3.5 h-3.5" /> Ver en Diario
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1047,6 +1168,39 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                     >
                       <Send className="w-3.5 h-3.5" /> Insertar en el Chat
                     </button>
+                  )}
+                </div>
+
+                <div className="pt-2 space-y-2 border-t border-[var(--glass-border)]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-cinzel font-bold text-[var(--text-primary)]">
+                      Guardar como Acontecimiento en la Cronología del {fechaLegibleStr}:
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLinkSummaryToDiary}
+                    className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 shadow-2xs hover:bg-[var(--accent-hover)] cursor-pointer"
+                  >
+                    <BookmarkPlus className="w-3.5 h-3.5" /> Guardar en el Diario ({fechaLegibleStr})
+                  </button>
+
+                  {linkedSuccessMsg && (
+                    <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-200">
+                      <span>{linkedSuccessMsg.text}</span>
+                      {onNavigateToDiary && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToDiary(linkedSuccessMsg.absDay);
+                            onClose();
+                          }}
+                          className="font-bold underline ml-2 flex items-center gap-1 cursor-pointer"
+                        >
+                          <Calendar className="w-3.5 h-3.5" /> Ver en Diario
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

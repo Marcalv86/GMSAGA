@@ -710,7 +710,7 @@ export const CalendarView: React.FC<{
               <button
                 onClick={() => _onTriggerAIUpdate?.()}
                 disabled={_isGenerating}
-                className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] px-2.5 sm:px-3 py-1.5 text-xs font-cinzel font-bold hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] px-2.5 sm:px-3 py-1.5 text-xs font-cinzel font-bold hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
                 title="Analiza todos los capítulos y mensajes del chat para reconstruir la cronología completa de días y sucesos"
                 aria-label="Sincronizar con el Chat"
               >
@@ -730,14 +730,14 @@ export const CalendarView: React.FC<{
                   setBorrador(JSON.parse(JSON.stringify(calSeguro)));
                   setEditandoCal(true);
                 }}
-                className="flex items-center gap-1 rounded-lg border border-[var(--user-border)] px-2 sm:px-2.5 py-1.5 text-xs font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer bg-[var(--surface)] transition-colors"
+                className="flex items-center gap-1 rounded-lg border border-[var(--user-border)] px-2 sm:px-2.5 py-1.5 text-xs font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer bg-[var(--surface)] transition-colors shrink-0"
                 title="Editar nombres de meses, festividades y días"
                 aria-label="Editar calendario"
               >
                 <Settings2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Editar</span>
               </button>
 
-              <div className="relative">
+              <div className="relative shrink-0">
                 <button
                   onClick={() => setShowLimpiezaMenu(!showLimpiezaMenu)}
                   className="flex items-center gap-1 rounded-lg border border-[var(--user-border)] px-2 sm:px-2.5 py-1.5 text-xs font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer bg-[var(--surface)] transition-colors"
@@ -754,7 +754,7 @@ export const CalendarView: React.FC<{
                       className="fixed inset-0 z-40"
                       onClick={() => setShowLimpiezaMenu(false)}
                     />
-                    <div className="absolute left-0 top-full mt-2 w-64 max-w-[calc(100vw-2.5rem)] bg-[var(--surface)] border border-[var(--glass-border)] rounded-xl shadow-2xl p-1.5 z-50 space-y-1 text-xs font-cinzel">
+                    <div className="absolute right-0 sm:left-0 top-full mt-2 w-64 max-w-[calc(100vw-2.5rem)] bg-[var(--surface)] border border-[var(--glass-border)] rounded-xl shadow-2xl p-1.5 z-50 space-y-1 text-xs font-cinzel">
                       <button
                         onClick={() => {
                           setShowLimpiezaMenu(false);
