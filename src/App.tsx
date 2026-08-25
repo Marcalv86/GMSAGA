@@ -85,7 +85,7 @@ import {
   setStoredAutoFailover,
   setStoredKeyRotationMode,
   setStoredMemorySyncGranularity,
-  syncMemoryFromChats
+  syncFullCampaignFromChats
 } from './utils/geminiHelper';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie, formatRollResult } from './utils/rollRequests';
@@ -1618,38 +1618,42 @@ export default function App() {
       setAlertConfig({
         isOpen: true,
         title: 'Sin Crónica',
-        message: 'No hay mensajes en la crónica para analizar y sincronizar la memoria viva.'
+        message: 'No hay mensajes en la crónica para analizar y sincronizar la partida con la IA.'
       });
       return;
     }
     setIsGenerating(true);
     setTopProgress({
       active: true,
-      label: 'Sincronizando memoria viva (Protagonista, PNJs, Lugares y Tramas) con la IA...',
+      label: 'Sincronizando campaña completa (Diario, Días, Horas, PNJs, Lugares y Tramas) con la IA...',
       type: 'sync'
     });
     try {
-      const updatedMemory = await syncMemoryFromChats(currentProject, currentChats);
+      const syncResult = await syncFullCampaignFromChats(currentProject, currentChats, currentFiles);
       await handleUpdateProjectField(p => ({
         memory: sanitizeProjectMemory({
           ...(p.memory || {}),
-          ...updatedMemory
-        })
+          ...syncResult.memory
+        }),
+        timeline: syncResult.timeline,
+        currentDate: syncResult.currentDate || p.currentDate,
+        threads: syncResult.threads || p.threads,
+        calendar: p.calendar || syncResult.calendar
       }));
       setAlertConfig({
         isOpen: true,
-        title: 'Memoria Viva Sincronizada',
-        message: 'La memoria viva del tomo (Protagonista, PNJs, Lugares y Tramas) ha sido actualizada con éxito a partir de la crónica.'
+        title: '¡Sincronización Total con IA Completada!',
+        message: `Se ha sincronizado toda la campaña a partir de todas las sesiones y capítulos:\n\n• ${syncResult.totalEvents} acontecimientos en ${syncResult.totalDays} jornadas con horas deducidas para el diario.\n• ${syncResult.totalNpcs} PNJs con afinidad y notas.\n• ${syncResult.totalQuests} tramas y misiones.\n• ${syncResult.totalLocations} lugares registrados.\n• Evolución del protagonista y consecuencias programadas.`
       });
     } catch (err: any) {
-      console.error('Error al sincronizar memoria con IA:', err);
-      logError('memory_sync', 'Error al sincronizar memoria viva con IA', err, {
+      console.error('Error al sincronizar campaña con IA:', err);
+      logError('memory_sync', 'Error al sincronizar campaña completa con IA', err, {
         projectName: currentProject.name
       });
       setAlertConfig({
         isOpen: true,
         title: 'Error de Sincronización',
-        message: describeApiError(err) || 'No se pudo sincronizar la memoria viva.'
+        message: describeApiError(err) || 'No se pudo sincronizar la campaña.'
       });
     } finally {
       setIsGenerating(false);
@@ -2599,11 +2603,11 @@ export default function App() {
 
           {activeTab === 'calendar' && currentProject && (
             <CalendarView project={currentProject}
-              
               files={currentFiles}
               chats={currentChats}
               onUpdate={handleUpdateProjectField}
               onUpdateMemory={handleUpdateMemory}
+              onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
               isGenerating={isGenerating}
               hasChats={currentChats.some(c =>
                 (c.messages || []).some(

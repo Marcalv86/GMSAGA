@@ -70,7 +70,38 @@ export const CALENDARIO_FANTASTICO: CalendarConfig = {
   yearSuffix: ''
 };
 
-export const CALENDARIOS_PREDEFINIDOS: CalendarConfig[] = [CALENDARIO_FANTASTICO, CALENDARIO_GREGORIANO];
+/**
+ * Cómputo de Harptos (Faerûn / Reinos Olvidados): 12 meses de 30 días con 5 festivales
+ * intercalares y semanas de 10 días (cabalgadas). Calendario canónico de D&D 5e Forgotten Realms.
+ */
+export const CALENDARIO_HARPTOS: CalendarConfig = {
+  name: 'Cómputo de Harptos (Reinos Olvidados / Faerûn)',
+  months: [
+    { name: 'Martillo (Hammer)', days: 30 },
+    { name: 'Altosolar (Alturiak)', days: 30 },
+    { name: 'Ches (Ches)', days: 30 },
+    { name: 'Tarsakh (Tarsakh)', days: 30 },
+    { name: 'Mirtul (Mirtul)', days: 30 },
+    { name: 'Kythorn (Kythorn)', days: 30 },
+    { name: 'Flamerule (Flamerule)', days: 30 },
+    { name: 'Eleasis (Eleasias)', days: 30 },
+    { name: 'Eleint (Eleint)', days: 30 },
+    { name: 'Marpenoth (Marpenoth)', days: 30 },
+    { name: 'Uktar (Uktar)', days: 30 },
+    { name: 'Anochecer (Nightal)', days: 30 }
+  ],
+  festivals: [
+    { name: 'Pleno Invierno (Midwinter)', afterMonth: 0 },
+    { name: 'Verdeflor (Greengrass)', afterMonth: 3 },
+    { name: 'Estivalia (Midsummer)', afterMonth: 5 },
+    { name: 'Festín de la Cosecha (Highharvestide)', afterMonth: 8 },
+    { name: 'Banquete de la Luna (Feast of the Moon)', afterMonth: 10 }
+  ],
+  weekdays: ['Primer día', 'Segundo día', 'Tercer día', 'Cuarto día', 'Quinto día', 'Sexto día', 'Séptimo día', 'Octavo día', 'Noveno día', 'Décimo día (Cabalgada)'],
+  yearSuffix: 'CV'
+};
+
+export const CALENDARIOS_PREDEFINIDOS: CalendarConfig[] = [CALENDARIO_HARPTOS, CALENDARIO_FANTASTICO, CALENDARIO_GREGORIANO];
 
 export const MINUTOS_POR_DIA = 24 * 60;
 

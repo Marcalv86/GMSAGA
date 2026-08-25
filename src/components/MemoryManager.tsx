@@ -546,11 +546,11 @@ export const MemoryManager: React.FC<{
             <button
               onClick={handleSyncWithAI}
               disabled={isGenerating || isSyncingAI}
-              title="Analizar las sesiones de crónica y sincronizar bajo demanda la memoria viva con la IA"
+              title="Analizar todas las sesiones y capítulos para sincronizar la memoria viva, PNJs, tramas y lugares con la IA"
               aria-label="Sincronizar con IA"
-              className="text-xs text-amber-900 dark:text-amber-100 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 px-2.5 sm:px-3.5 py-1.5 md:py-2 rounded-md font-cinzel transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-xs disabled:opacity-50"
+              className="text-xs text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] border border-[var(--accent)] px-3 sm:px-4 py-1.5 md:py-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-sm disabled:opacity-50"
             >
-              <Sparkles className={`w-3.5 h-3.5 text-amber-600 dark:text-amber-400 ${isSyncingAI ? 'animate-spin' : ''}`} />
+              <Sparkles className={`w-3.5 h-3.5 ${isSyncingAI ? 'animate-spin' : ''}`} />
               <span>{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
             </button>
           )}

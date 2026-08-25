@@ -15,6 +15,7 @@ import {
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import { registrarUso } from './usageStats';
 import {
+  CALENDARIO_HARPTOS,
   aDiaAbsoluto,
   desdeDiaAbsoluto,
   fechaLegible,
@@ -1512,7 +1513,34 @@ export async function generateContentWithFailover({
   throw lastError || new Error('No se pudo obtener respuesta de ningún modelo.');
 }
 
-export async function syncMemoryFromChats(project: Project, chats: Chat[]): Promise<Partial<Memory>> {
+export interface FullCampaignSyncResult {
+  memory: Partial<Memory>;
+  timeline: TimelineEntry[];
+  currentDate?: CampaignDate;
+  threads?: ScheduledThread[];
+  calendar?: CalendarConfig;
+  summary: string;
+  totalDays: number;
+  totalEvents: number;
+  totalNpcs: number;
+  totalQuests: number;
+  totalLocations: number;
+}
+
+/**
+ * Sincronización total e integral de la campaña con IA a partir de todos los chats:
+ * - Memoria viva: Historia consolidada, estado actual, tramas activas/completadas, PNJs (sin el protagonista) y lugares.
+ * - Diario & Cronología día a día: Días transcurridos, acontecimientos, hitos, clima, lugares y estado anímico.
+ * - INFERENCIA Y DEDUCCIÓN DE HORAS: Infiere y distribuye horas/minutos lógicos para cada evento,
+ *   especialmente en chats antiguos donde no existían marcas de tiempo explícitas.
+ * - Reloj & Calendario: Determina el instante final tras la última escena.
+ * - Hilos de consecuencias pendientes: Registra plazos programados a futuro.
+ */
+export async function syncFullCampaignFromChats(
+  project: Project,
+  chats: Chat[],
+  _files?: ProjectFile[]
+): Promise<FullCampaignSyncResult> {
   const sortedChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
   let messageCount = 0;
   let allHistory = '';
@@ -1526,7 +1554,7 @@ export async function syncMemoryFromChats(project: Project, chats: Chat[]): Prom
         m.content !== 'Tirando dados...'
     );
     if (validMessages.length > 0) {
-      allHistory += `\n--- Sesión / Capítulo: ${c.name} ---\n`;
+      allHistory += `\n=== SESIÓN / CAPÍTULO: ${c.name} ===\n`;
       allHistory += validMessages
         .map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`)
         .join('\n');
@@ -1536,7 +1564,7 @@ export async function syncMemoryFromChats(project: Project, chats: Chat[]): Prom
 
   if (messageCount === 0 || !allHistory.trim()) {
     throw new Error(
-      'No hay mensajes en la crónica de las sesiones todavía. Juega al menos un turno para que el Narrador pueda analizar y actualizar la memoria.'
+      'No hay mensajes en la crónica de las sesiones todavía. Juega al menos un turno para que el Narrador pueda analizar y sincronizar la memoria y el diario.'
     );
   }
 
@@ -1548,81 +1576,118 @@ export async function syncMemoryFromChats(project: Project, chats: Chat[]): Prom
     ? `Protagonista / Personaje Jugador (OC): "${project.memory.player_character.name}" (${project.memory.player_character.race || ''} ${project.memory.player_character.class || ''})`
     : '';
 
-  // Lo que ya está registrado, con sus identificadores. Sin esto el modelo
-  // reinventa cada entrada con otro título en cada sincronización y acabamos
-  // con la misma misión duplicada dos y tres veces.
+  const cal: CalendarConfig = (calendarioValido(project.calendar) ? project.calendar : CALENDARIO_HARPTOS)!;
+  const initDate = project.currentDate && Number.isFinite(project.currentDate.year)
+    ? project.currentDate
+    : { year: 1492, dayOfYear: 1, minute: 540 };
+  const startAbs = aDiaAbsoluto(cal, initDate);
+
+  // Entidades previas registradas
   const listExisting = <T extends { id: string }>(items: T[], describe: (i: T) => string) =>
     items.length ? items.map(i => `- [id: ${i.id}] ${describe(i)}`).join('\n') : '(ninguna todavía)';
 
   const existingState = `
-ESTADO ACTUAL DE LA MEMORIA (lo que YA está registrado):
-
-TRAMAS EXISTENTES:
+ESTADO ACTUAL REGISTRADO PREVIAMENTE:
+- TRAMAS:
 ${listExisting(project.memory?.quests || [], q => `"${q.title}" — objetivo: ${q.objective || 'sin objetivo'} — estado: ${q.status || 'activa'}`)}
 
-PNJS EXISTENTES:
+- PNJS REGISTRADOS:
 ${listExisting(project.memory?.npcs || [], n => `"${n.name}" — ${n.relation || 'sin relación'}`)}
 
-LUGARES EXISTENTES:
+- LUGARES REGISTRADOS:
 ${listExisting(project.memory?.locations || [], l => `"${l.name}"`)}
 `.trim();
 
-  const prompt = `Analiza el siguiente historial de sesiones de rol y actualiza la memoria viva del proyecto.
+  const prompt = `Eres el Gran Archivero, Cronista y Maestro de Campaña de este juego de rol en los Reinos Olvidados (D&D 5e / Forgotten Realms).
+Tu cometido es analizar TODO el historial de sesiones y capítulos para SINCRONIZAR Y RECONSTRUIR INTEGRALMENTE todos los módulos de la partida:
+1. Memoria Viva (Historia global, estado actual, tramas, PNJs con afinidad canónica, lugares y evolución del protagonista).
+2. Cronología y Diario día a día (días transcurridos, acontecimientos, lugares, clima, hitos, ánimo) CON INFERENCIA Y DEDUCCIÓN DE HORAS PARA CADA EVENTO (especialmente en chats antiguos o escenas sin hora explícita).
+3. Fecha de campaña y reloj final tras la última escena.
+4. Hilos narrativos y consecuencias programadas pendientes.
+
+CALENDARIO DE LA CAMPAÑA:
+- Calendario: ${cal.name} (${diasPorAno(cal)} días/año)
+- Fecha inicial de referencia: Día ${initDate.dayOfYear}, Año ${initDate.year} (${fechaLegible(cal, initDate)})
 
 ${existingState}
 
-REGLA ANTI-DUPLICADOS (LA MÁS IMPORTANTE):
-Antes de crear una entrada nueva, comprueba si ya existe arriba. Dos entradas son
-LA MISMA aunque las hayas titulado distinto: "Travesía hacia el puerto" y "Viaje al
-puerto" son la misma trama, igual que "Defender el barco" y "Repeler el abordaje"
-si describen el mismo suceso.
-- Si la entrada YA EXISTE: devuélvela con SU MISMO "id", conservando el título
-  original y actualizando solo lo que haya cambiado (progreso, estado, notas).
-- Crea una entrada SIN "id" únicamente si es algo genuinamente nuevo que no aparece
-  en la lista de arriba.
-- No dividas una misma trama en varias entradas por sus distintas fases.
+REGLA ANTI-DUPLICADOS (CRÍTICA):
+- Para tramas, PNJs y lugares que ya existan arriba, conserva su "id" y actualiza sus datos en lugar de duplicarlos.
+- ⚠️ REGLA ABSOLUTA DEL PROTAGONISTA: NO incluyas bajo ningún concepto al Personaje Jugador / Protagonista (OC ${pcName ? `"${pcName}"` : ''}) en la lista de "npcs". El protagonista/jugador NO es un PNJ.
 
-REGLAS OBLIGATORIAS DE EXTRACCIÓN:
-1. "story": Resumen narrativo consolidado de los acontecimientos transcurridos.
-2. "current_status": Estado actual de los aventureros, su ubicación inmediata, peligros y recursos.
-3. "quests": Lista de tramas y misiones activas o completadas.
-4. "npcs": EXCLUSIVAMENTE Personajes No Jugadores (PNJs / NPCs) secundarios, aliados, antagonistas, mentores, comerciantes o criaturas.
-   ⚠️ REGLA CRÍTICA: NO incluyas bajo ningún concepto al Personaje Jugador (PC / Protagonista / OC ${pcName ? `"${pcName}"` : ''}) en la lista de "npcs". El protagonista/jugador NO es un PNJ.
-5. "locations": Lugares, ciudades, tabernas, templos, regiones y mazmorras relevantes.
-6. "player_summary": Resumen narrativo enfocado en el PROTAGONISTA (OC): lo que le va sucediendo, sus vivencias, cambios emocionales, relaciones y estado general.
-7. "player_events": Lista de hitos y acontecimientos importantes que le han ocurrido directamente al protagonista en la crónica.
+INFERENCIA Y ASIGNACIÓN DE HORAS/MINUTOS (CRUCIAL PARA CHATS VIEJOS):
+Para cada entrada o escena de la cronología de eventos diarios, DEBES asignar un 'minute' (entero de 0 a 1439, o 'horaAprox' de 0 a 23):
+- Si el texto menciona franjas (amanecer, desayuno, mediodía, almuerzo, tarde, anochecer, cena, noche, medianoche, madrugada):
+  * Madrugada / Primeras horas: 04:00 - 05:30 (minute: 240 - 330)
+  * Amanecer / Desayuno: 07:00 - 08:30 (minute: 420 - 510)
+  * Media mañana: 10:00 - 11:30 (minute: 600 - 690)
+  * Mediodía / Almuerzo: 12:30 - 14:00 (minute: 750 - 840)
+  * Tarde: 15:00 - 17:30 (minute: 900 - 1050)
+  * Atardecer / Ocaso: 18:30 - 20:00 (minute: 1110 - 1200)
+  * Noche / Cena: 20:30 - 22:30 (minute: 1230 - 1350)
+  * Medianoche: 23:30 - 01:30 (minute: 1410 - 90)
+- EN CHATS VIEJOS O SIN MARCAS TEMPORALES EXPLÍCITAS: DEDUCE y DISTRIBUYE las horas de los sucesos de forma coherente y secuencial a lo largo del día (ej. despertar/preparativos a las 08:30 [510], viaje/encuentro a las 13:00 [780], combate/evento clave a las 17:30 [1050], posada/descanso a las 21:00 [1260]).
+- NUNCA dejes campos de hora nulos ni amontones todos los eventos a las 12:00.
 
 ${pcNotes ? `INFORMACIÓN DEL PROTAGONISTA (NO EXTRAER COMO PNJ):\n${pcNotes}\n` : ''}
 
-Devuelve la respuesta ESTRICTAMENTE en formato JSON con la siguiente estructura:
+Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
 {
-  "story": "Resumen narrativo de la historia hasta ahora (máximo 3 párrafos).",
-  "current_status": "El estado actual de los personajes y la situación inmediata.",
-  "player_summary": "Resumen de lo que le va sucediendo al protagonista y sus experiencias clave.",
+  "story": "Resumen narrativo consolidado de toda la historia hasta ahora (3-4 párrafos estructurados).",
+  "current_status": "Estado actual de los personajes, ubicación inmediata, peligros y recursos disponibles.",
+  "player_summary": "Resumen enfocado en el protagonista (OC): evolución, vivencias, psicología y relaciones.",
   "player_events": [
-    { "title": "Título del suceso clave del OC", "description": "Qué ocurrió y qué significado tuvo para el personaje", "dateOrTime": "Momento o fecha aproximada" }
+    { "title": "Hito clave del protagonista", "description": "Qué ocurrió y su significado", "dateOrTime": "Fecha o momento" }
   ],
   "quests": [
-    { "id": "id existente o omitir si es nueva", "title": "Nombre", "type": "Principal o Secundaria", "objective": "Objetivo", "progress": "Progreso actual", "status": "Activa" }
+    { "id": "id existente o nuevo", "title": "Título", "type": "Principal / Secundaria", "objective": "Objetivo", "progress": "Progreso", "status": "Activa / Completada" }
   ],
   "npcs": [
-    { 
-      "id": "id existente o omitir si es nuevo", 
-      "name": "Nombre del PNJ (NUNCA el protagonista)", 
-      "relation": "Aliado, Enemigo, Neutral, etc.", 
-      "notes": "Detalles clave y estado",
-      "vinculo": "Tipo de vínculo (solo para PNJs con Nombre Propio o habituales, omitir en figurantes)",
-      "atr": "Número del 0 al 20 (SOLO si el PNJ tiene Nombre Propio real o es recurrente; omitir en extras genéricos como 'Corsario', 'Guardia', 'Tabernero')",
-      "vin": "Número del 0 al 20 (SOLO para PNJs con Nombre Propio o recurrentes)",
-      "con": "Número del 0 al 20 (SOLO para PNJs con Nombre Propio o recurrentes)"
+    {
+      "id": "id existente o nuevo",
+      "name": "Nombre del PNJ (NUNCA el protagonista)",
+      "relation": "Aliado / Enemigo / Neutral / Mentor / Corsario / Contacto",
+      "status": "Vivo / Desaparecido / Muerto",
+      "description": "Rasgos físicos visibles y rol público",
+      "notes": "Detalles clave, trasfondo y actitud",
+      "aparenta": "Lo que muestra o finge",
+      "oculta": "Intenciones ocultas, secretos o debilidades si se conocen",
+      "vinculo": "Tipo de vínculo social/emocional (solo para PNJs nombrados/recurrentes)",
+      "atr": 10,
+      "vin": 5,
+      "con": 4
     }
   ],
   "locations": [
-    { "id": "id existente o omitir si es nuevo", "name": "Nombre", "desc": "Descripción breve y estado" }
+    { "id": "id existente o nuevo", "name": "Nombre del lugar", "desc": "Descripción del lugar y relevancia" }
+  ],
+  "diasTranscurridosTotal": 3,
+  "fechaFinal": { "year": 1492, "dayOfYear": 3, "minute": 1260 },
+  "resumenCronologia": "Resumen conciso de la cronología recuperada",
+  "timeline": [
+    {
+      "diaOffset": 0,
+      "minute": 540,
+      "title": "Título evocador del suceso",
+      "summary": "Resumen narrativo de lo ocurrido en esta escena en 1-3 frases.",
+      "lugar": "Ubicación",
+      "clima": "Atmósfera o clima",
+      "hito": "Hito destacado si aplica",
+      "mood": "⚔️",
+      "tipo": "acontecimiento"
+    }
+  ],
+  "hilosPendientes": [
+    {
+      "title": "Título del hilo o consecuencia",
+      "effect": "Qué sucederá al vencer el plazo",
+      "venceEnDiasDesdeInicio": 4,
+      "hidden": false
+    }
   ]
 }
 
-HISTORIAL DE PARTIDA:
+HISTORIAL COMPLETO DE PARTIDA:
 ${historyToAnalyze}`;
 
   const activeModel = getBackgroundTaskModel();
@@ -1641,7 +1706,7 @@ ${historyToAnalyze}`;
   });
 
   const resultText = response.text;
-  if (!resultText) throw new Error('No se recibió respuesta del modelo al sincronizar la memoria.');
+  if (!resultText) throw new Error('No se recibió respuesta del modelo al sincronizar la campaña.');
 
   let cleanText = resultText.trim();
   if (cleanText.startsWith('```')) {
@@ -1660,18 +1725,19 @@ ${historyToAnalyze}`;
   try {
     parsed = JSON.parse(cleanText);
   } catch (err) {
-    console.error('Failed to parse memory JSON from AI:', cleanText, err);
+    console.error('Failed to parse full sync JSON from AI:', cleanText, err);
     throw new Error(
       'La respuesta de la IA no tenía un formato estructurado reconocible. Inténtalo de nuevo.'
     );
   }
 
-  // Assign IDs to all items and strictly filter out any protagonist entry from npcs
+  // Quests
   const quests = (parsed.quests || []).map((q: any) => ({
     ...q,
     id: q.id || Date.now().toString() + Math.random().toString(36).substring(7)
   }));
 
+  // NPCs (Filtrado estricto del protagonista y asignación de ids)
   const pcNameClean = (project.memory?.player_character?.name || '').trim().toLowerCase();
   const genericPlayerNames = new Set([
     'protagonista',
@@ -1691,8 +1757,6 @@ ${historyToAnalyze}`;
       if (!nameLower) return false;
       if (genericPlayerNames.has(nameLower)) return false;
       if (pcNameClean && pcNameClean.length > 2) {
-        // Only treat it as the protagonist on an exact match or a substantial
-        // overlap; a 2-letter NPC name must not be swallowed by a long PC name.
         if (nameLower === pcNameClean) return false;
         if (nameLower.length > 3 && (nameLower.includes(pcNameClean) || pcNameClean.includes(nameLower))) {
           return false;
@@ -1705,11 +1769,13 @@ ${historyToAnalyze}`;
       id: n.id || Date.now().toString() + Math.random().toString(36).substring(7)
     }));
 
+  // Locations
   const locations = (parsed.locations || []).map((l: any) => ({
     ...l,
     id: l.id || Date.now().toString() + Math.random().toString(36).substring(7)
   }));
 
+  // Protagonist (OC)
   const prevPc = project.memory?.player_character;
   const parsedPcEvents = (parsed.player_events || []).map((e: any) => ({
     id: e.id || Date.now().toString() + Math.random().toString(36).substring(7),
@@ -1733,10 +1799,121 @@ ${historyToAnalyze}`;
     events: mergedEvents,
     portrait: prevPc?.portrait
   };
-
   const updatedPc = sanitizePlayerCharacter(candidatePc, 'Aryendell');
 
-  return {
+  // Timeline / Diario con inferencia de horas
+  const rawTimeline = Array.isArray(parsed.timeline) ? parsed.timeline : (Array.isArray(parsed.entradas) ? parsed.entradas : []);
+  const newTimelineEntries: TimelineEntry[] = [];
+
+  // Agrupar por día para distribuir horas en caso de que falten o coincidan
+  const eventsByDayOffset = new Map<number, any[]>();
+  rawTimeline.forEach((ev: any, idx: number) => {
+    const offset = typeof ev.diaOffset === 'number' && Number.isFinite(ev.diaOffset) ? Math.max(0, Math.round(ev.diaOffset)) : 0;
+    if (!eventsByDayOffset.has(offset)) {
+      eventsByDayOffset.set(offset, []);
+    }
+    eventsByDayOffset.get(offset)!.push({ ev, idx });
+  });
+
+  // Procesar cada día y asegurar distribución temporal adecuada
+  eventsByDayOffset.forEach((items, offset) => {
+    const targetAbs = startAbs + offset;
+    const dateObj = desdeDiaAbsoluto(cal, targetAbs);
+    const dateLabel = fechaLegible(cal, dateObj);
+    const count = items.length;
+
+    items.forEach(({ ev, idx }, iInDay) => {
+      let minute: number;
+      if (typeof ev.minute === 'number' && Number.isFinite(ev.minute) && ev.minute >= 0 && ev.minute <= 1439) {
+        minute = Math.round(ev.minute);
+      } else if (typeof ev.horaAprox === 'number' && Number.isFinite(ev.horaAprox) && ev.horaAprox >= 0 && ev.horaAprox <= 23) {
+        minute = Math.round(ev.horaAprox) * 60;
+      } else {
+        // Inferencia temporal de reparto equilibrado entre las 08:30 (510 min) y las 21:30 (1290 min)
+        if (count === 1) {
+          minute = 720; // 12:00
+        } else {
+          const step = Math.floor((1290 - 510) / Math.max(1, count - 1));
+          minute = 510 + iInDay * step;
+        }
+      }
+
+      newTimelineEntries.push({
+        id: `ai_entry_${targetAbs}_${idx}_${Date.now().toString(36)}`,
+        absDay: targetAbs,
+        date: dateLabel,
+        title: ev.title ? String(ev.title).trim() : undefined,
+        summary: String(ev.summary || ev.resumen || '').trim(),
+        lugar: ev.lugar ? String(ev.lugar).trim() : undefined,
+        clima: ev.clima ? String(ev.clima).trim() : undefined,
+        hito: ev.hito ? String(ev.hito).trim() : undefined,
+        mood: ev.mood || '📖',
+        tipo: ev.tipo || 'acontecimiento',
+        minute
+      });
+    });
+  });
+
+  // Preservar entradas manuales de la usuaria o que contengan imágenes adjuntas
+  const existingTimeline = project.timeline || [];
+  const manualUserEntries = existingTimeline.filter(
+    e => (e.images && e.images.length > 0) || e.tipo === 'diario'
+  );
+
+  // Fusionar y ordenar cronológicamente
+  const combinedTimeline = [...newTimelineEntries];
+  manualUserEntries.forEach(manual => {
+    if (!combinedTimeline.some(c => c.id === manual.id)) {
+      combinedTimeline.push(manual);
+    }
+  });
+  combinedTimeline.sort((a, b) => {
+    if (a.absDay !== b.absDay) return a.absDay - b.absDay;
+    return (a.minute ?? 720) - (b.minute ?? 720);
+  });
+
+  // CurrentDate final
+  let calculatedCurrentDate: CampaignDate = initDate;
+  if (parsed.fechaFinal && typeof parsed.fechaFinal.dayOfYear === 'number') {
+    calculatedCurrentDate = {
+      year: typeof parsed.fechaFinal.year === 'number' ? parsed.fechaFinal.year : initDate.year,
+      dayOfYear: Math.max(1, Math.min(diasPorAno(cal), parsed.fechaFinal.dayOfYear)),
+      minute: typeof parsed.fechaFinal.minute === 'number' ? parsed.fechaFinal.minute : 1260
+    };
+  } else if (combinedTimeline.length > 0) {
+    const lastEntry = combinedTimeline[combinedTimeline.length - 1];
+    const lastDateObj = desdeDiaAbsoluto(cal, lastEntry.absDay);
+    calculatedCurrentDate = {
+      year: lastDateObj.year,
+      dayOfYear: lastDateObj.dayOfYear,
+      minute: lastEntry.minute ?? 1260
+    };
+  }
+
+  // Hilos narrativos pendientes
+  const newThreads: ScheduledThread[] = [...(project.threads || [])];
+  if (Array.isArray(parsed.hilosPendientes)) {
+    parsed.hilosPendientes.forEach((h: any, idx: number) => {
+      const title = String(h.title || 'Consecuencia programada').trim();
+      const alreadyHas = newThreads.some(t => t.title.toLowerCase().trim() === title.toLowerCase());
+      if (!alreadyHas) {
+        const offset = typeof h.venceEnDiasDesdeInicio === 'number' ? h.venceEnDiasDesdeInicio : 5;
+        const dueAbs = startAbs + offset;
+        newThreads.push({
+          id: `ai_thread_${dueAbs}_${idx}_${Date.now().toString(36)}`,
+          title,
+          effect: String(h.effect || h.title || '').trim(),
+          dueAbsDay: dueAbs,
+          dueDate: fechaLegible(cal, desdeDiaAbsoluto(cal, dueAbs)),
+          hidden: Boolean(h.hidden),
+          status: 'pending',
+          origin: 'narrador'
+        });
+      }
+    });
+  }
+
+  const memoryMerged: Partial<Memory> = {
     story: parsed.story || project.memory?.story || '',
     current_status: parsed.current_status || project.memory?.current_status || '',
     quests: mergeEntities(project.memory?.quests || [], quests, 'title', 'objective'),
@@ -1744,6 +1921,27 @@ ${historyToAnalyze}`;
     locations: mergeEntities(project.memory?.locations || [], locations, 'name', 'desc'),
     player_character: updatedPc
   };
+
+  const uniqueDaysCount = new Set(combinedTimeline.map(e => e.absDay)).size;
+
+  return {
+    memory: memoryMerged,
+    timeline: combinedTimeline,
+    currentDate: calculatedCurrentDate,
+    threads: newThreads,
+    calendar: cal,
+    summary: parsed.resumenCronologia || `Sincronizados ${combinedTimeline.length} acontecimientos en ${uniqueDaysCount} jornadas.`,
+    totalDays: uniqueDaysCount,
+    totalEvents: combinedTimeline.length,
+    totalNpcs: memoryMerged.npcs?.length || 0,
+    totalQuests: memoryMerged.quests?.length || 0,
+    totalLocations: memoryMerged.locations?.length || 0
+  };
+}
+
+export async function syncMemoryFromChats(project: Project, chats: Chat[], files?: ProjectFile[]): Promise<Partial<Memory>> {
+  const result = await syncFullCampaignFromChats(project, chats, files);
+  return result.memory;
 }
 
 /**
