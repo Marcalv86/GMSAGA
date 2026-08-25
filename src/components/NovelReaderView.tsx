@@ -3,7 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import { Project, Chat } from '../types';
 import { stripRollRequests, stripStateTag } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
-import { Swords, Shield, FileDown, BookOpen } from 'lucide-react';
+import { exportNovelToPDF, exportNovelToMarkdown } from '../utils/pdfExport';
+import { Swords, Shield, FileDown, BookOpen, FileText, Check, Loader2 } from 'lucide-react';
 
 type ReaderTheme = 'parchment' | 'dark' | 'sepia' | 'light';
 
@@ -84,16 +85,43 @@ export const NovelReaderView: React.FC<{
   }, 0);
   const readingTimeMin = Math.max(1, Math.round(totalWords / 200));
 
+  const [exportProgress, setExportProgress] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState<'pdf' | 'md' | null>(null);
+
   const handleExportPDF = async () => {
-    if (!activeChat) return;
+    if (chaptersToRender.length === 0) return;
     setIsExporting(true);
+    setExportProgress('Iniciando maquetación de PDF...');
     try {
-      const { exportChronicleToPDF } = await import('../utils/pdfExport');
-      await exportChronicleToPDF(project, activeChat, () => {});
-    } catch (err) {
+      await exportNovelToPDF(project, chaptersToRender, {
+        scope: selectedScope,
+        showPlayerActions,
+        onProgress: msg => setExportProgress(msg)
+      });
+      setExportSuccess('pdf');
+      setTimeout(() => setExportSuccess(null), 3000);
+    } catch (err: any) {
       console.error('Error exporting PDF:', err);
+      alert('Error al exportar la novela a PDF: ' + (err?.message || 'Error desconocido'));
     } finally {
       setIsExporting(false);
+      setExportProgress(null);
+    }
+  };
+
+  const handleExportMarkdown = () => {
+    if (chaptersToRender.length === 0) return;
+    try {
+      exportNovelToMarkdown(project, chaptersToRender, {
+        scope: selectedScope,
+        showPlayerActions,
+        format: 'md'
+      });
+      setExportSuccess('md');
+      setTimeout(() => setExportSuccess(null), 3000);
+    } catch (err: any) {
+      console.error('Error exporting Markdown:', err);
+      alert('Error al exportar el texto: ' + (err?.message || 'Error desconocido'));
     }
   };
 
@@ -262,19 +290,51 @@ export const NovelReaderView: React.FC<{
             <span className="hidden sm:inline">{showPlayerActions ? 'Acciones: ON' : 'Acciones: OFF'}</span>
           </button>
 
-          {/* Export / Print */}
+          {/* Export to Markdown / Text */}
+          <button
+            onClick={handleExportMarkdown}
+            disabled={isExporting}
+            className={`text-xs font-cinzel font-bold px-2 sm:px-2.5 py-1 rounded border ${currentTheme.border} ${currentTheme.pageBg} ${currentTheme.text} hover:opacity-100 transition-all cursor-pointer flex items-center gap-1 shadow-xs`}
+            title={`Descargar ${selectedScope === 'all' ? 'toda la novela' : 'este capítulo'} en formato texto / Markdown (.md)`}
+            aria-label="Descargar Texto"
+          >
+            {exportSuccess === 'md' ? (
+              <Check className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (
+              <FileText className="w-3.5 h-3.5" />
+            )}
+            <span className="hidden sm:inline">{exportSuccess === 'md' ? '¡Descargado!' : 'Texto (.md)'}</span>
+          </button>
+
+          {/* Export / Print PDF */}
           <button
             onClick={handleExportPDF}
             disabled={isExporting}
-            className={`text-xs font-cinzel font-bold px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 transition-all cursor-pointer flex items-center gap-1 shadow-xs`}
-            title="Exportar la novela completa en formato PDF"
+            className={`text-xs font-cinzel font-bold px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1 shadow-xs`}
+            title={`Exportar ${selectedScope === 'all' ? 'la novela completa' : 'el capítulo actual'} como libro maquetado en PDF`}
             aria-label="Exportar PDF"
           >
-            <FileDown className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">PDF</span>
+            {isExporting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : exportSuccess === 'pdf' ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5" />
+            )}
+            <span className="hidden sm:inline">
+              {isExporting ? 'Maquetando...' : exportSuccess === 'pdf' ? '¡PDF Creado!' : 'PDF'}
+            </span>
           </button>
         </div>
       </div>
+
+      {/* Floating Export Progress Notification */}
+      {exportProgress && (
+        <div className="bg-amber-900/90 text-amber-100 px-4 py-2 text-xs font-cinzel flex items-center justify-center gap-2 shadow-md border-b border-amber-700/60 z-20">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
+          <span>{exportProgress}</span>
+        </div>
+      )}
 
       {/* Book Reading Canvas */}
       <div className="flex-1 overflow-y-auto px-3 sm:px-6 md:px-8 py-6 md:py-10">
