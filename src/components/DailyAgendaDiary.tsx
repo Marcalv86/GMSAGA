@@ -137,7 +137,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
   const timeline = project.timeline || [];
   const pcEvents = useMemo(() => project.memory?.player_character?.events || [], [project.memory?.player_character?.events]);
 
-  const porDia = useMemo(() => {
+  const { porDia, unifiedTimeline } = useMemo(() => {
     const map: Record<number, { entradas: TimelineEntry[]; fecha: string }> = {};
     const unified: TimelineEntry[] = [];
 
@@ -190,10 +190,26 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
       }
     });
 
-    return map;
+    return { porDia: map, unifiedTimeline: unified };
   }, [timeline, pcEvents, cal, fechaSegura.year, hoyAbs]);
 
-  const entradasDiaActivo = porDia[diaSeleccionado]?.entradas || [];
+  const entradasDiaActivo = useMemo(() => {
+    const directas = porDia[diaSeleccionado]?.entradas || [];
+    const directIds = new Set(directas.map(e => e.id));
+
+    // Normalizador de cadenas para comparación de fechas seguras
+    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    const nombreActivoNorm = norm(nombreDiaActivo);
+
+    const adicionales = unifiedTimeline.filter(e => {
+      if (directIds.has(e.id)) return false;
+      if (e.absDay === diaSeleccionado) return true;
+      if (e.date && norm(e.date) === nombreActivoNorm) return true;
+      return false;
+    });
+
+    return [...directas, ...adicionales];
+  }, [porDia, diaSeleccionado, nombreDiaActivo, unifiedTimeline]);
 
   // Scheduled threads
   const allThreads = project.threads || [];
@@ -213,8 +229,8 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
       source: 'entry' | 'file';
     }[] = [];
 
-    // From timeline entries
-    timeline.forEach(entry => {
+    // From unified timeline entries
+    unifiedTimeline.forEach(entry => {
       if (entry.images && Array.isArray(entry.images)) {
         entry.images.forEach((imgUrl, imgIdx) => {
           items.push({
@@ -1229,7 +1245,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
             <div className="flex items-center gap-2">
               <History className="w-5 h-5 text-[var(--accent)]" />
               <h3 className="font-cinzel text-base sm:text-lg font-bold text-[var(--text-primary)] m-0">
-                Crónica Completa de la Campaña ({timeline.length} entradas)
+                Crónica Completa de la Campaña ({unifiedTimeline.length} entradas)
               </h3>
             </div>
             <button
@@ -1240,7 +1256,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
             </button>
           </div>
 
-          {timeline.length === 0 ? (
+          {unifiedTimeline.length === 0 ? (
             <div className="py-12 text-center text-[var(--text-secondary)] font-cinzel">
               No hay entradas en la crónica todavía.
             </div>

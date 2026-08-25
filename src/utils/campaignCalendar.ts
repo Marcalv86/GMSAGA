@@ -246,9 +246,24 @@ export function parsearFechaTexto(
   const slots = yearLayout(cal);
   if (!slots || slots.length === 0) return null;
 
-  // 2. Extraer día del mes (ej: "1 de...", "15 de...", "día 15")
+  // 2. Extraer día del mes (ej: "1 de...", "I de...", "15 de...", "día 15", "primer día de...")
+  let diaNum = 1;
   const matchDia = tNorm.match(/(?:dia\s+)?(\d{1,3})\s*(?:de|\/|-|\s|$)/i);
-  const diaNum = matchDia ? parseInt(matchDia[1], 10) : 1;
+  if (matchDia) {
+    diaNum = parseInt(matchDia[1], 10);
+  } else {
+    // Probar números romanos comunes (I..XXXI) al inicio o antes de 'de'
+    const matchRomano = tNorm.match(/\b(xxx[i|v|x]*|xx[i|v|x]*|x[i|v|x]*|viii|vii|vi|iv|v|iii|ii|i)\b\s*(?:de|\/|-|\s|$)/i);
+    if (matchRomano) {
+      const romMap: Record<string, number> = {
+        i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10,
+        xi: 11, xii: 12, xiii: 13, xiv: 14, xv: 15, xvi: 16, xvii: 17, xviii: 18, xix: 19, xx: 20,
+        xxi: 21, xxii: 22, xxiii: 23, xxiv: 24, xxv: 25, xxvi: 26, xxvii: 27, xxviii: 28, xxix: 29, xxx: 30, xxxi: 31
+      };
+      const val = romMap[matchRomano[1].toLowerCase()];
+      if (val) diaNum = val;
+    }
+  }
 
   // 3. Comprobar si coincide con un festival
   if (cal.festivals && cal.festivals.length > 0) {

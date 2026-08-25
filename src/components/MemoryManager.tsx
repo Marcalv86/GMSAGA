@@ -1,8 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, NPC, Location, ProjectFile } from '../types';
+import { Project, NPC, Location, ProjectFile, TimelineEntry } from '../types';
 import {
-  obtenerInfoRelacion
+  obtenerInfoRelacion,
+  CALENDARIO_FANTASTICO,
+  aDiaAbsoluto,
+  aDiaAbsolutoDesdeTexto,
+  calendarioValido,
+  desdeDiaAbsoluto,
+  fechaInicial,
+  fechaLegible
 } from '../utils/campaignCalendar';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter } from '../utils/sanitizers';
@@ -18,9 +25,7 @@ import {
   Camera,
   Castle,
   ChevronDown,
-  ChevronRight,
   ChevronUp,
-  Clock,
   Compass,
   Eye,
   EyeOff,
@@ -198,6 +203,61 @@ export const MemoryManager: React.FC<{
 
   // Dossier modals
   const [selectedNpcForDossier, setSelectedNpcForDossier] = useState<NPC | null>(null);
+
+  // Auto-migración segura: consolidar acontecimientos del protagonista al Diario y Cronica de Campaña
+  useEffect(() => {
+    const pcEvs = project.memory?.player_character?.events;
+    if (pcEvs && pcEvs.length > 0 && onUpdateProject) {
+      const cal = project.calendar || CALENDARIO_FANTASTICO;
+      const yr = project.currentDate?.year || 1492;
+      const currentTimeline = project.timeline || [];
+      const newEntries: TimelineEntry[] = [];
+
+      pcEvs.forEach((ev, idx) => {
+        const alreadyExists = currentTimeline.some(
+          t => t.id === ev.id ||
+               (t.title && ev.title && t.title.trim().toLowerCase() === ev.title.trim().toLowerCase()) ||
+               (t.summary && ev.description && t.summary.trim().toLowerCase() === ev.description.trim().toLowerCase())
+        );
+        if (!alreadyExists) {
+          let abs = aDiaAbsolutoDesdeTexto(cal, ev.dateOrTime, yr);
+          if (abs === null) abs = aDiaAbsoluto(cal, project.currentDate || fechaInicial(yr));
+          const dateStr = ev.dateOrTime || (calendarioValido(cal) ? fechaLegible(cal, desdeDiaAbsoluto(cal, abs)) : `Día ${abs}`);
+          newEntries.push({
+            id: ev.id || `migrated_${Date.now()}_${idx}`,
+            absDay: abs,
+            date: dateStr,
+            title: ev.title,
+            summary: ev.description || ev.title,
+            mood: '🌸',
+            tipo: 'personal',
+            hito: ev.title
+          });
+        }
+      });
+
+      if (newEntries.length > 0) {
+        onUpdateProject(prev => ({
+          timeline: [...(prev.timeline || []), ...newEntries],
+          memory: {
+            ...(prev.memory || {}),
+            player_character: {
+              ...(prev.memory?.player_character || { name: 'Protagonista' }),
+              events: []
+            }
+          }
+        }));
+      } else {
+        onUpdateMemory(mem => ({
+          ...mem,
+          player_character: {
+            ...(mem.player_character || { name: 'Protagonista' }),
+            events: []
+          }
+        }));
+      }
+    }
+  }, [project.memory?.player_character?.events, project.timeline, project.calendar, project.currentDate, onUpdateProject, onUpdateMemory]);
 
   const [expandedLocIds, setExpandedLocIds] = useState<Set<string>>(new Set());
   const [selectedLocForDossier, setSelectedLocForDossier] = useState<Location | null>(null);
@@ -623,113 +683,28 @@ export const MemoryManager: React.FC<{
             </div>
           </div>
 
-          {/* Key Events & Hitos sincronizados con el Diario & Agenda */}
-          <div className="flex flex-col gap-3">
-            <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <CalendarClock className="w-4 h-4 text-[var(--accent)]" />
-                <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
-                  Acontecimientos e Hitos en el Diario & Agenda ({(project.timeline || []).length}):
-                </span>
+          {/* Acceso y sincronización con el Diario & Agenda de Campaña */}
+          <div className="bg-[var(--sidebar-bg)] p-4 sm:p-5 rounded-xl border border-[var(--user-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] shrink-0">
+                <CalendarClock className="w-5 h-5" />
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setActiveTab('diary')}
-                  className="px-3 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
-                  title="Abrir la pestaña de Diario & Agenda con el calendario completo"
-                >
-                  <Calendar className="w-3.5 h-3.5" /> Abrir Diario & Agenda
-                </button>
+              <div>
+                <h4 className="font-cinzel font-bold text-sm sm:text-base text-[var(--accent)] m-0">
+                  Diario & Agenda de Campaña
+                </h4>
+                <p className="text-xs text-[var(--text-secondary)] font-lora m-0 mt-0.5">
+                  Los acontecimientos, hitos, combates y la crónica detallada de campaña se registran y consultan en el Diario.
+                </p>
               </div>
             </div>
-
-            {/* Si no hay acontecimientos en el timeline ni en la ficha */}
-            {(!project.timeline || project.timeline.length === 0) && (!cleanPc.events || cleanPc.events.length === 0) ? (
-              <div className="bg-[var(--surface-soft)] border border-dashed border-[var(--glass-border)] p-8 rounded-xl text-center flex flex-col items-center justify-center gap-2.5">
-                <CalendarClock className="w-9 h-9 text-[var(--accent)] opacity-40" />
-                <p className="text-sm font-cinzel text-[var(--text-secondary)] m-0 font-bold">
-                  Los acontecimientos se registran día a día en el Diario & Agenda
-                </p>
-                <p className="text-xs text-[var(--text-secondary)] font-lora italic m-0 max-w-md leading-relaxed">
-                  Cada suceso, pacto, revelación o combate que vive el protagonista queda fechado automáticamente en su día correspondiente del calendario de Faerûn.
-                </p>
-                <button
-                  onClick={() => setActiveTab('diary')}
-                  className="mt-2 px-4 py-1.5 text-xs font-cinzel font-bold bg-[var(--surface)] hover:bg-[var(--glass)] border border-[var(--accent)]/50 text-[var(--accent)] rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <Calendar className="w-3.5 h-3.5" /> Ir al Diario de Campaña
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Entradas del Timeline de la Campaña (Diario & Agenda) */}
-                {(project.timeline || []).slice(-6).reverse().map(tl => (
-                  <div
-                    key={tl.id}
-                    onClick={() => setActiveTab('diary')}
-                    className="bg-[var(--surface)] border border-[var(--glass-border)] hover:border-[var(--accent)]/50 p-4 rounded-xl shadow-xs transition-all flex flex-col justify-between gap-2.5 cursor-pointer group"
-                    title="Haz clic para ver este día en el Diario & Agenda"
-                  >
-                    <div>
-                      <div className="flex justify-between items-start gap-2 mb-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-cinzel px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 font-bold">
-                            <Clock className="w-3 h-3" /> {tl.date || 'Día de campaña'}
-                          </span>
-                          {tl.lugar && (
-                            <span className="text-[10px] text-[var(--text-secondary)] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface-soft)]">
-                              📍 {tl.lugar}
-                            </span>
-                          )}
-                        </div>
-                        {tl.mood && <span className="text-base leading-none">{tl.mood}</span>}
-                      </div>
-
-                      {tl.title && (
-                        <h4 className="font-cinzel font-bold text-sm text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors m-0 mb-1">
-                          {tl.title}
-                        </h4>
-                      )}
-
-                      <p className="text-xs sm:text-sm font-lora text-[var(--text-primary)] leading-relaxed m-0 line-clamp-3">
-                        {tl.summary}
-                      </p>
-                    </div>
-
-                    <div className="flex justify-between items-center pt-2 border-t border-[var(--glass-border)] text-[11px] font-cinzel text-[var(--accent)]">
-                      <span>Ver día completo en la Agenda</span>
-                      <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                ))}
-
-                {/* Eventos directos del PC si existen */}
-                {(cleanPc.events || []).map(ev => (
-                  <div
-                    key={ev.id}
-                    className="bg-[var(--surface)] border border-[var(--glass-border)] hover:border-[var(--accent)]/50 p-4 rounded-xl shadow-xs transition-all flex flex-col justify-between gap-3"
-                  >
-                    <div>
-                      <div className="flex justify-between items-start gap-2 mb-1.5">
-                        <h4 className="font-cinzel font-bold text-sm sm:text-base text-[var(--accent)] m-0">
-                          {ev.title}
-                        </h4>
-                      </div>
-
-                      {ev.dateOrTime && (
-                        <span className="inline-block text-[11px] font-cinzel px-2 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 mb-2">
-                          {ev.dateOrTime}
-                        </span>
-                      )}
-
-                      <p className="text-xs sm:text-sm font-lora text-[var(--text-primary)] leading-relaxed m-0 whitespace-pre-wrap">
-                        {ev.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <button
+              onClick={() => setActiveTab('diary')}
+              className="px-4 py-2 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-2 shadow-xs shrink-0"
+              title="Abrir la pestaña de Diario & Agenda"
+            >
+              <Calendar className="w-4 h-4" /> Abrir Diario & Agenda
+            </button>
           </div>
         </div>
         );
