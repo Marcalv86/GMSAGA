@@ -99,6 +99,102 @@ export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODE
   return modelId.trim();
 }
 
+// ---------------------------------------------------------------- catálogo vivo de modelos
+
+export interface ModeloDelCatalogo {
+  id: string;
+  nombre: string;
+  entrada: number;
+  salida: number;
+}
+
+interface CatalogoGuardado {
+  modelos: ModeloDelCatalogo[];
+  actualizado: number;
+}
+
+const CLAVE_CATALOGO = 'gmstudio_catalogo_modelos';
+const EDAD_MAXIMA_CATALOGO_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Lo que la clave admite de verdad, guardado de la última consulta.
+ *
+ * La lista escrita a mano de aquí arriba envejece: Google retira modelos y saca
+ * otros sin avisar, y el día que uno desaparece hay que entrar a tocar el
+ * código. Esto pregunta a Google en segundo plano y se queda con la respuesta,
+ * así que la aplicación se entera sola.
+ */
+export function leerCatalogoModelos(): CatalogoGuardado | null {
+  try {
+    const raw = localStorage.getItem(CLAVE_CATALOGO);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.modelos)) return null;
+    return { modelos: parsed.modelos, actualizado: Number(parsed.actualizado) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+export function catalogoEstaViejo(maxEdadMs: number = EDAD_MAXIMA_CATALOGO_MS): boolean {
+  const guardado = leerCatalogoModelos();
+  if (!guardado) return true;
+  return Date.now() - guardado.actualizado > maxEdadMs;
+}
+
+export async function refrescarCatalogoModelos(): Promise<ModeloDelCatalogo[]> {
+  const modelos = await listarModelosDeLaClave();
+  // Una lista vacía no se guarda. Guardarla sellaría veinticuatro horas de
+  // «tu clave no admite ningún modelo» a partir de una respuesta rara o una
+  // consulta que salió a medias, y durante ese día la aplicación avisaría de
+  // modelos ausentes que están perfectamente.
+  if (modelos.length === 0) return modelos;
+  try {
+    localStorage.setItem(CLAVE_CATALOGO, JSON.stringify({ modelos, actualizado: Date.now() }));
+  } catch {
+    // Sin sitio en localStorage: se seguirá preguntando, que es lo de antes.
+  }
+  return modelos;
+}
+
+let refrescoDeCatalogoEnMarcha = false;
+
+/**
+ * Pone al día el catálogo sin que nadie lo pida y sin estorbar.
+ *
+ * Se llama al abrir la aplicación. Si no hay clave, o la lista es de hace menos
+ * de un día, no hace nada: no se gasta una petición en algo que cambia como
+ * mucho cada varios meses. `models.list` no consume cuota de generación.
+ */
+export function refrescarCatalogoEnSegundoPlano(): void {
+  if (refrescoDeCatalogoEnMarcha) return;
+  if (!hasConfiguredApiKey()) return;
+  if (!catalogoEstaViejo()) return;
+  refrescoDeCatalogoEnMarcha = true;
+  refrescarCatalogoModelos()
+    .then(modelos => {
+      logInfo('general', `Catálogo de modelos actualizado (${modelos.length})`, `Google admite ${modelos.length} modelos de narración con tu clave.`);
+    })
+    .catch(err => {
+      // Que falle no rompe nada: se sigue con la lista escrita a mano.
+      logWarn('general', 'No se pudo actualizar el catálogo de modelos', describeApiError(err));
+    })
+    .finally(() => {
+      refrescoDeCatalogoEnMarcha = false;
+    });
+}
+
+/**
+ * Si la clave admite este modelo. `null` cuando todavía no se ha consultado
+ * nunca: es distinto de saber que no está, y no debe pintarse como un error.
+ */
+export function modeloDisponible(modelId: string): boolean | null {
+  const guardado = leerCatalogoModelos();
+  if (!guardado || guardado.modelos.length === 0) return null;
+  const id = modelId.trim().toLowerCase();
+  return guardado.modelos.some(m => m.id.toLowerCase() === id);
+}
+
 export function getStoredAutoFailover(): boolean {
   return localStorage.getItem('gmstudio_auto_failover') !== 'off';
 }
@@ -1156,13 +1252,21 @@ ${diseaseConfig.customRules ? `\n- **Reglas de Enfermedad, Contagio y Estrés:**
   3. Tras un Descanso Largo o al cumplir 24 horas en el calendario, pide la correspondiente Tirada de Salvación de Constitución para evaluar si la enfermedad remite, se estabiliza o empeora.`;
   }
 
-  // El orden importa por dinero y por atención. Gemini cachea automáticamente
-  // el prefijo común entre peticiones, y ese prefijo se rompe en el primer
-  // carácter que cambia: por eso va primero todo lo estable (directivas,
-  // sistema, estilo, ficha y documentos) y al final lo que cambia cada turno
-  // (memoria viva), pegado a la escena. Además los modelos atienden mejor al
-  // principio y al final que al medio.
-  const sys = `${CORE_INTERFACE_PROTOCOLS}
+  // El orden importa por dinero y por espera. Gemini cachea el prefijo común
+  // entre peticiones, y ese prefijo se rompe en el primer carácter que cambia.
+  //
+  // La intención estaba escrita aquí desde el principio, pero el montaje no la
+  // cumplía: la ficha del protagonista (que cambia en cuanto se gasta una
+  // moneda) iba ANTES de los documentos, y la memoria y el calendario (que
+  // cambian cada turno) antes del bloque de directivas. Con casi quince mil
+  // tokens estables escondidos detrás de contenido volátil, la caché se rompía
+  // en el primer turno y se reprocesaba todo desde cero una y otra vez.
+  //
+  // Ahora se montan dos bloques: primero TODO lo que no cambia entre turnos, y
+  // después lo vivo. Como el bloque de directivas deja de ser lo último que se
+  // lee, al final se repite en dos líneas el compromiso de formato, que es lo
+  // que de verdad necesita estar fresco.
+  const bloqueEstable = `${CORE_INTERFACE_PROTOCOLS}
 
 ### INSTRUCCIONES DE CAMPAÑA (IDENTIDAD Y DIRECTIVAS MAESTRAS DEL NARRADOR)
 ${activeInstructions}
@@ -1175,16 +1279,9 @@ ${diseaseSection}
 ### ESTILO NARRATIVO (VOZ Y RITMO NOVELESCO)
 ${activeStyle}
 
-${pjSection}
-
 ### BASE DE CONOCIMIENTO (DOCUMENTOS, FICHAS Y MATERIAL ADJUNTO)
 Los siguientes archivos forman parte del canon íntegro del mundo y debes utilizarlos como fuente de verdad sobre PNJs, lugares, eventos pasados, reglas, oráculos y ambientación:
 ${filesText || 'No hay documentos de texto adicionales adjuntos.'}
-
-### CONOCIMIENTO DE LA CAMPAÑA (MEMORIA VIVA)
-${memoryContext}
-
-${calendarioSection}
 
 ### RESERVA DE DADOS DEL DIRECTOR DE JUEGO (USO EXCLUSIVO DEL NARRADOR)
 Al final de la entrada del turno se adjunta la reserva de dados reales tirados para tus acciones ocultas de PNJ, daño, tablas aleatorias y tiradas enfrentadas. Son de uso exclusivo para el Narrador (NUNCA para las acciones del protagonista). Úsalos en orden y descarta los que no gastes.
@@ -1249,8 +1346,25 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
      «atr» (0-20), «vin» (0-20) y «con» (0-20) representan la Atracción/Romance, Vínculo y Confianza que el PNJ siente hacia el protagonista. El Narrador los actualiza de forma autónoma según las vivencias y la química; son de solo lectura para el jugador.
    - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, +Z PO, -W PO, +A PP, -B PC] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda o consuma objetos o dinero durante la escena (ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)], si come 3 de 10: [INVENTARIO: -3 Buenas Bayas], si gasta 15 de oro en una tienda: [INVENTARIO: +Disfraz noble, -15 PO], si Jarlaxle le entrega una Máscara de Disfraz: [INVENTARIO: +1 Máscara de Disfraz (mágica, equipada)], si pierde la máscara: [INVENTARIO: -1 Máscara de Disfraz]). Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
-     Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.
-     Estado actual conocido: PG ${pc?.hp ?? '?'}/${pc?.maxHp ?? '?'}, CA ${pc?.ac ?? '?'}${pc?.conditions?.length ? `, condiciones: ${pc.conditions.join(', ')}` : ''}.`;
+     Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
+
+  // Todo lo que cambia de un turno a otro. Va detrás para no romper el prefijo
+  // cacheado, y de paso queda pegado a la escena, que es donde mejor se atiende.
+  const bloqueVivo = `
+${pjSection}
+
+### CONOCIMIENTO DE LA CAMPAÑA (MEMORIA VIVA)
+${memoryContext}
+
+${calendarioSection}
+
+### ESTADO ACTUAL DEL PROTAGONISTA (AHORA MISMO)
+Estado actual conocido: PG ${pc?.hp ?? '?'}/${pc?.maxHp ?? '?'}, CA ${pc?.ac ?? '?'}${pc?.conditions?.length ? `, condiciones: ${pc.conditions.join(', ')}` : ''}.
+
+Narra la escena respetando las DIRECTIVAS DE RESPUESTA CRÍTICAS de más arriba, y ciérrala con los registros internos que correspondan según el punto 7 (solo los que hayan cambiado de verdad en este turno).`;
+
+  const sys = `${bloqueEstable}
+${bloqueVivo}`;
 
   // Filter out initial placeholders
   const historyCompleto = currentChat.messages.filter(

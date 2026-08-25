@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   AVAILABLE_MODELS,
+  modeloDisponible,
+  leerCatalogoModelos,
   DEFAULT_MODEL_ID,
   DEFAULT_BACKGROUND_MODEL_ID,
   getStoredSafetyLevel,
@@ -116,6 +118,14 @@ export const ApiKeyModal: React.FC<{
     { id: string; nombre: string; entrada: number; salida: number }[] | null
   >(null);
   const [consultandoModelos, setConsultandoModelos] = useState(false);
+  // El catálogo guardado se enseña de entrada: se refresca solo en segundo
+  // plano al abrir la app, así que casi siempre ya está y al día.
+  useEffect(() => {
+    if (isOpen && modelosDeLaClave === null) {
+      const guardado = leerCatalogoModelos();
+      if (guardado && guardado.modelos.length > 0) setModelosDeLaClave(guardado.modelos);
+    }
+  }, [isOpen, modelosDeLaClave]);
   // El gasto medido se lee al abrir el panel: entre medias no cambia.
   const [uso, setUso] = useState<ResumenUso[]>([]);
   /**
@@ -487,6 +497,9 @@ export const ApiKeyModal: React.FC<{
               <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
                 {AVAILABLE_MODELS.map(m => {
                   const isSelected = selectedModel === m.id;
+                  // `null` = todavía no se ha consultado nunca; no es lo mismo
+                  // que saber que no está, y no debe pintarse como un problema.
+                  const disponible = modeloDisponible(m.id);
                   return (
                     <div
                       key={m.id}
@@ -497,6 +510,11 @@ export const ApiKeyModal: React.FC<{
                           : 'border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[color-mix(in_srgb,var(--surface)_80%,transparent)]'
                       }`}
                     >
+                      {disponible === false && (
+                        <div className="mb-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                          ⚠ Tu clave no ofrece este modelo hoy
+                        </div>
+                      )}
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-cinzel font-bold text-xs md:text-sm text-[var(--accent)] flex items-center gap-2">
                           <input

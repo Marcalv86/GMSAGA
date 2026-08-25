@@ -66,6 +66,7 @@ import {
 import {
   generateStoryTurnStream,
   limpiarParaMostrar,
+  refrescarCatalogoEnSegundoPlano,
   TiempoReportado,
   analyzeUploadedImage,
   extractNpcFromDocument,
@@ -349,6 +350,9 @@ export default function App() {
   // 1. Initial Load of Projects on Mount (IndexedDB + localStorage fallback)
   useEffect(() => {
     cleanupLocalStorageQuota();
+    // Preguntar a Google qué modelos admite la clave, como mucho una vez al día
+    // y sin bloquear nada. Así la lista deja de envejecer en el código.
+    refrescarCatalogoEnSegundoPlano();
 
     const initProjects = async () => {
       // Try loading from IndexedDB first
