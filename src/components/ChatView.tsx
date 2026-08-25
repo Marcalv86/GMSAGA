@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Chat, PlayerCharacter } from '../types';
+import { Chat, PlayerCharacter, Project, ProjectFile } from '../types';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
 import { CreativeStudioModal } from './CreativeStudioModal';
@@ -8,6 +8,10 @@ import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
 import { parseMessageRolls, RollBadgeCard } from './RollBadge';
+import {
+  CALENDARIO_FANTASTICO,
+  aDiaAbsoluto
+} from '../utils/campaignCalendar';
 import {
   PROBABILIDADES,
   PROBABILIDAD_POR_DEFECTO,
@@ -141,29 +145,29 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
     >
       {/* Header / Sender label with actions */}
       <div
-        className={`flex items-center gap-2 mb-1 text-xs font-cinzel font-bold tracking-wide ${
-          m.role === 'user' ? 'text-[var(--accent)] mr-2' : 'text-[var(--text-secondary)]'
+        className={`flex flex-wrap items-center justify-between gap-1.5 mb-1.5 text-xs font-cinzel font-bold tracking-wide min-w-0 max-w-full ${
+          m.role === 'user' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'
         }`}
       >
-        <span className="flex items-center gap-1.5">
-          {m.role === 'user' ? 'Tu Acción' : 'Narrador'}
+        <span className="flex items-center gap-1.5 min-w-0">
+          <span className="truncate">{m.role === 'user' ? 'Tu Acción' : 'Narrador'}</span>
           {hasSyncTags && (
             <span
-              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-[9px] font-sans font-normal normal-case tracking-normal shadow-2xs hover:bg-amber-500/20 transition-colors cursor-help"
+              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-[9px] font-sans font-normal normal-case tracking-normal shadow-2xs hover:bg-amber-500/20 transition-colors cursor-help shrink-0"
               title={`Sincronización en segundo plano completada: ${syncItems.join(', ')}`}
             >
               <Zap className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
-              <span>Sincronizado</span>
+              <span className="hidden xs:inline">Sincronizado</span>
             </span>
           )}
         </span>
 
         {/* Quick action buttons on hover / top bar */}
         {!isEditing && (
-          <div className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 ml-2 bg-[var(--bg-color)]/90 px-1.5 py-0.5 rounded border border-[var(--user-border)] shadow-2xs">
+          <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 bg-[var(--bg-color)]/95 px-1.5 py-0.5 rounded-lg border border-[var(--user-border)] shadow-2xs opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 transition-opacity max-w-full">
             <button
               onClick={() => handleCopyMessage(idx, m.content)}
-              className="hover:text-[var(--accent)] p-0.5 text-[11px] cursor-pointer transition-colors"
+              className="hover:text-[var(--accent)] px-1 py-0.5 text-[11px] cursor-pointer transition-colors"
               title="Copiar texto al portapapeles"
             >
               {copiedIndex === idx ? 'Copiado' : 'Copiar'}
@@ -172,10 +176,10 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
             <button
               onClick={() => handleStartEditing(idx, m.content)}
               disabled={isGenerating}
-              className="hover:text-[var(--accent)] p-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
+              className="hover:text-[var(--accent)] px-1 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40 flex items-center gap-1"
               title="Editar este texto"
             >
-              <Pencil className="w-3.5 h-3.5" /> Editar
+              <Pencil className="w-3 h-3" /> <span className="hidden xs:inline">Editar</span>
             </button>
             {isModel && (
               <>
@@ -183,20 +187,20 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                 <button
                   onClick={() => onRegenerateMessage(idx)}
                   disabled={isGenerating}
-                  className="hover:text-[var(--accent)] p-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
+                  className="hover:text-[var(--accent)] px-1 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40 flex items-center gap-1"
                   title="Rehacer / Volver a generar la respuesta del Narrador"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" /> Rehacer
+                  <RefreshCw className="w-3 h-3" /> <span className="hidden xs:inline">Rehacer</span>
                 </button>
                 {onOpenStudio && (
                   <>
                     <span className="text-[var(--glass-border)]">•</span>
                     <button
                       onClick={() => onOpenStudio('image', m.content)}
-                      className="hover:text-[var(--accent)] p-0.5 text-[11px] cursor-pointer transition-colors"
+                      className="hover:text-[var(--accent)] px-1 py-0.5 text-[11px] cursor-pointer transition-colors flex items-center gap-1"
                       title="Ilustrar esta escena con el taller creativo"
                     >
-                      <Wand2 className="w-3.5 h-3.5" /> Ilustrar
+                      <Wand2 className="w-3 h-3 text-amber-600 dark:text-amber-400" /> <span className="hidden xs:inline">Ilustrar</span>
                     </button>
                   </>
                 )}
@@ -212,10 +216,10 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                 })
               }
               disabled={isGenerating}
-              className="text-red-700 hover:text-red-900 p-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
+              className="text-red-700 hover:text-red-900 px-1 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
               title="Borrar o rebobinar la historia desde este punto"
             >
-              <Trash2 className="w-3.5 h-3.5" />{' '}
+              <Trash2 className="w-3 h-3" />
             </button>
           </div>
         )}
@@ -512,6 +516,10 @@ export const ChatView: React.FC<{
   onUpdatePlayerCharacter?: (pc: PlayerCharacter) => void;
   onOpenNovelReader?: () => void;
   isBackgroundSyncing?: boolean;
+  project?: Project;
+  files?: ProjectFile[];
+  onUpdateProject?: (updater: Partial<Project> | ((prev: Project) => Partial<Project>)) => Promise<void> | void;
+  onNavigateToDiary?: (absDay?: number) => void;
 }> = ({
   chat,
   chapterIndex,
@@ -535,7 +543,11 @@ export const ChatView: React.FC<{
   onDeleteMessage,
   onUpdatePlayerCharacter,
   onOpenNovelReader,
-  isBackgroundSyncing
+  isBackgroundSyncing,
+  project,
+  files = [],
+  onUpdateProject,
+  onNavigateToDiary
 }) => {
   const [activeRoll, setActiveRoll] = useState<{ sides: number; result: number } | null>(null);
   const [oraculoAbierto, setOraculoAbierto] = useState(false);
@@ -1518,6 +1530,16 @@ export const ChatView: React.FC<{
           isOpen={studioModal.isOpen}
           initialTab={studioModal.tab}
           sceneText={studioModal.sceneText}
+          lastSceneText={studioModal.sceneText}
+          project={project}
+          files={files}
+          selectedAbsDay={
+            project?.currentDate
+              ? aDiaAbsoluto(project.calendar || CALENDARIO_FANTASTICO, project.currentDate)
+              : undefined
+          }
+          onUpdateProject={onUpdateProject}
+          onNavigateToDiary={onNavigateToDiary}
           onClose={() => setStudioModal(null)}
           onInsertIntoChat={(text: string) => {
             setInputText(prev => (prev ? `${prev}\n\n${text}` : text));

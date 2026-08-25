@@ -392,11 +392,68 @@ export interface EntradaDeAgenda {
   clima?: string;
   hito?: string;
   diaOffset?: number;
+  hora?: string;
+  minute?: number;
   tipo?: 'acontecimiento' | 'noticia' | 'rumor' | 'inconsciencia' | 'salto_temporal';
 }
 
 /**
- * Lee `[AGENDA: resumen | lugar: X | clima: Y | hito: tipo — texto | dia: +2 | tipo: noticia/rumor/inconsciencia]`.
+ * Extrae el minuto del día (0-1439) a partir de una cadena o texto descriptivo.
+ * Reconoce formatos digitales (14:30, 09:15), formatos con am/pm o 'h' (14h, 8h30, 9am, 10pm)
+ * y referencias narrativas (alba, mañana, mediodía, tarde, crepúsculo, anochecer, medianoche).
+ */
+export function extraerMinutoDeTexto(texto?: string): number | null {
+  if (!texto) return null;
+  const t = sinTildes(texto);
+
+  // Formato digital directo: 14:30, 08:15, 9:00, 23:45
+  const digitalMatch = t.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (digitalMatch) {
+    const h = parseInt(digitalMatch[1], 10);
+    const m = parseInt(digitalMatch[2], 10);
+    return h * 60 + m;
+  }
+
+  // Formato hora con h: 14h, 8h30, 9h
+  const hMatch = t.match(/\b(\d{1,2})\s*h(?:oras?)?(?:\s*(\d{1,2}))?\b/i);
+  if (hMatch) {
+    const h = parseInt(hMatch[1], 10) % 24;
+    const m = hMatch[2] ? parseInt(hMatch[2], 10) % 60 : 0;
+    return h * 60 + m;
+  }
+
+  // Formato am/pm: 9am, 10:30pm
+  const ampmMatch = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if (ampmMatch) {
+    let h = parseInt(ampmMatch[1], 10);
+    const m = ampmMatch[2] ? parseInt(ampmMatch[2], 10) : 0;
+    const ampm = ampmMatch[3].toLowerCase();
+    if (ampm === 'pm' && h < 12) h += 12;
+    if (ampm === 'am' && h === 12) h = 0;
+    return (h % 24) * 60 + m;
+  }
+
+  // Franjas y momentos narrativos del día
+  if (/\b(madrugada|trasnochar|alta noche|hora bruja)\b/.test(t)) return 3 * 60; // 03:00
+  if (/\b(primera guardia|guardia de noche)\b/.test(t)) return 1 * 60 + 30; // 01:30
+  if (/\b(segunda guardia)\b/.test(t)) return 3 * 60 + 30; // 03:30
+  if (/\b(tercera guardia|alborada)\b/.test(t)) return 5 * 60 + 30; // 05:30
+  if (/\b(alba|amanecer|despertar|aurora|primera luz|rayar el dia)\b/.test(t)) return 6 * 60 + 30; // 06:30
+  if (/\b(desayuno|primera hora)\b/.test(t)) return 8 * 60; // 08:00
+  if (/\b(manana|media manana)\b/.test(t)) return 10 * 60; // 10:00
+  if (/\b(mediodia|almuerzo|comida|doce)\b/.test(t)) return 12 * 60 + 30; // 12:30
+  if (/\b(sobremesa|siesta)\b/.test(t)) return 14 * 60 + 30; // 14:30
+  if (/\b(tarde|media tarde|merienda)\b/.test(t)) return 16 * 60 + 30; // 16:30
+  if (/\b(crepusculo|ocaso|puesta de sol|atardecer|caida de la tarde)\b/.test(t)) return 18 * 60 + 45; // 18:45
+  if (/\b(anochecer|anochecido|hora de cenar|cena)\b/.test(t)) return 20 * 60 + 30; // 20:30
+  if (/\b(noche cerrada|medianoche)\b/.test(t)) return 23 * 60 + 30; // 23:30
+  if (/\b(noche)\b/.test(t)) return 22 * 60; // 22:00
+
+  return null;
+}
+
+/**
+ * Lee `[AGENDA: resumen | hora: HH:MM | lugar: X | clima: Y | hito: tipo — texto | dia: +2 | tipo: noticia/rumor/inconsciencia]`.
  *
  * Los campos son opcionales y van por nombre, no por posición: un modelo se salta
  * un campo intermedio con toda naturalidad, y si se leyeran por orden acabaría
@@ -422,6 +479,11 @@ export function leerAgenda(texto: string): EntradaDeAgenda[] {
       if (campo === 'lugar') entrada.lugar = valor;
       else if (campo === 'clima' || campo === 'tiempo') entrada.clima = valor;
       else if (campo === 'hito') entrada.hito = valor;
+      else if (campo === 'hora' || campo === 'momento' || campo === 'franja') {
+        entrada.hora = valor;
+        const min = extraerMinutoDeTexto(valor);
+        if (min !== null) entrada.minute = min;
+      }
       else if (campo === 'dia' || campo === 'offset' || campo === 'diaoffset') {
         const num = parseInt(valor.replace(/[^\d+-]/g, ''), 10);
         if (Number.isFinite(num)) entrada.diaOffset = num;
@@ -433,6 +495,17 @@ export function leerAgenda(texto: string): EntradaDeAgenda[] {
         else if (/inconscien|coma|convalecen|letargo|herido/i.test(valNorm)) entrada.tipo = 'inconsciencia';
         else if (/salto|elipsis/i.test(valNorm)) entrada.tipo = 'salto_temporal';
         else entrada.tipo = 'acontecimiento';
+      }
+    }
+
+    // Si no se especificó hora explícita, buscar en el resumen o en el hito
+    if (entrada.minute === undefined) {
+      const minResumen = extraerMinutoDeTexto(entrada.resumen);
+      if (minResumen !== null) {
+        entrada.minute = minResumen;
+      } else if (entrada.hito) {
+        const minHito = extraerMinutoDeTexto(entrada.hito);
+        if (minHito !== null) entrada.minute = minHito;
       }
     }
 

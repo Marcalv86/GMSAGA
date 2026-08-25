@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import {
+  CalendarDays,
   Check,
   FolderSync,
   Menu,
@@ -95,6 +96,7 @@ import {
   calendarioValido,
   DIAS_PARA_SER_RECURRENTE,
   desdeDiaAbsoluto,
+  extraerMinutoDeTexto,
   fechaLegible,
   obtenerInfoRelacion
 } from './utils/campaignCalendar';
@@ -664,6 +666,24 @@ export default function App() {
               ? nuevaFecha
               : desdeDiaAbsoluto(cal, entryAbsDay);
 
+          let resolvedMinute = entrada.minute;
+          if (resolvedMinute === undefined || resolvedMinute === null) {
+            const extracted = extraerMinutoDeTexto(
+              `${entrada.resumen} ${entrada.hito || ''} ${entrada.lugar || ''}`
+            );
+            if (extracted !== null) {
+              resolvedMinute = extracted;
+            } else {
+              const baseMin =
+                (entryAbsDay === nuevoAbs
+                  ? nuevaFecha.minute
+                  : entryAbsDay === hoyAbs
+                  ? fecha.minute
+                  : 540) || 540;
+              resolvedMinute = Math.min(1439, baseMin + i * 90);
+            }
+          }
+
           return {
             id: `dia_${entryAbsDay}_${i}_${Math.random().toString(36).slice(2, 7)}`,
             absDay: entryAbsDay,
@@ -672,7 +692,7 @@ export default function App() {
             lugar: entrada.lugar,
             clima: entrada.clima,
             hito: entrada.hito,
-            minute: entryAbsDay === hoyAbs ? fecha.minute : 720,
+            minute: resolvedMinute,
             tipo: entrada.tipo,
             timeSkipDays: diasDeDiferencia >= 2 ? diasDeDiferencia : undefined,
             chatId: currentChatId || undefined,
@@ -2466,6 +2486,7 @@ export default function App() {
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
               { id: 'chat', label: 'Crónica', icon: Swords },
+              { id: 'calendar', label: 'Diario & Agenda', icon: CalendarDays },
               { id: 'memory', label: 'Memoria Viva', icon: ScrollText },
               { id: 'files', label: 'Archivos & Lore', icon: Paperclip },
               { id: 'instructions', label: 'Directivas & NSFW', icon: Scroll }
@@ -2527,6 +2548,10 @@ export default function App() {
               onDeleteMessage={handleDeleteChatMessage}
               onOpenNovelReader={() => setActiveTab('novel')}
               isBackgroundSyncing={false}
+              project={currentProject || undefined}
+              files={currentFiles}
+              onUpdateProject={handleUpdateProjectField}
+              onNavigateToDiary={() => setActiveTab('calendar')}
             />
           )}
 

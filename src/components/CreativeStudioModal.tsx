@@ -21,15 +21,26 @@ import {
   Upload,
   Calendar,
   BookmarkPlus,
-  Plus
+  Plus,
+  RefreshCw,
+  Palette,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { Project, ProjectFile, TimelineEntry, CalendarConfig, CampaignDate } from '../types';
 import {
   CALENDARIO_FANTASTICO,
   aDiaAbsoluto,
+  desdeDiaAbsoluto,
   fechaInicial,
-  fechaLegible
+  fechaLegible,
+  extraerMinutoDeTexto
 } from '../utils/campaignCalendar';
+import {
+  extractVisualArtStyleFromImages,
+  generateImageWithFailover,
+  ExtractedImageStyle
+} from '../utils/geminiHelper';
 
 export interface CreativeStudioModalProps {
   isOpen?: boolean;
@@ -249,12 +260,19 @@ const synth = new FantasyAudioSynthesizer();
 function buildImagePromptFromScene(
   cleanText: string,
   archetype: string,
-  modifiers: string[]
+  modifiers: string[],
+  customStylePrompt?: string
 ): string {
   const snippet = cleanText ? cleanText.slice(0, 320) : 'A party of fantasy adventurers resting by a campfire';
   const modStr = modifiers.length > 0 ? `, ${modifiers.join(', ')}` : '';
 
+  if (archetype === 'uploaded_images' && customStylePrompt) {
+    return `Masterpiece high fantasy illustration: ${snippet}. ${customStylePrompt}${modStr}, award-winning fantasy illustration, artstation trending, 8k resolution`;
+  }
+
   switch (archetype) {
+    case 'uploaded_images':
+      return `Masterpiece high fantasy illustration matching campaign reference art style: ${snippet}. Cohesive color palette, atmospheric fantasy lighting, high detail${modStr}, artstation trending, 8k`;
     case 'character':
       return `Masterpiece character portrait, detailed fantasy hero/NPC from scene: ${snippet}. Intricate facial expression, high fantasy clothing and gear, atmospheric depth of field, dramatic rim lighting${modStr}, octane render, 8k resolution`;
     case 'action':
@@ -326,13 +344,19 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
 
   // Campaign Date Context
   const cal: CalendarConfig = project?.calendar || CALENDARIO_FANTASTICO;
-  const fechaSegura: CampaignDate =
-    project?.currentDate && Number.isFinite(project.currentDate.year)
+  const fechaSegura: CampaignDate = useMemo(() => {
+    if (selectedAbsDay !== undefined && Number.isFinite(selectedAbsDay)) {
+      return desdeDiaAbsoluto(cal, selectedAbsDay, project?.currentDate?.minute ?? 8 * 60);
+    }
+    return project?.currentDate && Number.isFinite(project.currentDate.year)
       ? project.currentDate
       : fechaInicial(1490);
+  }, [cal, project?.currentDate, selectedAbsDay]);
+
   const hoyAbs = useMemo(() => {
     return selectedAbsDay !== undefined ? selectedAbsDay : aDiaAbsoluto(cal, fechaSegura);
   }, [cal, fechaSegura, selectedAbsDay]);
+
   const fechaLegibleStr = useMemo(() => {
     return fechaLegible(cal, fechaSegura);
   }, [cal, fechaSegura]);
@@ -363,6 +387,19 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   const [linkedSuccessMsg, setLinkedSuccessMsg] = useState<{ text: string; absDay: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Style extraction & direct AI Image generation
+  const [extractedStyle, setExtractedStyle] = useState<ExtractedImageStyle | null>(() => {
+    try {
+      const saved = localStorage.getItem('gmstudio_extracted_style');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  });
+  const [isAnalyzingStyle, setIsAnalyzingStyle] = useState<boolean>(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [autoLinkToDiary, setAutoLinkToDiary] = useState<boolean>(true);
+
   // Video generation controls
   const [cameraMove, setCameraMove] = useState<string>('pan');
   const [videoPrompt, setVideoPrompt] = useState<string>('');
@@ -376,17 +413,101 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   const [customMusicUrl, setCustomMusicUrl] = useState<string>('');
   const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
 
-  // Auto-update prompts when currentScene, archetype, modifiers or camera move changes
-  useEffect(() => {
-    setImagePrompt(buildImagePromptFromScene(currentScene, imageArchetype, selectedModifiers));
-    setVideoPrompt(buildVideoPromptFromScene(currentScene, cameraMove));
-    setDiarySummary(buildDiarySummaryFromScene(currentScene));
-  }, [currentScene, imageArchetype, selectedModifiers, cameraMove]);
-
   // Available image files from campaign
   const campaignImageFiles = useMemo(() => {
     return files.filter(f => f.isImage || (f.content && f.content.startsWith('data:image')));
   }, [files]);
+
+  // Set default archetype to 'uploaded_images' if campaign images exist
+  useEffect(() => {
+    if (campaignImageFiles.length > 0 && (imageArchetype === 'classic' || !imageArchetype)) {
+      setImageArchetype('uploaded_images');
+    }
+  }, [campaignImageFiles.length]);
+
+  const handleExtractStyle = async () => {
+    if (campaignImageFiles.length === 0) return;
+    setIsAnalyzingStyle(true);
+    try {
+      const result = await extractVisualArtStyleFromImages(campaignImageFiles);
+      setExtractedStyle(result);
+      try {
+        localStorage.setItem('gmstudio_extracted_style', JSON.stringify(result));
+      } catch {}
+      setImageArchetype('uploaded_images');
+    } catch (err: any) {
+      console.error('Error analizando estilo de imagen:', err);
+    } finally {
+      setIsAnalyzingStyle(false);
+    }
+  };
+
+  // Auto-analyze once if user has uploaded images and not analyzed yet
+  useEffect(() => {
+    if (campaignImageFiles.length > 0 && !extractedStyle && !isAnalyzingStyle) {
+      handleExtractStyle();
+    }
+  }, [campaignImageFiles.length]);
+
+  // Auto-update prompts when currentScene, archetype, modifiers, camera move, or extractedStyle changes
+  useEffect(() => {
+    setImagePrompt(
+      buildImagePromptFromScene(
+        currentScene,
+        imageArchetype,
+        selectedModifiers,
+        extractedStyle?.stylePrompt
+      )
+    );
+    setVideoPrompt(buildVideoPromptFromScene(currentScene, cameraMove));
+    setDiarySummary(buildDiarySummaryFromScene(currentScene));
+  }, [currentScene, imageArchetype, selectedModifiers, cameraMove, extractedStyle]);
+
+  // Direct AI Generation with Imagen 3
+  const handleGenerateAIImage = async () => {
+    if (!imagePrompt.trim()) return;
+    setIsGeneratingImage(true);
+    setGenerationError(null);
+    try {
+      const base64Data = await generateImageWithFailover({
+        prompt: imagePrompt,
+        aspectRatio: '1:1'
+      });
+      setAttachedImageUrl(base64Data);
+
+      // Auto link to diary if enabled
+      if (autoLinkToDiary && project && onUpdateProject) {
+        const title = customSceneTitle.trim() || '🎨 Ilustración de la Escena';
+        const summary = diarySummary.trim() || currentScene.slice(0, 300) || imagePrompt;
+        const newEntry: TimelineEntry = {
+          id: `escena_${hoyAbs}_${Date.now()}`,
+          absDay: hoyAbs,
+          date: fechaLegibleStr,
+          title: title.startsWith('🎨') ? title : `🎨 ${title}`,
+          summary,
+          tipo: 'escena',
+          mood: '🎨',
+          images: [base64Data],
+          hito: `Escena ilustrada: ${title.replace(/^🎨\s*/, '')}`
+        };
+        const currentTimeline = project.timeline || [];
+        await onUpdateProject({
+          timeline: [newEntry, ...currentTimeline]
+        });
+        setLinkedSuccessMsg({
+          text: `¡Ilustración generada con IA y guardada en el Diario del día ${fechaLegibleStr}!`,
+          absDay: hoyAbs
+        });
+      }
+    } catch (err: any) {
+      console.error('Error generando imagen:', err);
+      setGenerationError(
+        err?.message || 'Error al generar la imagen con el modelo de IA. Verifica tu clave de API.'
+      );
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
 
   // Handle direct file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -427,11 +548,14 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
 
     const title = customSceneTitle.trim() || '🎨 Ilustración de la Escena';
     const summary = diarySummary.trim() || currentScene.slice(0, 300) || imagePrompt;
+    const parsedMin = extraerMinutoDeTexto(`${title} ${summary}`);
+    const resolvedMin = (parsedMin !== null && parsedMin !== undefined) ? parsedMin : (fechaSegura.minute || 840);
     
     const newEntry: TimelineEntry = {
       id: `escena_${hoyAbs}_${Date.now()}`,
       absDay: hoyAbs,
       date: fechaLegibleStr,
+      minute: resolvedMin,
       title: title.startsWith('🎨') ? title : `🎨 ${title}`,
       summary: summary,
       tipo: 'escena',
@@ -464,12 +588,17 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
     }
 
     const title = customSceneTitle.trim() || 'Acontecimiento de la Jornada';
+    const summary = diarySummary.trim() || currentScene.slice(0, 300);
+    const parsedMin = extraerMinutoDeTexto(`${title} ${summary}`);
+    const resolvedMin = (parsedMin !== null && parsedMin !== undefined) ? parsedMin : (fechaSegura.minute || 720);
+
     const newEntry: TimelineEntry = {
       id: `diario_${hoyAbs}_${Date.now()}`,
       absDay: hoyAbs,
       date: fechaLegibleStr,
+      minute: resolvedMin,
       title: title,
-      summary: diarySummary.trim() || currentScene.slice(0, 300),
+      summary: summary,
       tipo: 'diario',
       mood: '✨',
       hito: title
@@ -688,10 +817,60 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
           {/* TAB 1: IMAGE PROMPTING (ENRICHED BY SCENE) */}
           {activeTab === 'image' && (
             <div className="space-y-4">
+              {/* Card de Coherencia de Estilo Visual basada en las Imágenes del Usuario */}
+              {campaignImageFiles.length > 0 && (
+                <div className="p-3 sm:p-4 rounded-xl border border-purple-500/30 bg-purple-500/5 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs font-cinzel font-bold text-purple-700 dark:text-purple-300">
+                      <Palette className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <span>Estilo Artístico de tus Imágenes Subidas ({campaignImageFiles.length}):</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleExtractStyle}
+                      disabled={isAnalyzingStyle}
+                      className="px-2.5 py-1 text-[11px] font-cinzel rounded-lg border border-purple-500/40 bg-purple-500/10 text-purple-800 dark:text-purple-200 hover:bg-purple-500/20 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isAnalyzingStyle ? 'animate-spin' : ''}`} />
+                      {isAnalyzingStyle ? 'Analizando estilo...' : 'Re-analizar estilo'}
+                    </button>
+                  </div>
+
+                  {/* Miniaturas de las imágenes de referencia */}
+                  <div className="flex items-center gap-2 overflow-x-auto py-1">
+                    {campaignImageFiles.slice(0, 5).map(img => (
+                      <div
+                        key={img.id}
+                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg border border-purple-500/30 overflow-hidden shrink-0 shadow-xs"
+                      >
+                        <img
+                          src={img.content}
+                          alt={img.name}
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    ))}
+                    <div className="text-[11px] text-[var(--text-secondary)] pl-1 flex-1 min-w-[140px]">
+                      {extractedStyle ? (
+                        <div>
+                          <strong className="text-[var(--text-primary)] font-cinzel">{extractedStyle.styleName}</strong>
+                          <div className="text-[10px] text-[var(--text-secondary)] line-clamp-1">
+                            {extractedStyle.medium} · {extractedStyle.colorPalette}
+                          </div>
+                        </div>
+                      ) : (
+                        <span>Analizando la paleta y estética de tus imágenes subidas para aplicarla a las ilustraciones...</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Archetypes Selector */}
               <div>
                 <label className="block text-xs font-cinzel font-bold text-[var(--text-primary)] mb-2">
@@ -699,6 +878,15 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
+                    ...(campaignImageFiles.length > 0
+                      ? [
+                          {
+                            id: 'uploaded_images',
+                            label: '✨ Estilo de tus Imágenes',
+                            desc: extractedStyle?.styleName || 'Coherente con tus imágenes subidas'
+                          }
+                        ]
+                      : []),
                     { id: 'classic', label: '🎨 Cuadro Épico (D&D)', desc: 'Óleo clásico, luz dramática' },
                     { id: 'character', label: '👤 Retrato de Personaje', desc: 'Primer plano, expresión e indumentaria' },
                     { id: 'action', label: '⚔️ Acción & Hechizo', desc: 'Movimiento, partículas mágicas y combate' },
@@ -752,35 +940,64 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                 </div>
               </div>
 
-              {/* Prompt Output Box */}
-              <div className="p-4 rounded-xl border border-[var(--accent)] bg-[var(--surface-soft)] space-y-3">
-                <div className="flex items-center justify-between">
+              {/* Prompt Output Box & Generación Directa con IA */}
+              <div className="p-3.5 sm:p-4 rounded-xl border border-[var(--accent)] bg-[var(--surface-soft)] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
                   <span className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
-                    <Wand2 className="w-3.5 h-3.5" /> Prompt Listo para Generadores (Midjourney / DALL-E / Imagen 3 / Stable Diffusion):
+                    <Wand2 className="w-3.5 h-3.5" /> Prompt de Ilustración:
+                  </span>
+                  <span className="text-[10px] text-[var(--text-secondary)]">
+                    Compatible con Imagen 3, Midjourney, DALL-E y Stable Diffusion
                   </span>
                 </div>
                 <textarea
                   value={imagePrompt}
                   onChange={e => setImagePrompt(e.target.value)}
-                  rows={4}
+                  rows={3}
                   className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg p-2.5 text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
                 />
 
+                {generationError && (
+                  <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{generationError}</span>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                  <button
-                    onClick={() => copyToClipboard(imagePrompt, 'image_prompt')}
-                    className="px-3 py-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--bg-color)] text-xs font-cinzel font-bold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    {copiedPrompt === 'image_prompt' ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" /> ¡Copiado al Portapapeles!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" /> Copiar Prompt de Imagen
-                      </>
-                    )}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleGenerateAIImage}
+                      disabled={isGeneratingImage || !imagePrompt.trim()}
+                      className="px-3.5 py-1.5 bg-gradient-to-r from-purple-700 to-[var(--accent)] text-white rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 shadow-md hover:brightness-110 cursor-pointer disabled:opacity-50"
+                    >
+                      {isGeneratingImage ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Pintando con IA...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5" /> Generar con IA (Imagen 3)
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => copyToClipboard(imagePrompt, 'image_prompt')}
+                      className="px-3 py-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--bg-color)] text-xs font-cinzel font-bold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      {copiedPrompt === 'image_prompt' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" /> ¡Copiado!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" /> Copiar Prompt
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                   {handleSendToChat && (
                     <button
@@ -788,20 +1005,29 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                         handleSendToChat(`🎨 [Ilustración de la Escena]: ${imagePrompt}`);
                         onClose();
                       }}
-                      className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 shadow-2xs hover:bg-[var(--accent-hover)] cursor-pointer"
+                      className="px-3 py-1.5 bg-[var(--surface)] border border-[var(--user-border)] hover:border-[var(--accent)] text-[var(--text-primary)] rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 cursor-pointer"
                     >
-                      <Send className="w-3.5 h-3.5" /> Insertar en la Historia
+                      <Send className="w-3.5 h-3.5" /> Insertar en Chat
                     </button>
                   )}
                 </div>
               </div>
 
               {/* Vincular Ilustración a la Cronología / Diario */}
-              <div className="p-4 rounded-xl border border-[var(--glass-border)] bg-[var(--surface-soft)] space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="p-3.5 sm:p-4 rounded-xl border border-[var(--glass-border)] bg-[var(--surface-soft)] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
                   <span className="text-xs font-cinzel font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-                    <BookmarkPlus className="w-3.5 h-3.5 text-[var(--accent)]" /> Guardar / Vincular Ilustración al Diario de Campaña ({fechaLegibleStr})
+                    <BookmarkPlus className="w-3.5 h-3.5 text-[var(--accent)]" /> Guardar en el Diario de Campaña ({fechaLegibleStr})
                   </span>
+                  <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoLinkToDiary}
+                      onChange={e => setAutoLinkToDiary(e.target.checked)}
+                      className="accent-[var(--accent)] rounded"
+                    />
+                    <span>Auto-guardar al generar con IA</span>
+                  </label>
                 </div>
 
                 <div className="space-y-2">
@@ -814,6 +1040,36 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                       className="flex-1 bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[var(--accent)]"
                     />
                   </div>
+
+                  {/* Vista previa de la imagen generada o adjunta */}
+                  {attachedImageUrl && (
+                    <div className="p-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--bg-color)] flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={attachedImageUrl}
+                          alt="Ilustración generada o vinculada"
+                          className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-[var(--user-border)] shrink-0 shadow-xs"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="min-w-0">
+                          <div className="text-xs font-cinzel font-bold text-emerald-700 dark:text-emerald-300 truncate">
+                            ✓ Ilustración lista para el Diario
+                          </div>
+                          <div className="text-[10px] text-[var(--text-secondary)] line-clamp-1">
+                            Corresponde a la jornada: {fechaLegibleStr}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAttachedImageUrl('')}
+                        className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-500/10 cursor-pointer"
+                        title="Quitar imagen"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
 
                   {/* Imagen adjunta o seleccionada */}
                   <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -843,23 +1099,14 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                       </button>
                     )}
 
-                    {attachedImageUrl && (
-                      <div className="flex items-center gap-2 bg-[var(--glass)] px-2.5 py-1 rounded-lg border border-[var(--glass-border)] text-xs">
-                        <img
-                          src={attachedImageUrl}
-                          alt="Miniatura"
-                          className="w-5 h-5 object-cover rounded"
-                          referrerPolicy="no-referrer"
-                        />
-                        <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-bold">Imagen vinculada</span>
-                        <button
-                          type="button"
-                          onClick={() => setAttachedImageUrl('')}
-                          className="text-red-500 hover:text-red-700 ml-1 cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                    {attachedImageUrl && !linkedSuccessMsg && (
+                      <button
+                        type="button"
+                        onClick={handleLinkSceneToDiary}
+                        className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 shadow-2xs hover:bg-[var(--accent-hover)] cursor-pointer ml-auto"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Guardar en el Diario
+                      </button>
                     )}
                   </div>
 
@@ -887,20 +1134,10 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                       ))}
                     </div>
                   )}
-
-                  <div className="flex items-center justify-between pt-2">
-                    <button
-                      type="button"
-                      onClick={handleLinkSceneToDiary}
-                      className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] rounded-lg text-xs font-cinzel font-bold flex items-center gap-1.5 shadow-2xs hover:bg-[var(--accent-hover)] cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Vincular Escena Ilustrada al Diario
-                    </button>
-                  </div>
                 </div>
 
                 {linkedSuccessMsg && (
-                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-200">
+                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-800 dark:text-emerald-200">
                     <span>{linkedSuccessMsg.text}</span>
                     {onNavigateToDiary && (
                       <button
@@ -909,9 +1146,9 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                           onNavigateToDiary(linkedSuccessMsg.absDay);
                           onClose();
                         }}
-                        className="font-bold underline ml-2 flex items-center gap-1 cursor-pointer"
+                        className="font-bold underline flex items-center gap-1 cursor-pointer hover:text-emerald-600"
                       >
-                        <Calendar className="w-3.5 h-3.5" /> Ver en Diario
+                        <Calendar className="w-3.5 h-3.5" /> Abrir Día en el Diario ({fechaLegibleStr})
                       </button>
                     )}
                   </div>

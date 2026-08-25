@@ -2539,6 +2539,147 @@ Sé estructurado y comienza indicando el tipo.`;
   return response.text || '';
 }
 
+export interface ExtractedImageStyle {
+  styleName: string;
+  stylePrompt: string;
+  keyElements: string[];
+  colorPalette: string;
+  lighting: string;
+  medium: string;
+  fullDescription: string;
+}
+
+/**
+ * Analiza las imágenes de referencia subidas por el usuario y extrae un descriptor
+ * de estilo visual exacto para que Imagen 3 y los generadores de IA reproduzcan
+ * el mismo estilo artístico, paleta, iluminación y trazo.
+ */
+export async function extractVisualArtStyleFromImages(
+  imageFiles: ProjectFile[]
+): Promise<ExtractedImageStyle> {
+  const validImages = imageFiles.filter(
+    f => (f.isImage || (f.content && f.content.startsWith('data:image'))) && f.content
+  );
+
+  if (validImages.length === 0) {
+    throw new Error('No hay imágenes subidas en los archivos para analizar el estilo.');
+  }
+
+  // Tomar hasta 3 imágenes de referencia
+  const sampleImages = validImages.slice(0, 3);
+  const parts: any[] = [
+    {
+      text: `Eres un director de arte y maestro de concepto visual para campañas de alta fantasía y D&D.
+Analiza minuciosamente el estilo artístico, técnica visual, paleta de colores, iluminación, trazo y estética de estas imágenes de referencia subidas por el usuario.
+Tu objetivo es extraer una especificación y prompt de estilo visual PERFECTO para que cualquier generador de imágenes (Imagen 3 / Midjourney / DALL-E) replique con total exactitud este mismo estilo artístico en todas las escenas que se ilustren para esta campaña.
+
+Responde ÚNICAMENTE con un JSON con esta estructura exacta:
+{
+  "styleName": "Nombre evocador del estilo (ej. Óleo Oscuro Renacentista de Fantasía)",
+  "stylePrompt": "Descriptor conciso en inglés para añadir a los prompts de generación de imagen (ej. high fantasy oil painting with rich chiaroscuro lighting, deep sepia and amber tones, visible canvas brushstrokes, intricate character details, vintage fantasy artstation style)",
+  "keyElements": ["Elemento 1", "Elemento 2", "Elemento 3"],
+  "colorPalette": "Descripción de la paleta de colores y tonos predominantes",
+  "lighting": "Tipo de iluminación y sombras",
+  "medium": "Técnica o medio artístico (óleo, acuarela, concept art digital, grabado)",
+  "fullDescription": "Resumen en español para la usuaria explicando los rasgos visuales identificados"
+}`
+    }
+  ];
+
+  for (const img of sampleImages) {
+    const raw = img.content || '';
+    const base64 = raw.includes(',') ? raw.split(',')[1] : raw;
+    const mime = img.mime || 'image/jpeg';
+    if (base64 && base64.length > 50) {
+      parts.push({
+        inlineData: {
+          data: base64,
+          mimeType: mime
+        }
+      });
+    }
+  }
+
+  const response = await generateContentWithFailover({
+    primaryModel: getBackgroundTaskModel(),
+    contents: { parts },
+    config: {
+      responseMimeType: 'application/json',
+      temperature: 0.2
+    }
+  });
+
+  const cleanJson = (response.text || '{}')
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  try {
+    const parsed = JSON.parse(cleanJson);
+    return {
+      styleName: parsed.styleName || 'Estilo Personalizado de tus Imágenes',
+      stylePrompt: parsed.stylePrompt || 'masterpiece high fantasy illustration, richly detailed textures and atmospheric lighting matching campaign reference art',
+      keyElements: parsed.keyElements || ['Paleta coherente', 'Iluminación atmosférica'],
+      colorPalette: parsed.colorPalette || 'Tonos cálidos y contrastados',
+      lighting: parsed.lighting || 'Iluminación dramática',
+      medium: parsed.medium || 'Pintura digital / Óleo de fantasía',
+      fullDescription: parsed.fullDescription || 'Estilo visual extraído de las imágenes subidas por el usuario.'
+    };
+  } catch (e) {
+    console.error('Error parseando JSON de estilo de imagen:', e);
+    return {
+      styleName: 'Estilo Personalizado de tus Imágenes',
+      stylePrompt: 'masterpiece fantasy art, matching the color palette, lighting and brushwork of the user reference images, 8k resolution, artstation trending',
+      keyElements: ['Estilo coherente con las imágenes de campaña'],
+      colorPalette: 'Paleta personalizada',
+      lighting: 'Iluminación atmosférica',
+      medium: 'Arte de fantasía',
+      fullDescription: 'Estilo visual adaptado a tus referencias.'
+    };
+  }
+}
+
+/**
+ * Genera una imagen directamente con Imagen 3 / @google/genai usando la clave de API configurada.
+ */
+export async function generateImageWithFailover({
+  prompt,
+  aspectRatio = '1:1'
+}: {
+  prompt: string;
+  aspectRatio?: '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
+}): Promise<string> {
+  const { keys } = getRotatedApiKeys();
+  const keysToTry = keys.length > 0 ? keys : [''];
+  let lastError: any = null;
+
+  for (const apiKey of keysToTry) {
+    try {
+      const ai = getAIClient(apiKey || undefined);
+      const response = await ai.models.generateImages({
+        model: 'imagen-3.0-generate-002',
+        prompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg',
+          aspectRatio: (aspectRatio as any) || '1:1'
+        }
+      });
+      if (response.generatedImages && response.generatedImages.length > 0) {
+        const img = response.generatedImages[0];
+        const base64 = img?.image?.imageBytes;
+        if (base64) {
+          return `data:image/jpeg;base64,${base64}`;
+        }
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn('Error generando imagen con Imagen 3:', err);
+    }
+  }
+  throw lastError || new Error('No se pudo generar la imagen con el modelo de IA. Verifica tu clave de API.');
+}
+
 export async function analyzeNarrativeStyleFromDocument(
   text: string,
   fileName?: string
