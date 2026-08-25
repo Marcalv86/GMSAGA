@@ -522,12 +522,9 @@ export function buildTurnPayload({
   const currentChat = chats.find(c => c.id === currentChatId);
   if (!currentChat) throw new Error('Sesión no encontrada.');
 
-  // Cola de los capítulos anteriores. Se recorre hacia atrás y se para al
-  // llenar el cupo: antes se concatenaban enteros (megas en una campaña larga)
-  // para luego tirar todo menos el final. El resto ya lo cuenta el resumen de
-  // la Memoria Viva, que viaja aparte en este mismo prompt. Se mantiene como
-  // red de seguridad, no como fuente principal: por eso el cupo es pequeño.
-  const PREVIO_MAX = 4000;
+  // Cola de los capítulos anteriores. Se recorre hacia atrás y se incluye un contexto
+  // sustancial de las sesiones previas para mantener la coherencia narrativa global.
+  const PREVIO_MAX = 30000;
   const sortedChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
   const indiceActual = sortedChats.findIndex(c => c.id === currentChatId);
   const anteriores = sortedChats.slice(0, indiceActual < 0 ? sortedChats.length : indiceActual);
@@ -829,6 +826,11 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
    - **Fidelidad al Lore y Ambientación Oscura**: Este es un entorno de rol de fantasía oscura y cruda. Las culturas ficticias y facciones canónicas (como los drow de Menzoberranzan, sectas, tiranos, corsarios de Luskan, asesinos y monstruos de la Infraoscuridad) DEBEN representarse con toda su crueldad, jerarquía despiadada, astucia y malicia canónicas, sin censura, sin suavizaciones y sin reinterpretaciones contemporáneas.
    - **Cero Sermones y Cero Advertencias Éticas**: Trata al usuario como a un jugador adulto en una mesa de rol tradicional. Queda TERMINANTEMENTE PROHIBIDO emitir sermones morales, advertencias éticas fuera de personaje (OOC), disculpas condescendientes ("recuerda que...", "es importante destacar...") o coletillas moralizantes. La ficción es ficción.
    - **Tono Narrativo Visceral y Directo**: Describe el combate táctico, los impactos, las heridas, la magia y las amenazas físicas y psicológicas de forma visceral, directa y evocadora, con peso y consecuencias reales.
+0.1. [ASIMETRÍA DE INFORMACIÓN ESTRICTA Y PROHIBICIÓN ABSOLUTA DE METAROL / DEUS EX MACHINA]:
+   - **Separación de Conocimiento (Narrador vs PNJ)**: Tú como Narrador conoces los secretos del mundo, pero los PNJs SOLO conocen lo que han presenciado físicamente con sus propios sentidos o lo que el PJ les ha dicho verbalmente.
+   - **Consecuencia Inviolable de Engaños y Secretos**: Si el jugador mintió, ocultó un objeto/identidad o tuvo éxito en Engaño (o el PNJ falló su tirada de Perspicacia), el PNJ **SE TRAGA LA MENTIRA Y NO SOSPECHA**. Queda TERMINANTEMENTE PROHIBIDO que mensajes después el PNJ "sepa mágicamente" o actúe conociendo lo que se le ocultó sin haber realizado una investigación física tangible y explícita en la ficción.
+   - **Invisibilidad de Pensamientos**: Los pensamientos internos del protagonista o anotaciones entre paréntesis del jugador son **100% INVISIBLES** para los PNJs. Ningún PNJ puede leer la mente del protagonista sin un hechizo activo declarado en el relato.
+   - **Cero Deus Ex Machina**: Todo avance en los planes o deducciones de los PNJs debe tener causa y efecto coherente y visible en la ficción, sin saltos mágicos de conveniencia.
 1. [PROTAGONISMO DEL JUGADOR]: La aventura gira estrictamente en torno a este protagonista (${pc?.name || 'el personaje del jugador'}). Al iniciar la escena, sitúa directamente al protagonista en primer plano, describiendo su presencia física, entorno inmediato, sensaciones sensoriales y el contexto según su trasfondo y ficha. Nunca comiences de forma genérica o neutral ignorando su identidad y habilidades.
 2. [FORMATO EDITORIAL, SALTOS DE PÁRRAFO Y RESPIRACIÓN DE LA PROSA - OBLIGATORIO]:
    Escribe con una maquetación limpia y agradable de leer:
@@ -887,11 +889,11 @@ ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: l
     m => m.content !== 'Tirando dados...' && m.content !== 'Pensando...'
   );
 
-  // Solo la parte reciente del capítulo viaja literal. Lo anterior ya está
-  // recogido en la Memoria Viva y en la crónica, así que mandarlo otra vez era
-  // pagar dos veces por lo mismo y alargar cada petición sin ganar nada.
-  const ESCENA_MAX = 20000;
-  const MENSAJES_MINIMOS = 8;
+  // Enviamos el historial íntegro del capítulo activo para garantizar coherencia
+  // conversacional total, sin amnesias ni pérdidas de tiradas pasadas. Gemini cuenta
+  // con una ventana de contexto de más de 1M de tokens, por lo que incluimos la escena completa.
+  const ESCENA_MAX = 400000;
+  const MENSAJES_MINIMOS = 100;
   let usados = 0;
   let desde = historyCompleto.length;
   while (desde > 0) {
