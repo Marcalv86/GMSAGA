@@ -38,6 +38,7 @@ import {
 } from '../utils/campaignCalendar';
 import {
   extractVisualArtStyleFromImages,
+  describeApiError,
   generateImageWithFailover,
   ExtractedImageStyle
 } from '../utils/geminiHelper';
@@ -501,9 +502,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
       }
     } catch (err: any) {
       console.error('Error generando imagen:', err);
-      setGenerationError(
-        err?.message || 'Error al generar la imagen con el modelo de IA. Verifica tu clave de API.'
-      );
+      setGenerationError(describeApiError(err));
     } finally {
       setIsGeneratingImage(false);
     }

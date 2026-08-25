@@ -34,6 +34,7 @@ import {
   cleanApiKey,
   testSingleApiKey,
   testAllApiKeys,
+  testKeyAgainstModel,
   ApiKeyDiagnostic
 } from '../utils/geminiHelper';
 import { ResumenUso, borrarUso, resumirUso } from '../utils/usageStats';
@@ -216,10 +217,17 @@ export const ApiKeyModal: React.FC<{
     setIsTestingKeys(true);
     try {
       const results = await testAllApiKeys(apiKeysList);
+      // Listar modelos lo consigue casi cualquier clave viva. Lo que de verdad
+      // importa es si puede NARRAR con el modelo elegido, así que a las que pasan
+      // el primer filtro se les pide además una generación mínima: es la única
+      // prueba que se parece a lo que hará la app en cada turno.
+      const afinadas = await Promise.all(
+        results.map(r => (r.status === 'valid' ? testKeyAgainstModel(r.key, selectedModel) : Promise.resolve(r)))
+      );
       const map: Record<string, ApiKeyDiagnostic> = {};
       let validCount = 0;
       let invalidCount = 0;
-      for (const r of results) {
+      for (const r of afinadas) {
         map[r.key] = r;
         if (r.status === 'valid') validCount++;
         else if (r.status === 'invalid' || r.status === 'denied') invalidCount++;
@@ -232,7 +240,7 @@ export const ApiKeyModal: React.FC<{
         });
       } else {
         setBatchFeedback({
-          text: `✓ Diagnóstico completado: Todas las claves (${validCount}) están autorizadas y operativas en Google AI Studio.`,
+          text: `✓ Diagnóstico completado: las ${validCount} ${validCount === 1 ? 'clave está autorizada y puede narrar' : 'claves están autorizadas y pueden narrar'} con ${selectedModel}.`,
           isError: false
         });
       }
@@ -250,7 +258,8 @@ export const ApiKeyModal: React.FC<{
     setTestingSingleKey(k);
     try {
       const diag = await testSingleApiKey(k);
-      setKeyDiagnostics(prev => ({ ...prev, [k]: diag }));
+      const afinado = diag.status === 'valid' ? await testKeyAgainstModel(k, selectedModel) : diag;
+      setKeyDiagnostics(prev => ({ ...prev, [k]: afinado }));
     } finally {
       setTestingSingleKey(null);
     }

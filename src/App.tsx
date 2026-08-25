@@ -65,6 +65,7 @@ import {
 } from './utils/fileStorage';
 import {
   generateStoryTurnStream,
+  limpiarParaMostrar,
   TiempoReportado,
   analyzeUploadedImage,
   extractNpcFromDocument,
@@ -1007,15 +1008,16 @@ export default function App() {
         // que hace que la narración se escriba ante ti en vez de aparecer a saltos.
         // El guardado en disco sigue limitado dentro de geminiHelper.
         onChunk: (fullText: string) => {
+          const visible = limpiarParaMostrar(fullText);
           setCurrentChats(prev =>
             prev.map(c => {
               if (c.id !== currentChatId) return c;
               const msgs = [...c.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'model') {
-                msgs[msgs.length - 1] = { ...last, content: fullText };
+                msgs[msgs.length - 1] = { ...last, content: visible };
               } else {
-                msgs.push({ role: 'model', content: fullText });
+                msgs.push({ role: 'model', content: visible });
               }
               return { ...c, messages: msgs };
             })

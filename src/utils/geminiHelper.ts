@@ -119,8 +119,12 @@ export function getModelFailoverChain(initialModel: string): string[] {
     'gemini-3.1-flash-lite',
     'gemini-3.1-pro-preview'
   ];
+  // Con el respaldo apagado se usa el modelo elegido y punto. Antes esta rama
+  // devolvía exactamente la misma cadena que la de abajo, así que el interruptor
+  // no apagaba nada: quien fijaba un modelo seguía viendo cómo la app saltaba a
+  // otro a la primera saturación.
   if (!getStoredAutoFailover()) {
-    return [safeInitial, ...standardFallbacks.filter(m => m !== safeInitial && !isModelDeprecated(m))];
+    return [safeInitial];
   }
   const chain: string[] = [safeInitial];
   for (const m of standardFallbacks) {
@@ -273,9 +277,11 @@ export function buildSafetySettings(threshold: SafetyThreshold = getStoredSafety
     'HARM_CATEGORY_HARASSMENT',
     'HARM_CATEGORY_HATE_SPEECH',
     'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-    'HARM_CATEGORY_DANGEROUS_CONTENT',
-    'HARM_CATEGORY_CIVIC_INTEGRITY'
+    'HARM_CATEGORY_DANGEROUS_CONTENT'
   ];
+  // HARM_CATEGORY_CIVIC_INTEGRITY se quedó fuera a propósito: los modelos nuevos
+  // ya no la admiten y rechazan la petición ENTERA con un 400 INVALID_ARGUMENT.
+  // Una categoría que ni siquiera se estaba filtrando no vale tumbar cada turno.
   return categories.map(category => ({
     category,
     threshold
@@ -406,6 +412,218 @@ export function isKeyInCooldown(key: string): boolean {
   return true;
 }
 
+// ---------------------------------------------------------------- leer lo que Google responde
+
+/**
+ * Lo que ha fallado de verdad, en una forma con la que se pueda decidir.
+ *
+ * El SDK lanza `ApiError` con el código HTTP en `status` y el cuerpo JSON de
+ * Google en `message`. Antes esto se adivinaba con expresiones regulares sobre
+ * el texto, y adivinar salía caro: un 400 por un campo mal puesto se leía como
+ * «clave inválida» y descartaba las tres claves del bolsillo de una vez, así que
+ * el turno moría al primer intento aunque las claves estuvieran perfectas. El
+ * código y el estado simbólico de Google son la fuente; el texto, el último
+ * recurso.
+ */
+export interface ApiFailure {
+  /** Código HTTP. 0 si no llegó a haber respuesta: red caída o petición cancelada. */
+  status: number;
+  /** El estado simbólico de Google: RESOURCE_EXHAUSTED, INVALID_ARGUMENT, NOT_FOUND... */
+  googleStatus: string;
+  isRateLimit: boolean;
+  isOverloaded: boolean;
+  /** La clave no sirve. SOLO esto justifica retirarla del bolsillo. */
+  isInvalidKey: boolean;
+  isPermissionDenied: boolean;
+  /** El modelo no existe o esta clave no lo admite: toca cambiar de modelo, no de clave. */
+  isModelMissing: boolean;
+  /** Petición mal formada. Es culpa de la app, y ninguna clave lo va a arreglar. */
+  isBadRequest: boolean;
+  isNetwork: boolean;
+  isSafetyBlock: boolean;
+  isAborted: boolean;
+  /** Si volver a intentarlo tiene alguna posibilidad de salir mejor. */
+  isTransient: boolean;
+  /** Lo que Google pide esperar (RetryInfo), en milisegundos. 0 si no lo dice. */
+  retryAfterMs: number;
+  /** El mensaje humano de Google, ya desenterrado del JSON. */
+  detail: string;
+}
+
+/** Saca el cuerpo de error de Google esté donde esté: campo, JSON serializado o texto suelto. */
+function cuerpoDeError(err: any): { code: number; status: string; message: string; details: any[] } {
+  const vacio = { code: 0, status: '', message: '', details: [] as any[] };
+  if (!err) return vacio;
+
+  const directo = err?.error || err?.response?.data?.error;
+  if (directo && typeof directo === 'object') {
+    return {
+      code: Number(directo.code) || 0,
+      status: String(directo.status || ''),
+      message: String(directo.message || ''),
+      details: Array.isArray(directo.details) ? directo.details : []
+    };
+  }
+
+  const raw = typeof err === 'string' ? err : String(err?.message || '');
+  if (raw.includes('{')) {
+    // El SDK mete el JSON de Google tal cual en `message`.
+    const inicio = raw.indexOf('{');
+    const fin = raw.lastIndexOf('}');
+    if (fin > inicio) {
+      try {
+        const parsed = JSON.parse(raw.slice(inicio, fin + 1));
+        const e = parsed?.error || parsed;
+        if (e && typeof e === 'object') {
+          return {
+            code: Number(e.code) || 0,
+            status: String(e.status || ''),
+            message: String(e.message || raw),
+            details: Array.isArray(e.details) ? e.details : []
+          };
+        }
+      } catch {
+        // Un JSON a medias no es motivo para perder el resto de la información.
+      }
+    }
+  }
+  return { ...vacio, message: raw };
+}
+
+/** Los segundos que Google pide esperar, si se ha molestado en decirlo. */
+function leerRetryInfo(details: any[], texto: string): number {
+  for (const d of details || []) {
+    const delay = d?.retryDelay ?? d?.retry_delay;
+    if (typeof delay === 'string') {
+      const s = parseFloat(delay);
+      if (!isNaN(s) && s > 0) return Math.min(Math.round(s * 1000), 120000);
+    }
+  }
+  const m = texto.match(/retry[_ ]?delay["':\s]+(\d+(?:\.\d+)?)s/i);
+  if (m) {
+    const s = parseFloat(m[1]);
+    if (!isNaN(s) && s > 0) return Math.min(Math.round(s * 1000), 120000);
+  }
+  return 0;
+}
+
+export function classifyApiError(err: unknown): ApiFailure {
+  const e: any = err;
+  const cuerpo = cuerpoDeError(e);
+  const texto = `${cuerpo.message} ${cuerpo.status} ${String(e?.message || '')}`;
+  const lower = texto.toLowerCase();
+
+  // `ApiError.status` del SDK es el código HTTP real; es lo más fiable que hay.
+  const status = Number(e?.status) || Number(e?.code) || cuerpo.code || 0;
+  const googleStatus = cuerpo.status || '';
+  const gs = googleStatus.toUpperCase();
+
+  const isAborted = e?.name === 'AbortError' || /\baborted\b|abortada/i.test(lower);
+
+  const isNetwork =
+    !isAborted &&
+    status === 0 &&
+    /failed to fetch|networkerror|network error|load failed|econnreset|enotfound|etimedout|socket hang up|tiempo de espera agotado/i.test(
+      lower
+    );
+
+  const isRateLimit = status === 429 || gs === 'RESOURCE_EXHAUSTED' || /resource_exhausted|quota|rate limit/i.test(lower);
+
+  const isOverloaded =
+    status === 503 ||
+    status === 500 ||
+    status === 502 ||
+    status === 504 ||
+    gs === 'UNAVAILABLE' ||
+    gs === 'INTERNAL' ||
+    gs === 'DEADLINE_EXCEEDED' ||
+    /overloaded|unavailable|alta demanda|try again later|internal error/i.test(lower);
+
+  // Un 400 solo señala a la clave si Google nombra la clave. Cualquier otro 400
+  // (campo no admitido, contexto demasiado largo, modelo mal escrito) es de la
+  // petición, y descartar una clave por eso es tirar cuota buena a la basura.
+  const mencionaLaClave = /api[_ ]?key not valid|api_key_invalid|invalid api key|api key expired|api_key_expired/i.test(lower);
+  const isInvalidKey = mencionaLaClave || status === 401;
+
+  const isPermissionDenied =
+    !isInvalidKey && (status === 403 || gs === 'PERMISSION_DENIED' || /permission_denied|denied access/i.test(lower));
+
+  const isModelMissing =
+    status === 404 ||
+    gs === 'NOT_FOUND' ||
+    /is not found for api version|was not found|not found for api|no such model|unknown model|is not supported for/i.test(
+      lower
+    );
+
+  const isBadRequest = !isInvalidKey && !isModelMissing && (status === 400 || gs === 'INVALID_ARGUMENT');
+
+  const isSafetyBlock = /safety|blocked|prohibited_content|prohibited|recitation|block_reason/i.test(lower);
+
+  // Cortes de streaming a mitad: la conexión se fue, no la petición. Merece otra oportunidad.
+  const streamCortado = /incomplete json|unexpected end|terminated|premature close|stream|closed/i.test(lower);
+
+  const isTransient = isRateLimit || isOverloaded || isNetwork || streamCortado;
+
+  return {
+    status,
+    googleStatus,
+    isRateLimit,
+    isOverloaded,
+    isInvalidKey,
+    isPermissionDenied,
+    isModelMissing,
+    isBadRequest,
+    isNetwork,
+    isSafetyBlock,
+    isAborted,
+    isTransient,
+    retryAfterMs: isRateLimit || isOverloaded ? leerRetryInfo(cuerpo.details, texto) : 0,
+    detail: (cuerpo.message || String(e?.message || '')).slice(0, 400)
+  };
+}
+
+/** Espera que se rinde en cuanto la jugadora corta la generación. */
+export function esperar(ms: number, signal?: AbortSignal): Promise<void> {
+  if (ms <= 0 || signal?.aborted) return Promise.resolve();
+  return new Promise(resolve => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(t);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+}
+
+/**
+ * Espera creciente con un margen aleatorio.
+ *
+ * El azar no es adorno: si tres claves reintentan al mismo milisegundo vuelven a
+ * chocar contra la misma pared a la vez. Repartirlas en el tiempo es la mitad de
+ * lo que hace que un reintento sirva de algo.
+ */
+export function reboteMs(intento: number, base = 700, techo = 8000): number {
+  const tope = Math.min(base * Math.pow(2, intento), techo);
+  return Math.round(tope / 2 + Math.random() * (tope / 2));
+}
+
+/**
+ * Claves que se pueden usar ahora mismo, en orden de preferencia.
+ *
+ * Las que acaban de dar 429 se apartan de verdad en lugar de limitarse a ir las
+ * últimas: reintentar contra una clave que Google acaba de cerrar solo sirve
+ * para gastar el turno. Si TODAS están enfriándose se devuelven igualmente —más
+ * vale intentarlo con la que menos le queda que no intentar nada.
+ */
+export function clavesDisponibles(keys: string[], descartadas: Set<string> = new Set()): string[] {
+  const vivas = keys.filter(k => !descartadas.has(k));
+  const frescas = vivas.filter(k => !isKeyInCooldown(k));
+  return frescas.length > 0 ? frescas : vivas;
+}
+
 // Índice circular persistente para la rotación proactiva Round-Robin
 let globalRoundRobinIndex = (() => {
   try {
@@ -467,6 +685,20 @@ export function getRotatedApiKeys(): {
     activeOriginalIndex: rotated[0].origIdx,
     totalKeys: allKeys.length
   };
+}
+
+/**
+ * Las claves tal cual, SIN mover el turno de la rotación.
+ *
+ * Contar tokens o preguntar qué modelos admite una clave son consultas de
+ * mirón: no gastan cuota de generación y no deberían decidir con qué clave se
+ * narra el turno siguiente. Antes usaban `getRotatedApiKeys`, que avanza el
+ * índice circular y lo guarda, así que abrir el contador de contexto desbarataba
+ * el reparto de carga entre claves.
+ */
+export function peekApiKeys(): string[] {
+  const todas = getStoredApiKeys();
+  return clavesDisponibles(todas);
 }
 
 export function getStoredApiKey(): string {
@@ -536,47 +768,101 @@ export async function testSingleApiKey(apiKey: string): Promise<ApiKeyDiagnostic
       modelsFound: count
     };
   } catch (err: any) {
-    const raw = String(err?.message || '');
-    const lower = raw.toLowerCase();
+    const fallo = classifyApiError(err);
+    const detalle = fallo.detail ? ` ${fallo.detail.slice(0, 120)}` : '';
 
-    if (lower.includes('api key not valid') || lower.includes('api_key_invalid') || (lower.includes('400') && lower.includes('key'))) {
+    if (fallo.isInvalidKey) {
       return {
         key: cleaned,
         status: 'invalid',
-        code: 400,
-        message: 'Clave de API no válida o revocada en Google AI Studio (Error 400: API_KEY_INVALID).'
+        code: fallo.status || 400,
+        message: `Clave no válida o revocada en Google AI Studio.${detalle}`
       };
     }
-    if (lower.includes('denied') || lower.includes('permission_denied') || lower.includes('403')) {
+    if (fallo.isPermissionDenied) {
       return {
         key: cleaned,
         status: 'denied',
         code: 403,
-        message: 'Acceso denegado o proyecto suspendido/sin API habilitada (Error 403: PERMISSION_DENIED).'
+        message: `Acceso denegado: proyecto suspendido o sin la Generative Language API habilitada.${detalle}`
       };
     }
-    if (lower.includes('429') || lower.includes('resource_exhausted') || lower.includes('quota')) {
+    if (fallo.isRateLimit) {
       return {
         key: cleaned,
         status: 'quota',
         code: 429,
-        message: 'Clave válida, pero con cuota de peticiones agotada temporalmente (Error 429: RESOURCE_EXHAUSTED).'
+        message: `Clave válida, pero con la cuota agotada por ahora (429: RESOURCE_EXHAUSTED).${detalle}`
       };
     }
-    if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('load failed')) {
+    if (fallo.isNetwork) {
       return {
         key: cleaned,
         status: 'network',
         code: 0,
-        message: 'No se pudo conectar con Google (Error de red o conexión).'
+        message: 'No se pudo conectar con Google (error de red o conexión).'
       };
     }
 
     return {
       key: cleaned,
       status: 'error',
-      message: `Error al verificar: ${raw.slice(0, 150)}`
+      code: fallo.status || undefined,
+      message: `Error al verificar:${detalle || ` ${String(err?.message || '').slice(0, 150)}`}`
     };
+  }
+}
+
+/**
+ * Comprueba que una clave puede NARRAR con el modelo elegido, no solo que existe.
+ *
+ * Listar modelos pasa con casi cualquier clave viva, así que el diagnóstico daba
+ * verde a claves que luego fallaban en cada turno: sin facturación para el modelo
+ * de pago, con el modelo retirado, o con la cuota de generación a cero. Esto pide
+ * una respuesta mínima de verdad, que es la única prueba que vale.
+ */
+export async function testKeyAgainstModel(apiKey: string, modelId: string): Promise<ApiKeyDiagnostic> {
+  const cleaned = cleanApiKey(apiKey);
+  if (!cleaned) {
+    return { key: apiKey, status: 'invalid', code: 400, message: 'Clave vacía o mal formada.' };
+  }
+  try {
+    const ai = new GoogleGenAI({ apiKey: cleaned });
+    await ai.models.generateContent({
+      model: modelId,
+      contents: 'ping',
+      config: { maxOutputTokens: 1, temperature: 0 }
+    });
+    return {
+      key: cleaned,
+      status: 'valid',
+      code: 200,
+      message: `Clave operativa y capaz de generar con ${modelId}.`
+    };
+  } catch (err: any) {
+    const fallo = classifyApiError(err);
+    const detalle = fallo.detail ? ` ${fallo.detail.slice(0, 120)}` : '';
+    if (fallo.isInvalidKey) {
+      return { key: cleaned, status: 'invalid', code: fallo.status || 400, message: `Clave no válida o revocada.${detalle}` };
+    }
+    if (fallo.isPermissionDenied) {
+      return { key: cleaned, status: 'denied', code: 403, message: `Acceso denegado para ${modelId}.${detalle}` };
+    }
+    if (fallo.isRateLimit) {
+      return { key: cleaned, status: 'quota', code: 429, message: `Cuota agotada por ahora para ${modelId}.${detalle}` };
+    }
+    if (fallo.isModelMissing) {
+      return {
+        key: cleaned,
+        status: 'error',
+        code: fallo.status || 404,
+        message: `La clave es válida, pero el modelo «${modelId}» no existe para ella. Pulsa «Ver los de mi clave».`
+      };
+    }
+    if (fallo.isNetwork) {
+      return { key: cleaned, status: 'network', code: 0, message: 'No se pudo conectar con Google.' };
+    }
+    return { key: cleaned, status: 'error', code: fallo.status || undefined, message: `Error al probar ${modelId}:${detalle}` };
   }
 }
 
@@ -1022,6 +1308,34 @@ ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: l
   return { sys, contents };
 }
 
+/** Cuántas veces se insiste con la MISMA clave cuando Google está saturado. */
+const MAX_REINTENTOS_POR_SATURACION = 2;
+
+/**
+ * Por qué el modelo ha devuelto un turno en blanco.
+ *
+ * Un turno vacío antes se daba por bueno: la jugadora se quedaba mirando un
+ * mensaje sin una sola letra, sin manera de saber si había sido el filtro, el
+ * límite de salida o un tropiezo de la conexión. Nombrarlo permite además que el
+ * respaldo entre en acción en lugar de dar la escena por narrada.
+ */
+function explicarTurnoVacio(bloqueoDePrompt: string, motivoDeCierre: string): string {
+  if (bloqueoDePrompt) {
+    return `El modelo ha rechazado la petición antes de escribir nada (motivo: ${bloqueoDePrompt}). Baja los filtros en Motor → Filtros & NSFW.`;
+  }
+  const motivo = (motivoDeCierre || '').toUpperCase();
+  if (motivo === 'SAFETY' || motivo === 'PROHIBITED_CONTENT' || motivo === 'BLOCKLIST') {
+    return `El modelo ha cortado la escena por sus filtros de seguridad (motivo: ${motivo}). Baja los filtros en Motor → Filtros & NSFW.`;
+  }
+  if (motivo === 'RECITATION') {
+    return 'El modelo ha cortado la escena por parecerse demasiado a un texto con derechos (motivo: RECITATION). Reformula la última entrada.';
+  }
+  if (motivo === 'MAX_TOKENS') {
+    return 'El modelo agotó su límite de salida sin escribir nada aprovechable. El contexto de la campaña puede estar demasiado cargado.';
+  }
+  return 'El modelo ha devuelto un turno vacío, sin texto ni motivo de cierre.';
+}
+
 export async function generateStoryTurnStream({
   project,
   currentChatId,
@@ -1054,8 +1368,8 @@ export async function generateStoryTurnStream({
   const currentChat = chats.find(c => c.id === currentChatId);
   if (!currentChat) throw new Error('Sesión no encontrada.');
 
-  const { keys: apiKeys, totalKeys } = getRotatedApiKeys();
-  if (apiKeys.length === 0) {
+  const { keys: rotadas, totalKeys } = getRotatedApiKeys();
+  if (rotadas.length === 0) {
     throw new Error(
       'La clave de API de Gemini no está configurada.\n\nPulsa el botón "Motor" de la barra superior e introduce tu clave de Google AI Studio.'
     );
@@ -1064,38 +1378,64 @@ export async function generateStoryTurnStream({
   const baseModel = getStoredModel();
   const failoverChain = getModelFailoverChain(baseModel);
 
-  let success = false;
-  let fullText = '';
+  const storedKeys = getStoredApiKeys();
+  const numeroDeClave = (key: string, pos: number) => {
+    const i = storedKeys.indexOf(key);
+    return i >= 0 ? i + 1 : pos + 1;
+  };
+  const etiquetaDeClave = (n: number) => (totalKeys > 1 ? ` (Clave ${n}/${totalKeys})` : '');
+
+  /** Claves que Google ha rechazado de raíz (401/403). No se vuelven a tocar en este turno. */
+  const clavesMuertas = new Set<string>();
+  /** Modelos que no existen para estas claves (404). Se saltan sin gastar más claves en ellos. */
+  const modelosAusentes = new Set<string>();
+
   let lastError: any = null;
-  const fatalKeysSet = new Set<string>();
+  let ultimoFallo: ApiFailure | null = null;
 
-  for (let modelIndex = 0; modelIndex < failoverChain.length && !success; modelIndex++) {
-    // Si todas las claves del pool han sido rechazadas como fatales (400/403), no reintentar inútilmente
-    if (apiKeys.length > 0 && apiKeys.every(k => fatalKeysSet.has(k))) {
-      break;
-    }
+  const persistir = (texto: string, definitivo: boolean) =>
+    saveStreamedMessage(currentChat, texto, onSaveMessage, onStateReported, onTimeReported, definitivo);
 
+  for (let modelIndex = 0; modelIndex < failoverChain.length; modelIndex++) {
     const currentModel = failoverChain[modelIndex];
+    if (modelosAusentes.has(currentModel)) continue;
+    if (signal?.aborted) return;
+
+    const disponibles = clavesDisponibles(rotadas, clavesMuertas);
+    if (disponibles.length === 0) break;
+
     const isFallback = modelIndex > 0;
     const modelDisplayName = AVAILABLE_MODELS.find(m => m.id === currentModel)?.name || currentModel;
+    let saltarAlSiguienteModelo = false;
 
-    for (let keyIndex = 0; keyIndex < apiKeys.length && !success; keyIndex++) {
-      const currentApiKey = apiKeys[keyIndex];
-      if (fatalKeysSet.has(currentApiKey)) continue;
+    for (let k = 0; k < disponibles.length && !saltarAlSiguienteModelo; k++) {
+      const currentApiKey = disponibles[k];
+      if (clavesMuertas.has(currentApiKey)) continue;
 
+      const nClave = numeroDeClave(currentApiKey, k);
+      const keyLabel = etiquetaDeClave(nClave);
       const ai = getAIClient(currentApiKey);
-      const storedKeys = getStoredApiKeys();
-      const origKeyIdx = storedKeys.indexOf(currentApiKey);
-      const keyNumDisplay = origKeyIdx >= 0 ? origKeyIdx + 1 : keyIndex + 1;
-      const keyLabel = totalKeys > 1 ? ` (Clave ${keyNumDisplay}/${totalKeys})` : '';
 
-      // Si es la clave principal y no hay texto previo, intentamos 1 vez y si falla por cuota rotamos de inmediato a la siguiente clave
-      const maxRetriesForModel = isFallback ? 1 : 1;
+      // Saturación: se insiste con ESTA clave antes de rotar. Un 503 es la
+      // capacidad del modelo en Google, no un problema de la clave; cambiar de
+      // clave contra el mismo modelo saturado no arregla nada, esperar sí.
+      for (let intento = 0; intento <= MAX_REINTENTOS_POR_SATURACION; intento++) {
+        if (signal?.aborted) return;
 
-      for (let retry = 0; retry < maxRetriesForModel && !success; retry++) {
-        let streamReceivedText = false;
+        // Cada intento arranca con la hoja en blanco. Si el anterior dejó a
+        // medias un puñado de letras, arrastrarlas pegaría el arranque de una
+        // narración con el cuerpo de otra distinta.
+        let fullText = '';
+        let recibioTexto = false;
+        let motivoDeCierre = '';
+        let bloqueoDePrompt = '';
+
         try {
-          if (isFallback) {
+          if (intento > 0) {
+            setLoadingText(
+              `Google sigue saturado. Reintento ${intento}/${MAX_REINTENTOS_POR_SATURACION} en ${modelDisplayName}${keyLabel}...`
+            );
+          } else if (isFallback) {
             setLoadingText(
               `Google saturado en el modelo anterior. Continuando narración con ${modelDisplayName}${keyLabel}...`
             );
@@ -1122,6 +1462,7 @@ export async function generateStoryTurnStream({
             systemInstruction: sys,
             temperature: tempSetting,
             topP: topPSetting,
+            abortSignal: signal,
             ...(abierto ? {} : { safetySettings: buildSafetySettings(safetySetting) })
           };
 
@@ -1133,7 +1474,7 @@ export async function generateStoryTurnStream({
           const responseStream = await ai.models.generateContentStream({
             model: currentModel,
             contents,
-            config: { ...config, abortSignal: signal }
+            config
           });
 
           let lastSaveTime = Date.now();
@@ -1143,25 +1484,34 @@ export async function generateStoryTurnStream({
             if (signal?.aborted) break;
             const textPart = chunk.text ?? '';
             if (textPart) {
-              streamReceivedText = true;
+              recibioTexto = true;
               fullText += textPart;
               onChunk(fullText);
             }
+            const candidato = (chunk as any).candidates?.[0];
+            if (candidato?.finishReason) motivoDeCierre = String(candidato.finishReason);
+            const bloqueo = (chunk as any).promptFeedback?.blockReason;
+            if (bloqueo) bloqueoDePrompt = String(bloqueo);
             if ((chunk as any).usageMetadata) uso = (chunk as any).usageMetadata;
 
             // Guardado intermedio cada 1.5s
             const now = Date.now();
             if (now - lastSaveTime > 1500 && fullText.length > 0) {
               lastSaveTime = now;
-              await saveStreamedMessage(
-                currentChat,
-                fullText,
-                onSaveMessage,
-                onStateReported,
-                onTimeReported,
-                false
-              );
+              await persistir(fullText, false);
             }
+          }
+
+          if (signal?.aborted) {
+            if (fullText.trim().length > 0) await persistir(fullText.trim(), true);
+            return;
+          }
+
+          // Un turno en blanco no es un turno narrado: se trata como fallo para
+          // que entre el respaldo en vez de dar la escena por buena y dejar a la
+          // jugadora ante un mensaje vacío que no explica nada.
+          if (fullText.trim().length === 0) {
+            throw new Error(explicarTurnoVacio(bloqueoDePrompt, motivoDeCierre));
           }
 
           if (uso) {
@@ -1180,137 +1530,143 @@ export async function generateStoryTurnStream({
             );
           }
 
-          // Guardado final completo
-          if (fullText.trim().length > 0) {
-            await saveStreamedMessage(
-              currentChat,
-              fullText.trim(),
-              onSaveMessage,
-              onStateReported,
-              onTimeReported,
-              true
-            );
-          }
-          success = true;
-          break; // Salir del bucle si fue exitoso
+          await persistir(fullText.trim(), true);
+          return;
         } catch (e: any) {
-          if (signal?.aborted || e?.name === 'AbortError') {
-            if (fullText.trim().length > 0) {
-              await saveStreamedMessage(
-                currentChat,
-                fullText.trim(),
-                onSaveMessage,
-                onStateReported,
-                onTimeReported,
-                true
-              );
-            }
-            success = true;
+          const fallo = classifyApiError(e);
+
+          if (signal?.aborted || fallo.isAborted) {
+            if (fullText.trim().length > 0) await persistir(fullText.trim(), true);
             return;
           }
+
           lastError = e;
-          console.warn(`Error en modelo ${currentModel} (clave ${keyNumDisplay}):`, e);
-
-          const msg = String(e?.message || '');
-          const isRateLimit = /429|RESOURCE_EXHAUSTED|quota|rate/i.test(msg);
-          const isOverloaded = /503|UNAVAILABLE|overloaded|alta demanda|try again later|500|502|504/i.test(msg);
-          const isInvalidKey = /api_key_invalid|api key not valid|invalid_argument/i.test(msg) || (msg.includes('400') && /api key|api_key|key not valid/i.test(msg));
-          const isPermissionDenied = /permission_denied|403|denied access/i.test(msg);
-          const streamCortado =
-            streamReceivedText ||
-            /incomplete json|unexpected end|network|failed to fetch|load failed|terminated|aborted|stream|closed|econnreset|fetch/i.test(msg);
-
-          if (isInvalidKey || isPermissionDenied) {
-            fatalKeysSet.add(currentApiKey);
-          }
+          ultimoFallo = fallo;
+          console.warn(`Error en modelo ${currentModel} (clave ${nClave}):`, e);
 
           logWarn(
             'gemini_stream',
-            `Incidencia en modelo ${currentModel} (Clave ${keyNumDisplay}/${totalKeys})`,
-            msg || 'Error en streaming',
+            `Incidencia en modelo ${currentModel} (Clave ${nClave}/${totalKeys})`,
+            fallo.detail || 'Error en streaming',
             {
               chatName: currentChat.name,
               model: currentModel,
               details: {
-                isRateLimit,
-                isOverloaded,
-                isInvalidKey,
-                isPermissionDenied,
-                streamCortado,
-                keyIndex,
+                status: fallo.status,
+                googleStatus: fallo.googleStatus,
+                isRateLimit: fallo.isRateLimit,
+                isOverloaded: fallo.isOverloaded,
+                isInvalidKey: fallo.isInvalidKey,
+                isPermissionDenied: fallo.isPermissionDenied,
+                isModelMissing: fallo.isModelMissing,
+                isBadRequest: fallo.isBadRequest,
+                recibioTexto,
+                motivoDeCierre,
+                intento,
+                clave: nClave,
                 totalKeys
               }
             }
           );
 
-          // Si el streaming ya había entregado una respuesta sustancial y la conexión se interrumpió a mitad,
-          // preservamos TODO lo que el modelo ya había narrado en lugar de borrarlo y reintentar desde cero.
-          if (fullText.trim().length > 30) {
-            await saveStreamedMessage(
-              currentChat,
-              fullText.trim(),
-              onSaveMessage,
-              onStateReported,
-              onTimeReported,
-              true
-            );
-            success = true;
+          // Lo ya narrado no se tira. Si el corte llegó con la escena encaminada,
+          // se guarda y se para: reescribirla desde cero daría otra distinta y la
+          // jugadora perdería la que estaba leyendo.
+          if (recibioTexto && fullText.trim().length > 30) {
+            await persistir(fullText.trim(), true);
             return;
           }
 
-          // Si es clave inválida o acceso denegado, rotar inmediatamente a la siguiente clave sin reintentar
-          if (isInvalidKey || isPermissionDenied) {
-            if (keyIndex < apiKeys.length - 1) {
-              setLoadingText(`Clave ${keyNumDisplay} no autorizada. Probando siguiente clave del pool...`);
-              break;
-            }
+          if (fallo.isModelMissing) {
+            // Ese modelo no existe para estas claves. Ninguna otra clave lo va a
+            // hacer aparecer: al siguiente de la cadena.
+            modelosAusentes.add(currentModel);
+            saltarAlSiguienteModelo = true;
+            break;
           }
 
-          // Si no había texto escrito aún y es límite de cuota (429), enfriar clave y pasar de inmediato a la siguiente clave
-          if (isRateLimit) {
-            markKeyCooldown(currentApiKey, 60000);
-            if (keyIndex < apiKeys.length - 1) {
-              setLoadingText(`Límite de cuota en Clave ${keyNumDisplay}. Rotando a la siguiente clave para ${modelDisplayName}...`);
-              break; // saltar inmediatamente a la siguiente clave
+          if (fallo.isInvalidKey || fallo.isPermissionDenied) {
+            clavesMuertas.add(currentApiKey);
+            if (disponibles.some(kk => !clavesMuertas.has(kk))) {
+              setLoadingText(`Clave ${nClave} no autorizada. Probando la siguiente clave del bolsillo...`);
             }
+            break;
           }
 
-          if (isOverloaded || streamCortado) {
-            if (keyIndex < apiKeys.length - 1) {
-              setLoadingText(`Reintentando con la siguiente clave (${keyIndex + 2}/${totalKeys}) para ${modelDisplayName}...`);
-              await new Promise(resolve => setTimeout(resolve, 300));
-              break; // pasar a la siguiente clave del pool
+          if (fallo.isRateLimit) {
+            markKeyCooldown(currentApiKey, fallo.retryAfterMs || 60000);
+            if (disponibles.slice(k + 1).some(kk => !clavesMuertas.has(kk) && !isKeyInCooldown(kk))) {
+              setLoadingText(`Cuota agotada en la Clave ${nClave}. Rotando a la siguiente para ${modelDisplayName}...`);
             }
-            // Si se agotaron todas las claves en este modelo, pasar al siguiente modelo de respaldo
-            if (modelIndex < failoverChain.length - 1) {
-              const nextModel = failoverChain[modelIndex + 1];
-              const nextDisplayName = AVAILABLE_MODELS.find(m => m.id === nextModel)?.name || nextModel;
-              setLoadingText(`Servidores de Google saturados en ${modelDisplayName}. Saltando a ${nextDisplayName}...`);
-              await new Promise(resolve => setTimeout(resolve, 500));
-              break;
-            }
-          } else {
-            // Error no transitorio: pasar a la siguiente clave o modelo
-            if (keyIndex < apiKeys.length - 1) {
-              break;
-            }
-            if (modelIndex < failoverChain.length - 1) {
-              break;
-            }
+            break;
           }
+
+          if (fallo.isBadRequest) {
+            // La petición no le gusta a este modelo (un campo que no admite, el
+            // contexto pasado de largo). Repetirla con otra clave da exactamente
+            // el mismo 400: lo único que puede cambiar algo es otro modelo.
+            saltarAlSiguienteModelo = true;
+            break;
+          }
+
+          if (fallo.isTransient && intento < MAX_REINTENTOS_POR_SATURACION) {
+            await esperar(fallo.retryAfterMs || reboteMs(intento), signal);
+            continue;
+          }
+
+          break;
         }
       }
     }
-  } // key loop
 
-  if (!success && lastError) {
-    const errorMsg = describeApiError(lastError);
-    logError('gemini_stream', 'Fallo definitivo en la generación de narrativa', lastError, {
-      chatName: currentChat.name,
-      message: errorMsg
-    });
-    await saveStreamedMessage(currentChat, errorMsg, onSaveMessage);
-    throw lastError;
+    if (modelIndex < failoverChain.length - 1) {
+      const siguiente = failoverChain[modelIndex + 1];
+      if (!modelosAusentes.has(siguiente)) {
+        const nombreSiguiente = AVAILABLE_MODELS.find(m => m.id === siguiente)?.name || siguiente;
+        setLoadingText(`Sin suerte en ${modelDisplayName}. Saltando a ${nombreSiguiente}...`);
+        await esperar(300, signal);
+      }
+    }
+  }
+
+  if (signal?.aborted) return;
+
+  const errorFinal = lastError || new Error('No se pudo obtener respuesta de ningún modelo.');
+  logError('gemini_stream', 'Fallo definitivo en la generación de narrativa', errorFinal, {
+    chatName: currentChat.name,
+    message: describeApiError(errorFinal),
+    details: ultimoFallo ? { status: ultimoFallo.status, googleStatus: ultimoFallo.googleStatus } : undefined
+  });
+
+  // El mensaje de error NO se guarda como si lo hubiera narrado el Narrador.
+  // Antes se escribía en el chat y se quedaba allí: la jugadora lo leía como
+  // parte de la historia y, peor, viajaba a Google como contexto en todos los
+  // turnos siguientes. Se retira el hueco vacío y el aviso se da por la interfaz.
+  await descartarTurnoFallido(currentChat, onSaveMessage);
+  throw errorFinal;
+}
+
+/**
+ * Quita del chat el hueco que se había reservado para la respuesta.
+ *
+ * Solo se toca el último mensaje y solo si es del Narrador y está vacío o es el
+ * marcador de espera: nunca una escena de verdad.
+ */
+async function descartarTurnoFallido(
+  chat: Chat,
+  onSaveMessage?: (updatedChat: Chat) => Promise<void> | void
+) {
+  if (!onSaveMessage) return;
+  const messages = [...chat.messages];
+  const ultimo = messages[messages.length - 1];
+  if (!ultimo || ultimo.role !== 'model') return;
+  const contenido = (ultimo.content || '').trim();
+  if (contenido.length > 30 && contenido !== 'Tirando dados...') return;
+  messages.pop();
+  try {
+    await onSaveMessage({ ...chat, messages });
+  } catch (e) {
+    console.warn('onSaveMessage callback error:', e);
   }
 }
 
@@ -1410,19 +1766,34 @@ async function saveStreamedMessage(
   }
 }
 
+/** Margen para las tareas de fondo. El anterior, 35s, cortaba destilados largos en seco. */
+const TIMEOUT_TAREA_DE_FONDO_MS = 90000;
+
+/**
+ * Una petición sin streaming, insistiendo por todas las claves y modelos que haga falta.
+ *
+ * Es el camino de todo lo que no es narrar: sincronizar memoria, extraer PNJs,
+ * deducir el calendario, destilar documentos. Comparte con el narrador la misma
+ * lectura de errores, para que una clave quemada o un modelo inexistente
+ * signifiquen lo mismo en los dos sitios.
+ */
 export async function generateContentWithFailover({
   contents,
   config = {},
   primaryModel,
-  preferredChain
+  preferredChain,
+  signal,
+  timeoutMs = TIMEOUT_TAREA_DE_FONDO_MS
 }: {
   contents: any;
   config?: any;
   primaryModel?: string;
   preferredChain?: string[];
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }): Promise<any> {
-  const { keys: apiKeys } = getRotatedApiKeys();
-  const keysToTry = apiKeys.length > 0 ? apiKeys : [''];
+  const { keys: rotadas } = getRotatedApiKeys();
+  const todasLasClaves = rotadas.length > 0 ? rotadas : [''];
   const base = sanitizeModelId(primaryModel || getBackgroundTaskModel(), DEFAULT_BACKGROUND_MODEL_ID);
   const rawChain = preferredChain || getModelFailoverChain(base);
   const chain = rawChain
@@ -1433,19 +1804,28 @@ export async function generateContentWithFailover({
   }
 
   let lastError: any = null;
-  const fatalKeys = new Set<string>();
+  const clavesMuertas = new Set<string>();
+  const modelosAusentes = new Set<string>();
 
   for (let i = 0; i < chain.length; i++) {
-    if (keysToTry.length > 0 && keysToTry.every(k => k && fatalKeys.has(k))) {
-      break;
-    }
     const model = chain[i];
-    for (let k = 0; k < keysToTry.length; k++) {
-      const currentKey = keysToTry[k];
-      if (currentKey && fatalKeys.has(currentKey)) continue;
+    if (modelosAusentes.has(model)) continue;
+    if (signal?.aborted) throw new Error('Tarea cancelada.');
+
+    const disponibles = clavesDisponibles(todasLasClaves, clavesMuertas);
+    if (disponibles.length === 0) break;
+
+    let saltarAlSiguienteModelo = false;
+
+    for (let k = 0; k < disponibles.length && !saltarAlSiguienteModelo; k++) {
+      const currentKey = disponibles[k];
+      if (currentKey && clavesMuertas.has(currentKey)) continue;
 
       const ai = getAIClient(currentKey || undefined);
-      try {
+
+      for (let intento = 0; intento <= MAX_REINTENTOS_POR_SATURACION; intento++) {
+        if (signal?.aborted) throw new Error('Tarea cancelada.');
+
         const abierto = esModeloAbierto(model);
         const supportsThinking = model.includes('3.7') || model.includes('3.1') || model.includes('gemini-3');
         const cleanedConfig: any = {
@@ -1461,55 +1841,95 @@ export async function generateContentWithFailover({
             : {})
         };
 
-        // Timeout de 35s por modelo para evitar bloqueos infinitos
-        let res: any;
+        // El plazo se impone con un AbortController de verdad. Antes era un
+        // `Promise.race` contra un temporizador: al vencer, el código seguía
+        // adelante pero la petición continuaba viva contra Google, gastando la
+        // misma cuota que se creía haber liberado.
+        const relojDeGuardia = new AbortController();
+        const abortarPorTimeout = setTimeout(() => relojDeGuardia.abort(), timeoutMs);
+        const cancelarPorFuera = () => relojDeGuardia.abort();
+        signal?.addEventListener('abort', cancelarPorFuera, { once: true });
+
         try {
-          res = await Promise.race([
-            ai.models.generateContent({
-              model,
-              contents,
-              config: cleanedConfig
-            }),
-            new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error(`Tiempo de espera agotado (35s) en modelo ${model}`)),
-                35000
-              )
-            )
-          ]);
-        } catch (firstErr: any) {
-          const errMsg = String(firstErr?.message || '').toLowerCase();
-          // Si falló por responseMimeType no soportado, reintentar en este mismo modelo sin responseMimeType
-          if (cleanedConfig.responseMimeType && (errMsg.includes('not supported') || errMsg.includes('invalid') || errMsg.includes('responsemimetype'))) {
+          let res: any;
+          try {
             res = await ai.models.generateContent({
               model,
               contents,
-              config: { ...cleanedConfig, responseMimeType: undefined }
+              config: { ...cleanedConfig, abortSignal: relojDeGuardia.signal }
             });
-          } else {
-            throw firstErr;
+          } catch (firstErr: any) {
+            const errMsg = String(firstErr?.message || '').toLowerCase();
+            // Si el rechazo fue por `responseMimeType`, se repite sin él en este mismo modelo.
+            if (
+              cleanedConfig.responseMimeType &&
+              !relojDeGuardia.signal.aborted &&
+              (errMsg.includes('not supported') || errMsg.includes('responsemimetype'))
+            ) {
+              res = await ai.models.generateContent({
+                model,
+                contents,
+                config: { ...cleanedConfig, responseMimeType: undefined, abortSignal: relojDeGuardia.signal }
+              });
+            } else {
+              throw firstErr;
+            }
           }
-        }
-        return res;
-      } catch (err: any) {
-        lastError = err;
-        const msg = String(err?.message || '');
-        if (/429|RESOURCE_EXHAUSTED/i.test(msg)) {
-          if (currentKey) markKeyCooldown(currentKey, 60000);
-        }
-        if (/api_key_invalid|api key not valid|invalid_argument/i.test(msg) || (msg.includes('400') && /api key|api_key|key not valid/i.test(msg)) || /permission_denied|403/i.test(msg)) {
-          if (currentKey) fatalKeys.add(currentKey);
-        }
-        console.warn(`generateContentWithFailover fallo en ${model} (clave ${k + 1}/${keysToTry.length}):`, err);
-        if (k < keysToTry.length - 1) {
-          await new Promise(r => setTimeout(r, 100));
+          return res;
+        } catch (err: any) {
+          // Distinguir «lo hemos cortado nosotros por plazo» de «lo ha cortado la jugadora».
+          const vencioElPlazo = relojDeGuardia.signal.aborted && !signal?.aborted;
+          if (signal?.aborted) throw new Error('Tarea cancelada.');
+
+          const fallo = vencioElPlazo
+            ? ({
+                ...classifyApiError(err),
+                isTransient: true,
+                isAborted: false,
+                detail: `Tiempo de espera agotado (${Math.round(timeoutMs / 1000)}s) en el modelo ${model}.`
+              } as ApiFailure)
+            : classifyApiError(err);
+
+          lastError = vencioElPlazo ? new Error(fallo.detail) : err;
+          console.warn(
+            `generateContentWithFailover fallo en ${model} (clave ${k + 1}/${disponibles.length}):`,
+            fallo.detail || err
+          );
+
+          if (fallo.isModelMissing) {
+            modelosAusentes.add(model);
+            saltarAlSiguienteModelo = true;
+            break;
+          }
+          if (fallo.isInvalidKey || fallo.isPermissionDenied) {
+            if (currentKey) clavesMuertas.add(currentKey);
+            break;
+          }
+          if (fallo.isRateLimit) {
+            if (currentKey) markKeyCooldown(currentKey, fallo.retryAfterMs || 60000);
+            break;
+          }
+          if (fallo.isBadRequest) {
+            saltarAlSiguienteModelo = true;
+            break;
+          }
+          if (fallo.isTransient && intento < MAX_REINTENTOS_POR_SATURACION) {
+            await esperar(fallo.retryAfterMs || reboteMs(intento), signal);
+            continue;
+          }
+          break;
+        } finally {
+          clearTimeout(abortarPorTimeout);
+          signal?.removeEventListener('abort', cancelarPorFuera);
         }
       }
     }
+
     if (i < chain.length - 1) {
-      await new Promise(r => setTimeout(r, 300));
+      await esperar(300, signal);
     }
   }
+
   throw lastError || new Error('No se pudo obtener respuesta de ningún modelo.');
 }
 
@@ -2293,57 +2713,40 @@ function mergeEntities<T extends { id: string; portrait?: string; markers?: unkn
  * errores llegaban a pantalla como "no se pudo", que no dice qué hacer.
  */
 export function describeApiError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err ?? '');
-  const lower = raw.toLowerCase();
+  const fallo = classifyApiError(err);
+  const detalle = fallo.detail ? `\n\nGoogle dijo: «${fallo.detail.slice(0, 220)}»` : '';
 
-  if (
-    lower.includes('api_key_invalid') ||
-    lower.includes('api key not valid') ||
-    (lower.includes('400') && (lower.includes('api key') || lower.includes('key')))
-  ) {
-    return 'Una o varias claves de API en tu pool no son válidas o han sido revocadas en Google AI Studio (Error 400: API_KEY_INVALID).\n\nAbre «Motor» de la barra superior, pulsa «Diagnosticar Claves» y retira o actualiza las claves que aparezcan en rojo.';
+  if (fallo.isAborted) return 'La generación se detuvo a petición tuya.';
+
+  if (fallo.isInvalidKey) {
+    return `Una o varias claves de API de tu bolsillo no son válidas o han sido revocadas en Google AI Studio (Error ${fallo.status || 400}).\n\nAbre «Motor» en la barra superior, pulsa «Diagnosticar Claves» y retira o actualiza las que salgan en rojo.${detalle}`;
   }
-  if (
-    lower.includes('permission_denied') ||
-    lower.includes('denied access') ||
-    lower.includes('403')
-  ) {
-    return 'Google ha denegado el acceso al proyecto de tu clave de API (Error 403: PERMISSION_DENIED).\n\nVerifica en Google AI Studio (aistudio.google.com) que tu proyecto tenga permisos activos y la Generative Language API habilitada.';
+  if (fallo.isPermissionDenied) {
+    return `Google ha denegado el acceso al proyecto de tu clave (Error 403: PERMISSION_DENIED).\n\nComprueba en aistudio.google.com que el proyecto siga activo y con la Generative Language API habilitada.${detalle}`;
   }
-  if (lower.includes('429') || lower.includes('resource_exhausted') || lower.includes('quota')) {
-    return 'Has alcanzado temporalmente el límite de peticiones de la capa gratuita. La app intentó rotar a modelos alternativos pero la cuota de tu clave se encuentra en pausa. Espera unos segundos y pulsa «Continuar Narración».';
+  if (fallo.isRateLimit) {
+    const espera = fallo.retryAfterMs
+      ? ` Google pide esperar unos ${Math.ceil(fallo.retryAfterMs / 1000)} segundos.`
+      : ' Espera unos segundos.';
+    return `Todas tus claves han agotado su cuota de peticiones por ahora (Error 429: RESOURCE_EXHAUSTED).${espera} Después pulsa «Continuar Narración».${detalle}`;
   }
-  if (
-    lower.includes('api key') ||
-    lower.includes('api_key') ||
-    lower.includes('401')
-  ) {
-    return 'La clave de API no es válida o no está configurada. Revísala en el botón Motor.';
+  if (fallo.isModelMissing) {
+    return `El modelo seleccionado no existe o tu clave no lo admite (Error ${fallo.status || 404}).\n\nAbre «Motor» y pulsa «Ver los de mi clave» para elegir uno de los que Google te ofrece de verdad.${detalle}`;
   }
-  if (lower.includes('safety') || lower.includes('blocked') || lower.includes('prohibited')) {
-    return 'El modelo ha bloqueado la respuesta por sus filtros de seguridad. Prueba a bajar los filtros en Motor → Filtros & NSFW.';
+  if (fallo.isSafetyBlock) {
+    return `El modelo ha bloqueado la respuesta con sus filtros de seguridad.\n\nBaja los filtros en Motor → Filtros & NSFW.${detalle}`;
   }
-  if (
-    lower.includes('503') ||
-    lower.includes('unavailable') ||
-    lower.includes('overloaded') ||
-    lower.includes('alta demanda')
-  ) {
-    return 'Los servidores de Google estuvieron saturados en múltiples modelos de la cadena de respaldo. Espera unos instantes y pulsa «Continuar Narración» para reanudar la escena exactamente donde quedó.';
+  if (fallo.isOverloaded) {
+    return `Los servidores de Google están saturados (Error ${fallo.status || 503}). La app ya ha reintentado con tus claves y con los modelos de respaldo.\n\nEspera un momento y pulsa «Continuar Narración» para reanudar la escena donde quedó.${detalle}`;
   }
-  if (lower.includes('not found') || lower.includes('404')) {
-    return 'El modelo seleccionado no existe o no está disponible con tu clave. Abre el botón Motor y pulsa «Ver los de mi clave» para ver cuáles admite.';
+  if (fallo.isNetwork) {
+    return `No se ha podido contactar con Google. Comprueba tu conexión a internet.${detalle}`;
   }
-  if (lower.includes('is not supported') || lower.includes('not supported')) {
-    return `Google ha rechazado un campo de la petición, no tu clave: «${String((err as any)?.message || '').slice(0, 200)}». Si acabas de cambiar de modelo, prueba con otro; si no, es un fallo de la aplicación.`;
+  if (fallo.isBadRequest) {
+    return `Google ha rechazado un campo de la petición, no tu clave (Error 400: ${fallo.googleStatus || 'INVALID_ARGUMENT'}).\n\nSuele pasar al cambiar de modelo, o cuando la campaña arrastra demasiado contexto. Prueba con otro modelo desde «Motor».${detalle}`;
   }
-  if (lower.includes('incomplete json') || lower.includes('unexpected end') || lower.includes('terminated')) {
-    return 'La respuesta se cortó a mitad de camino, casi siempre por un bache de conexión. Vuelve a intentarlo; si estás con datos móviles, espera a tener mejor cobertura.';
-  }
-  if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('load failed')) {
-    return 'No se ha podido contactar con Google. Comprueba tu conexión a internet.';
-  }
-  return raw || 'Error desconocido.';
+
+  return fallo.detail || (err instanceof Error ? err.message : String(err ?? '')) || 'Error desconocido.';
 }
 
 export function parseStateTag(text: string): {
@@ -2380,6 +2783,24 @@ export function parseStateTag(text: string): {
   const cleaned = text.replace(/\[ESTADO:[^\]]*\]/gi, '').trim();
   const hasAny = state.hp !== undefined || state.ac !== undefined || state.conditions !== undefined;
   return { cleaned, state: hasAny ? state : null };
+}
+
+/**
+ * Lo que puede enseñarse mientras el texto todavía está llegando.
+ *
+ * El Narrador intercala etiquetas de servicio ([ESTADO:...], [TIEMPO:...],
+ * [CHAPTER:...]) que la app lee y retira al guardar. Pero el guardado ocurre
+ * cada segundo y medio, así que hasta entonces la jugadora las veía escritas en
+ * mitad de la escena. Aquí se quitan en cada fragmento, incluida la que aún se
+ * está tecleando y todavía no tiene su corchete de cierre.
+ */
+export function limpiarParaMostrar(texto: string): string {
+  if (!texto || !texto.includes('[')) return texto;
+  return texto
+    .replace(/\[(?:ESTADO|TIEMPO|AGENDA|HILO|CHAPTER|PRESENTES|VINCULO|AFINIDAD)\b[^\]]*\]/gi, '')
+    // Una etiqueta a medio llegar: se esconde hasta que se sepa cómo acaba.
+    .replace(/\[(?:E(?:S(?:T(?:A(?:D(?:O)?)?)?)?)?|T(?:I(?:E(?:M(?:P(?:O)?)?)?)?)?|A(?:G(?:E(?:N(?:D(?:A)?)?)?)?)?|H(?:I(?:L(?:O)?)?)?|C(?:H(?:A(?:P(?:T(?:E(?:R)?)?)?)?)?)?|P(?:R(?:E(?:S(?:E(?:N(?:T(?:E(?:S)?)?)?)?)?)?)?)?|V(?:I(?:N(?:C(?:U(?:L(?:O)?)?)?)?)?)?)[^\]]*$/i, '')
+    .replace(/[ \t]{2,}/g, ' ');
 }
 
 export function rollDicePool(): { d20: number[]; d100: number[]; d6: number[] } {
@@ -3007,10 +3428,12 @@ export async function generateImageWithFailover({
   aspectRatio?: '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
 }): Promise<string> {
   const { keys } = getRotatedApiKeys();
-  const keysToTry = keys.length > 0 ? keys : [''];
+  const todas = keys.length > 0 ? keys : [''];
+  const clavesMuertas = new Set<string>();
   let lastError: any = null;
 
-  for (const apiKey of keysToTry) {
+  for (const apiKey of clavesDisponibles(todas)) {
+    if (apiKey && clavesMuertas.has(apiKey)) continue;
     try {
       const ai = getAIClient(apiKey || undefined);
       const response = await ai.models.generateImages({
@@ -3031,7 +3454,13 @@ export async function generateImageWithFailover({
       }
     } catch (err: any) {
       lastError = err;
-      console.warn('Error generando imagen con Imagen 3:', err);
+      const fallo = classifyApiError(err);
+      if (fallo.isRateLimit && apiKey) markKeyCooldown(apiKey, fallo.retryAfterMs || 60000);
+      if ((fallo.isInvalidKey || fallo.isPermissionDenied) && apiKey) clavesMuertas.add(apiKey);
+      console.warn('Error generando imagen:', fallo.detail || err);
+      // Si el modelo de imagen no existe para ninguna clave, insistir con las
+      // demás solo alarga la espera para llegar al mismo sitio.
+      if (fallo.isModelMissing) break;
     }
   }
   throw lastError || new Error('No se pudo generar la imagen con el modelo de IA. Verifica tu clave de API.');
@@ -3106,8 +3535,7 @@ export async function countTurnTokens({
   chats: Chat[];
   files: ProjectFile[];
 }): Promise<{ total: number; sistema: number; conversacion: number; modelo: string }> {
-  const { keys } = getRotatedApiKeys();
-  const apiKey = keys[0] || getStoredApiKey();
+  const apiKey = peekApiKeys()[0] || getStoredApiKey();
   const ai = getAIClient(apiKey || undefined);
   const modelo = getStoredModel();
   const dicePool = rollDicePool();
@@ -3303,8 +3731,7 @@ ${primerRoleo || 'Todavía no se ha jugado nada.'}`;
 export async function listarModelosDeLaClave(): Promise<
   { id: string; nombre: string; entrada: number; salida: number }[]
 > {
-  const { keys } = getRotatedApiKeys();
-  const apiKey = keys[0] || getStoredApiKey();
+  const apiKey = peekApiKeys()[0] || getStoredApiKey();
   const ai = getAIClient(apiKey || undefined);
   const salida: { id: string; nombre: string; entrada: number; salida: number }[] = [];
 
