@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, NPC, Location, ProjectFile, TimelineEntry } from '../types';
+import { Project, Memory, NPC, Location, ProjectFile, TimelineEntry } from '../types';
 import {
   obtenerInfoRelacion,
   CALENDARIO_FANTASTICO,
@@ -12,7 +12,7 @@ import {
   fechaLegible
 } from '../utils/campaignCalendar';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
-import { sanitizePlayerCharacter } from '../utils/sanitizers';
+import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
 import { NpcDossierModal } from './NpcDossierModal';
 import { LocationDossierModal } from './LocationDossierModal';
@@ -321,6 +321,13 @@ export const MemoryManager: React.FC<{
   const onUpdateMemoryRef = useRef(onUpdateMemory);
   onUpdateMemoryRef.current = onUpdateMemory;
 
+  // Sincronizar localNotes si cambia memory.manual_notes externamente (por reseteo, IA o cambio de tomo)
+  useEffect(() => {
+    if (pendingNotesRef.current === null) {
+      setLocalNotes(project.memory?.manual_notes || '');
+    }
+  }, [project.memory?.manual_notes]);
+
   // Flush pending notes if this view unmounts inside the debounce window.
   useEffect(() => {
     return () => {
@@ -433,23 +440,59 @@ export const MemoryManager: React.FC<{
     }
   };
 
-  // Wipe Entire Memory
+  // Wipe Entire Memory Across All Tabs
   const handleWipeEntireMemory = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Restablecer Toda la Memoria',
       message:
-        '¿Deseas vaciar completamente la memoria de la campaña (crónica, estado, misiones, PNJs, lugares y análisis visuales)? Las notas manuales se conservarán.',
+        '¿Deseas vaciar y restablecer completamente toda la memoria de la campaña? Esta acción borrará los datos de todas las pestañas: el resumen e hitos del Protagonista, la cronología e hilos de la Agenda, la lista de PNJs y sus afinidades, los Lugares y mapas, las Tramas y misiones activas, el Resumen acumulado, el Estado de la compañía y las Notas del tomo.',
       onConfirm: async () => {
-        await onUpdateMemory(mem => ({
-          ...mem,
+        if (notesTimerRef.current) {
+          clearTimeout(notesTimerRef.current);
+          notesTimerRef.current = null;
+        }
+        pendingNotesRef.current = null;
+        setLocalNotes('');
+        setExpandedLocIds(new Set());
+        setExpandedQuestIds(new Set());
+        setSelectedNpcForDossier(null);
+        setSelectedLocForDossier(null);
+        setVinculosDestapados(new Set());
+
+        const emptyMemory: Memory = {
           story: '',
           current_status: '',
           quests: [],
           npcs: [],
+          companions: [],
           locations: [],
-          visual_memory: []
-        }));
+          manual_notes: '',
+          visual_memory: [],
+          player_character: {
+            name: project.memory?.player_character?.name || 'Aryendell',
+            title: 'Protagonista (OC)',
+            race: project.memory?.player_character?.race || 'Elfa de la Luna',
+            class: project.memory?.player_character?.class || 'Druida / Maga',
+            summary: '',
+            events: [],
+            notes: '',
+            backstory: '',
+            personality: '',
+            appearance: '',
+            portrait: project.memory?.player_character?.portrait
+          }
+        };
+
+        if (onUpdateProject) {
+          await onUpdateProject(() => ({
+            timeline: [],
+            threads: [],
+            memory: sanitizeProjectMemory(emptyMemory)
+          }));
+        }
+        await onUpdateMemory(() => emptyMemory);
+
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -558,11 +601,11 @@ export const MemoryManager: React.FC<{
           <button
             onClick={handleWipeEntireMemory}
             disabled={isGenerating}
-            title="Borrar todos los datos de memoria del tomo"
-            aria-label="Vaciar memoria"
-            className="text-xs text-red-700 hover:text-red-900 border border-red-200 bg-red-50/50 hover:bg-red-100 px-2 sm:px-2.5 py-1.5 md:py-2 rounded-md font-cinzel transition-all cursor-pointer flex items-center gap-1.5"
+            title="Vaciar y restablecer toda la memoria viva de la campaña en todas las pestañas"
+            aria-label="Restablecer toda la memoria"
+            className="text-xs text-red-700 hover:text-red-900 border border-red-200 bg-red-50/70 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60 dark:hover:bg-red-900/50 px-2.5 sm:px-3 py-1.5 md:py-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-xs disabled:opacity-50"
           >
-            <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Vaciar Memoria</span>
+            <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Restablecer Toda la Memoria</span><span className="sm:hidden">Restablecer</span>
           </button>
         </div>
       </div>
