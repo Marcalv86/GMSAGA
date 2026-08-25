@@ -464,6 +464,30 @@ export const InstructionsView: React.FC<{
                 Si un PNJ abre diarios o cartas del PJ, pregunta a la jugadora antes de inventar el texto.
               </p>
             </div>
+
+            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
+              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
+                <Flame className="w-3.5 h-3.5" /> Proximidad Física y Tensión Sexual
+              </div>
+              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
+                Anti-Retirada Cobarde · Sostener la cercanía y provocación
+              </code>
+              <p className="text-[11px] text-[var(--text-secondary)] m-0">
+                Los PNJs seductores/bribones aprovechan la proximidad física (espadas al cuello, agarres, susurros) sin apartarse con miedo.
+              </p>
+            </div>
+
+            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
+              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
+                <Swords className="w-3.5 h-3.5" /> Feminismo vs Paternalismo de Mesa
+              </div>
+              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
+                Anti-Sobreprotección · Robar besos y asumir riesgos
+              </code>
+              <p className="text-[11px] text-[var(--text-secondary)] m-0">
+                Cero condescendencia con el PJ. Los PNJs bribones se atreven a robar besos y seducir sabiendo que Aryendell puede repelerlos con magia (<span className="italic">Onda Atronadora</span>) si quiere.
+              </p>
+            </div>
           </div>
         )}
       </div>
