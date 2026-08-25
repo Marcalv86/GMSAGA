@@ -11,6 +11,8 @@ import {
 import {
   CALENDARIO_FANTASTICO,
   aDiaAbsoluto,
+  aDiaAbsolutoDesdeTexto,
+  calendarioValido,
   desdeDiaAbsoluto,
   diaDeLaSemana,
   diasDelMes,
@@ -131,18 +133,65 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
   const estacionActivo = useMemo(() => estacionDelDia(cal, fechaActiva.dayOfYear), [cal, fechaActiva.dayOfYear]);
   const esHoyActivo = diaSeleccionado === hoyAbs;
 
-  // Timeline entries grouped by day
+  // Timeline entries grouped by day (including player character events/milestones)
   const timeline = project.timeline || [];
+  const pcEvents = useMemo(() => project.memory?.player_character?.events || [], [project.memory?.player_character?.events]);
+
   const porDia = useMemo(() => {
     const map: Record<number, { entradas: TimelineEntry[]; fecha: string }> = {};
+    const unified: TimelineEntry[] = [];
+
     timeline.forEach(e => {
-      if (!map[e.absDay]) {
-        map[e.absDay] = { entradas: [], fecha: e.date };
+      let abs = e.absDay;
+      if (!Number.isFinite(abs) || abs === 0) {
+        const parsed = cal && calendarioValido(cal) ? aDiaAbsolutoDesdeTexto(cal, e.date, fechaSegura.year || 1492) : null;
+        if (parsed !== null) abs = parsed;
+        else abs = hoyAbs;
       }
-      map[e.absDay].entradas.push(e);
+      const entryConAbs: TimelineEntry = { ...e, absDay: abs };
+      const dateStr = e.date || (cal && calendarioValido(cal) ? fechaLegible(cal, desdeDiaAbsoluto(cal, abs)) : `Día ${abs}`);
+      if (!map[abs]) {
+        map[abs] = { entradas: [], fecha: dateStr };
+      }
+      map[abs].entradas.push(entryConAbs);
+      unified.push(entryConAbs);
     });
+
+    pcEvents.forEach((pce, idx) => {
+      const alreadyInTimeline = unified.some(
+        t => t.id === pce.id ||
+             (t.summary && pce.description && t.summary.trim().toLowerCase() === pce.description.trim().toLowerCase()) ||
+             (t.title && pce.title && t.title.trim().toLowerCase() === pce.title.trim().toLowerCase())
+      );
+
+      if (!alreadyInTimeline) {
+        let abs = cal && calendarioValido(cal) ? aDiaAbsolutoDesdeTexto(cal, pce.dateOrTime, fechaSegura.year || 1492) : null;
+        if (abs === null) {
+          abs = hoyAbs;
+        }
+
+        const dateStr = pce.dateOrTime || (cal && calendarioValido(cal) ? fechaLegible(cal, desdeDiaAbsoluto(cal, abs)) : `Día ${abs}`);
+        const virtualEntry: TimelineEntry = {
+          id: pce.id || `pcevent_${idx}_${Date.now()}`,
+          absDay: abs,
+          date: dateStr,
+          title: pce.title,
+          summary: pce.description || pce.title,
+          mood: '🌸',
+          tipo: 'personal',
+          hito: pce.title
+        };
+
+        if (!map[abs]) {
+          map[abs] = { entradas: [], fecha: dateStr };
+        }
+        map[abs].entradas.push(virtualEntry);
+        unified.push(virtualEntry);
+      }
+    });
+
     return map;
-  }, [timeline]);
+  }, [timeline, pcEvents, cal, fechaSegura.year, hoyAbs]);
 
   const entradasDiaActivo = porDia[diaSeleccionado]?.entradas || [];
 
@@ -215,7 +264,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
     minute: number;
     audioDuration: string;
     isDraft: boolean;
-    tipo: 'acontecimiento' | 'noticia' | 'rumor' | 'inconsciencia' | 'salto_temporal' | 'diario' | 'personal';
+    tipo: TimelineEntry['tipo'];
   }>({
     title: '',
     summary: '',

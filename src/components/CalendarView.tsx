@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Project,
   CalendarConfig,
@@ -16,6 +16,7 @@ import {
   CALENDARIOS_PREDEFINIDOS,
   CALENDARIO_FANTASTICO,
   aDiaAbsoluto,
+  aDiaAbsolutoDesdeTexto,
   avanzar,
   calendarioValido,
   desdeDiaAbsoluto,
@@ -110,18 +111,24 @@ export const CalendarView: React.FC<{
 
   // Estado para creación/edición de entradas de la agenda
   const [creandoEntrada, setCreandoEntrada] = useState(false);
+  const [nuevaEntradaTitulo, setNuevaEntradaTitulo] = useState('');
   const [nuevaEntradaResumen, setNuevaEntradaResumen] = useState('');
   const [nuevaEntradaLugar, setNuevaEntradaLugar] = useState('');
   const [nuevaEntradaClima, setNuevaEntradaClima] = useState('');
   const [nuevaEntradaHito, setNuevaEntradaHito] = useState('');
+  const [nuevaEntradaMood, setNuevaEntradaMood] = useState('🌸');
+  const [nuevaEntradaTipo, setNuevaEntradaTipo] = useState<'acontecimiento' | 'hito' | 'descubrimiento' | 'secreto' | 'noticia' | 'descanso'>('acontecimiento');
 
   const [editandoEntradaId, setEditandoEntradaId] = useState<string | null>(null);
   const [editEntradaDraft, setEditEntradaDraft] = useState<{
+    title: string;
     summary: string;
     lugar: string;
     clima: string;
     hito: string;
-  }>({ summary: '', lugar: '', clima: '', hito: '' });
+    mood: string;
+    tipo: 'acontecimiento' | 'hito' | 'descubrimiento' | 'secreto' | 'noticia' | 'descanso';
+  }>({ title: '', summary: '', lugar: '', clima: '', hito: '', mood: '🌸', tipo: 'acontecimiento' });
 
   const [studioModal, setStudioModal] = useState<{
     isOpen: boolean;
@@ -353,10 +360,13 @@ export const CalendarView: React.FC<{
   const iniciarEdicionEntrada = (e: TimelineEntry) => {
     setEditandoEntradaId(e.id);
     setEditEntradaDraft({
+      title: e.title || '',
       summary: e.summary || '',
       lugar: e.lugar || '',
       clima: e.clima || '',
-      hito: e.hito || ''
+      hito: e.hito || '',
+      mood: e.mood || '🌸',
+      tipo: (e.tipo as any) || 'acontecimiento'
     });
   };
 
@@ -367,10 +377,13 @@ export const CalendarView: React.FC<{
         t.id === id
           ? {
               ...t,
+              title: editEntradaDraft.title.trim() || undefined,
               summary: editEntradaDraft.summary.trim(),
               lugar: editEntradaDraft.lugar.trim() || undefined,
               clima: editEntradaDraft.clima.trim() || undefined,
-              hito: editEntradaDraft.hito.trim() || undefined
+              hito: editEntradaDraft.hito.trim() || undefined,
+              mood: editEntradaDraft.mood || undefined,
+              tipo: editEntradaDraft.tipo || 'acontecimiento'
             }
           : t
       )
@@ -387,10 +400,13 @@ export const CalendarView: React.FC<{
       id: `manual_${targetAbsDay}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       absDay: targetAbsDay,
       date: dateStr,
+      title: nuevaEntradaTitulo.trim() || undefined,
       summary: nuevaEntradaResumen.trim(),
       lugar: nuevaEntradaLugar.trim() || undefined,
       clima: nuevaEntradaClima.trim() || undefined,
       hito: nuevaEntradaHito.trim() || undefined,
+      mood: nuevaEntradaMood || '🌸',
+      tipo: nuevaEntradaTipo || 'acontecimiento',
       minute: fecha ? fecha.minute : 8 * 60
     };
 
@@ -398,10 +414,13 @@ export const CalendarView: React.FC<{
       timeline: [...(p.timeline || []), nueva]
     }));
 
+    setNuevaEntradaTitulo('');
     setNuevaEntradaResumen('');
     setNuevaEntradaLugar('');
     setNuevaEntradaClima('');
     setNuevaEntradaHito('');
+    setNuevaEntradaMood('🌸');
+    setNuevaEntradaTipo('acontecimiento');
     setCreandoEntrada(false);
   };
 
@@ -433,18 +452,75 @@ export const CalendarView: React.FC<{
     setMesVisto({ year: Math.max(1, y), month: m });
   };
 
-  // ------------------------------------------------------------ agenda por días
+  // ------------------------------------------------------------ agenda por días unificada
+  // Integra tanto project.timeline como project.memory.player_character.events
+  const pcEvents = project.memory?.player_character?.events || [];
 
-  const agenda = [...timeline].sort((a, b) => b.absDay - a.absDay);
-  const porDia = agenda.reduce<Record<number, { date: string; entradas: TimelineEntry[] }>>((acc, e) => {
-    if (!acc[e.absDay]) acc[e.absDay] = { date: e.date, entradas: [] };
-    acc[e.absDay].entradas.push(e);
-    return acc;
-  }, {});
+  const { porDia } = useMemo(() => {
+    const map: Record<number, { date: string; entradas: TimelineEntry[] }> = {};
+    const unified: TimelineEntry[] = [];
 
-  const diasAgenda = Object.keys(porDia)
-    .map(Number)
-    .sort((a, b) => b - a);
+    // 1. Agregar entradas del timeline deduciendo absDay si estuviera ausente o fuese 0
+    timeline.forEach(e => {
+      let abs = e.absDay;
+      if (!Number.isFinite(abs) || abs === 0) {
+        const parsed = cal && calendarioValido(cal) ? aDiaAbsolutoDesdeTexto(cal, e.date, fecha?.year || 1492) : null;
+        if (parsed !== null) abs = parsed;
+        else abs = hoyAbs;
+      }
+      const entryConAbs: TimelineEntry = { ...e, absDay: abs };
+      const dateStr = e.date || (cal && calendarioValido(cal) ? fechaLegible(cal, desdeDiaAbsoluto(cal, abs)) : `Día ${abs}`);
+      if (!map[abs]) {
+        map[abs] = { date: dateStr, entradas: [] };
+      }
+      map[abs].entradas.push(entryConAbs);
+      unified.push(entryConAbs);
+    });
+
+    // 2. Integrar acontecimientos e hitos del protagonista si no están ya en el timeline
+    pcEvents.forEach((pce, idx) => {
+      const alreadyInTimeline = unified.some(
+        t => t.id === pce.id ||
+             (t.summary && pce.description && t.summary.trim().toLowerCase() === pce.description.trim().toLowerCase()) ||
+             (t.title && pce.title && t.title.trim().toLowerCase() === pce.title.trim().toLowerCase())
+      );
+
+      if (!alreadyInTimeline) {
+        let abs = cal && calendarioValido(cal) ? aDiaAbsolutoDesdeTexto(cal, pce.dateOrTime, fecha?.year || 1492) : null;
+        if (abs === null) {
+          abs = hoyAbs;
+        }
+
+        const dateStr = pce.dateOrTime || (cal && calendarioValido(cal) ? fechaLegible(cal, desdeDiaAbsoluto(cal, abs)) : `Día ${abs}`);
+        const virtualEntry: TimelineEntry = {
+          id: pce.id || `pcevent_${idx}_${Date.now()}`,
+          absDay: abs,
+          date: dateStr,
+          title: pce.title,
+          summary: pce.description || pce.title,
+          mood: '🌸',
+          tipo: 'personal',
+          hito: pce.title
+        };
+
+        if (!map[abs]) {
+          map[abs] = { date: dateStr, entradas: [] };
+        }
+        map[abs].entradas.push(virtualEntry);
+        unified.push(virtualEntry);
+      }
+    });
+
+    return { porDia: map, unifiedTimeline: unified };
+  }, [timeline, pcEvents, cal, fecha?.year, hoyAbs]);
+
+  const diasAgenda = useMemo(
+    () =>
+      Object.keys(porDia)
+        .map(Number)
+        .sort((a, b) => b - a),
+    [porDia]
+  );
 
   // El día actualmente visualizado (si no se ha seleccionado ninguno, es hoy)
   const diaActivo = diaSeleccionado !== null ? diaSeleccionado : hoyAbs;
@@ -1010,104 +1086,204 @@ export const CalendarView: React.FC<{
 
           {/* VISTA 1: ESPACIO DEL DÍA SELECCIONADO (DIARIO Y RESUMEN DE ESE DÍA) */}
           {modoVisualizacion === 'dia' && (
-            <div className="bg-[var(--bg-color)]/60 border-2 border-[var(--glass-border)] rounded-xl p-4 sm:p-6 space-y-5">
-              {/* Cabecera del día seleccionado */}
-              <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-[var(--glass-border)]">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-cinzel font-bold text-[var(--accent)]">
-                      <span title={estacionActivo.nombre}>{estacionActivo.icono}</span> {nombreDiaActivo}
-                    </span>
-                    {diaSemanaActivo && (
-                      <span className="text-xs font-cinzel text-[var(--text-secondary)]">
-                        ({diaSemanaActivo})
+            <div className="bg-[var(--bg-color)]/70 border-2 border-[var(--glass-border)] rounded-xl p-4 sm:p-6 space-y-6 shadow-xs backdrop-blur-xs">
+              {/* Cabecera del día seleccionado con ambientación y herramientas decorativas */}
+              <div className="space-y-3 pb-4 border-b border-[var(--glass-border)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-lg font-cinzel font-bold text-[var(--accent)] tracking-wide flex items-center gap-1.5">
+                        <span title={estacionActivo.nombre}>{estacionActivo.icono}</span> {nombreDiaActivo}
                       </span>
-                    )}
-                    {esHoyActivo ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)]">
-                        HOY
-                      </span>
-                    ) : (
-                      <span className="text-xs text-[var(--text-secondary)] font-cinzel">
-                        · {distanciaEnDias(diaActivo - hoyAbs)}
-                      </span>
+                      {diaSemanaActivo && (
+                        <span className="text-xs font-cinzel text-[var(--text-secondary)] font-medium px-2 py-0.5 rounded bg-[var(--surface-soft)]">
+                          {diaSemanaActivo}
+                        </span>
+                      )}
+                      {esHoyActivo ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] shadow-2xs">
+                          HOY EN CAMPAÑA
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--text-secondary)] font-cinzel italic">
+                          · {distanciaEnDias(diaActivo - hoyAbs)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setCreandoEntrada(prev => !prev)}
+                      className="flex items-center gap-1.5 rounded-lg border border-[var(--accent)] px-3 py-1.5 text-xs font-cinzel font-bold text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Añadir acontecimiento
+                    </button>
+                    {entradasDiaActivo.length > 0 && (
+                      <button
+                        onClick={() => vaciarDiaCompleto(diaActivo, nombreDiaActivo)}
+                        className="flex items-center gap-1 rounded-lg border border-[var(--user-border)] px-2.5 py-1.5 text-xs font-cinzel text-red-500 hover:border-red-500 hover:bg-red-500/10 cursor-pointer transition-colors"
+                        title="Borrar todas las entradas de este día"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Vaciar día
+                      </button>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                {/* Cinta decorativa y ambientación rápida del día */}
+                <div className="p-2.5 rounded-lg bg-[var(--surface-soft)] border border-[var(--glass-border)] flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-cinzel font-semibold text-[var(--text-secondary)] flex items-center gap-1">
+                      ✨ Ambientación rápida:
+                    </span>
+                    {/* Clima rápido */}
+                    {[
+                      { icon: '☀️', name: 'Soleado' },
+                      { icon: '🌧️', name: 'Lluvia' },
+                      { icon: '❄️', name: 'Nieve' },
+                      { icon: '🌫️', name: 'Niebla' },
+                      { icon: '⛈️', name: 'Tormenta' },
+                      { icon: '🌌', name: 'Noche estrellada' }
+                    ].map(cl => (
+                      <button
+                        key={cl.name}
+                        onClick={() => {
+                          setNuevaEntradaClima(cl.name);
+                          if (!creandoEntrada) setCreandoEntrada(true);
+                        }}
+                        className="px-2 py-0.5 rounded text-[11px] bg-[var(--surface)] hover:border-[var(--accent)] border border-[var(--glass-border)] transition-colors cursor-pointer flex items-center gap-1"
+                        title={`Añadir apunte con clima ${cl.name}`}
+                      >
+                        <span>{cl.icon}</span> <span>{cl.name}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Botón directo de Taller Creativo para ilustrar el día */}
                   <button
-                    onClick={() => setCreandoEntrada(prev => !prev)}
-                    className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2.5 py-1 text-xs font-cinzel font-bold text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] cursor-pointer"
+                    onClick={() => {
+                      const fullScene =
+                        entradasDiaActivo.length > 0
+                          ? entradasDiaActivo
+                              .map(
+                                e =>
+                                  `${e.lugar ? `[${e.lugar}] ` : ''}${e.summary}${e.hito ? ` (${e.hito})` : ''}`
+                              )
+                              .join('. ')
+                          : `Jornada del ${nombreDiaActivo} en Faerûn`;
+                      setStudioModal({
+                        isOpen: true,
+                        tab: 'image',
+                        sceneText: `Ilustración o portada del ${nombreDiaActivo}: ${fullScene}`
+                      });
+                    }}
+                    className="text-[11px] font-cinzel font-bold text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/50 border border-amber-500/50 hover:bg-amber-200 dark:hover:bg-amber-900/70 px-2.5 py-1 rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Añadir nota
+                    <Wand2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" /> Ilustrar esta jornada
                   </button>
-                  {entradasDiaActivo.length > 0 && (
-                    <button
-                      onClick={() => vaciarDiaCompleto(diaActivo, nombreDiaActivo)}
-                      className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-1 text-xs font-cinzel text-red-500 hover:border-red-500 hover:bg-red-500/10 cursor-pointer"
-                      title="Borrar todas las entradas de este día"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Vaciar día
-                    </button>
-                  )}
                 </div>
               </div>
 
               {/* Formulario para añadir nueva entrada manual a este día */}
               {creandoEntrada && (
-                <div className="p-3.5 rounded-lg border border-[var(--accent)]/40 bg-[var(--surface-soft)] space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-cinzel text-xs font-bold text-[var(--accent)] flex items-center gap-1">
-                      <NotebookPen className="w-3.5 h-3.5" /> Nueva entrada para {nombreDiaActivo}
+                <div className="p-4 rounded-xl border border-[var(--accent)]/50 bg-[var(--surface-soft)] space-y-3 shadow-sm animate-fade-in">
+                  <div className="flex items-center justify-between border-b border-[var(--glass-border)] pb-2">
+                    <span className="font-cinzel text-xs font-bold text-[var(--accent)] flex items-center gap-1.5">
+                      <NotebookPen className="w-4 h-4" /> Nueva crónica o acontecimiento para {nombreDiaActivo}
                     </span>
                     <button
                       onClick={() => setCreandoEntrada(false)}
-                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer p-1"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <input
+                      value={nuevaEntradaTitulo}
+                      onChange={e => setNuevaEntradaTitulo(e.target.value)}
+                      placeholder="Título o nombre del acontecimiento (ej. El pacto de la taberna)"
+                      className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-3 py-1.5 outline-none focus:border-[var(--accent)] font-cinzel font-semibold"
+                    />
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={nuevaEntradaTipo}
+                        onChange={e => setNuevaEntradaTipo(e.target.value as any)}
+                        className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-2.5 py-1.5 outline-none focus:border-[var(--accent)] font-cinzel text-xs flex-1 cursor-pointer"
+                      >
+                        <option value="acontecimiento">📜 Acontecimiento / Crónica</option>
+                        <option value="hito">⚔️ Hito Épico / Combate</option>
+                        <option value="descubrimiento">💎 Descubrimiento / Hallazgo</option>
+                        <option value="secreto">🕯️ Secreto / Introspección</option>
+                        <option value="noticia">📰 Noticia / Rumor del Mundo</option>
+                        <option value="descanso">🌸 Descanso / Intimidad</option>
+                      </select>
+                      <select
+                        value={nuevaEntradaMood}
+                        onChange={e => setNuevaEntradaMood(e.target.value)}
+                        className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-2.5 py-1.5 outline-none focus:border-[var(--accent)] text-sm cursor-pointer"
+                        title="Tono / Ánimo"
+                      >
+                        <option value="🌸">🌸 Festivo</option>
+                        <option value="⚔️">⚔️ Marcial</option>
+                        <option value="🍷">🍷 Taberna</option>
+                        <option value="👑">👑 Corte</option>
+                        <option value="🎭">🎭 Sigilo</option>
+                        <option value="🕯️">🕯️ Misterio</option>
+                        <option value="💔">💔 Drama</option>
+                        <option value="🌲">🌲 Viaje</option>
+                        <option value="🐉">🐉 Peligro</option>
+                        <option value="🌙">🌙 Secreto</option>
+                        <option value="✨">✨ Magia</option>
+                        <option value="😊">😊 Paz</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <textarea
                     value={nuevaEntradaResumen}
                     onChange={e => setNuevaEntradaResumen(e.target.value)}
                     rows={3}
-                    placeholder="¿Qué aconteció o qué notas quieres registrar en este día?"
+                    placeholder="Describe los hechos, diálogos, descubrimientos o reflexiones que ocurrieron en este día..."
                     className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md p-2.5 text-sm font-lora outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
                   />
+
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                     <input
                       value={nuevaEntradaLugar}
                       onChange={e => setNuevaEntradaLugar(e.target.value)}
-                      placeholder="📍 Lugar (opcional)"
-                      className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2.5 py-1.5 outline-none focus:border-[var(--accent)]"
+                      placeholder="📍 Lugar (ej. Portal Bostezante, Luskan...)"
+                      className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-2.5 py-1.5 outline-none focus:border-[var(--accent)]"
                     />
                     <input
                       value={nuevaEntradaClima}
                       onChange={e => setNuevaEntradaClima(e.target.value)}
-                      placeholder="⛅ Clima (opcional)"
-                      className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2.5 py-1.5 outline-none focus:border-[var(--accent)]"
+                      placeholder="⛅ Clima (ej. Lluvia fría, Niebla marina...)"
+                      className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-2.5 py-1.5 outline-none focus:border-[var(--accent)]"
                     />
                     <input
                       value={nuevaEntradaHito}
                       onChange={e => setNuevaEntradaHito(e.target.value)}
-                      placeholder="⚔️ Hito o suceso clave"
-                      className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2.5 py-1.5 outline-none focus:border-[var(--accent)]"
+                      placeholder="⚔️ Hito clave (ej. Encuentro con Jarlaxle)"
+                      className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-2.5 py-1.5 outline-none focus:border-[var(--accent)]"
                     />
                   </div>
+
                   <div className="flex justify-end gap-2 pt-1">
                     <button
                       onClick={() => setCreandoEntrada(false)}
-                      className="px-3 py-1 text-xs font-cinzel border border-[var(--user-border)] rounded cursor-pointer"
+                      className="px-3 py-1.5 text-xs font-cinzel border border-[var(--user-border)] rounded-md hover:bg-[var(--surface)] cursor-pointer"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={() => crearEntradaManual(diaActivo)}
                       disabled={!nuevaEntradaResumen.trim()}
-                      className="px-3.5 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] disabled:opacity-40 cursor-pointer flex items-center gap-1"
+                      className="px-4 py-1.5 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-md hover:bg-[var(--accent-hover)] disabled:opacity-40 cursor-pointer flex items-center gap-1.5 shadow-xs"
                     >
-                      <Save className="w-3 h-3" /> Guardar en este día
+                      <Save className="w-3.5 h-3.5" /> Guardar en este día
                     </button>
                   </div>
                 </div>
@@ -1116,30 +1292,11 @@ export const CalendarView: React.FC<{
               {/* Acontecimientos de este día */}
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs font-cinzel font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-                    Acontecimientos del día ({entradasDiaActivo.length})
+                  <div className="text-xs font-cinzel font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Acontecimientos e hitos del día ({entradasDiaActivo.length})</span>
                   </div>
                   {entradasDiaActivo.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => {
-                          const fullScene = entradasDiaActivo
-                            .map(
-                              e =>
-                                `${e.lugar ? `[${e.lugar}] ` : ''}${e.summary}${e.hito ? ` (${e.hito})` : ''}`
-                            )
-                            .join('. ');
-                          setStudioModal({
-                            isOpen: true,
-                            tab: 'image',
-                            sceneText: `Acontecimientos del ${nombreDiaActivo}: ${fullScene}`
-                          });
-                        }}
-                        className="text-[11px] font-cinzel font-bold text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/40 border border-amber-500/50 hover:bg-amber-200 dark:hover:bg-amber-900/60 px-2.5 py-1 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors"
-                        title="Taller Creativo: Generar ilustración, música o cinemática con todos los acontecimientos de este día"
-                      >
-                        <Wand2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" /> Taller Creativo del Día
-                      </button>
                       {entradasDiaActivo.length > 1 && (
                         <button
                           onClick={() => consolidarEntradasDia(diaActivo, nombreDiaActivo)}
@@ -1161,13 +1318,20 @@ export const CalendarView: React.FC<{
                 </div>
 
                 {entradasDiaActivo.length === 0 ? (
-                  <div className="py-5 px-4 rounded-lg bg-[var(--surface-soft)]/30 border border-dashed border-[var(--glass-border)] text-center text-sm text-[var(--text-secondary)] space-y-1.5">
-                    <p className="italic m-0">
+                  <div className="py-8 px-4 rounded-xl bg-[var(--surface-soft)]/40 border border-dashed border-[var(--glass-border)] text-center text-sm text-[var(--text-secondary)] space-y-2">
+                    <CalendarClock className="w-8 h-8 mx-auto text-[var(--accent)] opacity-40" />
+                    <p className="italic m-0 font-cinzel font-bold text-[var(--text-primary)]">
                       No hay acontecimientos registrados para el {nombreDiaActivo}.
                     </p>
-                    <p className="text-xs opacity-75 m-0">
-                      El Narrador anotará lo que ocurra durante las sesiones de juego, o puedes pulsar «Añadir nota» para escribir un apunte a mano.
+                    <p className="text-xs opacity-75 m-0 max-w-md mx-auto leading-relaxed">
+                      El Narrador anotará lo que ocurra durante las sesiones de juego, o puedes pulsar «Añadir acontecimiento» para escribir una crónica, hito o apunte a mano.
                     </p>
+                    <button
+                      onClick={() => setCreandoEntrada(true)}
+                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--accent)]/50 text-xs font-cinzel font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10 cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Escribir primera crónica
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1178,19 +1342,74 @@ export const CalendarView: React.FC<{
                         return (
                           <div
                             key={entrada.id}
-                            className="p-3 rounded-lg border border-[var(--accent)] bg-[var(--surface-soft)] space-y-2"
+                            className="p-4 rounded-xl border border-[var(--accent)] bg-[var(--surface-soft)] space-y-3 shadow-xs"
                           >
-                            <span className="font-cinzel text-xs font-bold text-[var(--accent)]">
-                              Editar entrada #{idx + 1}
-                            </span>
+                            <div className="flex items-center justify-between border-b border-[var(--glass-border)] pb-1.5">
+                              <span className="font-cinzel text-xs font-bold text-[var(--accent)]">
+                                Editar entrada #{idx + 1}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={editEntradaDraft.tipo}
+                                  onChange={e =>
+                                    setEditEntradaDraft(prev => ({
+                                      ...prev,
+                                      tipo: e.target.value as any
+                                    }))
+                                  }
+                                  className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2 py-1 outline-none text-xs font-cinzel"
+                                >
+                                  <option value="acontecimiento">📜 Acontecimiento</option>
+                                  <option value="hito">⚔️ Hito</option>
+                                  <option value="descubrimiento">💎 Descubrimiento</option>
+                                  <option value="secreto">🕯️ Secreto</option>
+                                  <option value="noticia">📰 Noticia</option>
+                                  <option value="descanso">🌸 Descanso</option>
+                                </select>
+                                <select
+                                  value={editEntradaDraft.mood}
+                                  onChange={e =>
+                                    setEditEntradaDraft(prev => ({
+                                      ...prev,
+                                      mood: e.target.value
+                                    }))
+                                  }
+                                  className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2 py-1 outline-none text-xs"
+                                >
+                                  <option value="🌸">🌸</option>
+                                  <option value="⚔️">⚔️</option>
+                                  <option value="🍷">🍷</option>
+                                  <option value="👑">👑</option>
+                                  <option value="🎭">🎭</option>
+                                  <option value="🕯️">🕯️</option>
+                                  <option value="💔">💔</option>
+                                  <option value="🌲">🌲</option>
+                                  <option value="🐉">🐉</option>
+                                  <option value="🌙">🌙</option>
+                                  <option value="✨">✨</option>
+                                  <option value="😊">😊</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <input
+                              value={editEntradaDraft.title}
+                              onChange={e =>
+                                setEditEntradaDraft(prev => ({ ...prev, title: e.target.value }))
+                              }
+                              placeholder="Título (opcional)"
+                              className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-2.5 py-1.5 text-xs font-cinzel font-semibold outline-none focus:border-[var(--accent)]"
+                            />
+
                             <textarea
                               value={editEntradaDraft.summary}
                               onChange={e =>
                                 setEditEntradaDraft(prev => ({ ...prev, summary: e.target.value }))
                               }
                               rows={3}
-                              className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md p-2 text-sm font-lora outline-none focus:border-[var(--accent)] leading-relaxed"
+                              className="w-full bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md p-2 text-sm font-lora outline-none focus:border-[var(--accent)] leading-relaxed resize-y"
                             />
+
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                               <input
                                 value={editEntradaDraft.lugar}
@@ -1217,18 +1436,19 @@ export const CalendarView: React.FC<{
                                 className="bg-[var(--bg-color)] border border-[var(--user-border)] rounded px-2 py-1 outline-none"
                               />
                             </div>
+
                             <div className="flex justify-end gap-2 pt-1">
                               <button
                                 onClick={() => setEditandoEntradaId(null)}
-                                className="px-2.5 py-1 text-xs font-cinzel border border-[var(--user-border)] rounded cursor-pointer"
+                                className="px-3 py-1 text-xs font-cinzel border border-[var(--user-border)] rounded cursor-pointer"
                               >
                                 Cancelar
                               </button>
                               <button
                                 onClick={() => guardarEdicionEntrada(entrada.id)}
-                                className="px-3 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] cursor-pointer flex items-center gap-1"
+                                className="px-3.5 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] cursor-pointer flex items-center gap-1 shadow-xs"
                               >
-                                <Save className="w-3 h-3" /> Guardar
+                                <Save className="w-3.5 h-3.5" /> Guardar
                               </button>
                             </div>
                           </div>
@@ -1247,16 +1467,21 @@ export const CalendarView: React.FC<{
                       return (
                         <div
                           key={entrada.id}
-                          className={`group relative p-3.5 rounded-lg border transition-colors space-y-1.5 ${
+                          className={`group relative p-4 rounded-xl border transition-all space-y-2 shadow-xs ${
                             isInconsciencia
                               ? 'border-indigo-500/40 bg-indigo-950/15 ring-1 ring-indigo-500/20'
                               : isNoticia
                                 ? 'border-amber-500/40 bg-amber-950/15 ring-1 ring-amber-500/20'
-                                : 'border-[var(--glass-border)] bg-[var(--surface-soft)]/50 hover:bg-[var(--surface-soft)]'
+                                : entrada.tipo === 'hito'
+                                  ? 'border-amber-500/50 bg-[var(--surface)] hover:border-amber-500'
+                                  : 'border-[var(--glass-border)] bg-[var(--surface)] hover:border-[var(--accent)]/50'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-secondary)]">
+                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-[var(--text-secondary)]">
+                              {entrada.mood && (
+                                <span className="text-sm leading-none">{entrada.mood}</span>
+                              )}
                               {isInconsciencia && (
                                 <span className="inline-flex items-center gap-1 font-cinzel font-bold text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-500/30">
                                   <Moon className="w-3 h-3 text-indigo-400" />
@@ -1274,9 +1499,13 @@ export const CalendarView: React.FC<{
                                   {horaLegible(entrada.minute)} · {franjaDelDia(entrada.minute)}
                                 </span>
                               )}
-                              {entrada.lugar && <span>📍 {entrada.lugar}</span>}
+                              {entrada.lugar && (
+                                <span className="px-1.5 py-0.5 rounded bg-[var(--surface-soft)] font-cinzel">
+                                  📍 {entrada.lugar}
+                                </span>
+                              )}
                               {entrada.clima && (
-                                <span>
+                                <span className="px-1.5 py-0.5 rounded bg-[var(--surface-soft)]">
                                   {iconoDeClima(entrada.clima)} {entrada.clima}
                                 </span>
                               )}
@@ -1286,29 +1515,29 @@ export const CalendarView: React.FC<{
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 onClick={() => {
-                                  const sceneText = `${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ''}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ''}`;
+                                  const sceneText = `${entrada.title ? `[Título: ${entrada.title}] ` : ''}${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ''}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ''}`;
                                   setStudioModal({
                                     isOpen: true,
                                     tab: 'image',
                                     sceneText
                                   });
                                 }}
-                                className="px-1.5 py-0.5 rounded text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer flex items-center gap-1 text-[10px] font-cinzel font-semibold shadow-2xs"
+                                className="px-2 py-1 rounded-md text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer flex items-center gap-1 text-[10px] font-cinzel font-bold shadow-2xs transition-colors"
                                 title="Taller Creativo: Crear ilustración, música o cinemática para este acontecimiento"
                               >
                                 <Wand2 className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-                                <span className="hidden sm:inline">Crear contenido</span>
+                                <span className="hidden sm:inline">Ilustrar / Audio</span>
                               </button>
                               <button
                                 onClick={() => iniciarEdicionEntrada(entrada)}
-                                className="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-color)] cursor-pointer"
+                                className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] cursor-pointer transition-colors"
                                 title="Editar esta entrada"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => borrarEntrada(entrada.id)}
-                                className="p-1 rounded text-red-500/70 hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                                className="p-1.5 rounded-md text-red-500/70 hover:text-red-500 hover:bg-red-500/10 cursor-pointer transition-colors"
                                 title="Borrar esta entrada"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1316,12 +1545,18 @@ export const CalendarView: React.FC<{
                             </div>
                           </div>
 
-                          <p className="text-sm leading-relaxed text-[var(--text-primary)] m-0">
+                          {entrada.title && (
+                            <h4 className="font-cinzel font-bold text-sm text-[var(--text-primary)] m-0">
+                              {entrada.title}
+                            </h4>
+                          )}
+
+                          <p className="text-sm leading-relaxed text-[var(--text-primary)] m-0 font-lora">
                             {entrada.summary}
                           </p>
 
                           {entrada.hito && (
-                            <div className="pt-1.5 flex flex-wrap items-center gap-1.5">
+                            <div className="pt-1 flex flex-wrap items-center gap-1.5">
                               {(() => {
                                 const icono = iconoDeHito(entrada.hito);
                                 const esRelacion = /rivalidad|rival|amistad|amigo|romance|amor|cortej|declaraci|insinuaci|enemistad|enemigo|alianza|mentor/i.test(entrada.hito);
@@ -1534,6 +1769,9 @@ export const CalendarView: React.FC<{
                                 >
                                   <div className="space-y-1 flex-1">
                                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-[var(--text-secondary)]">
+                                      {entrada.mood && (
+                                        <span className="text-sm leading-none">{entrada.mood}</span>
+                                      )}
                                       {isInconsciencia && (
                                         <span className="inline-flex items-center gap-1 font-cinzel font-bold text-indigo-400 bg-indigo-950/50 px-1.5 py-0.2 rounded border border-indigo-500/30">
                                           <Moon className="w-3 h-3 text-indigo-400" />
@@ -1556,7 +1794,12 @@ export const CalendarView: React.FC<{
                                         </span>
                                       )}
                                     </div>
-                                    <p className="m-0 text-[var(--text-primary)] leading-relaxed">{entrada.summary}</p>
+                                    {entrada.title && (
+                                      <h5 className="font-cinzel font-bold text-xs text-[var(--text-primary)] m-0">
+                                        {entrada.title}
+                                      </h5>
+                                    )}
+                                    <p className="m-0 text-[var(--text-primary)] leading-relaxed font-lora">{entrada.summary}</p>
                                     {entrada.hito && (
                                       <div className="pt-1 flex flex-wrap items-center gap-1.5">
                                         {(() => {

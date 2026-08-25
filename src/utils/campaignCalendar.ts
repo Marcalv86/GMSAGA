@@ -224,6 +224,114 @@ export function distanciaEnDias(dias: number): string {
   return `venció hace ${Math.abs(dias)} días`;
 }
 
+/**
+ * Parsea una cadena de fecha escrita en lenguaje natural o canónico (ej: "1 de Alba de 1492",
+ * "1 de Primer Mes de Invierno de 1490 CV", "15 de Alturiak de 1492 DR", "Fuego Alto de 1492")
+ * y deduce su CampaignDate correspondiente dentro del calendario actual de la campaña.
+ */
+export function parsearFechaTexto(
+  cal: CalendarConfig,
+  texto?: string,
+  anoPorDefecto = 1492
+): CampaignDate | null {
+  if (!texto || typeof texto !== 'string') return null;
+  const tNorm = sinTildes(texto.trim());
+  if (!tNorm) return null;
+
+  // 1. Extraer año si está presente (ej. 1492, 1490, etc.)
+  const matchAno = tNorm.match(/\b(1\d{3}|20\d{2}|\d{1,4})\s*(?:dr|cv|d\.?\s*c\.?|a\.?\s*d\.?)?\b/i);
+  let year = matchAno ? parseInt(matchAno[1], 10) : anoPorDefecto;
+  if (!Number.isFinite(year) || year < 1) year = anoPorDefecto;
+
+  const slots = yearLayout(cal);
+  if (!slots || slots.length === 0) return null;
+
+  // 2. Extraer día del mes (ej: "1 de...", "15 de...", "día 15")
+  const matchDia = tNorm.match(/(?:dia\s+)?(\d{1,3})\s*(?:de|\/|-|\s|$)/i);
+  const diaNum = matchDia ? parseInt(matchDia[1], 10) : 1;
+
+  // 3. Comprobar si coincide con un festival
+  if (cal.festivals && cal.festivals.length > 0) {
+    for (const fest of cal.festivals) {
+      const fNorm = sinTildes(fest.name);
+      if (tNorm.includes(fNorm)) {
+        const slotIdx = slots.findIndex(
+          s => s.kind === 'festival' && sinTildes(s.festivalName || '') === fNorm
+        );
+        if (slotIdx >= 0) {
+          return { year, dayOfYear: slotIdx + 1, minute: 12 * 60 };
+        }
+      }
+    }
+  }
+
+  // 4. Comprobar si coincide con alguno de los meses del calendario actual
+  let matchedMonthIdx = -1;
+  cal.months.forEach((m, idx) => {
+    const mNorm = sinTildes(m.name);
+    if (tNorm.includes(mNorm)) {
+      matchedMonthIdx = idx;
+    }
+  });
+
+  // 5. Si no coincide directamente con cal.months, buscar equivalencias comunes de Harptos / fantasía
+  if (matchedMonthIdx < 0) {
+    const MESES_HARPTOS = [
+      ['martillo', 'hammer', 'primer mes de invierno', '1er mes de invierno', 'alba', 'invierno 1'],
+      ['alturiak', 'deshielo', 'garras del invierno'],
+      ['ches', 'siembra', 'la puesta'],
+      ['tarsakh', 'flor', 'lluvias'],
+      ['mirtul', 'solsticio', 'el deshielo'],
+      ['kythorn', 'ardiente', 'tiempo de flores'],
+      ['flamante', 'flamerule', 'siega', 'pleamar'],
+      ['eleasis', 'grano', 'sol alto'],
+      ['eleint', 'ocaso', 'desvanecimiento'],
+      ['marpenoth', 'bruma', 'caida de la hoja'],
+      ['uktar', 'escarcha', 'el abrazo'],
+      ['nocturnal', 'nightal', 'sepulcro', 'el dibujo']
+    ];
+
+    for (let mi = 0; mi < MESES_HARPTOS.length; mi++) {
+      if (MESES_HARPTOS[mi].some(alias => tNorm.includes(alias))) {
+        matchedMonthIdx = Math.min(mi, cal.months.length - 1);
+        break;
+      }
+    }
+  }
+
+  // Si se encontró un mes
+  if (matchedMonthIdx >= 0) {
+    const month = cal.months[matchedMonthIdx];
+    const dayInMonth = Math.max(1, Math.min(diaNum, month.days));
+    const slotIdx = slots.findIndex(
+      s => s.kind === 'month' && s.monthIndex === matchedMonthIdx && s.day === dayInMonth
+    );
+    if (slotIdx >= 0) {
+      return { year, dayOfYear: slotIdx + 1, minute: 12 * 60 };
+    }
+  }
+
+  // 6. Si solo se especificó un número de día (ej: "Día 1", "Día 45")
+  if (diaNum > 0 && diaNum <= slots.length) {
+    return { year, dayOfYear: diaNum, minute: 12 * 60 };
+  }
+
+  return null;
+}
+
+/**
+ * Devuelve el día absoluto a partir de un texto de fecha, o null si no se puede determinar.
+ */
+export function aDiaAbsolutoDesdeTexto(
+  cal: CalendarConfig,
+  texto?: string,
+  anoPorDefecto = 1492
+): number | null {
+  const cDate = parsearFechaTexto(cal, texto, anoPorDefecto);
+  if (!cDate) return null;
+  return aDiaAbsoluto(cal, cDate);
+}
+
 // ---------------------------------------------------------------- etiquetas del Narrador
 
 const TIEMPO_RE = /\[\s*TIEMPO\s*:\s*([^\]]+)\]/gi;

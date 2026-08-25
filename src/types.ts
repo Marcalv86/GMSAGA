@@ -84,7 +84,7 @@ export interface TimelineEntry {
   /** Minutos desde medianoche, para saber a qué hora ocurrió. */
   minute?: number;
   /** Categoría especial de la entrada (noticia del mundo, rumor, inconsciencia, etc.) */
-  tipo?: 'acontecimiento' | 'noticia' | 'rumor' | 'inconsciencia' | 'salto_temporal' | 'diario' | 'personal';
+  tipo?: 'acontecimiento' | 'hito' | 'descubrimiento' | 'secreto' | 'descanso' | 'noticia' | 'rumor' | 'inconsciencia' | 'salto_temporal' | 'diario' | 'personal';
   /** Si representa o abarca un salto temporal de múltiples días */
   timeSkipDays?: number;
 }
