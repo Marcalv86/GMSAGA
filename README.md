@@ -19,12 +19,12 @@ ni base de datos en la nube: todo se guarda en el navegador (IndexedDB + localSt
 
 ### Características
 
-- **Narrativa estilo novela**, con directivas de narración editables por campaña.
-- **Memoria viva persistente**: crónica, tramas, PNJs con ejes de afinidad, lugares y estado actual, sincronizables desde el historial con un clic.
+- **Narrativa estilo novela**, con directivas de narración editables por campaña y protocolos estrictos de asimetría de información (anti-metarol).
+- **Memoria viva persistente y autónoma**: crónica, tramas, PNJs con ejes de afinidad, lugares, notas secretas del GM y estado actual, actualizables de forma autónoma en cada turno o sincronizables bajo demanda.
 - **Ficha del protagonista (OC) y de PNJs**, con retratos que puedes subir o vincular desde la galería de la campaña.
 - **Mapas tácticos interactivos** con marcadores enlazables a PNJs y lugares.
 - **Seguimiento de combate**: rondas, iniciativa, HP y estados.
-- **Lector modo novela** y exportación de la crónica a PDF.
+- **Lector modo novela y exportación avanzada**: descarga directa a PDF maquetado como libro/novela o exportación a Markdown (.md) y texto limpio.
 - **Importación y exportación de campañas completas en JSON** (copia de seguridad).
 - **PWA instalable** y offline-first en móvil, tablet y escritorio.
 
