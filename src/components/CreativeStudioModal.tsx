@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Sparkles,
   Music,
@@ -17,14 +17,32 @@ import {
   Radio,
   BookOpen,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Upload,
+  Calendar,
+  BookmarkPlus,
+  ExternalLink,
+  Plus
 } from 'lucide-react';
+import { Project, ProjectFile, TimelineEntry, CalendarConfig, CampaignDate } from '../types';
+import {
+  CALENDARIO_FANTASTICO,
+  aDiaAbsoluto,
+  fechaInicial,
+  fechaLegible
+} from '../utils/campaignCalendar';
 
 export interface CreativeStudioModalProps {
   isOpen?: boolean;
   initialTab?: 'music' | 'image' | 'video' | 'voice' | 'diary';
   sceneText?: string;
   lastSceneText?: string;
+  project?: Project;
+  files?: ProjectFile[];
+  selectedAbsDay?: number;
+  onUpdateProject?: (updater: Partial<Project> | ((prev: Project) => Partial<Project>)) => Promise<void> | void;
+  onUploadFile?: (file: File, category?: any) => Promise<string>;
+  onNavigateToDiary?: (absDay?: number) => void;
   onInsertIntoChat?: (text: string) => void;
   onSendToChat?: (text: string) => void;
   onClose: () => void;
@@ -292,6 +310,12 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   initialTab = 'image',
   sceneText = '',
   lastSceneText = '',
+  project,
+  files = [],
+  selectedAbsDay,
+  onUpdateProject,
+  onUploadFile,
+  onNavigateToDiary,
   onInsertIntoChat,
   onSendToChat,
   onClose
@@ -300,6 +324,19 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
     initialTab
   );
   const handleSendToChat = onInsertIntoChat || onSendToChat;
+
+  // Campaign Date Context
+  const cal: CalendarConfig = project?.calendar || CALENDARIO_FANTASTICO;
+  const fechaSegura: CampaignDate =
+    project?.currentDate && Number.isFinite(project.currentDate.year)
+      ? project.currentDate
+      : fechaInicial(1490);
+  const hoyAbs = useMemo(() => {
+    return selectedAbsDay !== undefined ? selectedAbsDay : aDiaAbsoluto(cal, fechaSegura);
+  }, [cal, fechaSegura, selectedAbsDay]);
+  const fechaLegibleStr = useMemo(() => {
+    return fechaLegible(cal, fechaSegura);
+  }, [cal, fechaSegura]);
 
   // Scene Context State (Editable so the user can tweak what scene is being illustrated)
   const initialScene = useMemo(() => {
@@ -316,10 +353,16 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
     }
   }, [sceneText, lastSceneText]);
 
-  // Image generation controls
+  // Image generation & attachment controls
   const [imageArchetype, setImageArchetype] = useState<string>('classic');
   const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
   const [imagePrompt, setImagePrompt] = useState<string>('');
+  const [attachedImageUrl, setAttachedImageUrl] = useState<string>('');
+  const [customSceneTitle, setCustomSceneTitle] = useState<string>('');
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
+  const [showImagePicker, setShowImagePicker] = useState<boolean>(false);
+  const [linkedSuccessMsg, setLinkedSuccessMsg] = useState<{ text: string; absDay: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Video generation controls
   const [cameraMove, setCameraMove] = useState<string>('pan');
@@ -340,6 +383,111 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
     setVideoPrompt(buildVideoPromptFromScene(currentScene, cameraMove));
     setDiarySummary(buildDiarySummaryFromScene(currentScene));
   }, [currentScene, imageArchetype, selectedModifiers, cameraMove]);
+
+  // Available image files from campaign
+  const campaignImageFiles = useMemo(() => {
+    return files.filter(f => f.isImage || (f.url && f.url.startsWith('data:image')));
+  }, [files]);
+
+  // Handle direct file upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingImage(true);
+    try {
+      if (onUploadFile) {
+        const url = await onUploadFile(file, 'general');
+        setAttachedImageUrl(url);
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            setAttachedImageUrl(reader.result);
+          }
+          setIsUploadingImage(false);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    } catch (err) {
+      console.error('Error subiendo imagen:', err);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Link scene/illustration directly to Diary timeline
+  const handleLinkSceneToDiary = async () => {
+    if (!project || !onUpdateProject) {
+      if (handleSendToChat) {
+        handleSendToChat(`🎨 [Ilustración de la Escena del Día ${fechaLegibleStr}]: ${imagePrompt}`);
+        onClose();
+      }
+      return;
+    }
+
+    const title = customSceneTitle.trim() || '🎨 Ilustración de la Escena';
+    const summary = diarySummary.trim() || currentScene.slice(0, 300) || imagePrompt;
+    
+    const newEntry: TimelineEntry = {
+      id: `escena_${hoyAbs}_${Date.now()}`,
+      absDay: hoyAbs,
+      date: fechaLegibleStr,
+      title: title.startsWith('🎨') ? title : `🎨 ${title}`,
+      summary: summary,
+      tipo: 'escena',
+      mood: '🎨',
+      images: attachedImageUrl ? [attachedImageUrl] : undefined,
+      hito: `Escena ilustrada: ${title.replace(/^🎨\s*/, '')}`
+    };
+
+    const currentTimeline = project.timeline || [];
+    const updatedTimeline = [newEntry, ...currentTimeline];
+
+    await onUpdateProject({
+      timeline: updatedTimeline
+    });
+
+    setLinkedSuccessMsg({
+      text: `¡Escena ilustrada vinculada con éxito al ${fechaLegibleStr}!`,
+      absDay: hoyAbs
+    });
+  };
+
+  // Link summary directly as diary event
+  const handleLinkSummaryToDiary = async () => {
+    if (!project || !onUpdateProject) {
+      if (handleSendToChat) {
+        handleSendToChat(`📜 [Acontecimiento para el Diario]: ${diarySummary}`);
+        onClose();
+      }
+      return;
+    }
+
+    const title = customSceneTitle.trim() || 'Acontecimiento de la Jornada';
+    const newEntry: TimelineEntry = {
+      id: `diario_${hoyAbs}_${Date.now()}`,
+      absDay: hoyAbs,
+      date: fechaLegibleStr,
+      title: title,
+      summary: diarySummary.trim() || currentScene.slice(0, 300),
+      tipo: 'diario',
+      mood: '✨',
+      hito: title
+    };
+
+    const currentTimeline = project.timeline || [];
+    const updatedTimeline = [newEntry, ...currentTimeline];
+
+    await onUpdateProject({
+      timeline: updatedTimeline
+    });
+
+    setLinkedSuccessMsg({
+      text: `¡Acontecimiento guardado en el Diario del ${fechaLegibleStr}!`,
+      absDay: hoyAbs
+    });
+  };
 
   // Ambient tracks
   const ambientTracks = [

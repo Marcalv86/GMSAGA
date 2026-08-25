@@ -548,126 +548,131 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
       {/* =========================================================================
           CABECERA SUPERIOR Y SELECTOR DE VISTA
           ========================================================================= */}
-      <div className="bg-[var(--sidebar-bg)] p-4 sm:p-5 rounded-2xl border border-[var(--user-border)] shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="font-cinzel text-base sm:text-lg font-bold text-[var(--accent)] flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-[var(--accent)]" />
+      <div className="bg-[var(--sidebar-bg)] p-3.5 sm:p-5 rounded-2xl border border-[var(--user-border)] shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4">
+        <div className="flex flex-col gap-1 w-full md:w-auto">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-cinzel text-sm sm:text-base md:text-lg font-bold text-[var(--accent)] flex items-center gap-1.5 sm:gap-2">
+              <CalendarDays className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] shrink-0" />
               Diario & Agenda de Campaña
             </span>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--glass-border)] font-cinzel font-semibold flex items-center gap-1.5">
+            <span className="text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--glass-border)] font-cinzel font-semibold flex items-center gap-1.5 flex-wrap">
               <span>{cal.name}</span>
               <span>·</span>
               <span className="text-[var(--accent)] font-bold">📅 {fechaLegible(cal, fechaSegura)}</span>
               <span>⏳ {horaLegible(fechaSegura.minute)}</span>
             </span>
           </div>
-          <p className="text-xs text-[var(--text-secondary)] m-0">
+          <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0">
             Agenda narrativa con vista de día, selección de calendario, crónica y galería de ilustraciones de cada jornada.
           </p>
         </div>
 
-        {/* View Mode Switcher Pills */}
-        <div className="flex items-center gap-1.5 bg-[var(--surface)] p-1 rounded-xl border border-[var(--glass-border)] shadow-2xs flex-wrap self-stretch sm:self-auto justify-start">
-          <button
-            onClick={() => setViewMode('dia')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
-              viewMode === 'dia'
-                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" /> Día Vista
-          </button>
-          <button
-            onClick={() => setViewMode('galeria')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
-              viewMode === 'galeria'
-                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
-            }`}
-            title="Ver galería de fotos e ilustraciones organizadas por día"
-          >
-            <ImageIcon className="w-3.5 h-3.5" /> Galería Media ({mediaGalleryItems.length})
-          </button>
-          <button
-            onClick={() => setViewMode('todos')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
-              viewMode === 'todos'
-                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
-            }`}
-          >
-            <History className="w-3.5 h-3.5" /> Crónica ({timeline.length})
-          </button>
-          <button
-            onClick={() => setViewMode('relojes')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
-              viewMode === 'relojes'
-                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" /> Relojes ({activeThreads.length})
-          </button>
-        </div>
+        {/* View Mode Switcher & Actions */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start md:justify-end">
+          {/* View Mode Switcher Pills */}
+          <div className="flex items-center gap-1 bg-[var(--surface)] p-1 rounded-xl border border-[var(--glass-border)] shadow-2xs flex-wrap w-full sm:w-auto justify-start">
+            <button
+              onClick={() => setViewMode('dia')}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
+                viewMode === 'dia'
+                  ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" /> Día Vista
+            </button>
+            <button
+              onClick={() => setViewMode('galeria')}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
+                viewMode === 'galeria'
+                  ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
+              }`}
+              title="Ver galería de fotos e ilustraciones organizadas por día"
+            >
+              <ImageIcon className="w-3.5 h-3.5" /> Galería Media ({mediaGalleryItems.length})
+            </button>
+            <button
+              onClick={() => setViewMode('todos')}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
+                viewMode === 'todos'
+                  ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" /> Crónica ({timeline.length})
+            </button>
+            <button
+              onClick={() => setViewMode('relojes')}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold transition-all cursor-pointer ${
+                viewMode === 'relojes'
+                  ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs scale-[1.02]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)]'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" /> Relojes ({activeThreads.length})
+            </button>
+          </div>
 
-        {/* AI Sync Button if applicable */}
-        {onTriggerAIUpdate && (
-          <button
-            onClick={() => onTriggerAIUpdate()}
-            disabled={isGenerating || !hasChats}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer disabled:opacity-50 shadow-xs"
-            title="Extraer sucesos de la conversación actual e incorporarlos al diario"
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Analizando...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Sincronizar con Rol</span>
-              </>
-            )}
-          </button>
-        )}
+          {/* AI Sync Button if applicable */}
+          {onTriggerAIUpdate && (
+            <button
+              onClick={() => onTriggerAIUpdate()}
+              disabled={isGenerating || !hasChats}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer disabled:opacity-50 shadow-xs w-full sm:w-auto"
+              title="Extraer sucesos de la conversación actual e incorporarlos al diario"
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Analizando...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Sincronizar con Rol</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* =========================================================================
           CALENDARIO INTERACTIVO Y SELECTOR DE DÍA (Matching Screenshot 1)
           ========================================================================= */}
-      <div className="bg-[var(--surface-soft)] p-4 sm:p-6 rounded-2xl border border-[var(--user-border)] shadow-sm flex flex-col gap-4">
-        {/* Month Navigator Header: < Julio 2022 >   HOY */}
-        <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--glass-border)]">
-          <div className="flex items-center gap-2">
+      <div className="bg-[var(--surface-soft)] p-3.5 sm:p-6 rounded-2xl border border-[var(--user-border)] shadow-sm flex flex-col gap-4">
+        {/* Month Navigator Header: Responsive & aligned on mobile and desktop */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 pb-3 border-b border-[var(--glass-border)]">
+          <div className="flex items-center justify-between sm:justify-start gap-1.5 sm:gap-2 flex-1 min-w-0">
             <button
               onClick={() => cambiarMes(-1)}
-              className="p-2 rounded-lg border border-[var(--user-border)] bg-[var(--surface)] hover:bg-[var(--glass)] hover:border-[var(--accent)] text-[var(--text-primary)] transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-lg border border-[var(--user-border)] bg-[var(--surface)] hover:bg-[var(--glass)] hover:border-[var(--accent)] text-[var(--text-primary)] transition-colors cursor-pointer shrink-0"
               title="Mes anterior"
+              aria-label="Mes anterior"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            <h3 className="font-cinzel text-base sm:text-lg font-bold text-[var(--text-primary)] m-0 capitalize min-w-[160px] sm:min-w-[200px] text-center">
+            <h3 className="font-cinzel text-xs sm:text-base md:text-lg font-bold text-[var(--text-primary)] m-0 capitalize text-center flex-1 sm:flex-initial sm:min-w-[180px] truncate px-1">
               {mesActualConfig.name} {mesNavegacion.year}
               {cal.yearSuffix ? ` ${cal.yearSuffix}` : ''}
             </h3>
 
             <button
               onClick={() => cambiarMes(1)}
-              className="p-2 rounded-lg border border-[var(--user-border)] bg-[var(--surface)] hover:bg-[var(--glass)] hover:border-[var(--accent)] text-[var(--text-primary)] transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-lg border border-[var(--user-border)] bg-[var(--surface)] hover:bg-[var(--glass)] hover:border-[var(--accent)] text-[var(--text-primary)] transition-colors cursor-pointer shrink-0"
               title="Mes siguiente"
+              aria-label="Mes siguiente"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2 shrink-0">
             <button
               onClick={irAHoy}
-              className={`px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold border transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold border transition-all cursor-pointer text-center ${
                 diaSeleccionado === hoyAbs
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-xs'
                   : 'bg-[var(--surface)] border-[var(--user-border)] text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
@@ -677,9 +682,9 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
             </button>
             <button
               onClick={() => openNewEntryModal('diario')}
-              className="px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap"
             >
-              <Plus className="w-3.5 h-3.5" /> + Entrada
+              <Plus className="w-3.5 h-3.5" /> <span>+ Entrada</span>
             </button>
           </div>
         </div>
