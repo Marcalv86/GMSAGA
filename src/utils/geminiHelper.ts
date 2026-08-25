@@ -314,26 +314,52 @@ export function setStoredMemorySyncGranularity(granularity: MemorySyncGranularit
   }
 }
 
+export function cleanApiKey(raw: string): string {
+  if (!raw) return '';
+  let key = String(raw).trim();
+  // Limpieza de caracteres invisibles, BOM y espacios de ancho cero
+  key = key.replace(/[\uFEFF\u200B\u200C\u200D\u2060\u00A0\u180E\u2000-\u200A\u202F\u205F\u3000]/g, '').trim();
+  // Limpieza de comillas circundantes
+  key = key.replace(/^["'`]|["'`]$/g, '').trim();
+  // Extracción si viene en formato KEY=... o GEMINI_API_KEY=...
+  if (key.includes('=')) {
+    const parts = key.split('=');
+    const val = parts[parts.length - 1].trim().replace(/^["'`]|["'`]$/g, '');
+    if (val.length >= 15) {
+      key = val;
+    }
+  }
+  // Eliminar signos de puntuación no alfanuméricos en extremos
+  key = key.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '').trim();
+  return key;
+}
+
 export function getStoredApiKeys(): string[] {
   const localList = localStorage.getItem('gemini_api_keys');
   if (localList) {
     try {
       const parsed = JSON.parse(localList);
       if (Array.isArray(parsed)) {
-        const cleaned = parsed.map((k: any) => (typeof k === 'string' ? k.trim() : '')).filter(Boolean);
+        const cleaned = parsed.map((k: any) => cleanApiKey(typeof k === 'string' ? k : '')).filter(Boolean);
         if (cleaned.length > 0) return cleaned;
       }
     } catch {}
   }
   const single = localStorage.getItem('gemini_api_key');
-  if (single && single.trim()) return [single.trim()];
+  if (single) {
+    const c = cleanApiKey(single);
+    if (c) return [c];
+  }
   const envKey = process.env.GEMINI_API_KEY;
-  if (envKey && envKey !== 'MY_GEMINI_API_KEY') return [envKey.trim()];
+  if (envKey && envKey !== 'MY_GEMINI_API_KEY') {
+    const c = cleanApiKey(envKey);
+    if (c) return [c];
+  }
   return [];
 }
 
 export function setStoredApiKeys(keys: string[]): void {
-  const cleaned = keys.map(k => k.trim()).filter(Boolean);
+  const cleaned = keys.map(k => cleanApiKey(k)).filter(Boolean);
   if (cleaned.length > 0) {
     localStorage.setItem('gemini_api_keys', JSON.stringify(cleaned));
     localStorage.setItem('gemini_api_key', cleaned[0]);
@@ -361,17 +387,19 @@ export function setStoredKeyRotationMode(mode: KeyRotationMode): void {
 const keyCooldownMap = new Map<string, number>();
 
 export function markKeyCooldown(key: string, durationMs: number = 60000) {
-  if (key && key.trim()) {
-    keyCooldownMap.set(key.trim(), Date.now() + durationMs);
+  const clean = cleanApiKey(key);
+  if (clean) {
+    keyCooldownMap.set(clean, Date.now() + durationMs);
   }
 }
 
 export function isKeyInCooldown(key: string): boolean {
-  if (!key || !key.trim()) return false;
-  const expiry = keyCooldownMap.get(key.trim());
+  const clean = cleanApiKey(key);
+  if (!clean) return false;
+  const expiry = keyCooldownMap.get(clean);
   if (!expiry) return false;
   if (Date.now() > expiry) {
-    keyCooldownMap.delete(key.trim());
+    keyCooldownMap.delete(clean);
     return false;
   }
   return true;
@@ -446,10 +474,11 @@ export function getStoredApiKey(): string {
 }
 
 export function setStoredApiKey(key: string): void {
-  if (key && key.trim()) {
+  const clean = cleanApiKey(key);
+  if (clean) {
     const current = getStoredApiKeys();
-    const rest = current.filter(k => k !== key.trim());
-    setStoredApiKeys([key.trim(), ...rest]);
+    const rest = current.filter(k => k !== clean);
+    setStoredApiKeys([clean, ...rest]);
   } else {
     setStoredApiKeys([]);
   }
@@ -460,13 +489,100 @@ export function hasConfiguredApiKey(): boolean {
 }
 
 export function getAIClient(apiKey?: string): GoogleGenAI {
-  const key = apiKey || getStoredApiKey();
-  if (!key) {
+  const rawKey = apiKey || getStoredApiKey();
+  const cleanKey = cleanApiKey(rawKey);
+  if (!cleanKey) {
     throw new Error(
-      'La clave de API de Gemini no está configurada.\n\nPulsa el botón "Motor" de la barra superior e introduce tu clave de Google AI Studio.'
+      'La clave de API de Gemini no está configurada o no es válida.\n\nPulsa el botón "Motor" de la barra superior e introduce tu clave de Google AI Studio.'
     );
   }
-  return new GoogleGenAI({ apiKey: key });
+  return new GoogleGenAI({ apiKey: cleanKey });
+}
+
+export interface ApiKeyDiagnostic {
+  key: string;
+  status: 'valid' | 'invalid' | 'denied' | 'quota' | 'network' | 'error';
+  code?: number;
+  message: string;
+  modelsFound?: number;
+}
+
+export async function testSingleApiKey(apiKey: string): Promise<ApiKeyDiagnostic> {
+  const cleaned = cleanApiKey(apiKey);
+  if (!cleaned || cleaned.length < 15) {
+    return {
+      key: apiKey,
+      status: 'invalid',
+      code: 400,
+      message: 'Formato no válido (la clave es demasiado corta o está vacía).'
+    };
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: cleaned });
+    const paginas = await ai.models.list();
+    let count = 0;
+    for await (const _ of paginas) {
+      count++;
+      if (count >= 3) break;
+    }
+
+    return {
+      key: cleaned,
+      status: 'valid',
+      code: 200,
+      message: 'Clave operativa y autorizada en Google AI Studio.',
+      modelsFound: count
+    };
+  } catch (err: any) {
+    const raw = String(err?.message || '');
+    const lower = raw.toLowerCase();
+
+    if (lower.includes('api key not valid') || lower.includes('api_key_invalid') || (lower.includes('400') && lower.includes('key'))) {
+      return {
+        key: cleaned,
+        status: 'invalid',
+        code: 400,
+        message: 'Clave de API no válida o revocada en Google AI Studio (Error 400: API_KEY_INVALID).'
+      };
+    }
+    if (lower.includes('denied') || lower.includes('permission_denied') || lower.includes('403')) {
+      return {
+        key: cleaned,
+        status: 'denied',
+        code: 403,
+        message: 'Acceso denegado o proyecto suspendido/sin API habilitada (Error 403: PERMISSION_DENIED).'
+      };
+    }
+    if (lower.includes('429') || lower.includes('resource_exhausted') || lower.includes('quota')) {
+      return {
+        key: cleaned,
+        status: 'quota',
+        code: 429,
+        message: 'Clave válida, pero con cuota de peticiones agotada temporalmente (Error 429: RESOURCE_EXHAUSTED).'
+      };
+    }
+    if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('load failed')) {
+      return {
+        key: cleaned,
+        status: 'network',
+        code: 0,
+        message: 'No se pudo conectar con Google (Error de red o conexión).'
+      };
+    }
+
+    return {
+      key: cleaned,
+      status: 'error',
+      message: `Error al verificar: ${raw.slice(0, 150)}`
+    };
+  }
+}
+
+export async function testAllApiKeys(keys?: string[]): Promise<ApiKeyDiagnostic[]> {
+  const targetKeys = keys && keys.length > 0 ? keys : getStoredApiKeys();
+  if (targetKeys.length === 0) return [];
+  return Promise.all(targetKeys.map(k => testSingleApiKey(k)));
 }
 
 export interface TurnPayload {
@@ -950,14 +1066,22 @@ export async function generateStoryTurnStream({
   let success = false;
   let fullText = '';
   let lastError: any = null;
+  const fatalKeysSet = new Set<string>();
 
   for (let modelIndex = 0; modelIndex < failoverChain.length && !success; modelIndex++) {
+    // Si todas las claves del pool han sido rechazadas como fatales (400/403), no reintentar inútilmente
+    if (apiKeys.length > 0 && apiKeys.every(k => fatalKeysSet.has(k))) {
+      break;
+    }
+
     const currentModel = failoverChain[modelIndex];
     const isFallback = modelIndex > 0;
     const modelDisplayName = AVAILABLE_MODELS.find(m => m.id === currentModel)?.name || currentModel;
 
     for (let keyIndex = 0; keyIndex < apiKeys.length && !success; keyIndex++) {
       const currentApiKey = apiKeys[keyIndex];
+      if (fatalKeysSet.has(currentApiKey)) continue;
+
       const ai = getAIClient(currentApiKey);
       const storedKeys = getStoredApiKeys();
       const origKeyIdx = storedKeys.indexOf(currentApiKey);
@@ -1089,9 +1213,15 @@ export async function generateStoryTurnStream({
           const msg = String(e?.message || '');
           const isRateLimit = /429|RESOURCE_EXHAUSTED|quota|rate/i.test(msg);
           const isOverloaded = /503|UNAVAILABLE|overloaded|alta demanda|try again later|500|502|504/i.test(msg);
+          const isInvalidKey = /api_key_invalid|api key not valid|invalid_argument/i.test(msg) || (msg.includes('400') && /api key|api_key|key not valid/i.test(msg));
+          const isPermissionDenied = /permission_denied|403|denied access/i.test(msg);
           const streamCortado =
             streamReceivedText ||
             /incomplete json|unexpected end|network|failed to fetch|load failed|terminated|aborted|stream|closed|econnreset|fetch/i.test(msg);
+
+          if (isInvalidKey || isPermissionDenied) {
+            fatalKeysSet.add(currentApiKey);
+          }
 
           logWarn(
             'gemini_stream',
@@ -1103,6 +1233,8 @@ export async function generateStoryTurnStream({
               details: {
                 isRateLimit,
                 isOverloaded,
+                isInvalidKey,
+                isPermissionDenied,
                 streamCortado,
                 keyIndex,
                 totalKeys
@@ -1123,6 +1255,14 @@ export async function generateStoryTurnStream({
             );
             success = true;
             return;
+          }
+
+          // Si es clave inválida o acceso denegado, rotar inmediatamente a la siguiente clave sin reintentar
+          if (isInvalidKey || isPermissionDenied) {
+            if (keyIndex < apiKeys.length - 1) {
+              setLoadingText(`Clave ${keyNumDisplay} no autorizada. Probando siguiente clave del pool...`);
+              break;
+            }
           }
 
           // Si no había texto escrito aún y es límite de cuota (429), enfriar clave y pasar de inmediato a la siguiente clave
@@ -1292,11 +1432,17 @@ export async function generateContentWithFailover({
   }
 
   let lastError: any = null;
+  const fatalKeys = new Set<string>();
 
   for (let i = 0; i < chain.length; i++) {
+    if (keysToTry.length > 0 && keysToTry.every(k => k && fatalKeys.has(k))) {
+      break;
+    }
     const model = chain[i];
     for (let k = 0; k < keysToTry.length; k++) {
       const currentKey = keysToTry[k];
+      if (currentKey && fatalKeys.has(currentKey)) continue;
+
       const ai = getAIClient(currentKey || undefined);
       try {
         const abierto = esModeloAbierto(model);
@@ -1349,6 +1495,9 @@ export async function generateContentWithFailover({
         const msg = String(err?.message || '');
         if (/429|RESOURCE_EXHAUSTED/i.test(msg)) {
           if (currentKey) markKeyCooldown(currentKey, 60000);
+        }
+        if (/api_key_invalid|api key not valid|invalid_argument/i.test(msg) || (msg.includes('400') && /api key|api_key|key not valid/i.test(msg)) || /permission_denied|403/i.test(msg)) {
+          if (currentKey) fatalKeys.add(currentKey);
         }
         console.warn(`generateContentWithFailover fallo en ${model} (clave ${k + 1}/${keysToTry.length}):`, err);
         if (k < keysToTry.length - 1) {
@@ -1949,16 +2098,29 @@ export function describeApiError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? '');
   const lower = raw.toLowerCase();
 
+  if (
+    lower.includes('api_key_invalid') ||
+    lower.includes('api key not valid') ||
+    (lower.includes('400') && (lower.includes('api key') || lower.includes('key')))
+  ) {
+    return 'Una o varias claves de API en tu pool no son válidas o han sido revocadas en Google AI Studio (Error 400: API_KEY_INVALID).\n\nAbre «Motor» de la barra superior, pulsa «Diagnosticar Claves» y retira o actualiza las claves que aparezcan en rojo.';
+  }
+  if (
+    lower.includes('permission_denied') ||
+    lower.includes('denied access') ||
+    lower.includes('403')
+  ) {
+    return 'Google ha denegado el acceso al proyecto de tu clave de API (Error 403: PERMISSION_DENIED).\n\nVerifica en Google AI Studio (aistudio.google.com) que tu proyecto tenga permisos activos y la Generative Language API habilitada.';
+  }
   if (lower.includes('429') || lower.includes('resource_exhausted') || lower.includes('quota')) {
     return 'Has alcanzado temporalmente el límite de peticiones de la capa gratuita. La app intentó rotar a modelos alternativos pero la cuota de tu clave se encuentra en pausa. Espera unos segundos y pulsa «Continuar Narración».';
   }
   if (
     lower.includes('api key') ||
     lower.includes('api_key') ||
-    lower.includes('401') ||
-    lower.includes('403')
+    lower.includes('401')
   ) {
-    return 'La clave de API no es válida o no tiene permiso. Revísala en el botón Motor.';
+    return 'La clave de API no es válida o no está configurada. Revísala en el botón Motor.';
   }
   if (lower.includes('safety') || lower.includes('blocked') || lower.includes('prohibited')) {
     return 'El modelo ha bloqueado la respuesta por sus filtros de seguridad. Prueba a bajar los filtros en Motor → Filtros & NSFW.';
@@ -1974,9 +2136,6 @@ export function describeApiError(err: unknown): string {
   if (lower.includes('not found') || lower.includes('404')) {
     return 'El modelo seleccionado no existe o no está disponible con tu clave. Abre el botón Motor y pulsa «Ver los de mi clave» para ver cuáles admite.';
   }
-  // «No compatible» casi nunca significa que el modelo no valga: significa que la
-  // petición llevaba un campo que ese endpoint no acepta. Confundir las dos cosas
-  // manda a la usuaria a cambiar de clave por un fallo que está en el código.
   if (lower.includes('is not supported') || lower.includes('not supported')) {
     return `Google ha rechazado un campo de la petición, no tu clave: «${String((err as any)?.message || '').slice(0, 200)}». Si acabas de cambiar de modelo, prueba con otro; si no, es un fallo de la aplicación.`;
   }

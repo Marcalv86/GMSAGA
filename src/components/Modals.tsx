@@ -30,7 +30,11 @@ import {
   describeApiError,
   esModeloAbierto,
   hasConfiguredApiKey,
-  listarModelosDeLaClave
+  listarModelosDeLaClave,
+  cleanApiKey,
+  testSingleApiKey,
+  testAllApiKeys,
+  ApiKeyDiagnostic
 } from '../utils/geminiHelper';
 import { ResumenUso, borrarUso, resumirUso } from '../utils/usageStats';
 
@@ -56,7 +60,12 @@ import {
   FileText,
   Upload,
   Download,
-  ClipboardList
+  ClipboardList,
+  Activity,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Clock
 } from 'lucide-react';
 export interface PromptConfig {
   isOpen: boolean;
@@ -155,6 +164,9 @@ export const ApiKeyModal: React.FC<{
   const [batchRawText, setBatchRawText] = useState('');
   const [batchFeedback, setBatchFeedback] = useState<{ text: string; isError?: boolean } | null>(null);
   const keyFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [keyDiagnostics, setKeyDiagnostics] = useState<Record<string, ApiKeyDiagnostic>>({});
+  const [isTestingKeys, setIsTestingKeys] = useState(false);
+  const [testingSingleKey, setTestingSingleKey] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'model' | 'sync' | 'safety' | 'thinking' | 'key'>(
     'model'
@@ -167,12 +179,10 @@ export const ApiKeyModal: React.FC<{
     // 1. Line-by-line / whitespace / comma / semicolon tokens
     const tokens = rawText.split(/[\r\n,;\t\s]+/);
     for (let token of tokens) {
-      let clean = token.trim().replace(/^["'`]|["'`]$/g, '');
+      let clean = cleanApiKey(token);
       if (clean.includes('=')) {
-        clean = clean.split('=').pop()?.trim().replace(/^["'`]|["'`]$/g, '') || '';
+        clean = cleanApiKey(clean.split('=').pop() || '');
       }
-      // Remove leading/trailing non-alphanumeric punctuation except dot/underscore/hyphen if part of key
-      clean = clean.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
       if (clean.length >= 15 && /^[a-zA-Z0-9_.-]+$/.test(clean)) {
         if (!foundKeys.includes(clean)) {
           foundKeys.push(clean);
@@ -190,7 +200,7 @@ export const ApiKeyModal: React.FC<{
       const matches = rawText.match(pat);
       if (matches) {
         for (const m of matches) {
-          const cleanM = m.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+          const cleanM = cleanApiKey(m);
           if (cleanM.length >= 15 && !foundKeys.includes(cleanM)) {
             foundKeys.push(cleanM);
           }
@@ -199,6 +209,69 @@ export const ApiKeyModal: React.FC<{
     }
 
     return foundKeys;
+  };
+
+  const handleTestAllKeys = async () => {
+    if (apiKeysList.length === 0) return;
+    setIsTestingKeys(true);
+    try {
+      const results = await testAllApiKeys(apiKeysList);
+      const map: Record<string, ApiKeyDiagnostic> = {};
+      let validCount = 0;
+      let invalidCount = 0;
+      for (const r of results) {
+        map[r.key] = r;
+        if (r.status === 'valid') validCount++;
+        else if (r.status === 'invalid' || r.status === 'denied') invalidCount++;
+      }
+      setKeyDiagnostics(map);
+      if (invalidCount > 0) {
+        setBatchFeedback({
+          text: `Diagnóstico completado: ${validCount} ${validCount === 1 ? 'clave válida' : 'claves válidas'}, ${invalidCount} ${invalidCount === 1 ? 'clave no válida/revocada' : 'claves no válidas/revocadas'}. Puedes retirarlas con un clic abajo.`,
+          isError: true
+        });
+      } else {
+        setBatchFeedback({
+          text: `✓ Diagnóstico completado: Todas las claves (${validCount}) están autorizadas y operativas en Google AI Studio.`,
+          isError: false
+        });
+      }
+    } catch (err) {
+      setBatchFeedback({
+        text: `Error al diagnosticar claves: ${describeApiError(err)}`,
+        isError: true
+      });
+    } finally {
+      setIsTestingKeys(false);
+    }
+  };
+
+  const handleTestSingleKey = async (k: string) => {
+    setTestingSingleKey(k);
+    try {
+      const diag = await testSingleApiKey(k);
+      setKeyDiagnostics(prev => ({ ...prev, [k]: diag }));
+    } finally {
+      setTestingSingleKey(null);
+    }
+  };
+
+  const handleRemoveInvalidKeys = () => {
+    const filtered = apiKeysList.filter(k => {
+      const d = keyDiagnostics[k];
+      return !(d && (d.status === 'invalid' || d.status === 'denied'));
+    });
+    const removedCount = apiKeysList.length - filtered.length;
+    setApiKeysList(filtered);
+    if (filtered.length > 0) {
+      setKeyInput(filtered[0]);
+    } else {
+      setKeyInput('');
+    }
+    setBatchFeedback({
+      text: `✓ Se ${removedCount === 1 ? 'ha retirado 1 clave inválida' : `han retirado ${removedCount} claves inválidas`} del pool.`,
+      isError: false
+    });
   };
 
   const handleImportBatchKeys = (textToImport: string) => {
@@ -989,7 +1062,7 @@ export const ApiKeyModal: React.FC<{
                   </div>
                 )}
 
-                {/* Barra de Acciones Rápidas (Importar TXT / Pegar Varias / Exportar / Vaciar) */}
+                {/* Barra de Acciones Rápidas (Importar TXT / Pegar Varias / Diagnosticar / Exportar / Vaciar) */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
                   {/* Hidden file input */}
                   <input
@@ -1006,7 +1079,7 @@ export const ApiKeyModal: React.FC<{
                     className="px-2.5 py-1.5 bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] hover:bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--user-border)] rounded font-cinzel font-semibold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer hover:border-[var(--accent)]"
                     title="Importar claves desde un archivo .txt, .env o .json"
                   >
-                    <Upload className="w-3.5 h-3.5 text-[var(--accent)]" /> Importar Archivo .TXT
+                    <Upload className="w-3.5 h-3.5 text-[var(--accent)]" /> Importar TXT
                   </button>
 
                   <button
@@ -1022,18 +1095,33 @@ export const ApiKeyModal: React.FC<{
                     }`}
                     title="Pegar una lista de múltiples claves a la vez"
                   >
-                    <ClipboardList className="w-3.5 h-3.5" /> Pegar Varias a la Vez
+                    <ClipboardList className="w-3.5 h-3.5" /> Pegar Varias
                   </button>
 
                   {apiKeysList.length > 0 && (
                     <>
                       <button
                         type="button"
+                        onClick={handleTestAllKeys}
+                        disabled={isTestingKeys}
+                        className="px-2.5 py-1.5 bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] hover:bg-[var(--surface)] text-[var(--accent)] border border-[var(--accent)]/40 rounded font-cinzel font-semibold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer hover:border-[var(--accent)] disabled:opacity-50"
+                        title="Verificar validez y estado de todas las claves con Google AI Studio"
+                      >
+                        {isTestingKeys ? (
+                          <Loader className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Activity className="w-3.5 h-3.5" />
+                        )}
+                        {isTestingKeys ? 'Comprobando…' : 'Diagnosticar'}
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={handleExportKeys}
                         className="px-2.5 py-1.5 bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--user-border)] rounded font-cinzel font-semibold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
                         title="Descargar copia de respaldo en formato .txt"
                       >
-                        <Download className="w-3.5 h-3.5" /> Exportar (.txt)
+                        <Download className="w-3.5 h-3.5" /> Exportar
                       </button>
 
                       <button
@@ -1042,17 +1130,37 @@ export const ApiKeyModal: React.FC<{
                           if (window.confirm('¿Seguro que deseas vaciar todas las claves de API del pool?')) {
                             setApiKeysList([]);
                             setKeyInput('');
+                            setKeyDiagnostics({});
                             setBatchFeedback({ text: 'Pool de claves vaciado.', isError: false });
                           }
                         }}
                         className="px-2 py-1.5 text-stone-400 hover:text-red-500 rounded font-cinzel text-xs flex items-center gap-1 transition-all cursor-pointer ml-auto"
                         title="Vaciar todo el pool"
                       >
-                        <Trash2 className="w-3.5 h-3.5" /> Vaciar Todo
+                        <Trash2 className="w-3.5 h-3.5" /> Vaciar
                       </button>
                     </>
                   )}
                 </div>
+
+                {/* Banner de alerta si hay claves inválidas diagnosticadas */}
+                {apiKeysList.some(k => keyDiagnostics[k]?.status === 'invalid' || keyDiagnostics[k]?.status === 'denied') && (
+                  <div className="bg-red-50/90 dark:bg-red-950/70 border border-red-300 dark:border-red-800 p-2.5 rounded-lg flex items-center justify-between gap-2 text-red-900 dark:text-red-200 animate-[fadeIn_0.2s_ease]">
+                    <div className="flex items-center gap-2 text-xs">
+                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>
+                        Se detectaron claves inválidas o revocadas que provocan errores 400/403.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveInvalidKeys}
+                      className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-cinzel font-bold text-[11px] cursor-pointer shrink-0 transition-colors"
+                    >
+                      Retirar Inválidas
+                    </button>
+                  </div>
+                )}
 
                 {/* Panel desplegable para Pegar Varias Claves a la vez */}
                 {showBatchBox && (
@@ -1114,8 +1222,8 @@ export const ApiKeyModal: React.FC<{
                     onKeyDown={e => {
                       if (e.key === 'Enter' && newKeyInput.trim()) {
                         e.preventDefault();
-                        const val = newKeyInput.trim();
-                        if (!apiKeysList.includes(val)) {
+                        const val = cleanApiKey(newKeyInput);
+                        if (val && !apiKeysList.includes(val)) {
                           const updated = [...apiKeysList, val];
                           setApiKeysList(updated);
                           setNewKeyInput('');
@@ -1128,7 +1236,7 @@ export const ApiKeyModal: React.FC<{
                   <button
                     type="button"
                     onClick={() => {
-                      const val = newKeyInput.trim();
+                      const val = cleanApiKey(newKeyInput);
                       if (val && !apiKeysList.includes(val)) {
                         const updated = [...apiKeysList, val];
                         setApiKeysList(updated);
@@ -1145,31 +1253,98 @@ export const ApiKeyModal: React.FC<{
 
                 {/* Lista de claves configuradas en el Pool */}
                 {apiKeysList.length > 0 && (
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
                     {apiKeysList.map((k, idx) => {
                       const isMain = idx === 0;
                       const masked = k.length > 10 ? `${k.slice(0, 7)}••••••••${k.slice(-4)}` : '••••••••';
+                      const diag = keyDiagnostics[k];
+                      const isTestingThis = testingSingleKey === k;
                       return (
                         <div
                           key={idx}
-                          className={`flex items-center justify-between p-2 rounded border text-xs ${
-                            isMain
+                          className={`flex items-center justify-between p-2 rounded border text-xs gap-2 ${
+                            diag?.status === 'invalid' || diag?.status === 'denied'
+                              ? 'border-red-400 bg-red-50/60 dark:bg-red-950/40'
+                              : isMain
                               ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]'
                               : 'border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_60%,transparent)]'
                           }`}
                         >
-                          <div className="flex items-center gap-2 font-mono">
-                            <span className="w-4 h-4 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center text-[10px] font-bold">
+                          <div className="flex items-center gap-2 font-mono min-w-0 flex-wrap">
+                            <span className="w-4 h-4 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center text-[10px] font-bold shrink-0">
                               {idx + 1}
                             </span>
                             <span className="font-semibold">{masked}</span>
                             {isMain && (
-                              <span className="text-[10px] font-cinzel font-bold text-[var(--accent)] bg-[var(--accent)]/15 px-1.5 py-0.2 rounded">
+                              <span className="text-[10px] font-cinzel font-bold text-[var(--accent)] bg-[var(--accent)]/15 px-1.5 py-0.2 rounded shrink-0">
                                 Principal
                               </span>
                             )}
+                            {isTestingThis && (
+                              <span className="text-[10px] bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 shrink-0">
+                                <Loader className="w-3 h-3 animate-spin" /> Verificando…
+                              </span>
+                            )}
+                            {!isTestingThis && diag && (
+                              <>
+                                {diag.status === 'valid' && (
+                                  <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 shrink-0">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> Válida
+                                  </span>
+                                )}
+                                {diag.status === 'invalid' && (
+                                  <span
+                                    className="text-[10px] bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 shrink-0"
+                                    title={diag.message}
+                                  >
+                                    <XCircle className="w-3 h-3 text-red-600 dark:text-red-400" /> No válida (400)
+                                  </span>
+                                )}
+                                {diag.status === 'denied' && (
+                                  <span
+                                    className="text-[10px] bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 shrink-0"
+                                    title={diag.message}
+                                  >
+                                    <XCircle className="w-3 h-3 text-red-600 dark:text-red-400" /> Denegada (403)
+                                  </span>
+                                )}
+                                {diag.status === 'quota' && (
+                                  <span
+                                    className="text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 shrink-0"
+                                    title={diag.message}
+                                  >
+                                    <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400" /> Pausa Cuota (429)
+                                  </span>
+                                )}
+                                {diag.status === 'network' && (
+                                  <span
+                                    className="text-[10px] bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-300 dark:border-stone-700 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 shrink-0"
+                                    title={diag.message}
+                                  >
+                                    <AlertCircle className="w-3 h-3 text-stone-500" /> Error Red
+                                  </span>
+                                )}
+                                {diag.status === 'error' && (
+                                  <span
+                                    className="text-[10px] bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-300 dark:border-stone-700 px-1.5 py-0.5 rounded font-mono flex items-center gap-1 shrink-0"
+                                    title={diag.message}
+                                  >
+                                    <AlertCircle className="w-3 h-3 text-stone-500" /> Error
+                                  </span>
+                                )}
+                              </>
+                            )}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleTestSingleKey(k)}
+                              disabled={isTestingThis || isTestingKeys}
+                              className="text-stone-400 hover:text-[var(--accent)] p-1 rounded hover:bg-black/5 cursor-pointer disabled:opacity-40"
+                              title="Probar validez de esta clave en Google AI Studio"
+                            >
+                              <Activity className="w-3.5 h-3.5" />
+                            </button>
                             {!isMain && (
                               <button
                                 type="button"
