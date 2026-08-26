@@ -1880,8 +1880,43 @@ async function saveStreamedMessage(
   }
 }
 
-/** Margen para las tareas de fondo. El anterior, 35s, cortaba destilados largos en seco. */
+/** Margen base para las tareas de fondo. El primero, 35s, cortaba destilados largos en seco. */
 const TIMEOUT_TAREA_DE_FONDO_MS = 90000;
+
+/** Ni la tarea más pesada debería pasar de aquí en un solo intento. */
+const TIMEOUT_MAXIMO_MS = 300000;
+
+/**
+ * Pasado este plazo se deja de insistir, se haya probado lo que se haya probado.
+ *
+ * Sin un tope global la cascada se multiplica sola: tres modelos por tres claves
+ * por tres reintentos, a minuto y medio cada uno, son cuarenta minutos de reloj
+ * girando. Quien esté esperando pensará que la aplicación se ha colgado, y no
+ * irá muy desencaminado.
+ */
+const PRESUPUESTO_TOTAL_MS = 360000;
+
+/**
+ * Cuánto darle a una petición según lo que se le manda.
+ *
+ * Un plazo fijo trata igual a «extrae el nombre de este PNJ» que a «lee las
+ * cuatrocientas mil letras de la campaña entera y devuélveme el diario día a
+ * día». La segunda no cabe en noventa segundos ni con buena voluntad: se la
+ * cortaba siempre, y como cortar se parecía a un fallo pasajero, se reintentaba
+ * en la siguiente clave para volver a cortarla igual.
+ */
+export function plazoParaLaCarga(contents: any, explicito?: number): number {
+  if (explicito) return Math.min(explicito, TIMEOUT_MAXIMO_MS);
+  let letras = 0;
+  try {
+    letras = typeof contents === 'string' ? contents.length : JSON.stringify(contents ?? '').length;
+  } catch {
+    letras = 0;
+  }
+  // Medio segundo más por cada mil letras enviadas, sobre el margen base.
+  const calculado = TIMEOUT_TAREA_DE_FONDO_MS + Math.round(letras / 1000) * 500;
+  return Math.min(Math.max(calculado, TIMEOUT_TAREA_DE_FONDO_MS), TIMEOUT_MAXIMO_MS);
+}
 
 /**
  * Una petición sin streaming, insistiendo por todas las claves y modelos que haga falta.
@@ -1897,7 +1932,7 @@ export async function generateContentWithFailover({
   primaryModel,
   preferredChain,
   signal,
-  timeoutMs = TIMEOUT_TAREA_DE_FONDO_MS
+  timeoutMs
 }: {
   contents: any;
   config?: any;
@@ -1917,14 +1952,21 @@ export async function generateContentWithFailover({
     chain.push(DEFAULT_MODEL_ID, DEFAULT_BACKGROUND_MODEL_ID);
   }
 
+  const plazo = plazoParaLaCarga(contents, timeoutMs);
+  const seAcabaElTiempo = Date.now() + PRESUPUESTO_TOTAL_MS;
+
   let lastError: any = null;
   const clavesMuertas = new Set<string>();
   const modelosAusentes = new Set<string>();
+
+  /** Se ha gastado el presupuesto: insistir más solo alarga la espera. */
+  const sinTiempo = () => Date.now() > seAcabaElTiempo;
 
   for (let i = 0; i < chain.length; i++) {
     const model = chain[i];
     if (modelosAusentes.has(model)) continue;
     if (signal?.aborted) throw new Error('Tarea cancelada.');
+    if (sinTiempo()) break;
 
     const disponibles = clavesDisponibles(todasLasClaves, clavesMuertas);
     if (disponibles.length === 0) break;
@@ -1934,6 +1976,7 @@ export async function generateContentWithFailover({
     for (let k = 0; k < disponibles.length && !saltarAlSiguienteModelo; k++) {
       const currentKey = disponibles[k];
       if (currentKey && clavesMuertas.has(currentKey)) continue;
+      if (sinTiempo()) break;
 
       const ai = getAIClient(currentKey || undefined);
 
@@ -1960,7 +2003,7 @@ export async function generateContentWithFailover({
         // adelante pero la petición continuaba viva contra Google, gastando la
         // misma cuota que se creía haber liberado.
         const relojDeGuardia = new AbortController();
-        const abortarPorTimeout = setTimeout(() => relojDeGuardia.abort(), timeoutMs);
+        const abortarPorTimeout = setTimeout(() => relojDeGuardia.abort(), plazo);
         const cancelarPorFuera = () => relojDeGuardia.abort();
         signal?.addEventListener('abort', cancelarPorFuera, { once: true });
 
@@ -1998,9 +2041,14 @@ export async function generateContentWithFailover({
           const fallo = vencioElPlazo
             ? ({
                 ...classifyApiError(err),
-                isTransient: true,
+                // Que se agote el plazo no dice nada de la clave: dice que la
+                // tarea es larga. Marcarlo como fallo pasajero hacía que se
+                // reintentara en la misma clave y luego en las otras dos, para
+                // cortarlas exactamente igual. No es pasajero; lo que toca es
+                // probar un modelo más rápido, y solo eso.
+                isTransient: false,
                 isAborted: false,
-                detail: `Tiempo de espera agotado (${Math.round(timeoutMs / 1000)}s) en el modelo ${model}.`
+                detail: `Tiempo de espera agotado (${Math.round(plazo / 1000)}s) en el modelo ${model}.`
               } as ApiFailure)
             : classifyApiError(err);
 
@@ -2010,6 +2058,10 @@ export async function generateContentWithFailover({
             fallo.detail || err
           );
 
+          if (vencioElPlazo) {
+            saltarAlSiguienteModelo = true;
+            break;
+          }
           if (fallo.isModelMissing) {
             modelosAusentes.add(model);
             saltarAlSiguienteModelo = true;
@@ -2044,6 +2096,13 @@ export async function generateContentWithFailover({
     }
   }
 
+  if (sinTiempo()) {
+    throw new Error(
+      `La tarea ha tardado más de ${Math.round(PRESUPUESTO_TOTAL_MS / 60000)} minutos y se ha dejado de insistir. ` +
+        'Suele pasar cuando se le pide de una vez el repaso de una campaña muy larga: prueba con el modelo Flash Lite, ' +
+        'que responde antes, o parte el trabajo en menos capítulos.'
+    );
+  }
   throw lastError || new Error('No se pudo obtener respuesta de ningún modelo.');
 }
 
