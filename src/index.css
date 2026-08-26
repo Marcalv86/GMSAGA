@@ -156,7 +156,9 @@ body {
   font-family: 'Lora', Georgia, serif;
   color: var(--text-primary);
   font-size: 1.0625rem; /* ~17px */
-  line-height: 1.82;
+  /* 1.82 dejaba las líneas tan sueltas que una frase larga se leía como una
+     lista. Con 1.6 la mancha de texto vuelve a parecer una página de novela. */
+  line-height: 1.6;
   letter-spacing: -0.01em;
   overflow-wrap: break-word;
   word-wrap: break-word;
@@ -172,7 +174,9 @@ html[data-theme='dark'] .narrative-body {
 
 .narrative-body p {
   margin-top: 0;
-  margin-bottom: 1.5em; /* Salto amplio y distinguible entre párrafos */
+  /* El salto entre párrafos se nota por sí solo; sumado al interlineado
+     anterior separaba tanto que cada párrafo parecía un mensaje aparte. */
+  margin-bottom: 1em;
 }
 
 .narrative-body p:last-child {
@@ -186,7 +190,7 @@ html[data-theme='dark'] .narrative-body {
   border-left: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
   padding-top: 0.15rem;
   padding-bottom: 0.15rem;
-  margin-bottom: 1.35em;
+  margin-bottom: 0.95em;
 }
 
 /* Nombres propios y palabras clave en negrita enriquecida */
@@ -237,7 +241,7 @@ html[data-theme='dark'] .narrative-body {
 @media (max-width: 640px) {
   .narrative-body {
     font-size: 1.05rem; /* ~16.8px */
-    line-height: 1.8;
+    line-height: 1.6;
     letter-spacing: -0.012em;
     overflow-wrap: break-word;
     word-break: normal;
@@ -245,11 +249,11 @@ html[data-theme='dark'] .narrative-body {
     hyphens: manual;
   }
   .narrative-body p {
-    margin-bottom: 1.45em; /* Generoso espacio entre párrafos en móvil */
+    margin-bottom: 1em;
   }
   .narrative-body p.narrative-dialogue {
     padding-left: 0.65rem;
-    margin-bottom: 1.35em;
+    margin-bottom: 0.95em;
   }
 }
 

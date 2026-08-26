@@ -2507,7 +2507,7 @@ export default function App() {
           </div>
         )}
         {/* Top Navbar */}
-        <div className="h-13 md:h-14 border-b border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--bg-color)_85%,transparent)] backdrop-blur-xs flex justify-between items-center px-2.5 md:px-4 shrink-0 shadow-xs gap-2">
+        <div className="h-11 md:h-14 border-b border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--bg-color)_85%,transparent)] backdrop-blur-xs flex justify-between items-center px-2.5 md:px-4 shrink-0 shadow-xs gap-2">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -2524,11 +2524,13 @@ export default function App() {
           {/* Navigation Tabs */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
+              // «Archivos & Lore» y «Directivas & NSFW» ya no viven aquí: son
+              // ajustes de la campaña, no sitios donde se juega, y la barra
+              // lateral lleva a los dos. En el móvil, siete iconos en una fila
+              // de 390px dejaban el cabecero hecho un llavero.
               { id: 'chat', label: 'Crónica', icon: Swords },
               { id: 'calendar', label: 'Diario & Agenda', icon: CalendarDays },
-              { id: 'memory', label: 'Memoria Viva', icon: ScrollText },
-              { id: 'files', label: 'Archivos & Lore', icon: Paperclip },
-              { id: 'instructions', label: 'Directivas & NSFW', icon: Scroll }
+              { id: 'memory', label: 'Memoria Viva', icon: ScrollText }
             ].map(tab => {
               const TabIcon = tab.icon;
               const isCurrentActive =

@@ -43,6 +43,7 @@ import { ResumenUso, borrarUso, resumirUso } from '../utils/usageStats';
 
 import {
   Brain,
+  Cpu,
   Check,
   Dices,
   Gauge,
@@ -457,25 +458,38 @@ export const ApiKeyModal: React.FC<{
 
         {/* Tab Selector */}
         <div className="flex border-b border-[var(--glass-border)] pt-2 pb-2 gap-1.5 shrink-0 overflow-x-auto">
+          {/*
+            Cinco nombres largos no caben en 390px: la fila se iba de lado y
+            «Filtros & NSFW» quedaba cortado a media palabra, con dos pestañas
+            escondidas detrás de un arrastre que no se ve. En el móvil van solo
+            los iconos, que caben los cinco de una vez; el nombre vuelve en
+            cuanto hay sitio.
+          */}
           {[
-            { id: 'model', label: 'Modelo' },
-            { id: 'sync', label: 'Rendimiento & Respaldo' },
-            { id: 'safety', label: 'Filtros & NSFW' },
-            { id: 'thinking', label: 'Pensamiento & Temp' },
-            { id: 'key', label: 'API Keys' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveSettingsTab(tab.id as any)}
-              className={`px-3 py-1.5 rounded-lg font-cinzel text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeSettingsTab === tab.id
-                  ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
-                  : 'bg-[color-mix(in_srgb,var(--surface)_40%,transparent)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--surface)_80%,transparent)]'
-              }`}
-            >
-              <span>{tab.label}</span>
-            </button>
-          ))}
+            { id: 'model', label: 'Modelo', icon: Cpu },
+            { id: 'sync', label: 'Rendimiento & Respaldo', icon: Gauge },
+            { id: 'safety', label: 'Filtros & NSFW', icon: Shield },
+            { id: 'thinking', label: 'Pensamiento & Temp', icon: Brain },
+            { id: 'key', label: 'API Keys', icon: KeyRound }
+          ].map(tab => {
+            const TabIcon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveSettingsTab(tab.id as any)}
+                title={tab.label}
+                aria-label={tab.label}
+                className={`px-3 py-1.5 rounded-lg font-cinzel text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5 ${
+                  activeSettingsTab === tab.id
+                    ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
+                    : 'bg-[color-mix(in_srgb,var(--surface)_40%,transparent)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--surface)_80%,transparent)]'
+                }`}
+              >
+                <TabIcon className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Modal Body */}

@@ -42,6 +42,8 @@ import {
   X,
   Zap,
   Mic,
+  MoreHorizontal,
+  Copy,
   MicOff,
   Music,
   Wand2
@@ -97,6 +99,12 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
 }) => {
   const isModel = m.role === 'model';
   const rollRequests = isModel ? parseRollRequests(m.content) : [];
+  // El último mensaje enseña sus acciones sin que se pidan; los anteriores solo
+  // cuando se piden. Es estado del propio mensaje, no una prop, así que el memo
+  // que evita repintar el capítulo entero sigue intacto.
+  const [accionesAbiertas, setAccionesAbiertas] = useState(false);
+  const mostrarAcciones = isLastMessage || accionesAbiertas;
+
   const invitaciones = isModel && hasOracle ? leerInvitaciones(m.content) : [];
   const baseContent = isModel
     ? limpiarInvitaciones(
@@ -143,103 +151,13 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
           : ''
       }`}
     >
-      {/* Header / Sender label with actions */}
-      <div
-        className={`flex flex-wrap items-center justify-between gap-1.5 mb-1.5 text-xs font-cinzel font-bold tracking-wide min-w-0 max-w-full ${
-          m.role === 'user' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'
-        }`}
-      >
-        <span className="flex items-center gap-1.5 min-w-0">
-          <span className="truncate">{m.role === 'user' ? 'Tu Acción' : 'Narrador'}</span>
-          {hasSyncTags && (
-            <span
-              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-[9px] font-sans font-normal normal-case tracking-normal shadow-2xs hover:bg-amber-500/20 transition-colors cursor-help shrink-0"
-              title={`Sincronización en segundo plano completada: ${syncItems.join(', ')}`}
-            >
-              <Zap className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
-              <span className="hidden xs:inline">Sincronizado</span>
-            </span>
-          )}
-        </span>
+      {/*
+        Ni «Narrador» ni «Tu Acción»: la prosa a todo el ancho y la burbuja
+        compacta ya dicen quién habla, y esas dos etiquetas en negrita partían
+        la lectura en dos cada pocas líneas. Lo único que sobrevive aquí es el
+        aviso de sincronización, y solo cuando hay algo que avisar.
+      */}
 
-        {/* Quick action buttons on hover / top bar */}
-        {!isEditing && (
-          <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 bg-[var(--bg-color)]/95 px-1.5 py-0.5 rounded-lg border border-[var(--user-border)] shadow-2xs opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 transition-opacity max-w-full">
-            {/*
-              En el móvil no hay ratón, así que esta barra —pensada para
-              aparecer al pasar por encima— se queda fija. En los mensajes del
-              Narrador eso dejaba Copiar, Editar, Rehacer e Ilustrar por
-              duplicado: aquí arriba y otra vez en la fila de abajo, que además
-              se lee mejor porque lleva las palabras enteras. En pantalla
-              pequeña se enseña solo lo que la de abajo no trae.
-            */}
-            <div
-              className={`items-center gap-0.5 sm:gap-1 ${
-                isModel ? 'hidden sm:flex' : 'flex'
-              }`}
-            >
-            <button
-              onClick={() => handleCopyMessage(idx, m.content)}
-              className="hover:text-[var(--accent)] px-1 py-0.5 text-[11px] cursor-pointer transition-colors"
-              title="Copiar texto al portapapeles"
-            >
-              {copiedIndex === idx ? 'Copiado' : 'Copiar'}
-            </button>
-            <span className="text-[var(--glass-border)]">•</span>
-            <button
-              onClick={() => handleStartEditing(idx, m.content)}
-              disabled={isGenerating}
-              className="hover:text-[var(--accent)] px-1 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40 flex items-center gap-1"
-              title="Editar este texto"
-            >
-              <Pencil className="w-3 h-3" /> <span className="hidden xs:inline">Editar</span>
-            </button>
-            {isModel && (
-              <>
-                <span className="text-[var(--glass-border)]">•</span>
-                <button
-                  onClick={() => onRegenerateMessage(idx)}
-                  disabled={isGenerating}
-                  className="hover:text-[var(--accent)] px-1 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40 flex items-center gap-1"
-                  title="Rehacer / Volver a generar la respuesta del Narrador"
-                >
-                  <RefreshCw className="w-3 h-3" /> <span className="hidden xs:inline">Rehacer</span>
-                </button>
-                {onOpenStudio && (
-                  <>
-                    <span className="text-[var(--glass-border)]">•</span>
-                    <button
-                      onClick={() => onOpenStudio('image', m.content)}
-                      className="hover:text-[var(--accent)] px-1 py-0.5 text-[11px] cursor-pointer transition-colors flex items-center gap-1"
-                      title="Ilustrar esta escena con el taller creativo"
-                    >
-                      <Wand2 className="w-3 h-3 text-amber-600 dark:text-amber-400" /> <span className="hidden xs:inline">Ilustrar</span>
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-            </div>
-            <span className={`text-[var(--glass-border)] ${isModel ? 'hidden sm:inline' : ''}`}>•</span>
-            <button
-              onClick={() =>
-                setDeleteModal({
-                  index: idx,
-                  role: m.role,
-                  isLast: isLastMessage
-                })
-              }
-              disabled={isGenerating}
-              className="text-red-700 hover:text-red-900 px-1 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
-              title="Borrar o rebobinar la historia desde este punto"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Message Body or Inline Editor */}
       {isEditing ? (
         <div className="w-full max-w-[900px] bg-[var(--surface)] border-2 border-[var(--accent)] rounded-lg p-3 shadow-md">
           <div className="text-xs font-cinzel font-bold text-[var(--accent)] mb-2 flex justify-between items-center">
@@ -297,10 +215,11 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
           </div>
         </div>
       ) : (
+        <>
         <div
           className={
             m.role === 'user'
-              ? 'bg-[var(--msg-user)] border border-[var(--user-border)] py-2.5 sm:py-3 px-4 sm:px-5 rounded-2xl rounded-tr-sm text-[var(--text-primary)] max-w-[92%] sm:max-w-[85%] shadow-[2px_3px_8px_var(--glass-border)] mr-1 sm:mr-2 font-lora'
+              ? 'bg-[var(--msg-user)] border border-[var(--user-border)] py-2 sm:py-2.5 px-3.5 sm:px-4 rounded-2xl text-[var(--text-primary)] max-w-[88%] sm:max-w-[80%] font-lora'
               : 'py-1 text-[var(--text-primary)] w-full max-w-[900px] font-lora text-left'
           }
         >
@@ -425,75 +344,117 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
 
           <YouTubePreview content={m.content} />
           <SpotifyPreview content={m.content} />
+        </div>
+        {/*
+          Antes cada mensaje del Narrador arrastraba una botonera de cinco
+          botones con su raya de separación, y encima otra igual arriba. En
+          una escena larga eso es más interfaz que relato.
 
-          {/* Bottom action toolbar for Model message */}
-          {isModel && (
-            <div className="mt-2 pt-1.5 flex flex-wrap items-center gap-2 text-xs font-cinzel border-t border-[var(--glass-border)]/50">
+          Ahora hay una sola barra, y solo se ve donde hace falta: en el
+          último mensaje, que es el único donde «Rehacer» o «Continuar»
+          significan algo. En los de más arriba se pide: con el ratón basta
+          pasar por encima, y en el móvil se toca el punteado.
+        */}
+        {!isEditing && (
+          <div className="mt-2 flex items-center gap-2 min-h-6">
+            {!mostrarAcciones && (
               <button
-                onClick={() => onRegenerateMessage(idx)}
-                disabled={isGenerating}
-                className="px-2.5 py-1 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] border border-[var(--user-border)] rounded text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1 shadow-2xs"
-                title="Rehacer esta narración (Vuelve a tirar y genera una respuesta diferente)"
+                onClick={() => setAccionesAbiertas(true)}
+                className="sm:hidden px-2 py-0.5 -ml-1 rounded text-[var(--text-secondary)] opacity-50 hover:opacity-100 cursor-pointer"
+                title="Acciones de este mensaje"
+                aria-label="Acciones de este mensaje"
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Rehacer
+                <MoreHorizontal className="w-4 h-4" />
               </button>
-              <button
-                onClick={() => onContinueNarrative(idx)}
-                disabled={isGenerating}
-                className="px-2.5 py-1 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] border border-[var(--user-border)] rounded text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1 shadow-2xs"
-                title="Pedir al Narrador que continúe y profundice en esta escena"
-              >
-                <Play className="w-3.5 h-3.5" /> Continuar
-              </button>
-              {onOpenStudio && (
+            )}
+            <div
+              className={`${
+                mostrarAcciones ? 'flex' : 'hidden sm:group-hover/msg:flex'
+              } flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-cinzel`}
+            >
+              {isModel && (
+                <>
+                  <button
+                    onClick={() => onRegenerateMessage(idx)}
+                    disabled={isGenerating}
+                    className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
+                    title="Rehacer esta narración (vuelve a tirar y genera una respuesta diferente)"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Rehacer
+                  </button>
+                  <button
+                    onClick={() => onContinueNarrative(idx)}
+                    disabled={isGenerating}
+                    className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
+                    title="Pedir al Narrador que continúe y profundice en esta escena"
+                  >
+                    <Play className="w-3.5 h-3.5" /> Continuar
+                  </button>
+                  {onOpenStudio && (
+                    <button
+                      onClick={() => onOpenStudio('image', m.content)}
+                      className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                      title="Generar ilustración de esta escena o retrato"
+                    >
+                      <Wand2 className="w-3.5 h-3.5" /> Ilustrar
+                    </button>
+                  )}
+                </>
+              )}
+              {!isModel && (
                 <button
-                  onClick={() => onOpenStudio('image', m.content)}
-                  className="px-2.5 py-1 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-amber-100 dark:hover:bg-amber-900/30 border border-[var(--user-border)] rounded text-[11px] text-[var(--accent)] hover:text-[var(--accent)] font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                  title="Generar ilustración de esta escena o retrato"
+                  onClick={() => onRegenerateMessage(idx)}
+                  disabled={isGenerating}
+                  className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
+                  title="Re-ejecutar esta acción y generar nueva respuesta"
                 >
-                  <Wand2 className="w-3.5 h-3.5" /> Ilustrar
+                  <RefreshCw className="w-3.5 h-3.5" /> Re-tirar
                 </button>
               )}
               <button
                 onClick={() => handleStartEditing(idx, m.content)}
                 disabled={isGenerating}
-                className="px-2.5 py-1 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-amber-100 border border-[var(--user-border)] rounded text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
+                className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
                 title="Editar texto manualmente"
               >
                 <Pencil className="w-3.5 h-3.5" /> Editar
               </button>
               <button
                 onClick={() => handleCopyMessage(idx, m.content)}
-                className="px-2.5 py-1 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:bg-amber-100 border border-[var(--user-border)] rounded text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1 ml-auto"
-                title="Copiar texto"
+                className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                title="Copiar texto al portapapeles"
               >
-                <span>{copiedIndex === idx ? 'Copiado' : 'Copiar'}</span>
+                <Copy className="w-3.5 h-3.5" /> {copiedIndex === idx ? 'Copiado' : 'Copiar'}
+              </button>
+              <button
+                onClick={() =>
+                  setDeleteModal({ index: idx, role: m.role, isLast: isLastMessage })
+                }
+                disabled={isGenerating}
+                className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-red-700 transition-colors cursor-pointer disabled:opacity-40"
+                title="Borrar o rebobinar la historia desde este punto"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
-          )}
-
-          {/* Bottom action toolbar for User message (quick button) */}
-          {m.role === 'user' && (
-            <div className="mt-1.5 pt-1 flex items-center justify-end gap-2 text-[10px] font-cinzel opacity-80 group-hover/msg:opacity-100 transition-opacity">
-              <button
-                onClick={() => handleStartEditing(idx, m.content)}
-                disabled={isGenerating}
-                className="inline-flex items-center gap-1 hover:underline text-[var(--accent)] cursor-pointer disabled:opacity-40"
+            {/*
+              El aviso de sincronización era una etiqueta con texto encima del
+              mensaje, y en el móvil acababa metida en la botonera estorbando.
+              Aquí es solo la chispa, al final de la fila y en tono apagado: se
+              ve de un vistazo que el turno actualizó ficha, diario o calendario,
+              y quien quiera el detalle la toca.
+            */}
+            {hasSyncTags && (
+              <span
+                className="ml-auto shrink-0 text-amber-600/70 dark:text-amber-400/70 cursor-help"
+                title={`Sincronizado en segundo plano: ${syncItems.join(', ')}`}
               >
-                <Pencil className="w-3.5 h-3.5" /> Editar pregunta
-              </button>
-              <span className="leading-none">•</span>
-              <button
-                onClick={() => onRegenerateMessage(idx)}
-                disabled={isGenerating}
-                className="inline-flex items-center gap-1 hover:underline text-[var(--accent)] cursor-pointer disabled:opacity-40"
-                title="Re-ejecutar esta acción y generar nueva respuesta"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Re-tirar desde aquí
-              </button>
-            </div>
-          )}
-        </div>
+                <Zap className="w-3.5 h-3.5" />
+              </span>
+            )}
+          </div>
+        )}
+        </>
       )}
     </div>
   );
@@ -901,7 +862,7 @@ export const ChatView: React.FC<{
       )}
 
       {/* Top Header Bar: misma altura, posición y diseño que la barra de la Novela */}
-      <div className="bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] border-b border-[var(--glass-border)] px-3 sm:px-4 md:px-6 py-2.5 flex justify-between items-center gap-2 md:gap-3 shadow-2xs shrink-0 z-10">
+      <div className="bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] border-b border-[var(--glass-border)] px-3 sm:px-4 md:px-6 py-1 sm:py-2.5 flex justify-between items-center gap-2 md:gap-3 shadow-2xs shrink-0 z-10">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           {/* Selector de modo de lectura integrado: idéntico en Crónica y Novela */}
           <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-0.5 text-xs font-cinzel shadow-2xs shrink-0">
@@ -929,7 +890,7 @@ export const ChatView: React.FC<{
           <span className="border-r border-[var(--glass-border)] h-4 hidden sm:inline shrink-0" />
 
           <h3
-            className="font-cinzel text-xs sm:text-sm md:text-base font-bold text-[var(--accent)] m-0 truncate"
+            className="hidden sm:block font-cinzel text-sm md:text-base font-bold text-[var(--accent)] m-0 truncate"
             title={chat?.name || `Capítulo ${chapterIndex + 1}`}
           >
             {chat?.name || `Capítulo ${chapterIndex + 1}`}
