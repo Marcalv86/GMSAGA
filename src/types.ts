@@ -38,6 +38,16 @@ export interface CalendarConfig {
   weekdays?: string[];
   /** Cómo se nombra el año: «DR», «ABY», «d. C.»… */
   yearSuffix?: string;
+  /**
+   * En qué estación cae el primer día del año.
+   *
+   * No todos los calendarios arrancan en primavera. Harptos empieza en Martillo
+   * —«Deepwinter», y su primer festival es Pleno Invierno—, y el gregoriano en
+   * enero. Dar por hecho que el año abre en primavera desplazaba la estación un
+   * cuarto de año entero: la aplicación decía «primavera» mientras enseñaba
+   * «Pleno Invierno» ocho líneas más abajo.
+   */
+  estacionInicial?: 'primavera' | 'verano' | 'otoño' | 'invierno';
 }
 
 export interface CampaignDate {

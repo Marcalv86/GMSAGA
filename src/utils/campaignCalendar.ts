@@ -35,7 +35,8 @@ export const CALENDARIO_GREGORIANO: CalendarConfig = {
   ],
   festivals: [],
   weekdays: ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'],
-  yearSuffix: ''
+  yearSuffix: '',
+  estacionInicial: 'invierno'
 };
 
 /**
@@ -98,7 +99,9 @@ export const CALENDARIO_HARPTOS: CalendarConfig = {
     { name: 'Banquete de la Luna (Feast of the Moon)', afterMonth: 10 }
   ],
   weekdays: ['Primer día', 'Segundo día', 'Tercer día', 'Cuarto día', 'Quinto día', 'Sexto día', 'Séptimo día', 'Octavo día', 'Noveno día', 'Décimo día (Cabalgada)'],
-  yearSuffix: 'CV'
+  yearSuffix: 'CV',
+  // Martillo es «Deepwinter» y el primer festival del año es Pleno Invierno.
+  estacionInicial: 'invierno'
 };
 
 export const CALENDARIOS_PREDEFINIDOS: CalendarConfig[] = [CALENDARIO_HARPTOS, CALENDARIO_FANTASTICO, CALENDARIO_GREGORIANO];
@@ -779,11 +782,19 @@ export function estacionDelDia(cal: CalendarConfig, dayOfYear: number): Estacion
   if (/otono/.test(nombreMes)) return { nombre: 'otoño', icono: '🍂' };
   if (/invierno/.test(nombreMes)) return { nombre: 'invierno', icono: '❄️' };
 
+  // El año se reparte en cuatro, pero desde la estación en la que ARRANCA ese
+  // calendario. Antes se daba por hecho que era primavera, y con Harptos —que
+  // abre en pleno invierno— la estación salía desplazada un cuarto de año.
+  const RUEDA: Estacion[] = [
+    { nombre: 'primavera', icono: '🌱' },
+    { nombre: 'verano', icono: '🌞' },
+    { nombre: 'otoño', icono: '🍂' },
+    { nombre: 'invierno', icono: '❄️' }
+  ];
+  const arranque = Math.max(0, RUEDA.findIndex(e => e.nombre === (cal.estacionInicial || 'primavera')));
   const fraccion = (dayOfYear - 1) / Math.max(1, slots.length);
-  if (fraccion < 0.25) return { nombre: 'primavera', icono: '🌱' };
-  if (fraccion < 0.5) return { nombre: 'verano', icono: '🌞' };
-  if (fraccion < 0.75) return { nombre: 'otoño', icono: '🍂' };
-  return { nombre: 'invierno', icono: '❄️' };
+  const cuarto = Math.min(3, Math.floor(fraccion * 4));
+  return RUEDA[(arranque + cuarto) % 4];
 }
 
 export interface HiloLeido {
