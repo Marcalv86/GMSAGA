@@ -457,7 +457,7 @@ export const ApiKeyModal: React.FC<{
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-[var(--glass-border)] pt-2 pb-2 gap-1.5 shrink-0 overflow-x-auto">
+        <div className="flex flex-wrap items-center border-b border-[var(--glass-border)] pt-2 pb-2 gap-1.5 shrink-0">
           {/*
             Cinco nombres largos no caben en 390px: la fila se iba de lado y
             «Filtros & NSFW» quedaba cortado a media palabra, con dos pestañas

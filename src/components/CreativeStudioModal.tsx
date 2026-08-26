@@ -789,7 +789,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center px-4 pt-2 border-b border-[var(--glass-border)] bg-[var(--surface)] gap-1 overflow-x-auto">
+        <div className="flex flex-wrap items-center px-4 pt-2 border-b border-[var(--glass-border)] bg-[var(--surface)] gap-1.5">
           {[
             { id: 'image', label: '🎨 Ilustración de Escena', icon: ImageIcon },
             { id: 'video', label: '🎬 Cinemática de Video', icon: Film },

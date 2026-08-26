@@ -192,7 +192,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
         </div>
 
         {/* Tab Navigation (Páginas del Dossier) */}
-        <div className="flex border-b border-[var(--glass-border)] bg-[var(--surface)] px-4 gap-2 overflow-x-auto">
+        <div className="flex flex-wrap border-b border-[var(--glass-border)] bg-[var(--surface)] px-4 gap-2">
           <button
             onClick={() => setActiveTab('overview')}
             className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all shrink-0 whitespace-nowrap ${

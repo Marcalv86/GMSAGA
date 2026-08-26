@@ -154,7 +154,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
       </div>
 
       {/* Subtabs */}
-      <div className="flex items-center gap-1 px-3 md:px-6 pt-2 pb-1 border-b border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_30%,transparent)] overflow-x-auto shrink-0">
+      <div className="flex flex-wrap items-center gap-1.5 px-3 md:px-6 pt-2 pb-2 border-b border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_30%,transparent)] shrink-0">
         {[
           { id: 'resumen', label: 'Resumen & Estado', icon: ScrollText },
           { id: 'personajes', label: `PNJs (${(memory.npcs || []).length})`, icon: User },

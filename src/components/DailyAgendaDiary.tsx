@@ -1725,7 +1725,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                         <span className="text-[11px] font-cinzel text-[var(--text-secondary)]">
                           O elegir de los archivos de campaña:
                         </span>
-                        <div className="flex gap-2 overflow-x-auto pb-1">
+                        <div className="flex flex-wrap gap-2 pb-1">
                           {files
                             .filter(f => f.type?.startsWith('image/') || f.name.match(/\.(png|jpe?g|webp|gif|svg)$/i))
                             .slice(0, 8)

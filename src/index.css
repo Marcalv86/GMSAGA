@@ -183,14 +183,10 @@ html[data-theme='dark'] .narrative-body {
   margin-bottom: 0;
 }
 
-/* Diálogos novelescos sutiles con sangría y borde tenue */
+/* Diálogos novelescos limpios sin barras laterales */
 .narrative-body p.narrative-dialogue {
   color: var(--text-primary);
-  padding-left: 0.65rem;
-  border-left: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  padding-top: 0.15rem;
-  padding-bottom: 0.15rem;
-  margin-bottom: 0.95em;
+  margin-bottom: 1em;
 }
 
 /* Nombres propios y palabras clave en negrita enriquecida */
@@ -252,12 +248,22 @@ html[data-theme='dark'] .narrative-body {
     margin-bottom: 1em;
   }
   .narrative-body p.narrative-dialogue {
-    padding-left: 0.65rem;
-    margin-bottom: 0.95em;
+    margin-bottom: 1em;
   }
 }
 
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 @keyframes top-progress-indeterminate {
+
   0% {
     transform: translateX(-100%);
   }
