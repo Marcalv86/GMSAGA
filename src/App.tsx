@@ -1660,20 +1660,67 @@ export default function App() {
     });
     try {
       const syncResult = await syncFullCampaignFromChats(currentProject, currentChats, currentFiles);
-      await handleUpdateProjectField(p => ({
-        memory: sanitizeProjectMemory({
-          ...(p.memory || {}),
-          ...syncResult.memory
-        }),
-        timeline: syncResult.timeline,
-        currentDate: syncResult.currentDate || p.currentDate,
-        threads: syncResult.threads || p.threads,
-        calendar: p.calendar || syncResult.calendar
-      }));
+
+      /*
+       * La sincronización RELLENA HUECOS; no reescribe el diario.
+       *
+       * Antes se hacía `timeline: syncResult.timeline`, y eso es un reemplazo
+       * completo: lo que la IA no volviera a deducir desaparecía. Lo primero en
+       * caer eran las notas escritas a mano, que la IA no puede reconstruir
+       * porque nunca estuvieron en ningún chat: son de la jugadora y de nadie
+       * más. Perder eso por pulsar «sincronizar» es indefendible.
+       *
+       * Así que se conserva todo lo que ya había y solo se añaden jornadas de
+       * las que no hubiera nada escrito. Quien quiera rehacer un día concreto
+       * tiene «Vaciar día» al lado.
+       */
+      // El cálculo va aquí fuera a propósito. Hacerlo dentro del actualizador de
+      // estado parecía natural y no lo es: React lo ejecuta cuando le conviene
+      // —después de este punto, y a veces dos veces—, así que el aviso salía
+      // diciendo «0 jornadas nuevas» aunque hubiera añadido unas cuantas.
+      const previas =
+        (getLocalProjects().find(p => p.id === currentPId)?.timeline) ??
+        currentProject.timeline ??
+        [];
+      const diasConAlgo = new Set(previas.map(t => t.absDay));
+      const notasConservadas = previas.filter(
+        t => t.autoria === 'jugadora' || (!t.autoria && t.id.startsWith('manual_'))
+      ).length;
+      const aAnadir = (syncResult.timeline || []).filter(t => !diasConAlgo.has(t.absDay));
+      const jornadasNuevas = new Set(aAnadir.map(t => t.absDay)).size;
+
+      await handleUpdateProjectField(p => {
+        const base = p.timeline || [];
+        const yaHay = new Set(base.map(t => t.absDay));
+        return {
+          memory: sanitizeProjectMemory({
+            ...(p.memory || {}),
+            ...syncResult.memory
+          }),
+          timeline: [
+            ...base,
+            ...(syncResult.timeline || []).filter(t => !yaHay.has(t.absDay))
+          ].sort((a, b) => a.absDay - b.absDay),
+          currentDate: syncResult.currentDate || p.currentDate,
+          threads: syncResult.threads || p.threads,
+          calendar: p.calendar || syncResult.calendar
+        };
+      });
+
       setAlertConfig({
         isOpen: true,
         title: '¡Sincronización Total con IA Completada!',
-        message: `Se ha sincronizado toda la campaña a partir de todas las sesiones y capítulos:\n\n• ${syncResult.totalEvents} acontecimientos en ${syncResult.totalDays} jornadas con horas deducidas para el diario.\n• ${syncResult.totalNpcs} PNJs con afinidad y notas.\n• ${syncResult.totalQuests} tramas y misiones.\n• ${syncResult.totalLocations} lugares registrados.\n• Evolución del protagonista y consecuencias programadas.`
+        message:
+          `Se ha repasado toda la campaña a partir de las sesiones jugadas:\n\n` +
+          `• ${jornadasNuevas} ${jornadasNuevas === 1 ? 'jornada nueva' : 'jornadas nuevas'} en el diario, con sus horas deducidas.\n` +
+          `• ${syncResult.totalNpcs} PNJs con afinidad y notas.\n` +
+          `• ${syncResult.totalQuests} tramas y misiones.\n` +
+          `• ${syncResult.totalLocations} lugares registrados.\n` +
+          `• Evolución del protagonista y consecuencias programadas.\n\n` +
+          `Lo que ya estaba escrito no se ha tocado` +
+          (notasConservadas > 0
+            ? `, incluidas tus ${notasConservadas} ${notasConservadas === 1 ? 'nota' : 'notas'}.`
+            : '.')
       });
     } catch (err: any) {
       console.error('Error al sincronizar campaña con IA:', err);

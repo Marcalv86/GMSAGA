@@ -1017,8 +1017,24 @@ export const CalendarView: React.FC<{
                 const abs = absDeCelda(c.dayOfYear);
                 const esHoy = abs === hoyAbs;
                 const esSeleccionado = diaActivo === abs;
-                const conAgenda = (porDia[abs]?.entradas.length || 0) > 0;
-                const numEntradas = porDia[abs]?.entradas.length || 0;
+                const entradasDelDia = porDia[abs]?.entradas || [];
+                const conAgenda = entradasDelDia.length > 0;
+                const numEntradas = entradasDelDia.length;
+                /*
+                 * El punto decía «aquí hay algo» y nada más: había que entrar al
+                 * día para averiguar qué. Si esa jornada dejó un hito, la celda
+                 * enseña su icono —una espada, una brújula, un corazón— y el mes
+                 * se lee de un vistazo. Si no hubo hito pero sí ánimo anotado,
+                 * vale el ánimo. El punto se queda solo para lo que no trae nada
+                 * con lo que distinguirse.
+                 */
+                const conHito = entradasDelDia.find(e => e.hito);
+                const marca = conHito
+                  ? iconoDeHito(conHito.hito)
+                  : entradasDelDia.find(e => e.mood)?.mood || '';
+                const tituloMarca = conHito
+                  ? `${numEntradas} anotación(es) · ${conHito.hito}`
+                  : `${numEntradas} acontecimiento(s) anotado(s)`;
 
                 return (
                   <button
@@ -1042,13 +1058,18 @@ export const CalendarView: React.FC<{
                         <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] ml-1" title="Día actual" />
                       )}
                     </span>
-                    <span className="flex items-center gap-1 h-2">
-                      {conAgenda && (
-                        <span
-                          className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"
-                          title={`${numEntradas} acontecimiento(s) anotado(s)`}
-                        />
-                      )}
+                    <span className="flex items-center justify-center gap-1 h-3.5">
+                      {conAgenda &&
+                        (marca ? (
+                          <span className="text-[11px] leading-none" title={tituloMarca}>
+                            {marca}
+                          </span>
+                        ) : (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"
+                            title={tituloMarca}
+                          />
+                        ))}
                     </span>
                   </button>
                 );
@@ -1094,7 +1115,10 @@ export const CalendarView: React.FC<{
           <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-[var(--text-secondary)] mt-3 pt-2 border-t border-[var(--glass-border)]">
             <div className="flex flex-wrap gap-4">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[var(--accent)]" /> Hay acontecimientos escritos
+                <span className="text-[11px] leading-none">⚔️</span> El icono es el hito de esa jornada
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[var(--accent)]" /> Hay anotaciones sin hito
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-red-500" /> Vence un hilo programado
