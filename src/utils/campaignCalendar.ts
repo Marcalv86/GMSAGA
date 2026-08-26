@@ -131,7 +131,11 @@ function yearLayout(cal: CalendarConfig): DaySlot[] {
 
   const slots: DaySlot[] = [];
   cal.months.forEach((m, mi) => {
-    for (let d = 1; d <= m.days; d++) {
+    // Última defensa: un calendario importado o editado a mano puede traer un
+    // mes de un millón de días, y aquí eso son un millón de objetos y la
+    // pestaña bloqueada. Mejor un año raro que una aplicación que no arranca.
+    const dias = Math.min(1000, Math.max(1, Math.round(Number(m.days) || 30)));
+    for (let d = 1; d <= dias; d++) {
       slots.push({ kind: 'month', monthIndex: mi, day: d });
     }
     (cal.festivals || [])

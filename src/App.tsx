@@ -28,7 +28,8 @@ import {
   MapMarker,
   VisualMemoryItem,
   NPC,
-  ScheduledThread
+  ScheduledThread,
+  TimelineEntry
 } from './types';
 import { ChatView } from './components/ChatView';
 import { ContextUsageWidget } from './components/ContextUsageWidget';
@@ -660,7 +661,7 @@ export default function App() {
         ];
       }
 
-      const timeline = [
+      const timelineCompleto = [
         ...(p.timeline || []),
         ...t.agenda.map((entrada, i) => {
           const entryAbsDay =
@@ -708,7 +709,32 @@ export default function App() {
             msgIndex: msgInfo?.msgIndex
           };
         })
-      ].slice(-500);
+      ];
+
+      /*
+       * El diario tenía un tope de 500 entradas aplicado con `.slice(-500)`: al
+       * pasarlo, las más viejas se caían sin avisar. En una campaña larga eso es
+       * perder el principio de la crónica, y desde que existen las notas podía
+       * llevarse por delante lo escrito a mano, que no se puede recuperar de
+       * ningún sitio.
+       *
+       * El tope sigue existiendo —esto vive en el navegador y no puede crecer
+       * sin fin— pero sube, y lo que escribió la jugadora nunca entra en el
+       * sorteo: si hay que soltar lastre, se suelta de lo que el Narrador puede
+       * volver a deducir de los chats.
+       */
+      const TOPE_DIARIO = 2000;
+      let timeline = timelineCompleto;
+      if (timelineCompleto.length > TOPE_DIARIO) {
+        const esDeLaJugadora = (t: TimelineEntry) =>
+          t.autoria === 'jugadora' || (!t.autoria && t.id.startsWith('manual_'));
+        const notas = timelineCompleto.filter(esDeLaJugadora);
+        const delNarrador = timelineCompleto.filter(t => !esDeLaJugadora(t));
+        const sitioRestante = Math.max(0, TOPE_DIARIO - notas.length);
+        timeline = [...notas, ...delNarrador.slice(-sitioRestante)].sort(
+          (a, b) => a.absDay - b.absDay
+        );
+      }
 
       let mem = conVinculos(p, hoyAbs);
 

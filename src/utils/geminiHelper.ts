@@ -3861,7 +3861,11 @@ ${primerRoleo || 'Todavía no se ha jugado nada.'}`;
       .filter((m: any) => m && typeof m.name === 'string' && m.name.trim())
       .map((m: any) => ({
         name: String(m.name).trim(),
-        days: Math.max(1, Math.round(Number(m.days) || 30))
+        // Con tope por arriba: `yearLayout` construye un objeto por cada día
+        // del año, y un mes de cien mil días deducido por error dejaba la
+        // aplicación colgada para siempre —`calendarioValido` pasa por ahí en
+        // cada repintado— sin forma de volver atrás.
+        days: Math.min(1000, Math.max(1, Math.round(Number(m.days) || 30)))
       }));
     cal.festivals = Array.isArray(cal.festivals)
       ? cal.festivals
