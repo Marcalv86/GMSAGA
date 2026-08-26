@@ -391,6 +391,16 @@ export const CalendarView: React.FC<{
     setEditandoEntradaId(null);
   };
 
+  /**
+   * Si la escribió la jugadora y no el Narrador.
+   *
+   * Las entradas de antes de que existiera `autoria` se reconocen por el
+   * prefijo del identificador, que es como se venían creando a mano; así las
+   * notas viejas también se ven como notas.
+   */
+  const esNota = (entrada: TimelineEntry): boolean =>
+    entrada.autoria === 'jugadora' || (!entrada.autoria && entrada.id.startsWith('manual_'));
+
   const crearEntradaManual = async (targetAbsDay: number) => {
     if (!calendarioValido(cal) || !nuevaEntradaResumen.trim()) return;
     const dateObj = desdeDiaAbsoluto(cal, targetAbsDay);
@@ -407,6 +417,7 @@ export const CalendarView: React.FC<{
       hito: nuevaEntradaHito.trim() || undefined,
       mood: nuevaEntradaMood || '🌸',
       tipo: nuevaEntradaTipo || 'acontecimiento',
+      autoria: 'jugadora',
       minute: fecha ? fecha.minute : 8 * 60
     };
 
@@ -1117,7 +1128,7 @@ export const CalendarView: React.FC<{
                       onClick={() => setCreandoEntrada(prev => !prev)}
                       className="flex items-center gap-1.5 rounded-lg border border-[var(--accent)] px-3 py-1.5 text-xs font-cinzel font-bold text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Añadir acontecimiento
+                      <Plus className="w-3.5 h-3.5" /> Añadir nota
                     </button>
                     {entradasDiaActivo.length > 0 && (
                       <button
@@ -1190,7 +1201,7 @@ export const CalendarView: React.FC<{
                 <div className="p-4 rounded-xl border border-[var(--accent)]/50 bg-[var(--surface-soft)] space-y-3 shadow-sm animate-fade-in">
                   <div className="flex items-center justify-between border-b border-[var(--glass-border)] pb-2">
                     <span className="font-cinzel text-xs font-bold text-[var(--accent)] flex items-center gap-1.5">
-                      <NotebookPen className="w-4 h-4" /> Nueva crónica o acontecimiento para {nombreDiaActivo}
+                      <NotebookPen className="w-4 h-4" /> Nueva nota para {nombreDiaActivo}
                     </span>
                     <button
                       onClick={() => setCreandoEntrada(false)}
@@ -1324,13 +1335,13 @@ export const CalendarView: React.FC<{
                       No hay acontecimientos registrados para el {nombreDiaActivo}.
                     </p>
                     <p className="text-xs opacity-75 m-0 max-w-md mx-auto leading-relaxed">
-                      El Narrador anotará lo que ocurra durante las sesiones de juego, o puedes pulsar «Añadir acontecimiento» para escribir una crónica, hito o apunte a mano.
+                      El Narrador anotará aquí lo que ocurra durante la partida. También puedes escribir tú una nota: lo que pensaste, lo que sospechas o lo que no quieres que se te olvide.
                     </p>
                     <button
                       onClick={() => setCreandoEntrada(true)}
                       className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--accent)]/50 text-xs font-cinzel font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10 cursor-pointer transition-colors"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Escribir primera crónica
+                      <Plus className="w-3.5 h-3.5" /> Escribir una nota
                     </button>
                   </div>
                 ) : (
@@ -1482,6 +1493,13 @@ export const CalendarView: React.FC<{
                               {entrada.mood && (
                                 <span className="text-sm leading-none">{entrada.mood}</span>
                               )}
+                              {esNota(entrada) && (
+                                <span className="inline-flex items-center gap-1 font-cinzel font-bold px-2 py-0.5 rounded border text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--light-gold)_16%,transparent)] border-[color-mix(in_srgb,var(--light-gold)_55%,transparent)]">
+                                  <NotebookPen className="w-3 h-3" />
+                                  Nota
+                                </span>
+                              )}
+                              
                               {isInconsciencia && (
                                 <span className="inline-flex items-center gap-1 font-cinzel font-bold text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-500/30">
                                   <Moon className="w-3 h-3 text-indigo-400" />
@@ -1808,6 +1826,12 @@ export const CalendarView: React.FC<{
                                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-[var(--text-secondary)]">
                                       {entrada.mood && (
                                         <span className="text-sm leading-none">{entrada.mood}</span>
+                                      )}
+                                      {esNota(entrada) && (
+                                        <span className="inline-flex items-center gap-1 font-cinzel font-bold px-2 py-0.5 rounded border text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--light-gold)_16%,transparent)] border-[color-mix(in_srgb,var(--light-gold)_55%,transparent)]">
+                                          <NotebookPen className="w-3 h-3" />
+                                          Nota
+                                        </span>
                                       )}
                                       {isInconsciencia && (
                                         <span className="inline-flex items-center gap-1 font-cinzel font-bold text-indigo-400 bg-indigo-950/50 px-1.5 py-0.2 rounded border border-indigo-500/30">

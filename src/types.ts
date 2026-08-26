@@ -97,6 +97,15 @@ export interface TimelineEntry {
   tipo?: 'acontecimiento' | 'hito' | 'descubrimiento' | 'secreto' | 'descanso' | 'noticia' | 'rumor' | 'inconsciencia' | 'salto_temporal' | 'diario' | 'personal' | 'escena';
   /** Si representa o abarca un salto temporal de múltiples días */
   timeSkipDays?: number;
+  /**
+   * Quién escribió la entrada.
+   *
+   * No es lo mismo lo que narró la partida que lo que apuntó la jugadora por su
+   * cuenta, y el diario debería distinguirlo de un vistazo: lo suyo son notas.
+   * Las entradas anteriores a este campo se reconocen por el prefijo `manual_`
+   * del identificador, que es como se venían creando a mano.
+   */
+  autoria?: 'narrador' | 'jugadora';
 }
 
 export interface ScheduledThread {
