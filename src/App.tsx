@@ -149,9 +149,11 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   // Controlador de la generación en curso, para poder detenerla desde la interfaz.
   const generationAbortRef = useRef<AbortController | null>(null);
+  const wakeLockRef = useRef<any>(null);
   // El texto que aún no se ha pintado, y el repintado ya pedido al navegador.
   const textoPendienteRef = useRef<string | null>(null);
   const repintadoPedidoRef = useRef<number | null>(null);
+  const onVolverVisibleRef = useRef<(() => void) | null>(null);
   // Un turno de narración NO bloquea la pantalla: hay que poder leer cómo se
   // escribe. El velo se reserva para tareas que sí impiden seguir (subidas,
   // exportar a PDF).
@@ -1013,6 +1015,75 @@ export default function App() {
       const controller = new AbortController();
       generationAbortRef.current = controller;
 
+      const volcarPendiente = () => {
+        const pendiente = textoPendienteRef.current;
+        if (pendiente === null) return;
+        textoPendienteRef.current = null;
+        const visible = limpiarParaMostrar(pendiente);
+        setCurrentChats(prev =>
+          prev.map(c => {
+            if (c.id !== currentChatId) return c;
+            const msgs = [...c.messages];
+            const last = msgs[msgs.length - 1];
+            if (last && last.role === 'model') {
+              if (last.content === visible) return c;
+              msgs[msgs.length - 1] = { ...last, content: visible };
+            } else {
+              msgs.push({ role: 'model', content: visible });
+            }
+            return { ...c, messages: msgs };
+          })
+        );
+      };
+
+      // Si el fotograma pendiente se quedó en cola por estar la pestaña
+      // oculta, que se pinte en el mismo instante en que se recupera el foco:
+      // sin esto, el texto ya recibido no aparecía hasta el siguiente cambio,
+      // y ese hueco es justo el que se lee como "se ha quedado colgado".
+      const pedirCandadoDePantalla = async () => {
+        try {
+          const wl = (navigator as any).wakeLock;
+          if (!wl) return; // Navegador sin soporte: se sigue igual, sin este resguardo.
+          const lock = await wl.request('screen');
+          wakeLockRef.current = lock;
+          // La especificación suelta el candado sola al ocultarse la pestaña,
+          // y no solo cuando lo suelto yo desde el `finally`. Si no escucho
+          // este evento, la referencia se queda apuntando a un candado ya
+          // muerto: al volver, `if (!wakeLockRef.current)` lo ve como "vivo"
+          // y nunca se vuelve a pedir uno de verdad.
+          lock.addEventListener('release', () => {
+            if (wakeLockRef.current === lock) wakeLockRef.current = null;
+          });
+        } catch {
+          // Denegado (ahorro de batería, permisos) o pestaña ya oculta: no es
+          // motivo para interrumpir la narración por ello.
+        }
+      };
+
+      const onVolverVisible = () => {
+        if (document.visibilityState === 'visible') {
+          volcarPendiente();
+          // El candado se soltó solo al ocultarse la pestaña; si sigue en
+          // marcha el turno, se vuelve a pedir.
+          if (!wakeLockRef.current) pedirCandadoDePantalla();
+        }
+      };
+      onVolverVisibleRef.current = onVolverVisible;
+      document.addEventListener('visibilitychange', onVolverVisible);
+
+      /*
+       * Escenario real de partida nocturna: lees una respuesta larga sin
+       * tocar el móvil y la pantalla se apaga por inactividad. Para el
+       * navegador eso es EXACTAMENTE lo mismo que minimizar —la pestaña pasa
+       * a oculta— y ahí es donde nace "el Narrador se ha quedado colgado".
+       *
+       * El candado de pantalla no evita que cambies de app a propósito —la
+       * especificación lo suelta en cuanto la pestaña se oculta, siempre—, así
+       * que no es una solución para "minimizo y hago otra cosa". Pero sí evita
+       * el caso más frecuente: quedarte quieto leyendo mientras narra.
+       */
+      pedirCandadoDePantalla();
+
       await generateStoryTurnStream({
         project: currentProject,
         currentChatId,
@@ -1043,33 +1114,28 @@ export default function App() {
         // Google manda fragmentos cada pocos milisegundos, muchos de una sola
         // palabra. Pintar cada uno obligaba a rehacer el markdown de la escena
         // entera decenas de veces por segundo para un cambio que el ojo no
-        // llega a distinguir. Se acumulan y se vuelca uno por fotograma: el
-        // texto sigue apareciendo según se escribe, pero sin ahogar al
-        // navegador. El último fragmento nunca se queda sin pintar porque
-        // `onSaveMessage` cierra el turno con el texto completo.
+        // llega a distinguir. Se acumulan y se vuelca uno por fotograma.
+        //
+        // `requestAnimationFrame` se PAUSA por completo en cuanto la pestaña
+        // deja de estar visible —lo hacen todos los navegadores, es parte de
+        // la especificación— y no vuelve a correr hasta que se recupera el
+        // foco. Jugar desde el móvil con la pantalla bloqueándose a media
+        // narración, o simplemente cambiando de app un momento, se traducía en
+        // "el Narrador se ha quedado colgado": el texto seguía llegando y
+        // acumulándose, pero nada volvía a pintarse hasta volver a la pestaña,
+        // y entonces aparecía todo de golpe. Aquí se usa rAF solo cuando la
+        // página está visible; oculta, se vuelca sin esperar, porque no hay
+        // fotograma que perseguir.
         onChunk: (fullText: string) => {
           textoPendienteRef.current = fullText;
+          if (document.visibilityState === 'hidden') {
+            volcarPendiente();
+            return;
+          }
           if (repintadoPedidoRef.current !== null) return;
           repintadoPedidoRef.current = requestAnimationFrame(() => {
             repintadoPedidoRef.current = null;
-            const pendiente = textoPendienteRef.current;
-            if (pendiente === null) return;
-            textoPendienteRef.current = null;
-            const visible = limpiarParaMostrar(pendiente);
-            setCurrentChats(prev =>
-              prev.map(c => {
-                if (c.id !== currentChatId) return c;
-                const msgs = [...c.messages];
-                const last = msgs[msgs.length - 1];
-                if (last && last.role === 'model') {
-                  if (last.content === visible) return c;
-                  msgs[msgs.length - 1] = { ...last, content: visible };
-                } else {
-                  msgs.push({ role: 'model', content: visible });
-                }
-                return { ...c, messages: msgs };
-              })
-            );
+            volcarPendiente();
           });
         },
         setLoadingText,
@@ -1116,6 +1182,14 @@ export default function App() {
           latestChats.length > 0 ? latestChats : currentChats,
           currentFiles
         ).catch(() => {});
+      }
+      if (onVolverVisibleRef.current) {
+        document.removeEventListener('visibilitychange', onVolverVisibleRef.current);
+        onVolverVisibleRef.current = null;
+      }
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(() => {});
+        wakeLockRef.current = null;
       }
       if (repintadoPedidoRef.current !== null) {
         cancelAnimationFrame(repintadoPedidoRef.current);
