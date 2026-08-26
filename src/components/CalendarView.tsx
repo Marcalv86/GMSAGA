@@ -1555,6 +1555,43 @@ export const CalendarView: React.FC<{
                             {entrada.summary}
                           </p>
 
+                          {/*
+                            Las ilustraciones ya se guardaban en la entrada —el
+                            Taller Creativo las mete ahí desde el principio— pero
+                            el diario no las pintaba en ningún sitio: se generaban
+                            y desaparecían. Aquí es donde tenían que estar.
+                          */}
+                          {entrada.images && entrada.images.length > 0 && (
+                            <div
+                              className={`pt-1 grid gap-2 ${
+                                entrada.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'
+                              }`}
+                            >
+                              {entrada.images.slice(0, 4).map((src, iImg) => (
+                                <img
+                                  key={iImg}
+                                  src={src}
+                                  alt={entrada.title || entrada.summary.slice(0, 60)}
+                                  loading="lazy"
+                                  className="w-full max-h-72 object-cover rounded-lg border border-[var(--user-border)] shadow-xs"
+                                />
+                              ))}
+                            </div>
+                          )}
+
+                          {entrada.tags && entrada.tags.length > 0 && (
+                            <div className="pt-1 flex flex-wrap gap-1.5">
+                              {entrada.tags.map((etiqueta, iTag) => (
+                                <span
+                                  key={iTag}
+                                  className="px-2 py-0.5 rounded-full text-[10px] font-lora text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--light-gold)_18%,transparent)] border border-[color-mix(in_srgb,var(--light-gold)_50%,transparent)]"
+                                >
+                                  {etiqueta}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
                           {entrada.hito && (
                             <div className="pt-1 flex flex-wrap items-center gap-1.5">
                               {(() => {
@@ -1800,6 +1837,38 @@ export const CalendarView: React.FC<{
                                       </h5>
                                     )}
                                     <p className="m-0 text-[var(--text-primary)] leading-relaxed font-lora">{entrada.summary}</p>
+
+                                    {entrada.images && entrada.images.length > 0 && (
+                                      <div
+                                        className={`pt-1 grid gap-2 ${
+                                          entrada.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'
+                                        }`}
+                                      >
+                                        {entrada.images.slice(0, 4).map((src, iImg) => (
+                                          <img
+                                            key={iImg}
+                                            src={src}
+                                            alt={entrada.title || entrada.summary.slice(0, 60)}
+                                            loading="lazy"
+                                            className="w-full max-h-56 object-cover rounded-lg border border-[var(--user-border)] shadow-xs"
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {entrada.tags && entrada.tags.length > 0 && (
+                                      <div className="pt-1 flex flex-wrap gap-1.5">
+                                        {entrada.tags.map((etiqueta, iTag) => (
+                                          <span
+                                            key={iTag}
+                                            className="px-2 py-0.5 rounded-full text-[10px] font-lora text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--light-gold)_18%,transparent)] border border-[color-mix(in_srgb,var(--light-gold)_50%,transparent)]"
+                                          >
+                                            {etiqueta}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+
                                     {entrada.hito && (
                                       <div className="pt-1 flex flex-wrap items-center gap-1.5">
                                         {(() => {
