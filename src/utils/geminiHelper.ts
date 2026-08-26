@@ -1178,48 +1178,7 @@ ${enMarcha
 ${diario.length ? `ÚLTIMOS DÍAS REGISTRADOS EN LA AGENDA:\n${diario.map(d => `- ${d.date}${d.lugar ? ` · ${d.lugar}` : ''}${d.clima ? ` · ${d.clima}` : ''}: ${d.summary}${d.hito ? ` [${d.hito}]` : ''}`).join('\n')}` : ''}
 `.trim();
 
-    tiempoDirectiva = `   [TIEMPO: +Xh] — cuánto tiempo de campaña ha consumido esta escena. Usa d para días, h para horas y m para minutos; puedes combinarlos: [TIEMPO: +1d 6h], [TIEMPO: +2d], [TIEMPO: +1 semana].
-    Referencia: una conversación, de 5 a 20 minutos. Un asalto de combate, 6 segundos (un combate entero rara vez pasa de 5 minutos). Cruzar una ciudad a pie, una hora. Una jornada de viaje por camino, un día. Un descanso corto, una hora [TIEMPO: +1h]. Un descanso largo o dormir hasta el alba, ocho horas [TIEMPO: +8h]. Registrar, negociar o investigar a fondo, de una a tres horas.
-    Si el jugador declara que descansa, viaja o espera, calcula el tiempo que eso costaría de verdad.
-    [REGLA DE ORO DEL DIARIO / AGENDA — PROHIBIDO EN RESPUESTAS ORDINARIAS]:
-    - EL DIARIO NO SE ACTUALIZA EN CADA RESPUESTA NI EN CADA TURNO DE COMBATE O CONVERSACIÓN.
-    - Durante acciones normales (asaltos de combate, diálogos, exploración, tiradas de dados), JAMÁS incluyas la etiqueta [AGENDA: ...]. El reloj [TIEMPO: +Xm] sí avanza normalmente, pero el diario NO se escribe en cada turno.
-    - ÚNICOS MOMENTOS PERMITIDOS PARA EMITIR [AGENDA: ...]:
-      1. DESCANSO CORTO (máximo 2 al día, ~1 hora de pausa): Cuando los aventureros declaren formalmente una pausa o descanso corto (recuperar aliento, curar heridas con dados de golpe, afilar armas). En ese único turno emites UNA sola entrada [AGENDA: ...] resumiendo lo vivido en ese tramo de la jornada:
-         Ejemplo: [AGENDA: Tras el combate en las ruinas, nos resguardamos bajo el arco para vendar heridas y recuperar el aliento | lugar: Ruinas del Torreón | hito: descanso — Descanso corto]
-      2. DESCANSO LARGO (fin del día, 8 horas / acampar o dormir hasta el alba): Cuando acampen, duerman o concluyan la jornada completa. En ese único turno emites UNA sola entrada [AGENDA: ...] consolidando los hechos más memorables de todo el día y el descanso:
-         Ejemplo: [AGENDA: Montamos el campamento junto al arroyo; repasé el mapa a la luz de las brasas antes de caer rendido | lugar: Campamento del Arroyo | hito: descanso — Descanso largo]
-      3. SALTO TEMPORAL NARRATIVO O INCONSCIENCIA: Si por trama transcurren días enteros de convalecencia médica, coma o viaje largo.
-
-    [SALTOS TEMPORALES Y PREGONEROS — GENERACIÓN AUTÓNOMA Y DISPARO EXCLUSIVO POR NARRATIVA]:
-    - Los saltos temporales y las noticias de pregoneros/rumores los generas tú como Narrador de forma totalmente autónoma. JAMÁS preguntes al jugador fuera de personaje si desea hacer un salto temporal ni pidas permiso para narrar o generar noticias de pregoneros. El jugador no tiene que 'generar' nada manualmente.
-    - REGLA DE ORO DE DISPARO: SOLO aplica el salto temporal y las noticias de pregoneros si en la narrativa misma ha salido de forma justificada (por ejemplo: «has estado inconsciente 3 días en la enfermería y el OC ha investigado o descubierto qué ha pasado esos días», o durante una convalecencia médica o viaje largo). Si en la escena no ha habido tal periodo en la ficción, el tiempo avanza normalmente minuto a minuto o escena a escena.
-    - Si el protagonista cae inconsciente, en coma o pasa días de convalecencia/recuperación médica/prisión (p. ej., 2 días, 3 días, 1 semana), usa [TIEMPO: +3d], [TIEMPO: +1 semana] o el tiempo exacto.
-    Si no estás seguro de cuánto ha pasado, escribe [TIEMPO: +0m]: es preferible un reloj parado, que se corrige en dos clics, a uno que corre solo y descuadra la campaña.
-    [AGENDA: qué ha pasado hoy, EN PRIMERA PERSONA, con la voz del protagonista | lugar: dónde transcurre | clima: qué tiempo hace | hito: tipo — qué ha ocurrido | dia: +X] — SOLO emitida al tomar un descanso corto o descanso largo/dormir.
-      Esto es el cuaderno del protagonista, no un parte de incidencias: escribe como escribiría quien lo vivió, en primera persona y en pasado, en una o dos frases y con sitio para una impresión suya. No «Compartió el turno de guardia con el capitán», sino «Compartí guardia con Kieron. No dijo gran cosa, pero me tendió el odre sin que se lo pidiera». El campo «hito» va también en su voz.
-      El resumen es obligatorio; los demás campos son opcionales y van por nombre, así que puedes saltarte los que no vengan a cuento.
-      «lugar» es el sitio concreto: «la bodega del Marea de Alba», «el mercado bajo de Aguasprofundas».
-      «clima» en dos o tres palabras: «niebla densa», «sol de justicia», «llovizna fría». Sé coherente de un día para otro y con la estación.
-      «hito» solo cuando el día haya dejado huella, y empezando por su tipo seguido de un guion:
-        - Relaciones entre personajes: «hito: rivalidad — ...» (⚔️), «hito: amistad — ...» (❇️), «hito: romance — ...» (💘 interés romántico, insinuación o declaración sexual/emocional), «hito: enemistad — ...» (💀), «hito: alianza — ...» (🤝), «hito: mentor — ...» (🛡️).
-        - Descansos y recuperación: «hito: descanso — Descanso corto / largo y recuperación...» (⛺).
-        - Relojes y consecuencias del mundo: «hito: reloj activo — ...» (⏳), «hito: semilla — ...» (🌱), «hito: consecuencia gremio — ...» (💥), «hito: consecuencia familia — ...» (💥), «hito: consecuencia zona — ...» (💥).
-        - Sucesos clave: «hito: combate — ...», «hito: hallazgo — ...», «hito: revelación — ...», «hito: viaje — ...», «hito: herida — ...», «hito: muerte — ...», «hito: inconsciencia — ...», «hito: noticia — ...», «hito: rumor — ...».
-      [RELOJES ACTIVOS, SEMILLAS Y EVENTOS DEL MUNDO (HACE 1 SEMANA, 15 DÍAS O 1 MES)]:
-      - Utiliza el diario y los hilos como un tapiz vivo de causa y efecto. Cuando un evento mundial ocurrió hace una semana, 15 días o un mes (o cuando una semilla del pasado comience a dar frutos), muestra sus consecuencias activas o pasivas:
-        1. Sobre el OC / Protagonista (reputación, deudas, oportunidades, amenazas).
-        2. Sobre su gremio, hermandad, orden, banda o facción (presiones, encargos, bajas, alianzas).
-        3. Sobre su familia, linaje, hogar o seres queridos (cartas, tensiones, cambios de estatus).
-        4. Sobre la zona o región donde se encuentra ahora (escasez de suministros, patrullas alertas, toque de queda, precios inflados, rumores tensos en tabernas, facciones hostiles).
-      [SALTOS TEMPORALES, INCONSCIENCIA Y NOTICIAS DEL MUNDO]:
-      - Si hay un salto temporal en la narrativa (por inconsciencia de 3 días, coma o recuperación), registra de forma autónoma:
-        1. Convalecencia: [AGENDA: Desperté dolorido tras tres días en cama | lugar: Enfermería | hito: inconsciencia — Recuperación tras el combate].
-        2. Noticias del mundo ocurridas durante ese tiempo: [AGENDA: Se rumorea en las plazas que el gremio rival tomó el muelle oeste | dia: +1 | hito: consecuencia zona — Tensión comercial en los muelles | lugar: Taberna del Ancla].
-      [REGLA DE FECHA — IMPORTANTE]: la aplicación fecha esta entrada con el día EN CURSO al empezar la escena, antes de aplicar el [TIEMPO] de este mismo turno.
-    [HILO: título | vence en 15d | qué ocurrirá cuando llegue ese día | oculto] — cuando en la ficción quede un reloj activo en marcha con fecha (vence en 7d, 15d, 30d). Regístralos con generosidad para reflejar:
-      a) Relojes del mundo y consecuencias que maduran (una investigación enemiga que cerca al gremio, una cosecha que fracasa en la comarca, refuerzos que llegan a la fortaleza, una represalia familiar).
-      b) Promesas y planes del protagonista (plazos dados por prestamistas, juramentos, citas fijadas con PNJs).
+    tiempoDirectiva = `   - [TIEMPO: +Xm / +Xh / +Xd] — (Opcional) solo si transcurre un lapso apreciable de tiempo en la ficción (conversación larga, viaje o descanso).
 `;
   }
 

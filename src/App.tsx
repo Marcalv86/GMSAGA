@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import {
-  CalendarDays,
   Check,
   FolderSync,
   Menu,
@@ -35,13 +34,10 @@ import { ChatView } from './components/ChatView';
 import { ContextUsageWidget } from './components/ContextUsageWidget';
 import { Modals, PromptConfig, ConfirmConfig, AlertConfig, ApiKeyModal } from './components/Modals';
 
-import { MemoryManager } from './components/MemoryManager';
-import { StatusView } from './components/StatusView';
+import { SimpleMemoryView } from './components/SimpleMemoryView';
 import { FilesView } from './components/FilesView';
 import { InstructionsView } from './components/InstructionsView';
-import { NovelReaderView } from './components/NovelReaderView';
 import { MapViewer } from './components/MapViewer';
-import { CalendarView } from './components/CalendarView';
 import { InstallAppModal } from './components/InstallAppModal';
 import { LocalStorageModal } from './components/LocalStorageModal';
 import { ImportCampaignModal } from './components/ImportCampaignModal';
@@ -143,7 +139,7 @@ export default function App() {
   }, [currentFiles]);
 
   const [activeTab, setActiveTab] = useState<
-    'chat' | 'novel' | 'instructions' | 'files' | 'status' | 'memory' | 'calendar'
+    'chat' | 'files' | 'memory' | 'instructions' | 'novel'
   >('chat');
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -158,6 +154,8 @@ export default function App() {
   // escribe. El velo se reserva para tareas que sí impiden seguir (subidas,
   // exportar a PDF).
   const [isStreamingTurn, setIsStreamingTurn] = useState(false);
+  // Sincronización de memoria en segundo plano bajo petición manual
+  const [isSyncingMemory, setIsSyncingMemory] = useState(false);
   // IDs de archivos que están siendo procesados / extraídos en segundo plano
   const [extractingFileIds, setExtractingFileIds] = useState<string[]>([]);
 
@@ -1752,10 +1750,10 @@ export default function App() {
       });
       return;
     }
-    setIsGenerating(true);
+    setIsSyncingMemory(true);
     setTopProgress({
       active: true,
-      label: 'Sincronizando campaña completa (Diario, Días, Horas, PNJs, Lugares y Tramas) con la IA...',
+      label: 'Sincronizando memoria de campaña en segundo plano con la IA...',
       type: 'sync'
     });
     try {
@@ -1833,7 +1831,7 @@ export default function App() {
         message: describeApiError(err) || 'No se pudo sincronizar la campaña.'
       });
     } finally {
-      setIsGenerating(false);
+      setIsSyncingMemory(false);
       setTopProgress({ active: false, label: '' });
     }
   };
@@ -1871,50 +1869,6 @@ export default function App() {
       title: 'PNJ Creado en Memoria',
       message: `Se ha creado el personaje "${formattedName}"con su retrato vinculado automáticamente en la pestaña de PNJs de la Memoria.`
     });
-  };
-
-  const handleUploadEntityImage = async (
-    file: File,
-    category: FileCategory = 'portrait_npc'
-  ): Promise<string> => {
-    if (!currentPId) return '';
-    try {
-      const contentUrl = await optimizeImageFile(file);
-      const newFile: ProjectFile = {
-        id: 'file_' + Date.now() + '_' + Math.random().toString(36).substring(7),
-        name: file.name,
-        type: file.type,
-        mime: file.type,
-        category,
-        content: contentUrl,
-        isImage: true,
-        length: file.size
-      };
-      const updatedFiles = [...currentFiles, newFile];
-      setCurrentFiles(updatedFiles);
-      await saveFilesToDB(currentPId, updatedFiles);
-
-      // Background AI visual analysis if API key is configured
-      if (hasConfiguredApiKey()) {
-        analyzeUploadedImage(newFile, contentUrl)
-          .then(async analysis => {
-            if (analysis) {
-              const fileWithAnalysis = { ...newFile, analysis };
-              const refreshed = (await loadFilesFromDB(currentPId)).map(f =>
-                f.id === newFile.id ? fileWithAnalysis : f
-              );
-              setCurrentFiles(refreshed);
-              await saveFilesToDB(currentPId, refreshed);
-            }
-          })
-          .catch(err => console.error('Error in background entity image analysis:', err));
-      }
-
-      return contentUrl;
-    } catch (err) {
-      console.error('Error uploading entity image:', err);
-      return '';
-    }
   };
 
   const handleExtractNpc = async (file: ProjectFile) => {
@@ -2671,13 +2625,9 @@ export default function App() {
           {/* Navigation Tabs */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
-              // «Archivos & Lore» y «Directivas & NSFW» ya no viven aquí: son
-              // ajustes de la campaña, no sitios donde se juega, y la barra
-              // lateral lleva a los dos. En el móvil, siete iconos en una fila
-              // de 390px dejaban el cabecero hecho un llavero.
               { id: 'chat', label: 'Crónica', icon: Swords },
-              { id: 'calendar', label: 'Diario & Agenda', icon: CalendarDays },
-              { id: 'memory', label: 'Memoria Viva', icon: ScrollText }
+              { id: 'files', label: 'Archivos', icon: Paperclip },
+              { id: 'memory', label: 'Memoria', icon: ScrollText }
             ].map(tab => {
               const TabIcon = tab.icon;
               const isCurrentActive =
@@ -2735,79 +2685,27 @@ export default function App() {
               onContinueNarrative={handleContinueNarrative}
               onDeleteMessage={handleDeleteChatMessage}
               onOpenNovelReader={() => setActiveTab('novel')}
-              isBackgroundSyncing={false}
+              isBackgroundSyncing={isSyncingMemory}
               project={currentProject || undefined}
               files={currentFiles}
               onUpdateProject={handleUpdateProjectField}
-              onNavigateToDiary={() => setActiveTab('calendar')}
-            />
-          )}
-
-          {activeTab === 'novel' && currentProject && (
-            <NovelReaderView project={currentProject}
-              
-              chats={currentChats}
-              currentChatId={currentChatId}
-              onSelectChat={id => setCurrentChatId(id)}
-              onBackToChat={() => setActiveTab('chat')}
-            />
-          )}
-
-          {activeTab === 'status' && currentProject && (
-            <StatusView project={currentProject}
-              
-              files={currentFiles}
-              chats={currentChats}
-              onUpdate={handleUpdateProjectField}
-              onUpdateMemory={handleUpdateMemory}
+              onNavigateToDiary={() => setActiveTab('memory')}
             />
           )}
 
           {activeTab === 'memory' && currentProject && (
-            <MemoryManager
+            <SimpleMemoryView
               project={currentProject}
-              files={currentFiles}
               onUpdateMemory={handleUpdateMemory}
               onUpdateProject={handleUpdateProjectField}
               onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
-              onAutoClassifyAll={handleAutoClassifyAll}
-              onUploadEntityImage={handleUploadEntityImage}
-              isGenerating={isGenerating}
-              hasChats={currentChats.some(c =>
-                (c.messages || []).some(
-                  m =>
-                    m.content &&
-                    m.content.trim().length > 0 &&
-                    m.content !== 'Pensando...' &&
-                    m.content !== 'Tirando dados...'
-                )
-              )}
-            />
-          )}
-
-          {activeTab === 'calendar' && currentProject && (
-            <CalendarView project={currentProject}
-              files={currentFiles}
-              chats={currentChats}
-              onUpdate={handleUpdateProjectField}
-              onUpdateMemory={handleUpdateMemory}
-              onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
-              isGenerating={isGenerating}
-              hasChats={currentChats.some(c =>
-                (c.messages || []).some(
-                  m =>
-                    m.content &&
-                    m.content.trim().length > 0 &&
-                    m.content !== 'Pensando...' &&
-                    m.content !== 'Tirando dados...'
-                )
-              )}
+              isGenerating={isSyncingMemory}
             />
           )}
 
           {activeTab === 'files' && currentProject && (
-            <FilesView project={currentProject}
-              
+            <FilesView
+              project={currentProject}
               files={currentFiles}
               onUpload={handleFilesUpload}
               onDeleteFile={handleDeleteFile}
@@ -2827,8 +2725,8 @@ export default function App() {
           )}
 
           {activeTab === 'instructions' && currentProject && (
-            <InstructionsView project={currentProject}
-              
+            <InstructionsView
+              project={currentProject}
               onUpdate={handleUpdateProjectField}
               onRequestConfirm={(message, onConfirm) => {
                 setConfirmConfig({
