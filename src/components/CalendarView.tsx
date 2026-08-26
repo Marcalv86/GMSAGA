@@ -40,6 +40,7 @@ import {
   CalendarClock,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   History,
@@ -107,7 +108,20 @@ export const CalendarView: React.FC<{
   const [diaSeleccionado, setDiaSeleccionado] = useState<number | null>(null);
 
   // Modo de visualización: 'dia' (solo el día seleccionado) o 'todos' (historial completo de la campaña)
-  const [modoVisualizacion, setModoVisualizacion] = useState<'dia' | 'todos'>('dia');
+  const [modoVisualizacion, setModoVisualizacion] = useState<'dia' | 'todos'>('todos');
+  /**
+   * La crónica se lee por semanas, no de una sentada.
+   *
+   * Pintarla entera es cómodo el primer mes y un pozo sin fondo al tercero. La
+   * ventana es una semana DEL CALENDARIO que se esté usando —diez días en
+   * Harptos, siete en el gregoriano— porque es la unidad que la propia
+   * ambientación ya emplea, y la rejilla del mes está construida con ella.
+   * `0` es la semana en la que cae hoy; los números negativos van hacia atrás.
+   */
+  const [semanaOffset, setSemanaOffset] = useState(0);
+  const [verTodoElDiario, setVerTodoElDiario] = useState(false);
+  /** El mes ocupaba media pantalla para decir muy poco; ahora se abre a petición. */
+  const [mesDesplegado, setMesDesplegado] = useState(false);
 
   // Estado para creación/edición de entradas de la agenda
   const [creandoEntrada, setCreandoEntrada] = useState(false);
@@ -536,6 +550,28 @@ export const CalendarView: React.FC<{
   // El día actualmente visualizado (si no se ha seleccionado ninguno, es hoy)
   const diaActivo = diaSeleccionado !== null ? diaSeleccionado : hoyAbs;
 
+  /** Los días que dura una semana en este calendario. Sin semanas, decenas. */
+  const largoSemana = Math.max(1, cal?.weekdays?.length || 10);
+
+  const ventana = useMemo(() => {
+    if (!calendarioValido(cal) || !fecha) return null;
+    // Alineada con la rejilla del mes: la semana empieza donde empieza allí.
+    const diaDelAno = desdeDiaAbsoluto(cal, hoyAbs).dayOfYear;
+    const inicioSemanaDeHoy = hoyAbs - ((diaDelAno - 1) % largoSemana);
+    const desde = inicioSemanaDeHoy + semanaOffset * largoSemana;
+    return { desde, hasta: desde + largoSemana - 1 };
+  }, [cal, fecha, hoyAbs, largoSemana, semanaOffset]);
+
+  /** Los días de la crónica que caen dentro de la ventana. */
+  const diasVentana = useMemo(() => {
+    if (verTodoElDiario || !ventana) return diasAgenda;
+    return diasAgenda.filter(d => d >= ventana.desde && d <= ventana.hasta);
+  }, [diasAgenda, ventana, verTodoElDiario]);
+
+  /** Si queda algo escrito antes o después de lo que se está enseñando. */
+  const hayAntes = Boolean(ventana) && diasAgenda.some(d => d < (ventana as { desde: number }).desde);
+  const hayDespues = Boolean(ventana) && diasAgenda.some(d => d > (ventana as { hasta: number }).hasta);
+
   // ------------------------------------------------------------ sin calendario
 
   if (!activo) {
@@ -878,8 +914,39 @@ export const CalendarView: React.FC<{
           )}
         </div>
 
+        {/*
+          El mes, plegado.
+
+          Treinta celdas iguales de las que dos llevan un punto ocupaban media
+          pantalla de teléfono para decir «hay algo el día 1 y el 3», y empujaban
+          el diario —que es a lo que se viene— más de mil píxeles hacia abajo.
+          Sigue estando, a un toque.
+        */}
+        <button
+          onClick={() => setMesDesplegado(v => !v)}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-[var(--user-border)] bg-[var(--surface-soft)] hover:border-[var(--accent)] transition-colors cursor-pointer"
+          aria-expanded={mesDesplegado}
+        >
+          <span className="flex items-center gap-2 font-cinzel text-xs font-bold text-[var(--text-primary)] min-w-0">
+            <CalendarDays className="w-4 h-4 text-[var(--accent)] shrink-0" />
+            <span className="truncate">
+              Ver el mes de {calSeguro.months[mesVistoIdx]?.name || '—'}
+            </span>
+          </span>
+          <span className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] text-[var(--text-secondary)]">
+              {diasAgenda.length} {diasAgenda.length === 1 ? 'jornada escrita' : 'jornadas escritas'}
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 text-[var(--text-secondary)] transition-transform ${
+                mesDesplegado ? 'rotate-180' : ''
+              }`}
+            />
+          </span>
+        </button>
+
         {/* Rejilla interactiva del mes */}
-        <div>
+        <div className={mesDesplegado ? '' : 'hidden'}>
           <div className="flex items-center justify-between gap-2 mb-3">
             <h3 className="font-cinzel text-base md:text-lg font-bold text-[var(--accent)] m-0 flex items-center gap-2">
               <CalendarDays className="w-4 h-4" />
@@ -1055,7 +1122,7 @@ export const CalendarView: React.FC<{
                     : 'border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]'
                 }`}
               >
-                <Calendar className="w-3.5 h-3.5" /> Espacio del día
+                <Calendar className="w-3.5 h-3.5" /> El día
               </button>
               <button
                 onClick={() => setModoVisualizacion('todos')}
@@ -1065,7 +1132,7 @@ export const CalendarView: React.FC<{
                     : 'border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]'
                 }`}
               >
-                <History className="w-3.5 h-3.5" /> Crónica completa ({diasAgenda.length} {diasAgenda.length === 1 ? 'día' : 'días'})
+                <History className="w-3.5 h-3.5" /> Diario ({diasAgenda.length} {diasAgenda.length === 1 ? 'jornada' : 'jornadas'})
               </button>
             </div>
 
@@ -1681,6 +1748,67 @@ export const CalendarView: React.FC<{
                 </div>
               </div>
 
+              {/*
+                Dónde estás y cómo moverte. La crónica no se pinta entera: se
+                lee por semanas del calendario en uso, y esta barra dice cuál.
+              */}
+              {ventana && diasAgenda.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-cinzel text-[11px] font-bold tracking-wide text-[var(--accent)] truncate">
+                      {verTodoElDiario
+                        ? `TODO EL DIARIO · ${diasAgenda.length} ${diasAgenda.length === 1 ? 'jornada' : 'jornadas'}`
+                        : `${fechaLegible(cal, desdeDiaAbsoluto(cal, ventana.desde))} — ${fechaLegible(cal, desdeDiaAbsoluto(cal, ventana.hasta))}`}
+                    </span>
+                    {!verTodoElDiario && (
+                      <span className="text-[11px] text-[var(--text-secondary)] shrink-0">
+                        {diasVentana.length} {diasVentana.length === 1 ? 'jornada' : 'jornadas'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {!verTodoElDiario && (
+                      <>
+                        <button
+                          onClick={() => setSemanaOffset(o => o - 1)}
+                          disabled={!hayAntes}
+                          className="p-1.5 rounded border border-[var(--user-border)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-30 disabled:cursor-default cursor-pointer"
+                          title={`Semana anterior (${largoSemana} días)`}
+                          aria-label="Semana anterior"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        {semanaOffset !== 0 && (
+                          <button
+                            onClick={() => setSemanaOffset(0)}
+                            className="px-2.5 py-1 rounded border border-[var(--accent)] text-[var(--accent)] text-[11px] font-cinzel font-bold cursor-pointer"
+                            title="Volver a la semana en curso"
+                          >
+                            Hoy
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSemanaOffset(o => o + 1)}
+                          disabled={!hayDespues}
+                          className="p-1.5 rounded border border-[var(--user-border)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-30 disabled:cursor-default cursor-pointer"
+                          title={`Semana siguiente (${largoSemana} días)`}
+                          aria-label="Semana siguiente"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => setVerTodoElDiario(v => !v)}
+                      className="px-2.5 py-1 rounded border border-[var(--user-border)] hover:border-[var(--accent)] hover:text-[var(--accent)] text-[11px] font-cinzel cursor-pointer"
+                      title={verTodoElDiario ? 'Volver a leer por semanas' : 'Enseñar todas las jornadas de golpe'}
+                    >
+                      {verTodoElDiario ? 'Por semanas' : 'Ver todo'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {diasAgenda.length === 0 ? (
                 <div className="p-6 rounded-xl border border-dashed border-[var(--glass-border)] text-center space-y-3">
                   <p className="text-sm text-[var(--text-secondary)] italic m-0">
@@ -1704,7 +1832,19 @@ export const CalendarView: React.FC<{
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {diasAgenda.map((dia, diaIdx) => {
+                  {diasVentana.length === 0 && (
+                    <div className="p-6 rounded-xl border border-dashed border-[var(--glass-border)] text-center space-y-2">
+                      <p className="text-sm text-[var(--text-secondary)] italic m-0">
+                        En esta semana no se escribió nada.
+                      </p>
+                      <p className="text-xs text-[var(--text-secondary)] m-0">
+                        {hayAntes
+                          ? 'Hay jornadas escritas antes: usa la flecha de la izquierda.'
+                          : 'Aquí empieza la campaña; no hay días anteriores.'}
+                      </p>
+                    </div>
+                  )}
+                  {diasVentana.map((dia, diaIdx) => {
                     const entradas = porDia[dia].entradas;
                     const fObj = desdeDiaAbsoluto(calSeguro, dia);
                     const est = estacionDelDia(calSeguro, fObj.dayOfYear);
