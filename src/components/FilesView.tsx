@@ -19,7 +19,15 @@ import {
   Sparkles,
   Star,
   Trash2,
-  X
+  X,
+  Layers,
+  User,
+  Users,
+  ShieldAlert,
+  Dices,
+  ClipboardList,
+  ListFilter,
+  Music
 } from 'lucide-react';
 export const FilesView: React.FC<{
   project: Project;
@@ -191,41 +199,41 @@ export const FilesView: React.FC<{
     setSelectedAnalysisFile(null);
   };
 
-  const categoryLabels: { key: FileCategory | 'all'; label: string; icon: string; desc: string }[] = [
-    { key: 'all', label: 'Todos', icon: '', desc: 'Todo el material' },
-    { key: 'sheet_pj', label: 'Fichas PJ (OC)', icon: '', desc: 'Ficha y datos del protagonista' },
-    { key: 'sheet_companion', label: 'Fichas Familiares', icon: '', desc: 'Familiares, monturas y compañeros' },
-    { key: 'sheet_npc', label: 'Fichas PNJs / Monstruos', icon: '', desc: 'Statblocks de PNJs y criaturas' },
-    { key: 'portrait_pj', label: 'Retratos PJ', icon: '', desc: 'Personajes protagonistas' },
-    { key: 'portrait_npc', label: 'Retratos PNJ', icon: '', desc: 'PNJs, criaturas y villanos' },
-    { key: 'map', label: 'Mapas', icon: '', desc: 'Mapas tácticos y del mundo' },
-    { key: 'scene', label: 'Ilustraciones', icon: '', desc: 'Paisajes y escenas' },
-    { key: 'document', label: 'Documentos', icon: '', desc: 'Reglas, lore y libros' },
+  const categoryLabels: { key: FileCategory | 'all'; label: string; icon: React.ComponentType<{ className?: string }>; desc: string }[] = [
+    { key: 'all', label: 'Todos', icon: Layers, desc: 'Todo el material' },
+    { key: 'sheet_pj', label: 'Fichas PJ (OC)', icon: User, desc: 'Ficha y datos del protagonista' },
+    { key: 'sheet_companion', label: 'Fichas Familiares', icon: Users, desc: 'Familiares, monturas y compañeros' },
+    { key: 'sheet_npc', label: 'Fichas PNJs / Monstruos', icon: ShieldAlert, desc: 'Statblocks de PNJs y criaturas' },
+    { key: 'portrait_pj', label: 'Retratos PJ', icon: Sparkles, desc: 'Personajes protagonistas' },
+    { key: 'portrait_npc', label: 'Retratos PNJ', icon: Drama, desc: 'PNJs, criaturas y villanos' },
+    { key: 'map', label: 'Mapas', icon: Map, desc: 'Mapas tácticos y del mundo' },
+    { key: 'scene', label: 'Ilustraciones', icon: Image, desc: 'Paisajes y escenas' },
+    { key: 'document', label: 'Documentos', icon: BookOpen, desc: 'Reglas, lore y libros' },
     {
       key: 'style_sample',
       label: 'Muestras de estilo',
-      icon: '',
+      icon: Scroll,
       desc: 'Fragmentos que solo sirven de referencia de escritura'
     },
     {
       key: 'oracle',
       label: 'Oráculos y tablas',
-      icon: '',
+      icon: Dices,
       desc: 'Tablas que se consultan tirando dados, no lore que se lee'
     },
     {
       key: 'roster',
       label: 'Elenco',
-      icon: '',
+      icon: ClipboardList,
       desc: 'Quién es quién y qué es qué: nombres propios que no debe inventarse'
     },
     {
       key: 'index',
       label: 'Índices de aventura',
-      icon: '',
+      icon: ListFilter,
       desc: 'Qué se puede jugar en los módulos que has subido, una línea por capítulo'
     },
-    { key: 'audio', label: 'Audios', icon: '', desc: 'BSO y efectos' }
+    { key: 'audio', label: 'Audios', icon: Music, desc: 'BSO y efectos' }
   ];
 
   return (
@@ -343,6 +351,7 @@ export const FilesView: React.FC<{
           {categoryLabels.map(cat => {
             const count = categoryCounts[cat.key] || 0;
             const isActive = activeCategory === cat.key;
+            const CatIcon = cat.icon;
             return (
               <button
                 key={cat.key}
@@ -354,7 +363,7 @@ export const FilesView: React.FC<{
                 }`}
                 title={cat.desc}
               >
-                <span>{cat.icon}</span>
+                <CatIcon className="w-3.5 h-3.5 shrink-0" />
                 <span>{cat.label}</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.2 rounded-full ${
