@@ -84,8 +84,10 @@ import {
   setStoredAutoFailover,
   setStoredKeyRotationMode,
   setStoredMemorySyncGranularity,
-  syncFullCampaignFromChats
+  syncFullCampaignFromChats,
+  isNarrativeIncomplete
 } from './utils/geminiHelper';
+import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie, formatRollResult } from './utils/rollRequests';
 import { Probabilidad, formatoConsulta, formatoSignificado, nuevaConsulta } from './utils/oracle';
@@ -997,6 +999,27 @@ export default function App() {
     setIsStreamingTurn(true);
     setLoadingText('Consultando los archivos del tomo y tejiendo la trama...');
 
+    const volcarPendiente = () => {
+      const pendiente = textoPendienteRef.current;
+      if (pendiente === null) return;
+      textoPendienteRef.current = null;
+      const visible = limpiarParaMostrar(pendiente);
+      setCurrentChats(prev =>
+        prev.map(c => {
+          if (c.id !== currentChatId) return c;
+          const msgs = [...c.messages];
+          const last = msgs[msgs.length - 1];
+          if (last && last.role === 'model') {
+            if (last.content === visible) return c;
+            msgs[msgs.length - 1] = { ...last, content: visible };
+          } else {
+            msgs.push({ role: 'model', content: visible });
+          }
+          return { ...c, messages: msgs };
+        })
+      );
+    };
+
     try {
       const targetChat = currentChats.find(c => c.id === currentChatId);
       if (!targetChat) return;
@@ -1013,74 +1036,40 @@ export default function App() {
       const controller = new AbortController();
       generationAbortRef.current = controller;
 
-      const volcarPendiente = () => {
-        const pendiente = textoPendienteRef.current;
-        if (pendiente === null) return;
-        textoPendienteRef.current = null;
-        const visible = limpiarParaMostrar(pendiente);
-        setCurrentChats(prev =>
-          prev.map(c => {
-            if (c.id !== currentChatId) return c;
-            const msgs = [...c.messages];
-            const last = msgs[msgs.length - 1];
-            if (last && last.role === 'model') {
-              if (last.content === visible) return c;
-              msgs[msgs.length - 1] = { ...last, content: visible };
-            } else {
-              msgs.push({ role: 'model', content: visible });
-            }
-            return { ...c, messages: msgs };
-          })
-        );
-      };
-
       // Si el fotograma pendiente se quedó en cola por estar la pestaña
-      // oculta, que se pinte en el mismo instante en que se recupera el foco:
-      // sin esto, el texto ya recibido no aparecía hasta el siguiente cambio,
-      // y ese hueco es justo el que se lee como "se ha quedado colgado".
+      // oculta o en segundo plano, el latido del Web Worker y los eventos de visibilidad
+      // fuerzan su volcado inmediato para que el flujo nunca se pause.
       const pedirCandadoDePantalla = async () => {
         try {
           const wl = (navigator as any).wakeLock;
-          if (!wl) return; // Navegador sin soporte: se sigue igual, sin este resguardo.
+          if (!wl) return;
           const lock = await wl.request('screen');
           wakeLockRef.current = lock;
-          // La especificación suelta el candado sola al ocultarse la pestaña,
-          // y no solo cuando lo suelto yo desde el `finally`. Si no escucho
-          // este evento, la referencia se queda apuntando a un candado ya
-          // muerto: al volver, `if (!wakeLockRef.current)` lo ve como "vivo"
-          // y nunca se vuelve a pedir uno de verdad.
           lock.addEventListener('release', () => {
             if (wakeLockRef.current === lock) wakeLockRef.current = null;
           });
         } catch {
-          // Denegado (ahorro de batería, permisos) o pestaña ya oculta: no es
-          // motivo para interrumpir la narración por ello.
+          // Denegado o sin soporte: no interrumpe la narración
         }
       };
 
       const onVolverVisible = () => {
+        volcarPendiente();
         if (document.visibilityState === 'visible') {
-          volcarPendiente();
-          // El candado se soltó solo al ocultarse la pestaña; si sigue en
-          // marcha el turno, se vuelve a pedir.
           if (!wakeLockRef.current) pedirCandadoDePantalla();
         }
       };
       onVolverVisibleRef.current = onVolverVisible;
       document.addEventListener('visibilitychange', onVolverVisible);
+      window.addEventListener('focus', onVolverVisible);
+      window.addEventListener('pageshow', onVolverVisible);
 
-      /*
-       * Escenario real de partida nocturna: lees una respuesta larga sin
-       * tocar el móvil y la pantalla se apaga por inactividad. Para el
-       * navegador eso es EXACTAMENTE lo mismo que minimizar —la pestaña pasa
-       * a oculta— y ahí es donde nace "el Narrador se ha quedado colgado".
-       *
-       * El candado de pantalla no evita que cambies de app a propósito —la
-       * especificación lo suelta en cuanto la pestaña se oculta, siempre—, así
-       * que no es una solución para "minimizo y hago otra cosa". Pero sí evita
-       * el caso más frecuente: quedarte quieto leyendo mientras narra.
-       */
       pedirCandadoDePantalla();
+
+      // Iniciar el latido en segundo plano con Web Worker independiente
+      backgroundHeartbeat.start(() => {
+        volcarPendiente();
+      });
 
       await generateStoryTurnStream({
         project: currentProject,
@@ -1106,24 +1095,8 @@ export default function App() {
           const modelMsgIdx = currentList.length; // index of the model message being added
           void handleTimeReported(t, { msgIndex: modelMsgIdx });
         },
-        // Refresco de pantalla en CADA fragmento: es solo estado en memoria y es lo
-        // que hace que la narración se escriba ante ti en vez de aparecer a saltos.
-        // El guardado en disco sigue limitado dentro de geminiHelper.
-        // Google manda fragmentos cada pocos milisegundos, muchos de una sola
-        // palabra. Pintar cada uno obligaba a rehacer el markdown de la escena
-        // entera decenas de veces por segundo para un cambio que el ojo no
-        // llega a distinguir. Se acumulan y se vuelca uno por fotograma.
-        //
-        // `requestAnimationFrame` se PAUSA por completo en cuanto la pestaña
-        // deja de estar visible —lo hacen todos los navegadores, es parte de
-        // la especificación— y no vuelve a correr hasta que se recupera el
-        // foco. Jugar desde el móvil con la pantalla bloqueándose a media
-        // narración, o simplemente cambiando de app un momento, se traducía en
-        // "el Narrador se ha quedado colgado": el texto seguía llegando y
-        // acumulándose, pero nada volvía a pintarse hasta volver a la pestaña,
-        // y entonces aparecía todo de golpe. Aquí se usa rAF solo cuando la
-        // página está visible; oculta, se vuelca sin esperar, porque no hay
-        // fotograma que perseguir.
+        // Refresco de pantalla en CADA fragmento: se vuelca inmediatamente cuando
+        // está en segundo plano y a través de rAF cuando la ventana está activa.
         onChunk: (fullText: string) => {
           textoPendienteRef.current = fullText;
           if (document.visibilityState === 'hidden') {
@@ -1172,6 +1145,8 @@ export default function App() {
         });
       }
     } finally {
+      backgroundHeartbeat.stop(volcarPendiente);
+
       // La copia en disco es red de seguridad: si hay carpeta configurada en Copias, se sincroniza en segundo plano.
       if (currentProject) {
         const latestChats = getLocalChats(currentProject.id);
@@ -1183,6 +1158,8 @@ export default function App() {
       }
       if (onVolverVisibleRef.current) {
         document.removeEventListener('visibilitychange', onVolverVisibleRef.current);
+        window.removeEventListener('focus', onVolverVisibleRef.current);
+        window.removeEventListener('pageshow', onVolverVisibleRef.current);
         onVolverVisibleRef.current = null;
       }
       if (wakeLockRef.current) {
@@ -1193,6 +1170,7 @@ export default function App() {
         cancelAnimationFrame(repintadoPedidoRef.current);
         repintadoPedidoRef.current = null;
       }
+      volcarPendiente();
       textoPendienteRef.current = null;
       generationAbortRef.current = null;
       setIsStreamingTurn(false);
@@ -1267,6 +1245,9 @@ export default function App() {
     if (!currentPId || !currentChatId || !currentChat || isGenerating) return;
 
     let baseMessages = currentChat.messages;
+    const targetIdx = fromIndex !== undefined ? fromIndex : currentChat.messages.length - 1;
+    const targetMsg = currentChat.messages[targetIdx];
+
     if (fromIndex !== undefined && fromIndex < currentChat.messages.length - 1) {
       baseMessages = currentChat.messages.slice(0, fromIndex + 1);
       const updatedChat = { ...currentChat, messages: baseMessages };
@@ -1286,8 +1267,15 @@ export default function App() {
       });
     }
 
-    const continuePrompt =
+    let continuePrompt =
       '[Continúa la narración de forma fluida, profundizando en la escena, las reacciones del entorno y las consecuencias de lo ocurrido.]';
+
+    // Si la narración quedó a medias o cortada por fallo de red, se le instruye exactamente desde la última palabra
+    if (targetMsg && targetMsg.role === 'model' && isNarrativeIncomplete(targetMsg.content)) {
+      const anchor = targetMsg.content.trim().slice(-160).trim();
+      continuePrompt = `[SISTEMA - REANUDACIÓN DE ESCENA]: El último fragmento del relato se interrumpió abruptamente antes de concluir. El último texto fue: "${anchor}". Continúa el relato EXACTAMENTE a partir de ese punto sin repetir nada previo, concluyendo las frases y la escena con fluidez y los registros correspondientes.`;
+    }
+
     await triggerAIGeneration(continuePrompt, baseMessages);
   };
 

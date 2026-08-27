@@ -1385,6 +1385,122 @@ ${bloqueVivo}`;
 const MAX_REINTENTOS_POR_SATURACION = 2;
 
 /**
+ * Detecta con precisión quirúrgica si una respuesta del Narrador se quedó
+ * incompleta o cortada a mitad de frase debido a una caída de conexión,
+ * agotamiento de tokens de salida (MAX_TOKENS) o interrupción de la red.
+ */
+export function isNarrativeIncomplete(text: string): boolean {
+  if (!text) return false;
+  const raw = text.trim();
+  if (raw.length < 15) return false;
+  if (raw === 'Tirando dados...' || raw === 'Pensando...') return false;
+
+  // Si contiene etiquetas de cierre, estado o tirada, ha concluido formalmente
+  if (/\[(?:ESTADO|TIEMPO|AGENDA|HILO|PRESENTES|VINCULO|AFINIDAD|Petición de Tirada|Tirada)\b/i.test(raw)) {
+    return false;
+  }
+
+  // Quitar etiquetas informativas de capítulos
+  const clean = raw.replace(/\[CHAPTER:[^\]]*\]/gi, '').trim();
+  if (clean.length < 15) return false;
+
+  // Si termina con cierre formal de turno o estímulo cinematográfico
+  if (/< ?¿?Qué haces\?? ?>/i.test(clean) || /———◆———/i.test(clean)) return false;
+
+  const lastChar = clean[clean.length - 1];
+  const validPunctuation = ['.', '!', '?', '…', '»', '"', '”', '’', '`', '>'];
+  
+  if (validPunctuation.includes(lastChar)) {
+    return false;
+  }
+
+  if (lastChar === '*') {
+    const asterisks = (clean.match(/\*/g) || []).length;
+    if (asterisks % 2 === 0) {
+      const beforeAsterisk = clean.replace(/\*+$/, '').trim();
+      const lastCharBefore = beforeAsterisk[beforeAsterisk.length - 1];
+      if (lastCharBefore && validPunctuation.includes(lastCharBefore)) {
+        return false;
+      }
+    }
+  }
+
+  if (lastChar === ']') {
+    if (/\[[a-zA-Z0-9_\s:|áéíóúÁÉÍÓÚñÑ—–\-.,+/?#]+\]$/.test(clean)) {
+      return false;
+    }
+  }
+
+  // Si termina en letra, número, coma, guion, dos puntos o punto y coma, está cortada
+  return true;
+}
+
+/**
+ * Autocompleta de forma fluida y transparente una narración que se cortó
+ * por alcanzar el límite de tokens o por una desconexión en el tramo final.
+ */
+async function intentarCompletarNarrativa({
+  fullText,
+  ai,
+  model,
+  config,
+  contentsBase,
+  signal,
+  onChunk,
+  persistir,
+  setLoadingText
+}: {
+  fullText: string;
+  ai: any;
+  model: string;
+  config: any;
+  contentsBase: any[];
+  signal?: AbortSignal;
+  onChunk: (fullText: string) => void;
+  persistir: (text: string, definitivo: boolean) => Promise<void>;
+  setLoadingText: (text: string) => void;
+}): Promise<string> {
+  const anclaje = fullText.slice(-160).trim();
+  const promptCont = `[SISTEMA - REANUDACIÓN DE ESCENA]: La respuesta se interrumpió antes de concluir el relato. El último fragmento escrito fue: "${anclaje}". Continúa el relato EXACTAMENTE a partir de la última palabra sin repetir nada del texto previo, concluyendo de forma natural las frases, la escena y los registros internos finales.`;
+
+  const continuationContents = [
+    ...contentsBase,
+    { role: 'model', parts: [{ text: fullText }] },
+    { role: 'user', parts: [{ text: promptCont }] }
+  ];
+
+  setLoadingText('Completando el desenlace de la narración...');
+
+  try {
+    const contStream = await ai.models.generateContentStream({
+      model,
+      contents: continuationContents,
+      config
+    });
+
+    let lastSave = Date.now();
+
+    for await (const chunk of contStream) {
+      if (signal?.aborted) break;
+      const textPart = chunk.text ?? '';
+      if (textPart) {
+        fullText += textPart;
+        onChunk(fullText);
+      }
+      const now = Date.now();
+      if (now - lastSave > 1500 && fullText.length > 0) {
+        lastSave = now;
+        await persistir(fullText, false);
+      }
+    }
+  } catch (err) {
+    console.warn('Fallo en intento de autocompletado en caliente:', err);
+  }
+
+  return fullText;
+}
+
+/**
  * Por qué el modelo ha devuelto un turno en blanco.
  *
  * Un turno vacío antes se daba por bueno: la jugadora se quedaba mirando un
@@ -1502,6 +1618,8 @@ export async function generateStoryTurnStream({
         let recibioTexto = false;
         let motivoDeCierre = '';
         let bloqueoDePrompt = '';
+        let currentContents: any[] = [];
+        let currentConfig: any = null;
 
         try {
           if (intento > 0) {
@@ -1524,6 +1642,7 @@ export async function generateStoryTurnStream({
             userText,
             dicePool: rollDicePool()
           });
+          currentContents = contents;
 
           const thinkingSetting = getStoredThinkingLevel();
           const safetySetting = getStoredSafetyLevel();
@@ -1543,6 +1662,7 @@ export async function generateStoryTurnStream({
           if (thinkingBudget && !abierto) {
             config.thinkingConfig = thinkingBudget;
           }
+          currentConfig = config;
 
           const responseStream = await ai.models.generateContentStream({
             model: currentModel,
@@ -1585,6 +1705,22 @@ export async function generateStoryTurnStream({
           // jugadora ante un mensaje vacío que no explica nada.
           if (fullText.trim().length === 0) {
             throw new Error(explicarTurnoVacio(bloqueoDePrompt, motivoDeCierre));
+          }
+
+          // Protección contra respuestas cortadas por MAX_TOKENS o cierre abrupto:
+          // Si el texto quedó a mitad de frase, completarlo automáticamente.
+          if ((motivoDeCierre === 'MAX_TOKENS' || isNarrativeIncomplete(fullText)) && !signal?.aborted && fullText.trim().length > 30) {
+            fullText = await intentarCompletarNarrativa({
+              fullText,
+              ai,
+              model: currentModel,
+              config,
+              contentsBase: contents,
+              signal,
+              onChunk,
+              persistir,
+              setLoadingText
+            });
           }
 
           if (uso) {
@@ -1642,9 +1778,33 @@ export async function generateStoryTurnStream({
             }
           );
 
+          // Si el streaming se cortó con texto ya recibido e incompleto, intentamos
+          // reconectar y continuar la escena automáticamente antes de rendirnos.
+          if (recibioTexto && fullText.trim().length > 30 && !signal?.aborted && isNarrativeIncomplete(fullText)) {
+            try {
+              setLoadingText('Conexión interrumpida durante el streaming. Reconectando y completando relato...');
+              fullText = await intentarCompletarNarrativa({
+                fullText,
+                ai,
+                model: currentModel,
+                config: currentConfig,
+                contentsBase: currentContents,
+                signal,
+                onChunk,
+                persistir,
+                setLoadingText
+              });
+              if (!isNarrativeIncomplete(fullText)) {
+                await persistir(fullText.trim(), true);
+                return;
+              }
+            } catch (errRecuperacion) {
+              console.warn('Fallo en intento de rescate de streaming:', errRecuperacion);
+            }
+          }
+
           // Lo ya narrado no se tira. Si el corte llegó con la escena encaminada,
-          // se guarda y se para: reescribirla desde cero daría otra distinta y la
-          // jugadora perdería la que estaba leyendo.
+          // se guarda y se preserva íntegramente: la jugadora no pierde lo leído.
           if (recibioTexto && fullText.trim().length > 30) {
             await persistir(fullText.trim(), true);
             return;

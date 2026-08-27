@@ -19,6 +19,7 @@ import {
   leerInvitaciones,
   limpiarInvitaciones
 } from '../utils/oracle';
+import { isNarrativeIncomplete } from '../utils/geminiHelper';
 
 import {
   BookOpen,
@@ -106,6 +107,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   const mostrarAcciones = isLastMessage || accionesAbiertas;
 
   const invitaciones = isModel && hasOracle ? leerInvitaciones(m.content) : [];
+  const isIncomplete = isModel && isNarrativeIncomplete(m.content);
   const baseContent = isModel
     ? limpiarInvitaciones(
         stripStateTag(rollRequests.length ? stripRollRequests(m.content) : m.content)
@@ -344,6 +346,31 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
 
           <YouTubePreview content={m.content} />
           <SpotifyPreview content={m.content} />
+
+          {isIncomplete && isLastMessage && !isGenerating && (
+            <div className="mt-3 p-3 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent text-[var(--text-primary)] flex flex-wrap items-center justify-between gap-3 text-xs font-lora shadow-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="font-cinzel font-bold text-amber-700 dark:text-amber-300 block">
+                    Respuesta incompleta o interrumpida
+                  </span>
+                  <span className="text-[11px] text-[var(--text-secondary)]">
+                    El relato se interrumpió antes de concluir la escena.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => onContinueNarrative(idx)}
+                className="px-3 py-1.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] text-[var(--on-accent)] rounded-lg font-cinzel font-bold text-xs shadow-xs hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Continúa y concluye exactamente esta narración sin perder el texto previo"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" /> Continuar y Completar
+              </button>
+            </div>
+          )}
         </div>
         {/*
           Antes cada mensaje del Narrador arrastraba una botonera de cinco
@@ -374,6 +401,16 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
             >
               {isModel && (
                 <>
+                  {isIncomplete && (
+                    <button
+                      onClick={() => onContinueNarrative(idx)}
+                      disabled={isGenerating}
+                      className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold hover:underline cursor-pointer disabled:opacity-40"
+                      title="Reanudar y completar frase interrumpida"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" /> Completar Frase
+                    </button>
+                  )}
                   <button
                     onClick={() => onRegenerateMessage(idx)}
                     disabled={isGenerating}
