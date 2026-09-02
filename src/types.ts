@@ -283,6 +283,12 @@ export interface PlayerCharacter {
   portrait?: string;
 }
 
+export interface ProjectMemoryEdit {
+  id: string;
+  text: string;
+  createdAt: number;
+}
+
 export interface Memory {
   story: string;
   quests: Quest[];
@@ -291,6 +297,10 @@ export interface Memory {
   locations: Location[];
   current_status: string;
   manual_notes: string;
+  purpose_and_context?: string;
+  tools_and_resources?: string;
+  raw_project_memory?: string;
+  memory_edits?: ProjectMemoryEdit[];
   player_character?: PlayerCharacter;
   visual_memory?: VisualMemoryItem[];
 }

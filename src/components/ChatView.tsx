@@ -45,9 +45,7 @@ import {
   Mic,
   MoreHorizontal,
   Copy,
-  MicOff,
-  Music,
-  Wand2
+  MicOff
 } from 'lucide-react';
 interface ChatMessageItemProps {
   m: { role: 'user' | 'model'; content: string };
@@ -71,7 +69,6 @@ interface ChatMessageItemProps {
   setPreguntaOraculo: (p: string) => void;
   setOraculoAbierto: (open: boolean) => void;
   handleRollRequestClick: (req: RollRequest) => void;
-  onOpenStudio?: (tab: 'music' | 'image' | 'video' | 'voice', sceneText?: string) => void;
 }
 
 const ChatMessageItem = React.memo<ChatMessageItemProps>(({
@@ -95,8 +92,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   setDeleteModal,
   setPreguntaOraculo,
   setOraculoAbierto,
-  handleRollRequestClick,
-  onOpenStudio
+  handleRollRequestClick
 }) => {
   const isModel = m.role === 'model';
   const rollRequests = isModel ? parseRollRequests(m.content) : [];
@@ -427,15 +423,6 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                   >
                     <Play className="w-3.5 h-3.5" /> Continuar
                   </button>
-                  {onOpenStudio && (
-                    <button
-                      onClick={() => onOpenStudio('image', m.content)}
-                      className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
-                      title="Generar ilustración de esta escena o retrato"
-                    >
-                      <Wand2 className="w-3.5 h-3.5" /> Ilustrar
-                    </button>
-                  )}
                 </>
               )}
               {!isModel && (
@@ -842,9 +829,7 @@ export const ChatView: React.FC<{
     handleSaveAndRegenerate,
     handleRollRequestClick,
     onContinueNarrative,
-    onRegenerateMessage,
-    onOpenStudio: (tab: 'music' | 'image' | 'video' | 'voice', sceneText?: string) =>
-      setStudioModal({ isOpen: true, tab, sceneText })
+    onRegenerateMessage
   });
   ultimasAcciones.current = {
     handleCopyMessage,
@@ -854,9 +839,7 @@ export const ChatView: React.FC<{
     handleSaveAndRegenerate,
     handleRollRequestClick,
     onContinueNarrative,
-    onRegenerateMessage,
-    onOpenStudio: (tab: 'music' | 'image' | 'video' | 'voice', sceneText?: string) =>
-      setStudioModal({ isOpen: true, tab, sceneText })
+    onRegenerateMessage
   };
 
   const acciones = useMemo(
@@ -871,9 +854,7 @@ export const ChatView: React.FC<{
       handleRollRequestClick: (req: RollRequest) => ultimasAcciones.current.handleRollRequestClick(req),
       onContinueNarrative: (fromIndex?: number) => ultimasAcciones.current.onContinueNarrative(fromIndex),
       onRegenerateMessage: (index: number, updatedUserPrompt?: string) =>
-        ultimasAcciones.current.onRegenerateMessage(index, updatedUserPrompt),
-      onOpenStudio: (tab: 'music' | 'image' | 'video' | 'voice', sceneText?: string) =>
-        ultimasAcciones.current.onOpenStudio(tab, sceneText)
+        ultimasAcciones.current.onRegenerateMessage(index, updatedUserPrompt)
     }),
     []
   );
@@ -1087,7 +1068,6 @@ export const ChatView: React.FC<{
                     setPreguntaOraculo={setPreguntaOraculo}
                     setOraculoAbierto={setOraculoAbierto}
                     handleRollRequestClick={acciones.handleRollRequestClick}
-                    onOpenStudio={acciones.onOpenStudio}
                   />
                 );
               })
@@ -1285,35 +1265,6 @@ export const ChatView: React.FC<{
                 {d.label}
               </button>
             ))}
-
-            {/* Separador de herramientas creativas */}
-            <span className="hidden sm:inline border-r border-[var(--glass-border)] h-5 my-auto mx-1 shrink-0" />
-
-            {/* Botón de Música & Bardo */}
-            <button
-              onClick={() => {
-                const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
-                setStudioModal({ isOpen: true, tab: 'music', sceneText: lastModelMsg });
-              }}
-              className="shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)] hover:bg-[var(--glass)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
-              title="Música ambiental, sintetizador de laúd/taberna, canciones de YouTube y Spotify"
-              aria-label="Bardo & Música"
-            >
-              <Music className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Bardo & Música</span>
-            </button>
-
-            {/* Botón de Taller Creativo (Imágenes, Cinemática y Escena) */}
-            <button
-              onClick={() => {
-                const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
-                setStudioModal({ isOpen: true, tab: 'image', sceneText: lastModelMsg });
-              }}
-              className="shrink-0 rounded-lg px-2 sm:px-3 py-1 text-xs font-cinzel font-bold border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)] hover:bg-[var(--glass)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
-              title="Taller multimedia: Generar ilustraciones de escenas, retratos de personajes y videos cinemáticos a partir de la escena"
-              aria-label="Taller Creativo"
-            >
-              <Wand2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Taller Creativo</span>
-            </button>
           </div>
         </div>
 
@@ -1450,29 +1401,6 @@ export const ChatView: React.FC<{
                         </div>
                         <div className="text-[11px] text-[var(--text-secondary)] truncate">
                           {isListening ? 'Pulsa para detener' : 'Habla para escribir tu acción'}
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Opción 4: Taller Creativo */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsActionsMenuOpen(false);
-                        const lastModelMsg = [...(chat?.messages || [])].reverse().find(m => m.role === 'model')?.content || '';
-                        setStudioModal({ isOpen: true, tab: 'image', sceneText: lastModelMsg });
-                      }}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group border-t border-[var(--glass-border)]/60 mt-0.5 pt-1.5"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Wand2 className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
-                          Taller Creativo & Multimedia
-                        </div>
-                        <div className="text-[11px] text-[var(--text-secondary)] truncate">
-                          Ilustrar escenas, retratos y música
                         </div>
                       </div>
                     </button>

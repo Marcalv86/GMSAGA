@@ -55,7 +55,6 @@ import {
   Settings2,
   Sparkles,
   Trash2,
-  Wand2,
   X,
   Newspaper,
   Moon
@@ -1261,29 +1260,6 @@ export const CalendarView: React.FC<{
                       </button>
                     ))}
                   </div>
-
-                  {/* Botón directo de Taller Creativo para ilustrar el día */}
-                  <button
-                    onClick={() => {
-                      const fullScene =
-                        entradasDiaActivo.length > 0
-                          ? entradasDiaActivo
-                              .map(
-                                e =>
-                                  `${e.lugar ? `[${e.lugar}] ` : ''}${e.summary}${e.hito ? ` (${e.hito})` : ''}`
-                              )
-                              .join('. ')
-                          : `Jornada del ${nombreDiaActivo} en Faerûn`;
-                      setStudioModal({
-                        isOpen: true,
-                        tab: 'image',
-                        sceneText: `Ilustración o portada del ${nombreDiaActivo}: ${fullScene}`
-                      });
-                    }}
-                    className="text-[11px] font-cinzel font-bold text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/50 border border-amber-500/50 hover:bg-amber-200 dark:hover:bg-amber-900/70 px-2.5 py-1 rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors"
-                  >
-                    <Wand2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" /> Ilustrar esta jornada
-                  </button>
                 </div>
               </div>
 
@@ -1620,23 +1596,8 @@ export const CalendarView: React.FC<{
                               )}
                             </div>
 
-                            {/* Botones de acción por entrada (Crear contenido, Editar y Borrar) */}
+                            {/* Botones de acción por entrada (Editar y Borrar) */}
                             <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                onClick={() => {
-                                  const sceneText = `${entrada.title ? `[Título: ${entrada.title}] ` : ''}${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ''}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ''}`;
-                                  setStudioModal({
-                                    isOpen: true,
-                                    tab: 'image',
-                                    sceneText
-                                  });
-                                }}
-                                className="px-2 py-1 rounded-md text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer flex items-center gap-1 text-[10px] font-cinzel font-bold shadow-2xs transition-colors"
-                                title="Taller Creativo: Crear ilustración, música o cinemática para este acontecimiento"
-                              >
-                                <Wand2 className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-                                <span className="hidden sm:inline">Ilustrar / Audio</span>
-                              </button>
                               <button
                                 onClick={() => iniciarEdicionEntrada(entrada)}
                                 className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] cursor-pointer transition-colors"
@@ -2085,21 +2046,6 @@ export const CalendarView: React.FC<{
                                     )}
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                      onClick={() => {
-                                        const sceneText = `${entrada.lugar ? `[Lugar: ${entrada.lugar}] ` : ''}${entrada.summary}${entrada.hito ? ` [Hito: ${entrada.hito}]` : ''}`;
-                                        setStudioModal({
-                                          isOpen: true,
-                                          tab: 'image',
-                                          sceneText
-                                        });
-                                      }}
-                                      className="px-1.5 py-0.5 rounded text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer flex items-center gap-1 text-[10px] font-cinzel font-semibold shadow-2xs"
-                                      title="Taller Creativo: Crear contenido para este acontecimiento"
-                                    >
-                                      <Wand2 className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-                                      <span className="hidden sm:inline">Crear</span>
-                                    </button>
                                     <button
                                       onClick={() => iniciarEdicionEntrada(entrada)}
                                       className="text-[var(--text-secondary)] hover:text-[var(--accent)] p-1 cursor-pointer"

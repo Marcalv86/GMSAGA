@@ -9,10 +9,9 @@ import {
   Search,
   Eye,
   EyeOff,
-  Wand2,
+  Check,
   Lock
 } from 'lucide-react';
-import { CreativeStudioModal } from './CreativeStudioModal';
 import {
   aDiaAbsoluto,
   calendarioValido,
@@ -29,7 +28,8 @@ interface StatusViewProps {
 }
 
 export const StatusView: React.FC<StatusViewProps> = ({
-  project
+  project,
+  onUpdateMemory
 }) => {
   const memory = project.memory || {
     story: '',
@@ -52,12 +52,21 @@ export const StatusView: React.FC<StatusViewProps> = ({
   // --- NOTAS Y SECRETOS (SOLO LECTURA CON VISIBILIDAD TOGGLE) ---
   const [mostrarNotasNarrador, setMostrarNotasNarrador] = useState(false);
 
-  // --- MODAL TALLER CREATIVO ---
-  const [studioModal, setStudioModal] = useState<{
-    isOpen: boolean;
-    tab?: 'image' | 'video' | 'music' | 'diary';
-    sceneText: string;
-  } | null>(null);
+  const toggleQuest = (id: string) => {
+    if (!onUpdateMemory) return;
+    onUpdateMemory(prev => {
+      const mem = prev || { story: '', quests: [], npcs: [], locations: [], current_status: '', manual_notes: '' };
+      const quests = (mem.quests || []).map(q => {
+        if (q.id !== id) return q;
+        const isDone = q.status.toLowerCase().includes('complet') || q.status.toLowerCase().includes('resuelt');
+        return {
+          ...q,
+          status: isDone ? 'Activa' : 'Completada'
+        };
+      });
+      return { ...mem, quests };
+    });
+  };
 
   // Hilos programados en el tiempo
   const threads = project.threads || [];
@@ -151,25 +160,6 @@ export const StatusView: React.FC<StatusViewProps> = ({
               Dónde están ahora mismo, qué peligros inmediatos enfrentan y con qué recursos cuentan.
             </p>
           </div>
-
-          {memory.current_status && (
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() =>
-                  setStudioModal({
-                    isOpen: true,
-                    tab: 'image',
-                    sceneText: `Estado actual: ${memory.current_status}`
-                  })
-                }
-                title="Taller Creativo: Ilustrar o musicalizar la situación actual"
-                className="flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-cinzel font-bold text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 cursor-pointer shadow-2xs transition-colors"
-              >
-                <Wand2 className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-                <span>Crear contenido</span>
-              </button>
-            </div>
-          )}
         </div>
 
         {memory.current_status ? (
@@ -371,20 +361,16 @@ export const StatusView: React.FC<StatusViewProps> = ({
                         </span>
                       </div>
 
-                      <button
-                        onClick={() =>
-                          setStudioModal({
-                            isOpen: true,
-                            tab: 'image',
-                            sceneText: `Misión: ${q.title}. Objetivo: ${q.objective || ''}. Progreso: ${q.progress || ''}`
-                          })
-                        }
-                        className="p-1 rounded text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer"
-                        title="Taller Creativo: Ilustrar esta misión"
-                      >
-                        <Wand2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => toggleQuest(q.id)}
+                          className={`p-1 rounded transition-colors cursor-pointer ${
+                            isDone ? 'text-emerald-600 hover:text-emerald-700' : 'text-[var(--text-secondary)] hover:text-emerald-600'
+                          }`}
+                          title={isDone ? 'Marcar como activa' : 'Marcar como completada'}
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </div>
 
                     {/* Título */}
                     <h3 className={`font-cinzel font-bold text-sm sm:text-base m-0 ${isDone ? 'line-through opacity-80' : 'text-[var(--text-primary)]'}`}>
@@ -492,16 +478,6 @@ export const StatusView: React.FC<StatusViewProps> = ({
           </div>
         )}
       </section>
-
-      {/* MODAL TALLER CREATIVO */}
-      {studioModal?.isOpen && (
-        <CreativeStudioModal
-          isOpen={studioModal.isOpen}
-          initialTab={studioModal.tab || 'image'}
-          sceneText={studioModal.sceneText}
-          onClose={() => setStudioModal(null)}
-        />
-      )}
     </div>
   );
 };

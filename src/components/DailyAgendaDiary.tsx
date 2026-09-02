@@ -39,7 +39,6 @@ import {
   Trash2,
   Save,
   X,
-  Wand2,
   Image as ImageIcon,
   Smile,
   Clock,
@@ -913,29 +912,6 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
 
               {entradasDiaActivo.length > 0 && (
                 <button
-                  onClick={() => {
-                    const fullScene = entradasDiaActivo
-                      .map(
-                        e =>
-                          `${e.lugar ? `[${e.lugar}] ` : ''}${e.summary}${e.hito ? ` (${e.hito})` : ''}`
-                      )
-                      .join('. ');
-                    setStudioModal({
-                      isOpen: true,
-                      tab: 'image',
-                      sceneText: `Acontecimientos del ${nombreDiaActivo}: ${fullScene}`
-                    });
-                  }}
-                  className="px-2.5 sm:px-3 py-1.5 text-xs font-cinzel font-bold text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/40 border border-amber-500/50 hover:bg-amber-200 dark:hover:bg-amber-900/60 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs shrink-0"
-                  title="Taller Creativo: Generar ilustración o música para el día"
-                >
-                  <Wand2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                  <span className="hidden sm:inline">Taller Creativo</span>
-                </button>
-              )}
-
-              {entradasDiaActivo.length > 0 && (
-                <button
                   onClick={() => handleClearDay(diaSeleccionado)}
                   className="p-1.5 sm:p-2 text-red-500 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-red-500/30 shrink-0"
                   title="Vaciar todas las entradas de este día"
@@ -1061,19 +1037,6 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                             title="Editar entrada"
                           >
                             <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              setStudioModal({
-                                isOpen: true,
-                                tab: 'image',
-                                sceneText: `${entrada.title ? `${entrada.title}: ` : ''}${entrada.summary}`
-                              })
-                            }
-                            className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 rounded-lg transition-colors cursor-pointer"
-                            title="Taller Creativo (Generar imagen/música)"
-                          >
-                            <Wand2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteEntry(entrada.id)}
@@ -1532,19 +1495,6 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                   title="Cambiar Ánimo / Mood"
                 >
                   <Smile className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() =>
-                    setStudioModal({
-                      isOpen: true,
-                      tab: 'image',
-                      sceneText: `${entryDraft.title ? `${entryDraft.title}: ` : ''}${entryDraft.summary}`
-                    })
-                  }
-                  className="p-1.5 sm:p-2 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 transition-colors cursor-pointer"
-                  title="Taller Creativo (Generar con IA)"
-                >
-                  <Wand2 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleSaveEntry}

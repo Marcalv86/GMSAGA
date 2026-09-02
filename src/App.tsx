@@ -85,6 +85,7 @@ import {
   setStoredKeyRotationMode,
   setStoredMemorySyncGranularity,
   syncFullCampaignFromChats,
+  generateClaudeProjectMemory,
   isNarrativeIncomplete
 } from './utils/geminiHelper';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
@@ -1156,6 +1157,42 @@ export default function App() {
           currentFiles
         ).catch(() => {});
       }
+      // Actualización automática de memoria general estilo Claude/Gemini:
+      // Si la campaña no tiene memoria sintetizada inicial o han transcurrido mensajes,
+      // sintetiza la memoria viva en segundo plano de manera no bloqueante.
+      if (currentProject) {
+        const latestChats = getLocalChats(currentProject.id);
+        const effectiveChats = latestChats.length > 0 ? latestChats : currentChats;
+        const totalMsgs = effectiveChats.reduce((acc, c) => acc + (c.messages?.length || 0), 0);
+        const lastSyncTime = currentProject.lastMemoryUpdate || 0;
+        const msSinceLastSync = Date.now() - lastSyncTime;
+        const needsInitialSync = !currentProject.memory?.raw_project_memory;
+        const needsPeriodicSync = totalMsgs > 0 && totalMsgs % 6 === 0 && msSinceLastSync > 120000;
+
+        if (needsInitialSync || needsPeriodicSync) {
+          setTimeout(async () => {
+            try {
+              const newRawMem = await generateClaudeProjectMemory({
+                project: currentProject,
+                chats: effectiveChats,
+                files: currentFiles
+              });
+              if (newRawMem && newRawMem.trim().length > 0) {
+                await handleUpdateProjectField(p => ({
+                  lastMemoryUpdate: Date.now(),
+                  memory: {
+                    ...(p.memory || {}),
+                    raw_project_memory: newRawMem
+                  }
+                }));
+              }
+            } catch (err) {
+              console.warn('Auto-background memory synthesis skipped:', err);
+            }
+          }, 1500);
+        }
+      }
+
       if (onVolverVisibleRef.current) {
         document.removeEventListener('visibilitychange', onVolverVisibleRef.current);
         window.removeEventListener('focus', onVolverVisibleRef.current);
@@ -2684,6 +2721,8 @@ export default function App() {
           {activeTab === 'memory' && currentProject && (
             <SimpleMemoryView
               project={currentProject}
+              chats={currentChats}
+              files={currentFiles}
               onUpdateMemory={handleUpdateMemory}
               onUpdateProject={handleUpdateProjectField}
               onTriggerAIUpdate={handleTriggerMemorySyncWithAI}

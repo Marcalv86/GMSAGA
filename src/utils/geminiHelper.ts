@@ -1002,7 +1002,9 @@ export function buildTurnPayload({
 
   // Cola de los capítulos anteriores. Se recorre hacia atrás y se incluye un contexto
   // sustancial de las sesiones previas para mantener la coherencia narrativa global.
-  const PREVIO_MAX = 30000;
+  // Cola de sesiones anteriores. Se incluye un resumen compacto de apoyo.
+  // La memoria general del proyecto (Project Memory) sintetiza el grueso del lore y estado.
+  const PREVIO_MAX = 8000;
   const sortedChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
   const indiceActual = sortedChats.findIndex(c => c.id === currentChatId);
   const anteriores = sortedChats.slice(0, indiceActual < 0 ? sortedChats.length : indiceActual);
@@ -1012,8 +1014,8 @@ export function buildTurnPayload({
   for (let i = anteriores.length - 1; i >= 0 && acumulado < PREVIO_MAX; i--) {
     const c = anteriores[i];
     const texto =
-      `\n--- Sesión: ${c.name} ---\n` +
-      (c.messages || []).map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n');
+      `\n--- Sesión previa: ${c.name} ---\n` +
+      (c.messages || []).slice(-10).map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n');
     const hueco = PREVIO_MAX - acumulado;
     const recorte = texto.length > hueco ? texto.slice(-hueco) : texto;
     trozos.unshift(recorte);
@@ -1021,45 +1023,28 @@ export function buildTurnPayload({
   }
   const allPreviousHistory = trozos.join('');
 
+  let rawProjectMemBlock = '';
+  if (project.memory?.raw_project_memory) {
+    rawProjectMemBlock = `
+=== MEMORIA GENERAL DEL PROYECTO (PROJECT MEMORY) ===
+${project.memory.raw_project_memory.trim()}
+`;
+  }
+
+  let userDirectivesBlock = '';
+  if (project.memory?.memory_edits && project.memory.memory_edits.length > 0) {
+    userDirectivesBlock = `
+=== DIRECTIVAS Y EDICIONES MANUALES DEL USUARIO (CUMPLIMIENTO OBLIGATORIO) ===
+${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n')}
+`;
+  }
+
   const memoryContext = project.memory
     ? `
-HISTORIA HASTA AHORA:
-${project.memory.story || 'Inicio de la crónica.'}
-
-ESTADO ACTUAL:
-${project.memory.current_status || 'Todo en orden.'}
-
-OBJETIVOS Y TRAMAS ACTIVAS:
-${(project.memory.quests || []).map(q => `- [${q.type}] ${q.title}: ${q.objective} (Progreso: ${q.progress})`).join('\n') || 'Sin tramas activas.'}
-
-PERSONAJES IMPORTANTES (NPCS):
-${(project.memory.npcs || []).map(n => `- ${n.name} (${n.relation}): ${n.notes}`).join('\n') || 'Sin PNJs registrados.'}
-
-VÍNCULOS CON EL PROTAGONISTA (solo los personajes que ya son habituales):
-${
-  (project.memory.npcs || []).filter(n => n.recurrente).length
-    ? (project.memory.npcs || [])
-        .filter(n => n.recurrente)
-        .map(
-          n =>
-            `- ${n.name}${n.vinculo ? ` [${n.vinculo}]` : ''}${
-              n.atr !== undefined || n.vin !== undefined || n.con !== undefined
-                ? ` (Afinidad actual -> ATR: ${n.atr ?? 0}/20, VÍN: ${n.vin ?? 0}/20, CON: ${n.con ?? 0}/20)`
-                : ''
-            }\n    Deja ver: ${n.aparenta || 'sin registrar'}\n    Se guarda: ${n.oculta || 'sin registrar'}`
-        )
-        .join('\n')
-    : 'Todavía ninguno. Ningún personaje ha vuelto suficientes veces.'
-}
-
-LUGARES CLAVE:
-${(project.memory.locations || []).map(l => `- ${l.name}: ${l.desc}`).join('\n') || 'Sin lugares clave.'}
-
-NOTAS DIRECTAS DEL MAESTRO:
-${project.memory.manual_notes || 'Sin notas adicionales.'}
-
-RESUMEN DE SESIONES ANTERIORES:
-${allPreviousHistory.length > 0 ? allPreviousHistory : 'No hay sesiones previas.'}
+${rawProjectMemBlock}
+${userDirectivesBlock}
+${project.memory.manual_notes ? `NOTAS DIRECTAS DEL MAESTRO:\n${project.memory.manual_notes}\n` : ''}
+${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHistory}` : ''}
   `.trim()
     : 'No hay memoria acumulada aún.';
 
@@ -1330,17 +1315,16 @@ ${bloqueVivo}`;
     m => m.content !== 'Tirando dados...' && m.content !== 'Pensando...'
   );
 
-  // Enviamos el historial íntegro del capítulo activo para garantizar coherencia
-  // conversacional total, sin amnesias ni pérdidas de tiradas pasadas. Gemini cuenta
-  // con una ventana de contexto de más de 1M de tokens, por lo que incluimos la escena completa.
+  // Sesión activa (Capítulo en curso): Se incluye íntegra para garantizar continuidad,
+  // coherencia y evitar amnesias locales en los turnos recientes, aprovechando la amplia ventana
+  // de contexto del modelo. Si la sesión supera un umbral extremo (~400k caracteres),
+  // se protege con un límite de seguridad generoso.
   const ESCENA_MAX = 400000;
-  const MENSAJES_MINIMOS = 100;
   let usados = 0;
   let desde = historyCompleto.length;
   while (desde > 0) {
     const coste = (historyCompleto[desde - 1].content || '').length;
-    const yaIncluidos = historyCompleto.length - desde;
-    if (usados + coste > ESCENA_MAX && yaIncluidos >= MENSAJES_MINIMOS) break;
+    if (usados + coste > ESCENA_MAX && (historyCompleto.length - desde) >= 100) break;
     usados += coste;
     desde--;
   }
@@ -2654,6 +2638,132 @@ ${historyToAnalyze}`;
 export async function syncMemoryFromChats(project: Project, chats: Chat[], files?: ProjectFile[]): Promise<Partial<Memory>> {
   const result = await syncFullCampaignFromChats(project, chats, files);
   return result.memory;
+}
+
+/**
+ * Regenera y sintetiza la memoria unificada del proyecto (estilo Claude Project Memory)
+ * con las 3 secciones canónicas (Purpose & context, Current state, Tools & resources)
+ * y respetando estrictamente las directivas manuales de "Dile a la IA qué recordar u olvidar".
+ */
+export async function generateClaudeProjectMemory({
+  project,
+  chats,
+  files = [],
+  newDirective
+}: {
+  project: Project;
+  chats: Chat[];
+  files?: ProjectFile[];
+  newDirective?: string;
+}): Promise<string> {
+  // Historial exhaustivo de sesiones recientes
+  const validChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
+  let recentHistory = '';
+  for (const c of validChats) {
+    const msgs = (c.messages || []).filter(m => m.content && m.content.trim().length > 0);
+    if (msgs.length > 0) {
+      recentHistory += `\n=== SESIÓN: ${c.name} (Total mensajes: ${msgs.length}) ===\n`;
+      // Tomamos los primeros mensajes para el planteamiento y los más recientes para el estado actual
+      if (msgs.length <= 40) {
+        recentHistory += msgs.map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n\n');
+      } else {
+        recentHistory += `[Primeros compases de la sesión]:\n` +
+          msgs.slice(0, 10).map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n\n') +
+          `\n\n[... últimos compases de la sesión activa ...]:\n` +
+          msgs.slice(-30).map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n\n');
+      }
+    }
+  }
+
+  // Resumen y extractos de los archivos del proyecto (fichas, compendios, reglas)
+  const docFiles = files.filter(f => !f.isImage && !f.isAudio);
+  const fileSummaryList = docFiles.length > 0
+    ? docFiles.map(f => {
+        const snippet = f.content ? `:\n"${f.content.slice(0, 500).replace(/\n+/g, ' ')}..."` : '';
+        return `- **${f.name}**${f.category ? ` [${f.category}]` : ''}${snippet}`;
+      }).join('\n\n')
+    : '- Ningún documento adicional cargado.';
+
+  // Directivas manuales del usuario
+  const allDirectives = [...(project.memory?.memory_edits || [])];
+  if (newDirective && newDirective.trim().length > 0) {
+    allDirectives.push({
+      id: `edit_${Date.now()}`,
+      text: newDirective.trim(),
+      createdAt: Date.now()
+    });
+  }
+
+  const directivesPrompt = allDirectives.length > 0
+    ? `DIRECTIVAS MANUALES DEL USUARIO (DE OBLIGADO CUMPLIMIENTO):\n${allDirectives.map((d, i) => `${i + 1}. ${d.text}`).join('\n')}`
+    : 'No hay directivas manuales adicionales.';
+
+  // Información del Personaje Jugador si existe
+  const pc = project.memory?.player_character;
+  const pcSummary = pc ? `PERSONAJE PRINCIPAL (PJ / OC):
+- Nombre: ${pc.name}
+- Raza: ${pc.race || 'No especificada'}
+- Clase/Subclase: ${pc.class || ''} ${pc.subclass || ''}
+- Trasfondo: ${pc.background || 'No especificado'}
+- Rasgos/Notas: ${pc.summary || pc.notes || 'Ninguna'}
+` : '';
+
+  const prompt = `Eres el sintetizador de memoria de proyecto para este entorno de rol (D&D 5e / Forgotten Realms).
+Tu tarea es generar o actualizar la MEMORIA PERSISTENTE DEL PROYECTO (en formato estructurado Markdown, exactamente como la memoria de proyectos de Claude).
+
+Debes sintetizar y redactar un documento sintético, riguroso, inmersivo y conciso con EXACTAMENTE estas tres secciones principales en Markdown:
+
+### Purpose & context
+- Párrafo fluido explicando quién es el jugador, el personaje protagonista (nombre, clase, raza, trasfondo), compañeros o invocaciones directas, universo/ambientación (Forgotten Realms, Bregan D'aerthe, Luskan, Menzoberranzan, etc.), y estilo narrativo (prosa atmosférica, tiradas ocultas integradas).
+- Subsección "Key worldbuilding parameters established:" con viñetas concisas que reflejen las reglas de ambientación, tono, crueldad canónica de los drow, etc.
+
+### Current state
+- Párrafo conciso y descriptivo del estado exacto en el que se encuentra la sesión activa: situación física inmediata del protagonista (ataduras, salud, pertrechos), acompañantes presentes, ubicación actual, peligros o descubrimientos inmediatos.
+
+### Tools & resources
+- Lista en viñetas de las herramientas, fichas, módulos y documentos reales cargados en el proyecto.
+
+INFORMACIÓN DEL PROYECTO:
+- Nombre: ${project.name}
+- Directivas / Instrucciones del Sistema: ${project.instructions || 'Sin directivas específicas'}
+- Estilo: ${project.style || 'Narrativo inmersivo'}
+${pcSummary}
+- Memoria actual previa:
+${project.memory?.raw_project_memory || project.memory?.story || 'Sin memoria previa'}
+- Estado actual previo:
+${project.memory?.current_status || 'Sin estado previo'}
+
+ARCHIVOS Y DOCUMENTOS DEL PROYECTO:
+${fileSummaryList}
+
+${directivesPrompt}
+
+HISTORIAL DE SESIONES RECIENTES:
+${recentHistory.length > 0 ? recentHistory.slice(-90000) : 'No hay historial de chat previo.'}
+
+REGLAS DE SALIDA:
+- Genera EXCLUSIVAMENTE el texto en Markdown estructurado con las 3 secciones (### Purpose & context, ### Current state, ### Tools & resources).
+- NO incluyas introducciones como "Aquí tienes la memoria:", ni etiquetas de bloque de código json o markdown \`\`\`. Devuelve el texto Markdown directo.
+- Si las directivas del usuario modifican parámetros (ej. dejar de usar oráculo, eliminar bardo/taller creativo, cambiar reglas), intéggralas y refléjalas fielmente en el contenido.`;
+
+  try {
+    const bgModel = getBackgroundTaskModel();
+    const safetySetting = getStoredSafetyLevel();
+    const response = await generateContentWithFailover({
+      primaryModel: bgModel,
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        ...(esModeloAbierto(bgModel) ? {} : { safetySettings: buildSafetySettings(safetySetting) })
+      } as any
+    });
+
+    const generated = (response.text || '').trim();
+    return generated;
+  } catch (err) {
+    console.error('Error al generar la memoria del proyecto:', err);
+    throw err;
+  }
 }
 
 /**
