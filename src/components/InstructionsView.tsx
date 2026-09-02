@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, DiseaseConfig, DiseaseRuleSystem } from '../types';
+import { Project, DiseaseConfig, DiseaseRuleSystem, NarrativeLengthConfig, NarrativeLengthMode, DialoguePacing } from '../types';
 import {
   DEFAULT_DM_INSTRUCTIONS,
   DEFAULT_SYSTEM,
@@ -19,15 +19,18 @@ import {
 
 import {
   Activity,
+  AlignLeft,
   Check,
   ChevronDown,
   ChevronUp,
   Dices,
   Flame,
+  Gauge,
   HeartPulse,
   Hourglass,
   Info,
   Lock,
+  MessageSquare,
   PenTool,
   RefreshCw,
   Save,
@@ -66,6 +69,24 @@ export const InstructionsView: React.FC<{
     project.diseaseConfig?.customRules || DEFAULT_DISEASE_CUSTOM_RULES
   );
 
+  // Estado para Control de Extensión y Párrafos Mín / Máx
+  const [narrativeLengthMode, setNarrativeLengthMode] = useState<NarrativeLengthMode>(
+    project.narrativeLength?.mode || 'adaptativo'
+  );
+  const [minParagraphs, setMinParagraphs] = useState<number>(
+    project.narrativeLength?.minParagraphs ?? 2
+  );
+  const [maxParagraphs, setMaxParagraphs] = useState<number>(
+    project.narrativeLength?.maxParagraphs ?? 4
+  );
+  const [dialoguePacing, setDialoguePacing] = useState<DialoguePacing>(
+    project.narrativeLength?.dialoguePacing || 'auto'
+  );
+  const [customLengthGuideline, setCustomLengthGuideline] = useState<string>(
+    project.narrativeLength?.customGuideline || ''
+  );
+  const [showLengthAdvanced, setShowLengthAdvanced] = useState(false);
+
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [showProtocolsDetail, setShowProtocolsDetail] = useState(false);
   const [showDiseaseAdvanced, setShowDiseaseAdvanced] = useState(false);
@@ -81,6 +102,7 @@ export const InstructionsView: React.FC<{
     system: string;
     style: string;
     diseaseConfig: DiseaseConfig;
+    narrativeLength?: NarrativeLengthConfig;
   } | null>(null);
 
   useEffect(() => {
@@ -108,6 +130,11 @@ export const InstructionsView: React.FC<{
     );
     setExhaustionRules(project.diseaseConfig?.exhaustionRules || DND2024_EXHAUSTION_RULES);
     setCustomDiseaseRules(project.diseaseConfig?.customRules || DEFAULT_DISEASE_CUSTOM_RULES);
+    setNarrativeLengthMode(project.narrativeLength?.mode || 'equilibrado');
+    setMinParagraphs(project.narrativeLength?.minParagraphs ?? 2);
+    setMaxParagraphs(project.narrativeLength?.maxParagraphs ?? 4);
+    setDialoguePacing(project.narrativeLength?.dialoguePacing || 'conciso');
+    setCustomLengthGuideline(project.narrativeLength?.customGuideline || '');
     setSaveStatus('saved');
   }, [project.id]);
 
@@ -120,7 +147,8 @@ export const InstructionsView: React.FC<{
     newInst?: string,
     newSys?: string,
     newSty?: string,
-    newDiseaseCfg?: Partial<DiseaseConfig>
+    newDiseaseCfg?: Partial<DiseaseConfig>,
+    newLengthCfg?: Partial<NarrativeLengthConfig>
   ) => {
     const activeDiseaseCfg: DiseaseConfig = {
       system: newDiseaseCfg?.system ?? diseaseSystem,
@@ -129,11 +157,20 @@ export const InstructionsView: React.FC<{
       customRules: newDiseaseCfg?.customRules ?? customDiseaseRules
     };
 
+    const activeLengthCfg: NarrativeLengthConfig = {
+      mode: newLengthCfg?.mode ?? narrativeLengthMode,
+      minParagraphs: newLengthCfg?.minParagraphs ?? minParagraphs,
+      maxParagraphs: newLengthCfg?.maxParagraphs ?? maxParagraphs,
+      dialoguePacing: newLengthCfg?.dialoguePacing ?? dialoguePacing,
+      customGuideline: newLengthCfg?.customGuideline !== undefined ? newLengthCfg.customGuideline : customLengthGuideline
+    };
+
     const payload: Partial<Project> = {
       instructions: newInst !== undefined ? newInst : instructions,
       system: newSys !== undefined ? newSys : system,
       style: newSty !== undefined ? newSty : style,
-      diseaseConfig: activeDiseaseCfg
+      diseaseConfig: activeDiseaseCfg,
+      narrativeLength: activeLengthCfg
     };
 
     setSaveStatus('saving');
@@ -151,7 +188,8 @@ export const InstructionsView: React.FC<{
     newInst?: string,
     newSys?: string,
     newSty?: string,
-    newDiseaseCfg?: Partial<DiseaseConfig>
+    newDiseaseCfg?: Partial<DiseaseConfig>,
+    newLengthCfg?: Partial<NarrativeLengthConfig>
   ) => {
     setSaveStatus('unsaved');
     const activeDiseaseCfg: DiseaseConfig = {
@@ -161,18 +199,55 @@ export const InstructionsView: React.FC<{
       customRules: newDiseaseCfg?.customRules ?? customDiseaseRules
     };
 
+    const activeLengthCfg: NarrativeLengthConfig = {
+      mode: newLengthCfg?.mode ?? narrativeLengthMode,
+      minParagraphs: newLengthCfg?.minParagraphs ?? minParagraphs,
+      maxParagraphs: newLengthCfg?.maxParagraphs ?? maxParagraphs,
+      dialoguePacing: newLengthCfg?.dialoguePacing ?? dialoguePacing,
+      customGuideline: newLengthCfg?.customGuideline !== undefined ? newLengthCfg.customGuideline : customLengthGuideline
+    };
+
     pendingRef.current = {
       instructions: newInst !== undefined ? newInst : instructions,
       system: newSys !== undefined ? newSys : system,
       style: newSty !== undefined ? newSty : style,
-      diseaseConfig: activeDiseaseCfg
+      diseaseConfig: activeDiseaseCfg,
+      narrativeLength: activeLengthCfg
     };
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = setTimeout(() => {
-      saveChanges(newInst, newSys, newSty, newDiseaseCfg);
+      saveChanges(newInst, newSys, newSty, newDiseaseCfg, newLengthCfg);
     }, 1500);
+  };
+
+  const handleSelectLengthPreset = async (mode: NarrativeLengthMode) => {
+    let min = 2;
+    let max = 4;
+    if (mode === 'adaptativo') {
+      min = 1;
+      max = 4;
+    } else if (mode === 'agil') {
+      min = 1;
+      max = 2;
+    } else if (mode === 'detallado') {
+      min = 4;
+      max = 6;
+    } else if (mode === 'personalizado') {
+      min = minParagraphs;
+      max = maxParagraphs;
+    }
+
+    setNarrativeLengthMode(mode);
+    setMinParagraphs(min);
+    setMaxParagraphs(max);
+
+    await saveChanges(undefined, undefined, undefined, undefined, {
+      mode,
+      minParagraphs: min,
+      maxParagraphs: max
+    });
   };
 
   const handleApplyDiseasePreset = async (presetType: 'dnd5e_2024' | 'dnd5e' | 'grimdark' | 'narrative') => {
@@ -221,12 +296,29 @@ export const InstructionsView: React.FC<{
       setAutoPenalties(true);
       setExhaustionRules(DND2024_EXHAUSTION_RULES);
       setCustomDiseaseRules(DEFAULT_DISEASE_CUSTOM_RULES);
-      await saveChanges(DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE, {
-        system: 'dnd5e_2024',
-        autoPenalties: true,
-        exhaustionRules: DND2024_EXHAUSTION_RULES,
-        customRules: DEFAULT_DISEASE_CUSTOM_RULES
-      });
+      setNarrativeLengthMode('equilibrado');
+      setMinParagraphs(2);
+      setMaxParagraphs(4);
+      setDialoguePacing('conciso');
+      setCustomLengthGuideline('');
+      await saveChanges(
+        DEFAULT_DM_INSTRUCTIONS,
+        DEFAULT_SYSTEM,
+        DEFAULT_STYLE,
+        {
+          system: 'dnd5e_2024',
+          autoPenalties: true,
+          exhaustionRules: DND2024_EXHAUSTION_RULES,
+          customRules: DEFAULT_DISEASE_CUSTOM_RULES
+        },
+        {
+          mode: 'equilibrado',
+          minParagraphs: 2,
+          maxParagraphs: 4,
+          dialoguePacing: 'conciso',
+          customGuideline: ''
+        }
+      );
     };
 
     if (onRequestConfirm) {
@@ -255,8 +347,8 @@ export const InstructionsView: React.FC<{
       ) {
         fileText = await file.text();
       } else {
-        const reader = new FileReader();
         fileText = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
           reader.onload = () => resolve((reader.result as string) || '');
           reader.onerror = reject;
           reader.readAsText(file);
@@ -720,6 +812,341 @@ export const InstructionsView: React.FC<{
             </div>
           </div>
         )}
+      </div>
+
+      {/* SECCIÓN: CONTROL DE EXTENSIÓN Y RITMO NARRATIVO (PÁRRAFOS MÍNIMO / MÁXIMO) */}
+      <div className="bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.25)] rounded-lg p-4 md:p-6 shadow-sm mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-md bg-amber-900/20 text-[var(--accent)] shrink-0">
+              <AlignLeft className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-cinzel text-base md:text-lg m-0 text-[var(--accent)] flex items-center gap-2">
+                Control de Extensión y Ritmo Narrativo
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
+                Controla la longitud de las respuestas del DM (párrafos mínimos y máximos) para evitar textos excesivos en diálogos o conversaciones con PNJs.
+              </p>
+            </div>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-cinzel font-bold bg-amber-100/80 text-amber-950 border border-amber-300">
+            <Gauge className="w-3.5 h-3.5 text-[var(--accent)]" />
+            <span>
+              {narrativeLengthMode === 'adaptativo' && 'Adaptativo Inteligente (Auto)'}
+              {narrativeLengthMode === 'agil' && 'Modo Ágil (1 - 2 párrafos)'}
+              {narrativeLengthMode === 'equilibrado' && 'Modo Equilibrado (2 - 4 párrafos)'}
+              {narrativeLengthMode === 'detallado' && 'Modo Detallado (4 - 6 párrafos)'}
+              {narrativeLengthMode === 'personalizado' && `Personalizado (${minParagraphs} - ${maxParagraphs} párrafos)`}
+            </span>
+          </div>
+        </div>
+
+        {/* Presets Rápidos */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+          <button
+            type="button"
+            onClick={() => handleSelectLengthPreset('adaptativo')}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all relative ${
+              narrativeLengthMode === 'adaptativo'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>Adaptativo (IA)</span>
+              {narrativeLengthMode === 'adaptativo' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <div className="text-[11px] font-semibold text-[var(--text-primary)] mb-1">Auto-contextual</div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              La IA modula automáticamente: 1-2 párrafos en diálogos con PNJs y combates; 2-4 en exploración y escenarios.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectLengthPreset('agil')}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              narrativeLengthMode === 'agil'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>Ágil / Diálogos</span>
+              {narrativeLengthMode === 'agil' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <div className="text-[11px] font-semibold text-[var(--text-primary)] mb-1">1 - 2 párrafos</div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Respuestas directas y rápidas siempre. Ideal para conversaciones continuas sin parrafadas.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectLengthPreset('equilibrado')}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              narrativeLengthMode === 'equilibrado'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>Equilibrado</span>
+              {narrativeLengthMode === 'equilibrado' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <div className="text-[11px] font-semibold text-[var(--text-primary)] mb-1">2 - 4 párrafos</div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Equilibrio clásico entre ambientación sensorial y réplicas de los personajes.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectLengthPreset('detallado')}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              narrativeLengthMode === 'detallado'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>Detallado</span>
+              {narrativeLengthMode === 'detallado' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <div className="text-[11px] font-semibold text-[var(--text-primary)] mb-1">4 - 6 párrafos</div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Mayor riqueza en descripción de estancias, atmósfera y momentos climáticos.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectLengthPreset('personalizado')}
+            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
+              narrativeLengthMode === 'personalizado'
+                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
+                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
+            }`}
+          >
+            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
+              <span>Personalizado</span>
+              {narrativeLengthMode === 'personalizado' && <Check className="w-3.5 h-3.5 text-green-700" />}
+            </div>
+            <div className="text-[11px] font-semibold text-[var(--text-primary)] mb-1">{minParagraphs} - {maxParagraphs} párrafos</div>
+            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
+              Ajusta manualmente los valores numéricos exactos de párrafos y reglas de conversación.
+            </p>
+          </button>
+        </div>
+
+        {/* Ajustes Numéricos y de Diálogo */}
+        <div className="bg-[var(--bg-color)] p-3.5 md:p-4 rounded-lg border border-[rgba(139,69,19,0.2)] mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Controles de Párrafos Mínimo / Máximo */}
+            <div>
+              <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] mb-2 flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-[var(--accent)]" /> Rango de Párrafos por Respuesta
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-[var(--sidebar-bg)] p-2.5 rounded border border-[rgba(139,69,19,0.25)]">
+                  <label className="text-[10px] font-cinzel font-bold text-[var(--text-secondary)] block mb-1 uppercase">
+                    Mínimo Párrafos
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={minParagraphs <= 1}
+                      onClick={() => {
+                        const newMin = Math.max(1, minParagraphs - 1);
+                        setMinParagraphs(newMin);
+                        setNarrativeLengthMode('personalizado');
+                        scheduleDebouncedSave(undefined, undefined, undefined, undefined, {
+                          mode: 'personalizado',
+                          minParagraphs: newMin,
+                          maxParagraphs
+                        });
+                      }}
+                      className="w-7 h-7 rounded bg-[var(--bg-color)] border border-[rgba(139,69,19,0.3)] hover:border-[var(--accent)] font-bold text-xs disabled:opacity-40 cursor-pointer flex items-center justify-center"
+                    >
+                      -
+                    </button>
+                    <span className="font-mono font-bold text-sm text-[var(--accent)] min-w-[24px] text-center">
+                      {minParagraphs}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={minParagraphs >= maxParagraphs}
+                      onClick={() => {
+                        const newMin = Math.min(maxParagraphs, minParagraphs + 1);
+                        setMinParagraphs(newMin);
+                        setNarrativeLengthMode('personalizado');
+                        scheduleDebouncedSave(undefined, undefined, undefined, undefined, {
+                          mode: 'personalizado',
+                          minParagraphs: newMin,
+                          maxParagraphs
+                        });
+                      }}
+                      className="w-7 h-7 rounded bg-[var(--bg-color)] border border-[rgba(139,69,19,0.3)] hover:border-[var(--accent)] font-bold text-xs disabled:opacity-40 cursor-pointer flex items-center justify-center"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-[var(--sidebar-bg)] p-2.5 rounded border border-[rgba(139,69,19,0.25)]">
+                  <label className="text-[10px] font-cinzel font-bold text-[var(--text-secondary)] block mb-1 uppercase">
+                    Máximo Párrafos
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={maxParagraphs <= minParagraphs}
+                      onClick={() => {
+                        const newMax = Math.max(minParagraphs, maxParagraphs - 1);
+                        setMaxParagraphs(newMax);
+                        setNarrativeLengthMode('personalizado');
+                        scheduleDebouncedSave(undefined, undefined, undefined, undefined, {
+                          mode: 'personalizado',
+                          minParagraphs,
+                          maxParagraphs: newMax
+                        });
+                      }}
+                      className="w-7 h-7 rounded bg-[var(--bg-color)] border border-[rgba(139,69,19,0.3)] hover:border-[var(--accent)] font-bold text-xs disabled:opacity-40 cursor-pointer flex items-center justify-center"
+                    >
+                      -
+                    </button>
+                    <span className="font-mono font-bold text-sm text-[var(--accent)] min-w-[24px] text-center">
+                      {maxParagraphs}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={maxParagraphs >= 15}
+                      onClick={() => {
+                        const newMax = Math.min(15, maxParagraphs + 1);
+                        setMaxParagraphs(newMax);
+                        setNarrativeLengthMode('personalizado');
+                        scheduleDebouncedSave(undefined, undefined, undefined, undefined, {
+                          mode: 'personalizado',
+                          minParagraphs,
+                          maxParagraphs: newMax
+                        });
+                      }}
+                      className="w-7 h-7 rounded bg-[var(--bg-color)] border border-[rgba(139,69,19,0.3)] hover:border-[var(--accent)] font-bold text-xs disabled:opacity-40 cursor-pointer flex items-center justify-center"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Comportamiento en Diálogos con PNJs */}
+            <div>
+              <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] mb-2 flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-[var(--accent)]" /> Ritmo en Diálogos e Intercambios con PNJs
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDialoguePacing('conciso');
+                    scheduleDebouncedSave(undefined, undefined, undefined, undefined, { dialoguePacing: 'conciso' });
+                  }}
+                  className={`p-2 rounded border text-left cursor-pointer transition-all ${
+                    dialoguePacing === 'conciso'
+                      ? 'bg-amber-900/15 border-[var(--accent)] font-bold text-[var(--accent)] ring-1 ring-[var(--accent)]'
+                      : 'bg-[var(--sidebar-bg)] border-[rgba(139,69,19,0.25)] text-[var(--text-secondary)] hover:border-amber-700/50'
+                  }`}
+                >
+                  <div className="text-[11px] font-cinzel flex items-center justify-between">
+                    <span>Conciso (1-2)</span>
+                    {dialoguePacing === 'conciso' && <Check className="w-3 h-3 text-green-700" />}
+                  </div>
+                  <p className="text-[10px] m-0 mt-0.5 leading-tight opacity-80">
+                    Respuestas directas sin rodeos.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDialoguePacing('natural');
+                    scheduleDebouncedSave(undefined, undefined, undefined, undefined, { dialoguePacing: 'natural' });
+                  }}
+                  className={`p-2 rounded border text-left cursor-pointer transition-all ${
+                    dialoguePacing === 'natural'
+                      ? 'bg-amber-900/15 border-[var(--accent)] font-bold text-[var(--accent)] ring-1 ring-[var(--accent)]'
+                      : 'bg-[var(--sidebar-bg)] border-[rgba(139,69,19,0.25)] text-[var(--text-secondary)] hover:border-amber-700/50'
+                  }`}
+                >
+                  <div className="text-[11px] font-cinzel flex items-center justify-between">
+                    <span>Natural</span>
+                    {dialoguePacing === 'natural' && <Check className="w-3 h-3 text-green-700" />}
+                  </div>
+                  <p className="text-[10px] m-0 mt-0.5 leading-tight opacity-80">
+                    Cadencia novelesca equilibrada.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDialoguePacing('extendido');
+                    scheduleDebouncedSave(undefined, undefined, undefined, undefined, { dialoguePacing: 'extendido' });
+                  }}
+                  className={`p-2 rounded border text-left cursor-pointer transition-all ${
+                    dialoguePacing === 'extendido'
+                      ? 'bg-amber-900/15 border-[var(--accent)] font-bold text-[var(--accent)] ring-1 ring-[var(--accent)]'
+                      : 'bg-[var(--sidebar-bg)] border-[rgba(139,69,19,0.25)] text-[var(--text-secondary)] hover:border-amber-700/50'
+                  }`}
+                >
+                  <div className="text-[11px] font-cinzel flex items-center justify-between">
+                    <span>Extendido</span>
+                    {dialoguePacing === 'extendido' && <Check className="w-3 h-3 text-green-700" />}
+                  </div>
+                  <p className="text-[10px] m-0 mt-0.5 leading-tight opacity-80">
+                    Microgestos y atmósfera detallada.
+                  </p>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Desplegable de Directriz Avanzada / Personalizada */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowLengthAdvanced(!showLengthAdvanced)}
+            className="flex items-center gap-1.5 text-xs font-cinzel font-bold text-[var(--accent)] hover:underline cursor-pointer"
+          >
+            {showLengthAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            <span>Directriz Adicional de Extensión y Párrafos (Opcional)</span>
+          </button>
+
+          {showLengthAdvanced && (
+            <div className="mt-2.5 p-3 rounded-lg bg-[var(--bg-color)] border border-[rgba(139,69,19,0.25)]">
+              <label className="block text-[11px] font-cinzel font-bold text-[var(--text-secondary)] mb-1">
+                Instrucción específica sobre cuándo escribir más o menos:
+              </label>
+              <input
+                type="text"
+                value={customLengthGuideline}
+                onChange={e => {
+                  const val = e.target.value;
+                  setCustomLengthGuideline(val);
+                  scheduleDebouncedSave(undefined, undefined, undefined, undefined, { customGuideline: val });
+                }}
+                onBlur={() => saveChanges()}
+                placeholder="Ej: En combates ser rápido y conciso; en descanso largo o nuevos lugares detallar hasta 4 párrafos..."
+                className="w-full bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] px-3 py-2 rounded text-xs font-lora outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* SECCIÓN EDITABLE: DIRECTIVAS DE CAMPAÑA, LORE, SISTEMA Y ESTILO */}

@@ -1196,6 +1196,47 @@ ${diseaseConfig.customRules ? `\n- **Reglas de Enfermedad, Contagio y Estrés:**
   3. Tras un Descanso Largo o al cumplir 24 horas en el calendario, pide la correspondiente Tirada de Salvación de Constitución para evaluar si la enfermedad remite, se estabiliza o empeora.`;
   }
 
+  // Control de extensión y ritmo de respuesta (Inteligencia contextual + Mínimo / Máximo de párrafos)
+  const nLen = project.narrativeLength;
+  const pacingMode = nLen?.mode || 'adaptativo';
+  const minP = nLen?.minParagraphs ?? (pacingMode === 'agil' ? 1 : pacingMode === 'detallado' ? 4 : 2);
+  const maxP = nLen?.maxParagraphs ?? (pacingMode === 'agil' ? 2 : pacingMode === 'detallado' ? 6 : 4);
+  const dialoguePacing = nLen?.dialoguePacing || 'auto';
+  const customGuideline = nLen?.customGuideline?.trim() ? `\n- **Directriz adicional de extensión:** ${nLen.customGuideline.trim()}` : '';
+
+  let narrativeLengthSection = '';
+  if (pacingMode === 'adaptativo') {
+    narrativeLengthSection = `
+### RITMO NARRATIVO Y EXTENSIÓN ADAPTATIVA INTELIGENTE (MODO AUTOMÁTICO):
+El Narrador debe modular de forma inteligente y autónoma la extensión de cada respuesta según la naturaleza del turno actual:
+1. **Diálogos, Intercambios Rápidos y Conversaciones con PNJs:** Responde de forma **ágil y concisa en 1 o 2 párrafos**. Céntrate en la réplica directa del interlocutor, su tono de voz y microgestos inmediatos. **PROHIBIDO** soltar parrafadas kilométricas o descripciones ambientales redundantes cuando el jugador está manteniendo un intercambio verbal continuo.
+2. **Combates, Tensión y Decisiones Tácticas:** Responde en **1 o 2 párrafos viscerales, directos y cinéticos**, concluyendo en el punto de corte del impacto o pidiendo la tirada correspondiente.
+3. **Llegada a Nuevas Ubicaciones o Exploración de Escenarios:** Desarrolla la escena en **2 a 4 párrafos ricos en atmósfera sensorial** (iluminación, olores, sonido ambiental, arquitectura y sensación de peligro).
+4. **Hitos Mayores, Epifanías o Revelaciones Críticas:** Emplea la extensión literaria necesaria para dar peso dramático al momento sin caer en relleno gratuito.
+- **Regla de Oro de Concisión:** Adapta la longitud de tu respuesta al peso del input del jugador. Si el jugador hace una pregunta corta o dice una frase a un PNJ, no respondas con una novela; responde con la réplica y el latido presente.${customGuideline}`;
+  } else {
+    narrativeLengthSection = `
+### CONTROL DE EXTENSIÓN Y RITMO NARRATIVO (PÁRRAFOS MÍNIMO / MÁXIMO):
+- **Extensión Solicitada:** Entre **${minP}** y **${maxP} párrafos** de narración por turno.
+- **Modo Seleccionado:** ${
+      pacingMode === 'agil'
+        ? 'Ágil / Conversacional (1-2 párrafos)'
+        : pacingMode === 'detallado'
+        ? 'Detallado / Descriptivo (4-6 párrafos)'
+        : pacingMode === 'personalizado'
+        ? `Personalizado (${minP}-${maxP} párrafos)`
+        : 'Equilibrado (2-4 párrafos)'
+    }.
+- **Regla en Diálogos con PNJs:** ${
+      dialoguePacing === 'conciso' || dialoguePacing === 'auto'
+        ? 'Cuando el turno sea una conversación o intercambio verbal con un PNJ, **responde de forma concisa y directa en 1 o 2 párrafos**. No satures la escena con prosa ambiental innecesaria; deja que la conversación fluya rápido.'
+        : dialoguePacing === 'extendido'
+        ? 'En diálogos con PNJs, acompaña cada réplica con rica descripción de micro-gestos, lenguaje corporal y atmósfera.'
+        : 'En diálogos con PNJs, mantén una cadencia natural equilibrando diálogo y reacción física.'
+    }.${customGuideline}
+- **Principio de Concisión vs. Atmósfera:** Respeta estrictamente este rango de párrafos. Evita respuestas excesivamente kilométricas cuando el jugador solo ha realizado una acción puntual o réplica breve.`;
+  }
+
   // El orden importa por dinero y por espera. Gemini cachea el prefijo común
   // entre peticiones, y ese prefijo se rompe en el primer carácter que cambia.
   //
@@ -1222,6 +1263,8 @@ ${diseaseSection}
 
 ### ESTILO NARRATIVO (VOZ Y RITMO NOVELESCO)
 ${activeStyle}
+
+${narrativeLengthSection}
 
 ### BASE DE CONOCIMIENTO (DOCUMENTOS, FICHAS Y MATERIAL ADJUNTO)
 Los siguientes archivos forman parte del canon íntegro del mundo y debes utilizarlos como fuente de verdad sobre PNJs, lugares, eventos pasados, reglas, oráculos y ambientación:
@@ -1315,35 +1358,11 @@ ${bloqueVivo}`;
     m => m.content !== 'Tirando dados...' && m.content !== 'Pensando...'
   );
 
-  // Sesión activa (Capítulo en curso): Se incluye íntegra para garantizar continuidad,
-  // coherencia y evitar amnesias locales en los turnos recientes, aprovechando la amplia ventana
-  // de contexto del modelo. Si la sesión supera un umbral extremo (~400k caracteres),
-  // se protege con un límite de seguridad generoso.
-  const ESCENA_MAX = 400000;
-  let usados = 0;
-  let desde = historyCompleto.length;
-  while (desde > 0) {
-    const coste = (historyCompleto[desde - 1].content || '').length;
-    if (usados + coste > ESCENA_MAX && (historyCompleto.length - desde) >= 100) break;
-    usados += coste;
-    desde--;
-  }
-  const history = historyCompleto.slice(desde);
-
+  // Sesión activa (Capítulo en curso): Se incluye el 100% íntegro de los mensajes
+  // sin ningún recorte ni límite de caracteres, aprovechando la ventana nativa de Gemini (1M-2M tokens).
   const contents: any[] = [];
   let lastRole = '';
-  if (desde > 0) {
-    contents.push({
-      role: 'user',
-      parts: [
-        {
-          text: `[Nota del sistema: los ${desde} mensajes anteriores de este capítulo no se incluyen literalmente. Lo ocurrido está recogido en la MEMORIA VIVA y en la CRÓNICA de más arriba. Continúa desde ahí con naturalidad, sin pedir que se repitan.]`
-        }
-      ]
-    });
-    lastRole = 'user';
-  }
-  for (const m of history) {
+  for (const m of historyCompleto) {
     const r = m.role;
     if (r === lastRole) {
       contents[contents.length - 1].parts.push({ text: '\n\n' + m.content });

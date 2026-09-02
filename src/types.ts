@@ -19,6 +19,19 @@ export interface Project {
   threads?: ScheduledThread[];
   /** Configuración de gestión de enfermedades, agotamiento y penalizadores de salud. */
   diseaseConfig?: DiseaseConfig;
+  /** Configuración de control de extensión y ritmo de respuestas del DM (mínimo y máximo de párrafos). */
+  narrativeLength?: NarrativeLengthConfig;
+}
+
+export type NarrativeLengthMode = 'adaptativo' | 'agil' | 'equilibrado' | 'detallado' | 'personalizado';
+export type DialoguePacing = 'auto' | 'conciso' | 'natural' | 'extendido';
+
+export interface NarrativeLengthConfig {
+  mode: NarrativeLengthMode;
+  minParagraphs?: number;
+  maxParagraphs?: number;
+  dialoguePacing?: DialoguePacing;
+  customGuideline?: string;
 }
 
 export type DiseaseRuleSystem = 'dnd5e' | 'dnd5e_2024' | 'custom' | 'narrative_only';
