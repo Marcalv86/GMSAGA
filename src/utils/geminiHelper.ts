@@ -51,10 +51,22 @@ export interface AIModelOption {
 
 export const AVAILABLE_MODELS: AIModelOption[] = [
   {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    badge: 'Última Generación · Ultra Rápido',
+    desc: 'Último modelo Flash de Google, máxima velocidad de respuesta y excelente agilidad de rol con mínimo consumo de tokens.'
+  },
+  {
     id: 'gemini-3.7-flash',
     name: 'Gemini 3.7 Flash',
     badge: 'Recomendado · Híbrido y Rápido',
     desc: 'Modelo insignia con razonamiento adaptativo, narración fluida y detección precisa de mecánicas de rol.'
+  },
+  {
+    id: 'gemini-3.6-flash',
+    name: 'Gemini 3.6 Flash',
+    badge: 'Eficiente · Alta Estabilidad',
+    desc: 'Versión ágil y contrastada de Flash para turnos consistentes y excelente gestión de contexto.'
   },
   {
     id: 'gemini-3.1-flash-lite',
@@ -211,7 +223,9 @@ export function setStoredAutoFailover(enabled: boolean): void {
 export function getModelFailoverChain(initialModel: string): string[] {
   const safeInitial = sanitizeModelId(initialModel, DEFAULT_MODEL_ID);
   const standardFallbacks = [
+    'gemini-3.8-flash',
     'gemini-3.7-flash',
+    'gemini-3.6-flash',
     'gemini-3.1-flash-lite',
     'gemini-3.1-pro-preview'
   ];

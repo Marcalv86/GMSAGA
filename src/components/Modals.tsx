@@ -732,9 +732,19 @@ export const ApiKeyModal: React.FC<{
                       desc: 'Ultra rápido y consumo mínimo de cuota (Recomendado)'
                     },
                     {
+                      id: 'gemini-3.8-flash',
+                      name: 'Gemini 3.8 Flash',
+                      desc: 'Última generación ultra veloz'
+                    },
+                    {
                       id: 'gemini-3.7-flash',
                       name: 'Gemini 3.7 Flash',
                       desc: 'Híbrido de razonamiento'
+                    },
+                    {
+                      id: 'gemini-3.6-flash',
+                      name: 'Gemini 3.6 Flash',
+                      desc: 'Eficiente y equilibrado'
                     },
                     {
                       id: 'gemini-3.1-pro-preview',

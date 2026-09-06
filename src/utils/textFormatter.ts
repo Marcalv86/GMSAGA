@@ -14,8 +14,11 @@ export function stripInternalTagsAndHeaders(raw: string | undefined | null): str
 
   let text = raw;
 
-  // 1. Eliminar bloques de código que solo contenían cabeceras de metadatos (ej: ```text 📅 ... 👤 Nivel ... ```)
-  text = text.replace(/```(?:text|md|markdown)?\s*[\r\n]*(?:📅|👤|🌟|⚜️|🖤)[^`]*?```/gi, '');
+  // 1. Eliminar bloques de código que solo contenían cabeceras de metadatos (ej: ```text 📅 ... 👤 Nivel ... ``` o ```text 📍 ... ```)
+  text = text
+    .replace(/```(?:text|md|markdown)?\s*[\r\n]*(?:📅|👤|🌟|⚜️|🖤|📍|\[ESCENA)[^`]*?```/gi, '')
+    .replace(/\[\s*ESCENA(?:\s*:|\])[\s\S]*?(?:\[\s*\/ESCENA\s*\]|\])/gi, '')
+    .replace(/^[ \t]*📍[^\n\r]+(?:\r?\n[ \t]*(?:🌤|👥|🩸|⚡)[^\n\r]+)*/gim, '');
 
   // 2. Eliminar etiquetas de sincronización entre corchetes [TAG: ...]
   text = text

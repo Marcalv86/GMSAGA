@@ -8,6 +8,7 @@ import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
 import { parseMessageRolls, RollBadgeCard } from './RollBadge';
+import { parseSceneHUD, SceneHUDCard } from './SceneHUDCard';
 import {
   CALENDARIO_FANTASTICO,
   aDiaAbsoluto
@@ -111,7 +112,11 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
     : m.content;
 
   // Extraer tiradas estructuradas embebidas en el mensaje (ej: [Tirada de Sigilo: d20 natural = 18 | CD 15])
-  const { narrativeText, rolls } = parseMessageRolls(baseContent);
+  const { narrativeText: textWithoutRolls, rolls } = parseMessageRolls(baseContent);
+  // Extraer el HUD de escena para los mensajes del modelo
+  const { narrativeText, sceneHUD } = isModel
+    ? parseSceneHUD(textWithoutRolls)
+    : { narrativeText: textWithoutRolls, sceneHUD: null };
   const bodyText = isModel ? formatNarrativeText(narrativeText) : narrativeText;
 
   // Detección de elementos técnicos sincronizados en segundo plano
@@ -221,6 +226,11 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
               : 'py-1 text-[var(--text-primary)] w-full max-w-[900px] font-lora text-left'
           }
         >
+          {/* Cintillo Cinemático de Escena */}
+          {isModel && sceneHUD && (
+            <SceneHUDCard hud={sceneHUD} messageIndex={idx} />
+          )}
+
           {bodyText && (
             <div className="markdown-body narrative-body">
               <ReactMarkdown
