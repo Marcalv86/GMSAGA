@@ -223,12 +223,16 @@ interface SceneHUDCardProps {
 }
 
 export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud }) => {
-  // Estado de colapso local: por defecto expandido con vista limpia
+  // Estado de colapso local: por defecto contraído (cintillo compacto no expandido)
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('gmstudio_scene_hud_default_collapsed') === 'true';
+      const stored = localStorage.getItem('gmstudio_scene_hud_default_collapsed');
+      if (stored !== null) {
+        return stored === 'true';
+      }
+      return true; // Por defecto no expandido
     } catch {
-      return false;
+      return true;
     }
   });
 
@@ -239,7 +243,13 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud }) => {
     <div className="w-full mb-3 select-none transition-all duration-200">
       <div className="rounded-lg border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] shadow-xs overflow-hidden backdrop-blur-xs">
         {/* Cabecera / Barra principal del Cintillo */}
-        <div className="px-3.5 py-2 flex items-center justify-between gap-2 border-b border-[var(--glass-border)]/50 bg-[color-mix(in_srgb,var(--surface)_50%,transparent)]">
+        <div
+          onClick={() => setCollapsed(!collapsed)}
+          className={`px-3.5 py-2 flex items-center justify-between gap-2 bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] cursor-pointer hover:bg-[color-mix(in_srgb,var(--surface)_75%,transparent)] transition-colors ${
+            collapsed ? '' : 'border-b border-[var(--glass-border)]/50'
+          }`}
+          title={collapsed ? 'Pulsa para expandir detalles de la escena' : 'Pulsa para contraer'}
+        >
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <span className="p-1 rounded bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] shrink-0">
               <Compass className="w-3.5 h-3.5" />
@@ -271,7 +281,10 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud }) => {
             )}
             
             <button
-              onClick={() => setCollapsed(!collapsed)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCollapsed(!collapsed);
+              }}
               className="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
               title={collapsed ? 'Expandir detalles de escena' : 'Colapsar a cintillo compacto'}
               aria-label={collapsed ? 'Expandir escena' : 'Colapsar escena'}
