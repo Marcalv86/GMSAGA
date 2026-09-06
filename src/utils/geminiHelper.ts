@@ -67,18 +67,6 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     name: 'Gemini 3.6 Flash',
     badge: 'Eficiente · Alta Estabilidad',
     desc: 'Versión ágil y contrastada de Flash para turnos consistentes y excelente gestión de contexto.'
-  },
-  {
-    id: 'gemini-3.1-flash-lite',
-    name: 'Gemini 3.1 Flash Lite',
-    badge: 'Ultra Ligero · Ahorro de cuota',
-    desc: 'Optimizado para máxima velocidad y consumo mínimo de tokens, ideal para sesiones continuas.'
-  },
-  {
-    id: 'gemini-3.1-pro-preview',
-    name: 'Gemini 3.1 Pro',
-    badge: 'Máxima Inteligencia · Prosa rica',
-    desc: 'El modelo superior para razonamiento profundo, prosa literaria exquisita y coherencia impecable en tramas complejas.'
   }
 ];
 
@@ -93,6 +81,7 @@ export function isModelDeprecated(modelId: string): boolean {
     m.includes('1.5') ||
     m.includes('2.0') ||
     m.includes('2.5') ||
+    m.includes('3.1') ||
     m === 'gemini-pro' ||
     m === 'gemini-flash' ||
     m.includes('thinking-exp') ||
@@ -100,15 +89,20 @@ export function isModelDeprecated(modelId: string): boolean {
   );
 }
 
-export const DEFAULT_MODEL_ID = 'gemini-3.7-flash';
-export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.1-flash-lite';
-export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.1-flash-lite';
+export const DEFAULT_MODEL_ID = 'gemini-3.8-flash';
+export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.8-flash';
+export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.6-flash';
 
 export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODEL_ID): string {
   if (!modelId || isModelDeprecated(modelId)) {
     return fallback;
   }
-  return modelId.trim();
+  const trimmed = modelId.trim();
+  const validIds = AVAILABLE_MODELS.map(m => m.id);
+  if (!validIds.includes(trimmed)) {
+    return fallback;
+  }
+  return trimmed;
 }
 
 // ---------------------------------------------------------------- catálogo vivo de modelos
@@ -225,9 +219,7 @@ export function getModelFailoverChain(initialModel: string): string[] {
   const standardFallbacks = [
     'gemini-3.8-flash',
     'gemini-3.7-flash',
-    'gemini-3.6-flash',
-    'gemini-3.1-flash-lite',
-    'gemini-3.1-pro-preview'
+    'gemini-3.6-flash'
   ];
   // Con el respaldo apagado se usa el modelo elegido y punto. Antes esta rama
   // devolvía exactamente la misma cadena que la de abajo, así que el interruptor
@@ -253,13 +245,8 @@ export function getStoredBackgroundModel(): string {
   const local = localStorage.getItem('gemini_background_model');
   if (local && local.trim()) {
     const trimmed = local.trim();
-    if (isModelDeprecated(trimmed)) {
-      localStorage.setItem('gemini_background_model', DEFAULT_BACKGROUND_MODEL_ID);
-      return DEFAULT_BACKGROUND_MODEL_ID;
-    }
     const validIds = AVAILABLE_MODELS.map(m => m.id);
     if (validIds.includes(trimmed)) return trimmed;
-    if (/^(gemini|gemma)[\w.-]*$/i.test(trimmed)) return trimmed;
   }
   return DEFAULT_BACKGROUND_MODEL_ID;
 }
@@ -280,15 +267,8 @@ export function getStoredModel(): string {
   const local = localStorage.getItem('gemini_model');
   if (local && local.trim()) {
     const trimmed = local.trim();
-    if (isModelDeprecated(trimmed)) {
-      localStorage.setItem('gemini_model', DEFAULT_MODEL_ID);
-      return DEFAULT_MODEL_ID;
-    }
     const validIds = AVAILABLE_MODELS.map(m => m.id);
     if (validIds.includes(trimmed)) return trimmed;
-    // Un identificador escrito a mano en el panel del Motor también vale; solo se
-    // descartan restos de versiones anteriores que ya no son nombres de modelo.
-    if (/^(gemini|gemma)[\w.-]*$/i.test(trimmed)) return trimmed;
   }
   return DEFAULT_MODEL_ID;
 }

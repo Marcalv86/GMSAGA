@@ -11,6 +11,7 @@ import {
   ScrollText,
   Sliders,
   Smartphone,
+  Sparkles,
   Sun,
   Swords,
   Trash2,
@@ -74,6 +75,7 @@ import {
   setStoredApiKey,
   setStoredApiKeys,
   hasConfiguredApiKey,
+  AVAILABLE_MODELS,
   getStoredModel,
   setStoredModel,
   setStoredBackgroundModel,
@@ -182,6 +184,7 @@ export default function App() {
   const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null);
   const [promptValue, setPromptValue] = useState('');
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [currentActiveModel, setCurrentActiveModel] = useState<string>(() => getStoredModel());
   const [isLocalStorageModalOpen, setIsLocalStorageModalOpen] = useState(false);
   const [isImportCampaignModalOpen, setIsImportCampaignModalOpen] = useState(false);
   const [topProgress, setTopProgress] = useState<{
@@ -2307,9 +2310,10 @@ export default function App() {
         onSaveKey={key => {
           setStoredApiKey(key);
         }}
-        currentModel={getStoredModel()}
+        currentModel={currentActiveModel}
         onSaveModel={model => {
           setStoredModel(model);
+          setCurrentActiveModel(model);
         }}
       />
 
@@ -2681,6 +2685,18 @@ export default function App() {
               title={theme === 'dark' ? 'Volver al tema de día' : 'Cambiar al tema de noche'}
             >
               {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Selector rápido del Modelo IA Activo */}
+            <button
+              onClick={() => setIsApiKeyModalOpen(true)}
+              className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] hover:border-[var(--accent)] text-[var(--text-secondary)] hover:text-[var(--accent)] text-xs font-cinzel transition-all cursor-pointer shadow-xs max-w-[130px] sm:max-w-[200px]"
+              title={`Modelo activo: ${currentActiveModel} — Clic para cambiar de modelo o configurar API Keys`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span className="truncate font-semibold text-[11px] sm:text-xs hidden xs:inline sm:inline">
+                {AVAILABLE_MODELS.find(m => m.id === currentActiveModel)?.name || currentActiveModel}
+              </span>
             </button>
           </div>
         </div>

@@ -36,9 +36,8 @@ export function parseSceneHUD(rawContent: string): { narrativeText: string; scen
   let text = rawContent;
   let hudRaw = '';
 
-  // Patrón 1: Bloque de código al inicio con 📍 o [ESCENA
-  const codeBlockMatch = text.match(/^[ \t]*```(?:text|md|markdown)?\s*\n([\s\S]*?📍[\s\S]*?)```[ \t]*\n?/i) ||
-                         text.match(/^[ \t]*```(?:text|md|markdown)?\s*\n([\s\S]*?\[ESCENA[\s\S]*?)```[ \t]*\n?/i);
+  // Patrón 1: Bloque de código al inicio con 📍, [ESCENA o 📅
+  const codeBlockMatch = text.match(/^[ \t]*```(?:text|md|markdown)?\s*\n([\s\S]*?(?:📍|\[ESCENA|📅)[\s\S]*?)```[ \t]*\n?/i);
 
   if (codeBlockMatch) {
     hudRaw = codeBlockMatch[1];
@@ -55,6 +54,13 @@ export function parseSceneHUD(rawContent: string): { narrativeText: string; scen
       if (linesMatch) {
         hudRaw = linesMatch[1];
         text = text.slice(linesMatch[0].length);
+      } else {
+        // Patrón 4: Formato previo de fecha/hora (📅 ... | ⏳ ...)
+        const legacyMatch = text.match(/^[ \t]*(📅[^\n\r]+(?:\r?\n[ \t]*(?:👤|🌟|⚜️|🖤|❤️)[^\n\r]+)*)[ \t]*(?:\r?\n|$)/i);
+        if (legacyMatch) {
+          hudRaw = legacyMatch[1];
+          text = text.slice(legacyMatch[0].length);
+        }
       }
     }
   }
@@ -151,10 +157,24 @@ function parseHUDContent(raw: string): SceneHUDData {
       date = tChunks[0] || '';
       timeOfDay = tChunks.slice(1).join(', ') || '';
     }
+    // Formato previo de fecha/hora (📅 ...)
+    else if (line.startsWith('📅')) {
+      const clean = line.replace(/^📅\s*/, '').trim();
+      const parts = clean.split(/\||·/);
+      date = parts[0]?.replace(/^📅\s*/, '').trim() || '';
+      if (parts[1]) {
+        timeOfDay = parts[1].replace(/⏳\s*/, '').trim();
+      }
+    }
+    // Formato previo de nivel o estado (👤 ...)
+    else if (line.startsWith('👤')) {
+      const clean = line.replace(/^👤\s*/, '').trim();
+      conditions.push(clean);
+    }
   }
 
   return {
-    location: location || 'Entorno desconocido',
+    location: location || 'Entorno de la escena',
     subLocation,
     region,
     date,

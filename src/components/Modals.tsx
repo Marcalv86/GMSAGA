@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   AVAILABLE_MODELS,
-  modeloDisponible,
-  leerCatalogoModelos,
   DEFAULT_MODEL_ID,
   DEFAULT_BACKGROUND_MODEL_ID,
   getStoredSafetyLevel,
@@ -30,9 +28,6 @@ import {
   SafetyThreshold,
   ThinkingLevelSetting,
   describeApiError,
-  esModeloAbierto,
-  hasConfiguredApiKey,
-  listarModelosDeLaClave,
   cleanApiKey,
   testSingleApiKey,
   testAllApiKeys,
@@ -48,10 +43,8 @@ import {
   Dices,
   Gauge,
   Loader,
-  RefreshCw,
   KeyRound,
   Lightbulb,
-  Pencil,
   Settings,
   Shield,
   ShieldAlert,
@@ -115,18 +108,6 @@ export const ApiKeyModal: React.FC<{
   const [selectedBackgroundModel, setSelectedBackgroundModel] = useState(
     getStoredBackgroundModel() || DEFAULT_BACKGROUND_MODEL_ID
   );
-  const [modelosDeLaClave, setModelosDeLaClave] = useState<
-    { id: string; nombre: string; entrada: number; salida: number }[] | null
-  >(null);
-  const [consultandoModelos, setConsultandoModelos] = useState(false);
-  // El catálogo guardado se enseña de entrada: se refresca solo en segundo
-  // plano al abrir la app, así que casi siempre ya está y al día.
-  useEffect(() => {
-    if (isOpen && modelosDeLaClave === null) {
-      const guardado = leerCatalogoModelos();
-      if (guardado && guardado.modelos.length > 0) setModelosDeLaClave(guardado.modelos);
-    }
-  }, [isOpen, modelosDeLaClave]);
   // El gasto medido se lee al abrir el panel: entre medias no cambia.
   const [uso, setUso] = useState<ResumenUso[]>([]);
   /**
@@ -147,19 +128,6 @@ export const ApiKeyModal: React.FC<{
       mediaTotal: media('mediaTotal'),
       porcentajeCache: media('porcentajeCache')
     };
-  };
-  const [errorModelos, setErrorModelos] = useState('');
-
-  const consultarModelos = async () => {
-    setConsultandoModelos(true);
-    setErrorModelos('');
-    try {
-      setModelosDeLaClave(await listarModelosDeLaClave());
-    } catch (err) {
-      setErrorModelos(describeApiError(err));
-    } finally {
-      setConsultandoModelos(false);
-    }
   };
   const [safetyLevel, setSafetyLevel] = useState<SafetyThreshold>(getStoredSafetyLevel());
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelSetting>(getStoredThinkingLevel());
@@ -511,9 +479,6 @@ export const ApiKeyModal: React.FC<{
               <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
                 {AVAILABLE_MODELS.map(m => {
                   const isSelected = selectedModel === m.id;
-                  // `null` = todavía no se ha consultado nunca; no es lo mismo
-                  // que saber que no está, y no debe pintarse como un problema.
-                  const disponible = modeloDisponible(m.id);
                   return (
                     <div
                       key={m.id}
@@ -524,11 +489,6 @@ export const ApiKeyModal: React.FC<{
                           : 'border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[color-mix(in_srgb,var(--surface)_80%,transparent)]'
                       }`}
                     >
-                      {disponible === false && (
-                        <div className="mb-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-                          ⚠ Tu clave no ofrece este modelo hoy
-                        </div>
-                      )}
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-cinzel font-bold text-xs md:text-sm text-[var(--accent)] flex items-center gap-2">
                           <input
@@ -576,24 +536,6 @@ export const ApiKeyModal: React.FC<{
                 })}
               </div>
 
-              {/* Custom Model input */}
-              <div className="bg-[var(--glass)] p-2.5 rounded-lg border border-[var(--glass-border)]">
-                <label className="text-[11px] font-cinzel font-bold text-[var(--text-secondary)] block mb-1">
-                  <Pencil className="w-3.5 h-3.5" /> O introduce un identificador personalizado para el Narrador:
-                </label>
-                <input
-                  type="text"
-                  placeholder="Nombre o ID del modelo personalizado"
-                  value={AVAILABLE_MODELS.some(m => m.id === selectedModel) ? '' : selectedModel}
-                  onChange={e => {
-                    if (e.target.value.trim()) {
-                      setSelectedModel(e.target.value.trim());
-                    }
-                  }}
-                  className="w-full bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] border border-[var(--user-border)] p-1.5 rounded font-mono text-xs outline-none focus:border-[var(--accent)]"
-                />
-              </div>
-
               {uso.length > 0 && (
                 <div className="bg-[var(--glass)] p-2.5 rounded-lg border border-[var(--glass-border)] space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -635,63 +577,6 @@ export const ApiKeyModal: React.FC<{
                   </div>
                 </div>
               )}
-
-              {esModeloAbierto(selectedModel) && (
-                <div className="bg-amber-50/90 border border-amber-300 p-2.5 rounded-lg text-amber-950 text-[11px] leading-relaxed">
-                  <strong>Con un Gemma seleccionado:</strong> no admiten los ajustes de la pestaña de Censura
-                  ni la lectura de enlaces que pegues, así que la app deja de enviárselos y rige el filtro que
-                  traiga Google de fábrica. A cambio consumen una cuota distinta a la de los Gemini, que es
-                  justo lo que sirve cuando estos dan error de demanda.
-                </div>
-              )}
-
-              {/* Lo que de verdad admite la clave, preguntado a Google */}
-              <div className="bg-[var(--glass)] p-2.5 rounded-lg border border-[var(--glass-border)] space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[11px] text-[var(--text-secondary)]">
-                    La lista de arriba está escrita a mano y envejece. Esto pregunta a Google qué admite tu
-                    clave hoy.
-                  </span>
-                  <button
-                    onClick={consultarModelos}
-                    disabled={consultandoModelos || !hasConfiguredApiKey()}
-                    className="shrink-0 flex items-center gap-1.5 rounded border border-[var(--user-border)] px-2.5 py-1 font-cinzel text-[11px] font-bold hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40 cursor-pointer"
-                  >
-                    {consultandoModelos ? (
-                      <Loader className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-3 h-3" />
-                    )}
-                    {consultandoModelos ? 'Consultando…' : 'Ver los de mi clave'}
-                  </button>
-                </div>
-
-                {errorModelos && <p className="text-[11px] text-red-500 m-0">{errorModelos}</p>}
-
-                {modelosDeLaClave && (
-                  <div className="max-h-40 overflow-y-auto flex flex-col gap-1">
-                    {modelosDeLaClave.length === 0 && (
-                      <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                        La clave no ha devuelto ningún modelo de narración.
-                      </p>
-                    )}
-                    {modelosDeLaClave.map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => setSelectedModel(m.id)}
-                        className={`text-left rounded px-2 py-1 font-mono text-[11px] transition-colors cursor-pointer ${
-                          selectedModel === m.id
-                            ? 'bg-[var(--accent)] text-[var(--on-accent)]'
-                            : 'hover:bg-[color-mix(in_srgb,var(--surface)_80%,transparent)]'
-                        }`}
-                        title={`${m.nombre} · entrada ${m.entrada.toLocaleString('es-ES')} tokens`}
-                      >
-                        {m.id}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
@@ -724,17 +609,12 @@ export const ApiKeyModal: React.FC<{
                 <label className="font-cinzel font-bold text-[var(--text-primary)] block">
                   Modelo para Tareas Auxiliares y Extracciones Opcionales:
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {[
-                    {
-                      id: 'gemini-3.1-flash-lite',
-                      name: 'Gemini 3.1 Flash Lite',
-                      desc: 'Ultra rápido y consumo mínimo de cuota (Recomendado)'
-                    },
                     {
                       id: 'gemini-3.8-flash',
                       name: 'Gemini 3.8 Flash',
-                      desc: 'Última generación ultra veloz'
+                      desc: 'Última generación ultra rápida'
                     },
                     {
                       id: 'gemini-3.7-flash',
@@ -745,11 +625,6 @@ export const ApiKeyModal: React.FC<{
                       id: 'gemini-3.6-flash',
                       name: 'Gemini 3.6 Flash',
                       desc: 'Eficiente y equilibrado'
-                    },
-                    {
-                      id: 'gemini-3.1-pro-preview',
-                      name: 'Gemini 3.1 Pro',
-                      desc: 'Máxima precisión deductiva'
                     }
                   ].map(bgm => {
                     const isBgSelected = selectedBackgroundModel === bgm.id;
