@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   AVAILABLE_MODELS,
+  AUXILIARY_BACKGROUND_MODELS,
   DEFAULT_MODEL_ID,
   DEFAULT_BACKGROUND_MODEL_ID,
   getStoredSafetyLevel,
@@ -607,26 +608,13 @@ export const ApiKeyModal: React.FC<{
               {/* Modelo de Segundo Plano (Background Model) */}
               <div className="pt-3 border-t border-[var(--glass-border)] space-y-2">
                 <label className="font-cinzel font-bold text-[var(--text-primary)] block">
-                  Modelo para Tareas Auxiliares y Extracciones Opcionales:
+                  Modelo para Tareas Auxiliares (Resúmenes y Memoria Persistente):
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {[
-                    {
-                      id: 'gemini-3.8-flash',
-                      name: 'Gemini 3.8 Flash',
-                      desc: 'Última generación ultra rápida'
-                    },
-                    {
-                      id: 'gemini-3.7-flash',
-                      name: 'Gemini 3.7 Flash',
-                      desc: 'Híbrido de razonamiento'
-                    },
-                    {
-                      id: 'gemini-3.6-flash',
-                      name: 'Gemini 3.6 Flash',
-                      desc: 'Eficiente y equilibrado'
-                    }
-                  ].map(bgm => {
+                <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
+                  Utilizado para la sincronización de memoria persistente, resúmenes de sesión, extracción de fichas y tareas en segundo plano.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {AUXILIARY_BACKGROUND_MODELS.map(bgm => {
                     const isBgSelected = selectedBackgroundModel === bgm.id;
                     return (
                       <div

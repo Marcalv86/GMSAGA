@@ -90,15 +90,48 @@ export function isModelDeprecated(modelId: string): boolean {
 }
 
 export const DEFAULT_MODEL_ID = 'gemini-3.8-flash';
-export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.8-flash';
-export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.6-flash';
+
+export interface BackgroundModelOption {
+  id: string;
+  name: string;
+  desc: string;
+}
+
+export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
+  {
+    id: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash Lite',
+    desc: 'Ultra rápido y consumo mínimo de cuota (Ideal para resúmenes y memoria persistente)'
+  },
+  {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    desc: 'Última generación ultra rápida'
+  },
+  {
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    desc: 'Híbrido de razonamiento'
+  },
+  {
+    id: 'gemini-3.6-flash',
+    name: 'Gemini 3.6 Flash',
+    desc: 'Eficiente y equilibrado'
+  }
+];
+
+export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.5-flash-lite';
+export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.5-flash-lite';
 
 export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODEL_ID): string {
   if (!modelId || isModelDeprecated(modelId)) {
     return fallback;
   }
   const trimmed = modelId.trim();
-  const validIds = AVAILABLE_MODELS.map(m => m.id);
+  const validIds = [
+    ...AVAILABLE_MODELS.map(m => m.id),
+    ...AUXILIARY_BACKGROUND_MODELS.map(m => m.id)
+  ];
   if (!validIds.includes(trimmed)) {
     return fallback;
   }
@@ -245,7 +278,7 @@ export function getStoredBackgroundModel(): string {
   const local = localStorage.getItem('gemini_background_model');
   if (local && local.trim()) {
     const trimmed = local.trim();
-    const validIds = AVAILABLE_MODELS.map(m => m.id);
+    const validIds = AUXILIARY_BACKGROUND_MODELS.map(m => m.id);
     if (validIds.includes(trimmed)) return trimmed;
   }
   return DEFAULT_BACKGROUND_MODEL_ID;
