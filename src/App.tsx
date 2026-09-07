@@ -94,8 +94,8 @@ import {
 } from './utils/geminiHelper';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
-import { RollRequest, rollDie, formatRollResult } from './utils/rollRequests';
-import { Probabilidad, formatoConsulta, formatoSignificado, nuevaConsulta } from './utils/oracle';
+import { RollRequest, rollDie } from './utils/rollRequests';
+import { Probabilidad, formatoSignificado, nuevaConsulta } from './utils/oracle';
 import {
   aDiaAbsoluto,
   avanzar,
@@ -148,7 +148,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<
     'chat' | 'files' | 'memory' | 'instructions' | 'novel'
   >('chat');
-  const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   // Controlador de la generación en curso, para poder detenerla desde la interfaz.
   const generationAbortRef = useRef<AbortController | null>(null);
@@ -969,10 +968,9 @@ export default function App() {
   };
 
   // Messaging & Turn Generation
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || !currentPId || !currentChatId || isGenerating) return;
-    const text = inputText.trim();
-    setInputText('');
+  const handleSendMessage = async (textToSend: string) => {
+    const text = textToSend.trim();
+    if (!text || !currentPId || !currentChatId || isGenerating) return;
 
     if (currentChat) {
       const updatedMessages = [...currentChat.messages, { role: 'user' as const, content: text }];
@@ -986,35 +984,23 @@ export default function App() {
     }
   };
 
-  const appendToInput = (fragment: string) => {
-    setInputText(prev => {
-      const clean = prev.trim();
-      return clean ? `${clean} ${fragment} ` : `${fragment} `;
-    });
-  };
-
   const handleRollDice = (sides: number) => {
-    const roll = rollDie(sides);
-    appendToInput(`[Tirada d${sides}: ${roll}]`);
-    return roll;
+    return rollDie(sides);
   };
 
-  const handleRollRequest = (req: RollRequest) => {
-    const natural = rollDie(20);
-    appendToInput(formatRollResult(req, natural));
-    return natural;
+  const handleRollRequest = (_req: RollRequest) => {
+    return rollDie(20);
   };
 
   // El dado se tira aquí, no en el modelo. Lo único que hace el Narrador con esto
   // es leer la tabla de la jugadora e interpretar lo que salga.
   const handleOracleAsk = (pregunta: string, probabilidad: Probabilidad) => {
     const consulta = nuevaConsulta(pregunta, probabilidad);
-    appendToInput(formatoConsulta(consulta));
     return consulta.resultado;
   };
 
   const handleOracleMeaning = () => {
-    appendToInput(formatoSignificado());
+    return formatoSignificado();
   };
 
   const triggerAIGeneration = async (userPrompt: string, baseMessages?: Message[]) => {
@@ -2742,8 +2728,6 @@ export default function App() {
             <ChatView
               chat={currentChat}
               chapterIndex={currentChapterIndex >= 0 ? currentChapterIndex : 0}
-              inputText={inputText}
-              setInputText={setInputText}
               isGenerating={isGenerating}
               isStreaming={isStreamingTurn}
               streamingStatus={loadingText}

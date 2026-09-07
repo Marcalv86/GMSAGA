@@ -19,8 +19,11 @@ import {
   PROBABILIDAD_POR_DEFECTO,
   Probabilidad,
   leerInvitaciones,
-  limpiarInvitaciones
+  limpiarInvitaciones,
+  nuevaConsulta,
+  formatoConsulta
 } from '../utils/oracle';
+import { formatRollResult } from '../utils/rollRequests';
 import { isNarrativeIncomplete } from '../utils/geminiHelper';
 
 import {
@@ -523,14 +526,12 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
 export const ChatView: React.FC<{
   chat?: Chat;
   chapterIndex: number;
-  inputText: string;
-  setInputText: React.Dispatch<React.SetStateAction<string>>;
   isGenerating: boolean;
   isStreaming?: boolean;
   /** Qué está pasando ahora mismo: reintentos, esperas, etc. */
   streamingStatus?: string;
   onStopGeneration?: () => void;
-  onSendMessage: () => void;
+  onSendMessage: (text: string) => void;
   /** Devuelve el número sacado, para que la animación enseñe justo lo que se envía. */
   onRollDice: (sides: number) => number;
   /** Resuelve una petición de tirada del Narrador. Devuelve el d20 natural. */
@@ -538,7 +539,7 @@ export const ChatView: React.FC<{
   /** Consulta al oráculo: la app tira, la jugadora fija la probabilidad. */
   onOracleAsk?: (pregunta: string, probabilidad: Probabilidad) => number;
   /** Dos tiradas para las tablas de significado. */
-  onOracleMeaning?: () => void;
+  onOracleMeaning?: () => string;
   /** Si no hay tablas subidas, el oráculo no tiene nada que consultar. */
   hasOracle?: boolean;
   onFileUpload: (files: File[]) => void;
@@ -558,8 +559,6 @@ export const ChatView: React.FC<{
 }> = ({
   chat,
   chapterIndex,
-  inputText,
-  setInputText,
   isGenerating,
   isStreaming,
   streamingStatus,
@@ -585,6 +584,21 @@ export const ChatView: React.FC<{
   onUpdateProject,
   onNavigateToDiary
 }) => {
+  const [inputText, setInputText] = useState('');
+
+  const appendToInput = (fragment: string) => {
+    setInputText(prev => {
+      const clean = prev.trim();
+      return clean ? `${clean} ${fragment} ` : `${fragment} `;
+    });
+  };
+
+  const handleSend = () => {
+    if (!inputText.trim() || isGenerating) return;
+    const text = inputText.trim();
+    setInputText('');
+    onSendMessage(text);
+  };
   const [activeRoll, setActiveRoll] = useState<{ sides: number; result: number } | null>(null);
   const [oraculoAbierto, setOraculoAbierto] = useState(false);
   const [preguntaOraculo, setPreguntaOraculo] = useState('');
@@ -774,18 +788,34 @@ export const ChatView: React.FC<{
   };
 
   const handleDieClick = (sides: number) => {
-    showRoll(sides, onRollDice(sides));
+    const roll = onRollDice(sides);
+    showRoll(sides, roll);
+    appendToInput(`[Tirada d${sides}: ${roll}]`);
   };
 
   const handleRollRequestClick = (req: RollRequest) => {
-    showRoll(20, onRollRequest(req));
+    const natural = onRollRequest(req);
+    showRoll(20, natural);
+    appendToInput(formatRollResult(req, natural));
   };
 
   const consultarOraculo = (pregunta: string) => {
     if (!onOracleAsk || !pregunta.trim()) return;
-    showRoll(100, onOracleAsk(pregunta, probabilidad));
+    const res = onOracleAsk(pregunta, probabilidad);
+    showRoll(100, res);
+    const consulta = nuevaConsulta(pregunta, probabilidad);
+    consulta.resultado = res;
+    consulta.doble = res % 11 === 0;
+    appendToInput(formatoConsulta(consulta));
     setPreguntaOraculo('');
     setOraculoAbierto(false);
+  };
+
+  const handleOracleMeaningClick = () => {
+    if (onOracleMeaning) {
+      const significado = onOracleMeaning();
+      appendToInput(significado);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -1253,10 +1283,7 @@ export const ChatView: React.FC<{
 
                 {onOracleMeaning && (
                   <button
-                    onClick={() => {
-                      onOracleMeaning();
-                      setOraculoAbierto(false);
-                    }}
+                    onClick={handleOracleMeaningClick}
                     className="ml-auto rounded-lg border border-teal-400/40 bg-teal-500/10 px-3 py-1.5 font-cinzel text-[11px] font-semibold text-teal-700 dark:text-teal-300 hover:bg-teal-500/20 hover:border-teal-400 cursor-pointer transition-all shadow-xs"
                     title="Dos tiradas en tus tablas de significado, sin pregunta de sí o no"
                   >
@@ -1472,7 +1499,7 @@ export const ChatView: React.FC<{
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  onSendMessage();
+                  handleSend();
                 }
               }}
               // El cajón mide 38px de alto y el texto de ayuda ocupaba dos
@@ -1483,7 +1510,7 @@ export const ChatView: React.FC<{
               rows={1}
             />
             <button
-              onClick={onSendMessage}
+              onClick={handleSend}
               disabled={isGenerating || !inputText.trim()}
               className="bg-[var(--accent)] text-[var(--on-accent)] w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-[#5a0000] flex items-center justify-center shrink-0 hover:bg-[var(--accent-hover)] active:scale-95 transition-all disabled:opacity-30 shadow-2xs cursor-pointer"
               title="Enviar acción"
@@ -1592,7 +1619,7 @@ export const ChatView: React.FC<{
             onSceneTransition(promptText);
           } else {
             setInputText(promptText);
-            onSendMessage();
+            handleSend();
           }
         }}
         isGenerating={isGenerating}
