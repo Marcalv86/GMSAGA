@@ -456,10 +456,33 @@ export default function App() {
           const sanitizedMem = sanitizeProjectMemory(p.memory);
           if (JSON.stringify(sanitizedMem) !== JSON.stringify(p.memory)) {
             modified = true;
-            return {
+            p = {
               ...p,
               memory: sanitizedMem
             };
+          }
+
+          // Migración y actualización automática de directivas del DM si el proyecto tiene la versión previa
+          if (
+            !p.instructions ||
+            (p.instructions.includes('# Instrucciones de Sistema') &&
+              (!p.instructions.includes('8.1 Montaje Alterno') ||
+                !p.instructions.includes('Principio de Progresión en Bambalinas') ||
+                !p.instructions.includes('⭐ 00. CARGA DE CONTEXTO') ||
+                !p.instructions.includes('Arraigo en el Mundo e Interconexión de Faerûn')))
+          ) {
+            modified = true;
+            if (!p.instructions) {
+              p = { ...p, instructions: DEFAULT_DM_INSTRUCTIONS };
+            } else if (p.instructions.includes('### Directivas de la Campaña Importada')) {
+              const customPart = p.instructions.split('### Directivas de la Campaña Importada')[1] || '';
+              p = {
+                ...p,
+                instructions: `${DEFAULT_DM_INSTRUCTIONS}\n\n### Directivas de la Campaña Importada${customPart}`
+              };
+            } else {
+              p = { ...p, instructions: DEFAULT_DM_INSTRUCTIONS };
+            }
           }
 
           return p;

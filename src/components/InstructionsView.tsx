@@ -136,7 +136,7 @@ export const InstructionsView: React.FC<{
     setDialoguePacing(project.narrativeLength?.dialoguePacing || 'conciso');
     setCustomLengthGuideline(project.narrativeLength?.customGuideline || '');
     setSaveStatus('saved');
-  }, [project.id]);
+  }, [project.id, project.instructions, project.system, project.style]);
 
   const handleSafetyChange = (newLevel: SafetyThreshold) => {
     setSafetyLevel(newLevel);
