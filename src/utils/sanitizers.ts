@@ -57,12 +57,15 @@ export function sanitizePlayerCharacter(
       title: 'Protagonista (OC)',
       race: 'Elfa de la Luna',
       class: 'Druida / Maga',
+      level: 'Nivel 1',
+      levelProgress: 0,
       summary: '',
       events: []
     };
   }
 
   let name = (pc.name || '').trim();
+  let levelProgress = typeof pc.levelProgress === 'number' ? Math.max(0, Math.min(100, pc.levelProgress)) : 50;
   let recoveredNote: string | undefined = undefined;
 
   if (isInvalidCharacterName(name)) {
@@ -108,6 +111,7 @@ export function sanitizePlayerCharacter(
     ...pc,
     name: name || fallbackName,
     title: title || pc.title,
+    levelProgress,
     summary,
     notes,
     events: Array.isArray(pc.events) ? pc.events : []

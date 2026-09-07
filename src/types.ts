@@ -254,6 +254,7 @@ export interface PlayerCharacter {
   gender?: string;
   subclass?: string;
   level?: string;
+  levelProgress?: number; // 0-100 percentage towards next level
   background?: string;
   alignment?: string;
   experience?: string;

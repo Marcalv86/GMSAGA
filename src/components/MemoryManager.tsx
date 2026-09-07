@@ -699,6 +699,23 @@ export const MemoryManager: React.FC<{
                   )}
                 </div>
 
+                {/* Level & Progress Bar */}
+                <div className="mt-2.5 flex flex-col gap-1.5 bg-[var(--surface)] p-3 rounded-lg border border-[var(--glass-border)]">
+                  <div className="flex justify-between items-center text-xs font-cinzel">
+                    <span className="font-bold text-[var(--accent)] flex items-center gap-1.5">
+                      <span>{cleanPc.level || 'Nivel 1'}</span>
+                      {cleanPc.class && <span className="text-[var(--text-secondary)] font-normal">({cleanPc.class})</span>}
+                    </span>
+                    <span className="text-[var(--text-secondary)] font-semibold">{cleanPc.levelProgress ?? 40}% para subir de nivel</span>
+                  </div>
+                  <div className="w-full bg-[var(--surface-soft)] rounded-full h-2 overflow-hidden border border-[var(--glass-border)]">
+                    <div 
+                      className="bg-[var(--accent)] h-full transition-all duration-300 rounded-full"
+                      style={{ width: `${cleanPc.levelProgress ?? 40}%` }}
+                    />
+                  </div>
+                </div>
+
                 <div className="mt-3 text-xs text-[var(--text-secondary)] bg-[var(--surface)]/70 p-3 rounded-lg border border-[var(--glass-border)] font-lora leading-relaxed">
                   Aquí se registran de forma automática los acontecimientos, evolución personal y hechos trascendentales que le van sucediendo a tu personaje. La IA actualiza la memoria viva en cada respuesta a partir de la crónica de juego.
                 </div>
