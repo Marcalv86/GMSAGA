@@ -31,7 +31,9 @@ export function stripInternalTagsAndHeaders(raw: string | undefined | null): str
     .replace(/\[\s*V[IÍ]NCULO\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*AFINIDAD\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*CHAPTER\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*Pregunta\s+de\s+Mesa\s*:[^\]]*\]/gi, '');
+    .replace(/\[\s*Pregunta\s+de\s+Mesa\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*Nota\s+de\s+Mesa\s*:[^\]]*\]/gi, '')
+    .replace(/^[ \t]*<[ \t]*¿?Qué\s+haces\??[ \t]*>[ \t]*$/gim, '');
 
   // 3. Eliminar cabeceras de fecha / estadísticas / renombre / afinidad fuera del HUD
   text = text
