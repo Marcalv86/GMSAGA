@@ -226,15 +226,20 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
         <div
           className={
             m.role === 'user'
-              ? 'bg-[var(--msg-user)] border border-[var(--user-border)] py-2 sm:py-2.5 px-3.5 sm:px-4 rounded-2xl text-[var(--text-primary)] max-w-[88%] sm:max-w-[80%] font-lora'
+              ? (m.content.includes('[Transición') || m.content.startsWith('⏳'))
+                ? 'bg-[color-mix(in_srgb,var(--msg-user)_92%,rgba(245,158,11,0.1))] border border-amber-500/40 py-2 sm:py-2.5 px-3.5 sm:px-4 rounded-2xl text-[var(--text-primary)] max-w-[88%] sm:max-w-[80%] font-lora shadow-xs'
+                : 'bg-[var(--msg-user)] border border-[var(--user-border)] py-2 sm:py-2.5 px-3.5 sm:px-4 rounded-2xl text-[var(--text-primary)] max-w-[88%] sm:max-w-[80%] font-lora'
               : 'py-1 text-[var(--text-primary)] w-full max-w-[900px] font-lora text-left'
           }
         >
           {/* Badge visual si es una Transición de Escena / Salto de Tiempo */}
           {m.role === 'user' && (m.content.includes('[Transición') || m.content.startsWith('⏳')) && (
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-cinzel font-bold text-amber-700 dark:text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 rounded-full mb-1.5 shadow-2xs">
-              <FastForward className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-cinzel font-bold text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/35 px-2.5 py-0.5 rounded-full mb-2 shadow-2xs">
+              <FastForward className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
               <span>Transición de Escena / Salto de Tiempo</span>
+              <span className="text-[9px] opacity-80 font-sans font-semibold uppercase tracking-wider ml-1 bg-amber-500/25 px-1.5 py-0.5 rounded">
+                Mundo y PNJs en Marcha
+              </span>
             </div>
           )}
 

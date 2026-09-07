@@ -469,7 +469,8 @@ export default function App() {
               (!p.instructions.includes('8.1 Montaje Alterno') ||
                 !p.instructions.includes('Principio de Progresión en Bambalinas') ||
                 !p.instructions.includes('⭐ 00. CARGA DE CONTEXTO') ||
-                !p.instructions.includes('Arraigo en el Mundo e Interconexión de Faerûn')))
+                !p.instructions.includes('Arraigo en el Mundo e Interconexión de Faerûn') ||
+                !p.instructions.includes('8.2 Protocolo de Transición de Escena')))
           ) {
             modified = true;
             if (!p.instructions) {

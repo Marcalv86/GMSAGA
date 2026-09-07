@@ -27,19 +27,19 @@ export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
     tag: 'Descanso Largo · 8h',
     icon: Sun,
     description:
-      'Pasa la noche tranquilamente. El grupo recupera todos sus PG, dados de golpe y ranuras. La IA actualiza el HUD con la nueva fecha/hora y clima matutino.',
+      'Pasa la noche. El grupo recupera PG, dados de golpe y ranuras. El mundo no se detiene: los PNJs vigilan o traman, facciones avanzan en bambalinas y amanece con un nuevo estímulo o acontecimiento.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Descanso Largo]: La escena previa concluye y el grupo completa un descanso largo de 8 horas sin sobresaltos. Se recuperan todos los puntos de golpe, dados de golpe y recursos gastados. Amanece un nuevo día: actualiza el encabezado de HUD (📍 lugar, fecha/hora matutina, 🌤 clima y 👥 presentes) y narra el despertar, el estado del campamento o la habitación y la primera situación que activa la jornada.'
+      '⏳ [Transición de Escena / Descanso Largo · 8 horas]: La escena anterior concluye y el grupo completa un descanso largo de 8 horas sin sobresaltos mayores. Se recuperan todos los puntos de golpe, dados de golpe y recursos de clase.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Actualiza el encabezado de HUD (📍 nuevo momento/lugar, fecha Harptos y hora matutina, 🌤 clima y visibilidad, 👥 presentes). El paso de la noche afecta a los PNJs y al entorno: narra qué han estado haciendo los acompañantes durante las guardias o el reposo, cómo amanece la situación (ánimos, preparativos) y qué movimientos han ocurrido en bambalinas con las facciones o enemigos cercanos. Abre la jornada con un estímulo activo o novedad inmediata que rompa la quietud.'
   },
   {
     id: 'short_rest',
     title: 'Descanso Corto (1-2 horas)',
-    tag: 'Descanso Corto · 1h',
+    tag: 'Descanso Corto · 1-2h',
     icon: Coffee,
     description:
-      'Una pausa tranquila para tomar aliento, vendar heridas, gastar dados de golpe y charlar en calma antes de proseguir.',
+      'Pausa para vendar heridas, gastar dados de golpe y charlar. El entorno circundante sigue en marcha: cambios de guardia, ruidos y ajustes de tensión.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Descanso Corto]: Transcurre una hora de respiro tranquilo en el lugar. El grupo aprovecha para tomar aliento, vendar heridas y recuperar recursos breves. Concluye la pausa y describe qué ocurre inmediatamente después o cómo se reactiva el entorno.'
+      '⏳ [Transición de Escena / Descanso Corto · 1-2 horas]: Transcurre un receso de una a dos horas de calma. El grupo toma aliento, venda heridas, gasta dados de golpe y recupera recursos breves.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: El entorno no se detiene; describe cómo reaccionan los PNJs presentes tras la pausa, qué cambios se perciben en el entorno tras este intervalo (patrullas, rumores, ruidos que se aproximan o cambios de viento) y presenta el estímulo activo que encara el grupo al levantarse.'
   },
   {
     id: 'time_skip_hours',
@@ -47,9 +47,9 @@ export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
     tag: 'Salto Temporal · Horas',
     icon: Moon,
     description:
-      'Pasan varias horas del día. La luz solar se extingue, cae la noche, se encienden antorchas y cambian las guardias o la atmósfera.',
+      'Pasan varias horas del día. Cae el sol, se encienden antorchas, rotan turnos y las facciones o criaturas nocturnas mueven ficha.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Salto Temporal]: Pasan varias horas de espera o actividad cotidiana. La luz diurna se extingue y cae la noche: actualiza el HUD con la hora vespertina/nocturna y sitúa la escena en la nueva situación bajo la oscuridad o las antorchas.'
+      '⏳ [Transición de Escena / Salto Temporal de Varias Horas]: Transcurren varias horas de espera o camino. La luz solar se extingue y cae la noche: actualiza el encabezado de HUD con la nueva hora vespertina/nocturna y visibilidad reducida.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Durante estas horas, los PNJs presentes y lejanos han seguido sus rutinas o planes en bambalinas. Narra la atmósfera nocturna, los cambios de guardia y ánimos, y el acontecimiento o rumor que surge con la llegada de la oscuridad.'
   },
   {
     id: 'location_change',
@@ -57,9 +57,9 @@ export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
     tag: 'Cambio de Escena · Viaje',
     icon: Compass,
     description:
-      'Elipsis de desplazamiento hacia un nuevo destino o escenario. La IA narra brevemente el viaje y sitúa al grupo a su llegada con nuevo HUD.',
+      'Elipsis de desplazamiento hacia un nuevo destino. Se narran los hitos de la ruta y se sitúa al grupo a su llegada con nuevo HUD y una situación viva.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Viaje]: La escena actual queda cerrada y se produce el desplazamiento o viaje hacia el siguiente destino relevante. Narra brevemente el trayecto y sitúa al grupo a su llegada con el nuevo encabezado de HUD (📍 nuevo lugar exacto, 🌤 clima y 👥 presentes) y el estímulo inicial del nuevo escenario.'
+      '⏳ [Transición de Escena / Viaje y Desplazamiento]: Se cierra la escena previa y el grupo emprende el viaje hacia el siguiente destino relevante.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Narra de forma concisa el trayecto y la dinámica entre los viajeros durante el camino. Sitúa al grupo a su llegada con un nuevo encabezado de HUD (📍 nuevo lugar exacto, 🌤 clima y 👥 presentes) y un acontecimiento, encuentro o complicación que recibe al grupo en el nuevo escenario.'
   },
   {
     id: 'downtime_days',
@@ -67,9 +67,9 @@ export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
     tag: 'Tiempo Muerto · Días',
     icon: Calendar,
     description:
-      'Varios días de relativa calma: forja, compras, lecturas o descanso en la posada. Rumores que llegan y el evento que rompe la monotonía.',
+      'Varios días de actividad cotidiana, compras, forja o convalecencia. Noticias que llegan de la Costa de la Espada o Luskan y un suceso que rompe la monotonía.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Tiempo Muerto]: Transcurren varios días de calma relativa y vida cotidiana en la zona. Describe las rutinas que han seguido los personajes, rumores o noticias que hayan llegado de la Costa de la Espada o de Luskan, y el acontecimiento o visita que interrumpe la monotonía y arranca el siguiente conflicto.'
+      '⏳ [Transición de Escena / Tiempo Muerto · Varios Días]: Transcurren varios días de calma relativa y vida cotidiana en la zona.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Durante este tiempo, el mundo de Faerûn ha seguido girando: actualiza la fecha en el HUD. Detalla qué han estado haciendo los personajes, qué noticias, rumores o intrigas han cruzado los caminos (desde Luskan, Aguasprofundas o la región), y cuál es el acontecimiento, visita o ruptura de la calma que arranca el nuevo conflicto.'
   }
 ];
 
@@ -137,6 +137,19 @@ export const SceneTransitionModal: React.FC<SceneTransitionModalProps> = ({
 
         {/* Modal Body: Scrollable */}
         <div className="p-5 overflow-y-auto space-y-4 flex-1">
+          {/* Living World Banner */}
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-start gap-2.5 text-xs text-[var(--text-secondary)]">
+            <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <span className="font-cinzel font-bold text-amber-800 dark:text-amber-300 block text-xs">
+                Causalidad Viva y Progresión de Faerûn
+              </span>
+              <p className="text-[11px] leading-relaxed">
+                El tiempo no es un decorado inerte: al saltar horas o días, los PNJs y facciones presentes y lejanas continúan sus planes en bambalinas. La IA actualizará el encabezado de HUD y abrirá la nueva escena con consecuencias orgánicas y un estímulo vivo inmediato.
+              </p>
+            </div>
+          </div>
+
           {/* Quick Presets Grid */}
           <div>
             <label className="block font-cinzel text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2.5 flex items-center gap-1.5">
@@ -182,7 +195,7 @@ export const SceneTransitionModal: React.FC<SceneTransitionModalProps> = ({
                 htmlFor="scene-transition-textarea"
                 className="block font-cinzel text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5"
               >
-                <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" /> Detalle o Instrucción de la Transición
+                <FastForward className="w-3.5 h-3.5 text-[var(--accent)]" /> Instrucción Narrativa para el Narrador
               </label>
               <span className="text-[10px] text-[var(--text-secondary)]">
                 Puedes personalizar lo que ocurre durante el salto
