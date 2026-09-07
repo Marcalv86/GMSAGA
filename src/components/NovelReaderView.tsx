@@ -14,14 +14,15 @@ export const NovelReaderView: React.FC<{
   currentChatId: string | null;
   onSelectChat: (chatId: string) => void;
   onBackToChat: () => void;
-}> = ({ project, chats, currentChatId, onSelectChat, onBackToChat }) => {
+}> = ({ project, chats = [], currentChatId, onSelectChat, onBackToChat }) => {
   const [selectedScope, setSelectedScope] = useState<'current' | 'all'>('current');
   const [theme, setTheme] = useState<ReaderTheme>('parchment');
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
   const [showPlayerActions, setShowPlayerActions] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
-  const activeChat = chats.find(c => c.id === currentChatId) || chats[0];
+  const safeChats = Array.isArray(chats) ? chats : [];
+  const activeChat = safeChats.find(c => c.id === currentChatId) || safeChats[0];
 
   // Theme styling definitions
   const themeStyles = {
@@ -77,11 +78,11 @@ export const NovelReaderView: React.FC<{
   };
 
   // Prepare chapters to render
-  const chaptersToRender = selectedScope === 'all' ? chats : activeChat ? [activeChat] : [];
+  const chaptersToRender = selectedScope === 'all' ? safeChats : activeChat ? [activeChat] : [];
 
   // Compute total word count
   const totalWords = chaptersToRender.reduce((acc, ch) => {
-    return acc + ch.messages.reduce((mAcc, m) => mAcc + m.content.split(/\s+/).length, 0);
+    return acc + (ch?.messages || []).reduce((mAcc, m) => mAcc + (m?.content || '').split(/\s+/).filter(Boolean).length, 0);
   }, 0);
   const readingTimeMin = Math.max(1, Math.round(totalWords / 200));
 
@@ -102,10 +103,10 @@ export const NovelReaderView: React.FC<{
       setTimeout(() => setExportSuccess(null), 3000);
     } catch (err: any) {
       console.error('Error exporting PDF:', err);
-      alert('Error al exportar la novela a PDF: ' + (err?.message || 'Error desconocido'));
+      setExportProgress('Error al exportar: ' + (err?.message || 'Error desconocido'));
+      setTimeout(() => setExportProgress(null), 4000);
     } finally {
       setIsExporting(false);
-      setExportProgress(null);
     }
   };
 
@@ -139,13 +140,13 @@ export const NovelReaderView: React.FC<{
             <button
               onClick={onBackToChat}
               className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
-              title="Volver al modo de juego: escribes y el Narrador responde"
-              aria-label="Volver al modo de juego"
+              title="Volver al modo de juego interactivo"
+              aria-label="Volver al juego"
             >
-              <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Jugar</span>
+              <Swords className="w-3.5 h-3.5" /> <span>Jugar</span>
             </button>
-            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Leer el capítulo como una novela">
-              <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Leer</span>
+            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo lectura de novela activo">
+              <BookOpen className="w-3.5 h-3.5" /> <span>Novela</span>
             </span>
           </div>
 

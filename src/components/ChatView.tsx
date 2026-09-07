@@ -901,16 +901,16 @@ export const ChatView: React.FC<{
               «Jugar» y «Leer» dicen lo que hace cada uno.
             */}
             <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo de juego: escribes y el Narrador responde">
-              <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Jugar</span>
+              <Swords className="w-3.5 h-3.5" /> <span>Jugar</span>
             </span>
             {onOpenNovelReader && (
               <button
                 onClick={onOpenNovelReader}
                 className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
-                title="Leer el capítulo como una novela, sin la interfaz de juego"
-                aria-label="Modo lectura"
+                title="Leer la crónica en formato novela maquetada"
+                aria-label="Modo novela"
               >
-                <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Leer</span>
+                <BookOpen className="w-3.5 h-3.5" /> <span>Novela</span>
               </button>
             )}
           </div>

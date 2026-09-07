@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import {
+  BookOpen,
   Check,
   FolderSync,
   Menu,
@@ -38,6 +39,7 @@ import { Modals, PromptConfig, ConfirmConfig, AlertConfig, ApiKeyModal } from '.
 import { SimpleMemoryView } from './components/SimpleMemoryView';
 import { FilesView } from './components/FilesView';
 import { InstructionsView } from './components/InstructionsView';
+import { NovelReaderView } from './components/NovelReaderView';
 import { MapViewer } from './components/MapViewer';
 import { InstallAppModal } from './components/InstallAppModal';
 import { LocalStorageModal } from './components/LocalStorageModal';
@@ -2732,6 +2734,29 @@ export default function App() {
               onUpdateProject={handleUpdateProjectField}
               onNavigateToDiary={() => setActiveTab('memory')}
             />
+          )}
+
+          {activeTab === 'novel' && (
+            currentProject ? (
+              <NovelReaderView
+                project={currentProject}
+                chats={currentChats}
+                currentChatId={currentChatId}
+                onSelectChat={id => setCurrentChatId(id)}
+                onBackToChat={() => setActiveTab('chat')}
+              />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-[var(--text-secondary)] font-cinzel gap-3">
+                <BookOpen className="w-12 h-12 text-[var(--accent)] opacity-50" />
+                <p>Selecciona un tomo o campaña para leer en formato novela.</p>
+                <button
+                  onClick={() => setActiveTab('chat')}
+                  className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] font-bold text-xs shadow-md cursor-pointer hover:opacity-90"
+                >
+                  Volver a la Crónica
+                </button>
+              </div>
+            )
           )}
 
           {activeTab === 'memory' && currentProject && (
