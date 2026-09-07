@@ -11,8 +11,10 @@ import {
   ThermometerSnowflake,
   Skull,
   ShieldAlert,
-  Anchor
+  Anchor,
+  Award
 } from 'lucide-react';
+import { Project } from '../types';
 
 export interface SceneHUDData {
   location: string;
@@ -225,9 +227,10 @@ function extractCharacters(text: string, characters: string[]): void {
 interface SceneHUDCardProps {
   hud: SceneHUDData;
   messageIndex?: number;
+  project?: Project;
 }
 
-export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud }) => {
+export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud, project }) => {
   // Estado de colapso local: por defecto contraído (cintillo compacto no expandido)
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
@@ -243,6 +246,15 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud }) => {
 
   const fullLocation = [hud.location, hud.subLocation, hud.region].filter(Boolean).join(' · ');
   const fullTime = [hud.date, hud.timeOfDay].filter(Boolean).join(' · ');
+
+  // Calcular progreso de nivel e hitos a partir de la memoria y eventos
+  const pc = project?.memory?.player_character;
+  const eventsCount = pc?.events?.length || 0;
+  const questsCompleted = project?.memory?.quests?.filter(q => q.status === 'Completada')?.length || 0;
+  const levelProgress = pc?.levelProgress !== undefined && pc.levelProgress > 0 
+    ? pc.levelProgress 
+    : Math.min(100, Math.max(15, (eventsCount * 15) + (questsCompleted * 25)));
+  const characterLevel = pc?.level || 'Nivel 1';
 
   return (
     <div className="w-full mb-3 select-none transition-all duration-200">
@@ -424,6 +436,27 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud }) => {
                 </div>
               </div>
             )}
+
+            {/* Barra de Progreso Visual de Hitos / Nivel */}
+            <div className="flex items-start gap-2 bg-[color-mix(in_srgb,var(--surface-soft)_60%,transparent)] p-2 rounded-md border border-[var(--glass-border)]/40 sm:col-span-2 md:col-span-3">
+              <Award className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+              <div className="flex flex-col gap-1 min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1 text-[10px] font-cinzel">
+                  <span className="font-bold text-[var(--accent)] uppercase tracking-wider">
+                    Progreso de Hitos y Experiencia ({characterLevel})
+                  </span>
+                  <span className="font-semibold text-[var(--text-secondary)]">
+                    {levelProgress}% para subir de nivel ({eventsCount} eventos registrados, {questsCompleted} hitos)
+                  </span>
+                </div>
+                <div className="w-full bg-[var(--surface)] rounded-full h-2 overflow-hidden border border-[var(--glass-border)]">
+                  <div 
+                    className="bg-gradient-to-r from-[var(--accent)] to-amber-500 h-full transition-all duration-300 rounded-full"
+                    style={{ width: `${levelProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

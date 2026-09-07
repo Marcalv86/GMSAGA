@@ -73,6 +73,7 @@ interface ChatMessageItemProps {
   setOraculoAbierto: (open: boolean) => void;
   handleRollRequestClick: (req: RollRequest) => void;
   onOpenTransitionModal?: () => void;
+  project?: Project;
 }
 
 const ChatMessageItem = React.memo<ChatMessageItemProps>(({
@@ -97,7 +98,8 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   setPreguntaOraculo,
   setOraculoAbierto,
   handleRollRequestClick,
-  onOpenTransitionModal
+  onOpenTransitionModal,
+  project
 }) => {
   const isModel = m.role === 'model';
   const rollRequests = isModel ? parseRollRequests(m.content) : [];
@@ -242,7 +244,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
         >
           {/* Cintillo Cinemático de Escena */}
           {isModel && sceneHUD && (
-            <SceneHUDCard hud={sceneHUD} messageIndex={idx} />
+            <SceneHUDCard hud={sceneHUD} messageIndex={idx} project={project} />
           )}
 
           {bodyText && (
@@ -1108,6 +1110,7 @@ export const ChatView: React.FC<{
                     setOraculoAbierto={setOraculoAbierto}
                     handleRollRequestClick={acciones.handleRollRequestClick}
                     onOpenTransitionModal={() => setShowTransitionModal(true)}
+                    project={project}
                   />
                 );
               })
