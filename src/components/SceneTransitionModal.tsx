@@ -198,7 +198,7 @@ export const SceneTransitionModal: React.FC<SceneTransitionModalProps> = ({
                 <FastForward className="w-3.5 h-3.5 text-[var(--accent)]" /> Instrucción Narrativa para el Narrador
               </label>
               <span className="text-[10px] text-[var(--text-secondary)]">
-                Puedes personalizar lo que ocurre durante el salto
+                Instrucción interna: se envía en segundo plano al Narrador (no aparece en la crónica)
               </span>
             </div>
             <textarea
