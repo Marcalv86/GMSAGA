@@ -2,11 +2,16 @@ import React, { useState } from 'react';
 import {
   Compass,
   Clock,
-  CloudSun,
   Users,
   Heart,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Snowflake,
+  Wind,
+  ThermometerSnowflake,
+  Skull,
+  ShieldAlert,
+  Anchor
 } from 'lucide-react';
 
 export interface SceneHUDData {
@@ -302,21 +307,74 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud }) => {
         {!collapsed && (
           <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs font-lora animate-in fade-in duration-200">
             {/* Atmósfera: Clima e Iluminación */}
-            {(hud.weather || hud.light) && (
-              <div className="flex items-start gap-2 bg-[color-mix(in_srgb,var(--surface-soft)_60%,transparent)] p-2 rounded-md border border-[var(--glass-border)]/40">
-                <CloudSun className="w-3.5 h-3.5 text-amber-500/80 mt-0.5 shrink-0" />
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="font-cinzel text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-                    Atmósfera
-                  </span>
-                  <span className="text-[var(--text-primary)] leading-snug">
-                    {hud.weather}
-                    {hud.weather && hud.light && ' · '}
-                    {hud.light && <span className="opacity-90 italic">{hud.light}</span>}
-                  </span>
+            {(hud.weather || hud.light) && (() => {
+              const weatherLower = (hud.weather || '').toLowerCase();
+              const textCombined = `${weatherLower} ${(hud.region || '').toLowerCase()} ${(hud.location || '').toLowerCase()}`;
+              const isExtremeCold = /frío|helado|temperatura|bajo cero|hielo|polar/i.test(textCombined);
+              const isBlizzard = /ventisca|tormenta|blizzard|whiteout|nieve ciega/i.test(textCombined);
+              const isAurilsRime = /auril|rime|oscuridad|noche eterna/i.test(textCombined);
+              const isUnderdark = /infraoscuridad|locura|esporas|abismo|túnel|menzoberranzan/i.test(textCombined);
+              const isUrbanGuard = /guardia|cascos grises|puños flamígeros|arresto|recompensa|notoriedad|crimen/i.test(textCombined);
+              const isMaritime = /mar|tormenta marina|neblina|umbral|barco|galera|carabela|olas/i.test(textCombined);
+
+              return (
+                <div className="flex items-start gap-2 bg-[color-mix(in_srgb,var(--surface-soft)_60%,transparent)] p-2 rounded-md border border-[var(--glass-border)]/40">
+                  {isUnderdark ? (
+                    <Skull className="w-3.5 h-3.5 text-purple-400 mt-0.5 shrink-0" />
+                  ) : isUrbanGuard ? (
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                  ) : isMaritime ? (
+                    <Anchor className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                  ) : (
+                    <Snowflake className="w-3.5 h-3.5 text-cyan-500/90 mt-0.5 shrink-0 animate-pulse" />
+                  )}
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-cinzel text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                        {isUnderdark ? 'Infraoscuridad' : isUrbanGuard ? 'Vigilancia Urbana' : isMaritime ? 'Mar de las Espadas' : 'Atmósfera (Faerûn)'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {isBlizzard && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 text-[9px] font-bold border border-indigo-500/30" title="Ventisca Activa (Visibilidad 5 pies, CD CON por Agotamiento)">
+                            <Wind className="w-2.5 h-2.5" /> Ventisca
+                          </span>
+                        )}
+                        {isExtremeCold && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[9px] font-bold border border-cyan-500/30" title="Frío Extremo (Salvación CON cada hora o Agotamiento)">
+                            <ThermometerSnowflake className="w-2.5 h-2.5" /> Frío Extremo
+                          </span>
+                        )}
+                        {isAurilsRime && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[9px] font-bold border border-purple-500/30" title="La Rime de Auril (Noche Eterna)">
+                            Rime
+                          </span>
+                        )}
+                        {isUnderdark && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50" title="Riesgo de Locura / Presencia Abisal">
+                            Locura
+                          </span>
+                        )}
+                        {isUrbanGuard && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-bold border border-amber-500/30" title="Vigilancia de Guardia / Notoriedad">
+                            Alerta
+                          </span>
+                        )}
+                        {isMaritime && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 text-[9px] font-bold border border-blue-500/30" title="Condiciones Marítimas / Marejada">
+                            Mar
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[var(--text-primary)] leading-snug">
+                      {hud.weather}
+                      {hud.weather && hud.light && ' · '}
+                      {hud.light && <span className="opacity-90 italic">{hud.light}</span>}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Presentes en Escena */}
             {hud.characters.length > 0 && (

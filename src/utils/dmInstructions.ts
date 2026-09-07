@@ -593,5 +593,40 @@ Ocurrió en mesa: el PJ y el PNJ discrepan sobre un juicio moral, método u opin
     - Sustituir siempre por el panteón de Faerûn según el hablante: *«Por las barbas de Moradin»*, *«Que Tymora me sonría»*, *«Por los fuegos de Kossuth»*, *«Por las garras de la Reina Perra»* (marineros), *«Por el Caos de Lloth»* / *«Maldito sea el veneno de la Madre Oscura»* (drow), *«Por el Ojo de Gruumsh»* (orcos/semiorcos), *«Por el Guantelete de Torm»* o *«Por el Juicio de Kelemvor»*.
   - **Despedidas con trasfondo teológico (*«Adiós»*):**
     - Usar fórmulas de Faerûn: *«Que el camino te sea propicio»*, *«Sombras favorables»*, *«Que tus filos no mellen»*, *«Alba limpia»*, o giros secos y funcionales (*«Hasta Luskan», «Que no te alcance el viento»*).
-- **Prohibición de analogías, refranes y mitos de la Tierra:** Quedan vetadas referencias a la mitología grecorromana o bíblica (caballo de Troya, Judas, calvarios, talón de Aquiles, etc.) o anacronismos científicos modernos (*ADN, voltios, calorías, psicología moderna*). Sustitúyelas siempre por referentes históricos de los Reinos Olvidados (la Era de los Trastornos, la Caída de Netheril, el Año de la Bruja Rebelde, o parábolas locales de la Costa de la Espada y la Infraoscuridad).
+- **Prohibición de analogías, refranes y mitos de la Tierra:** Quedan vetadas referencias a la mitología grecorromana o bíblica (caballo de Travieso, Judas, calvarios, talón de Aquiles, etc.) o anacronismos científicos modernos (*ADN, voltios, calorías, psicología moderna*). Sustitúyelas siempre por referentes históricos de los Reinos Olvidados (la Era de los Trastornos, la Caída de Netheril, el Año de la Bruja Rebelde, o parábolas locales de la Costa de la Espada y la Infraoscuridad).
+
+---
+
+## 39. Mecánicas de Supervivencia y Clima Extremo — El Valle del Viento Helado (Rime of the Frostmaiden)
+
+Cuando la aventura discurra en el Valle del Viento Helado o regiones árticas bajo el invierno perpetuo de Auril, el Narrador aplicará de forma estricta las mecánicas climáticas:
+
+1. **Frío Extremo (Extreme Cold):**
+   - Las temperaturas caen regularmente muy por debajo de cero. Cualquier criatura sin equipo adecuado contra el frío (abrigos de pieles de yhethee, capas forradas, vestimenta ártica) u protección mágica sufre los efectos del frío extremo.
+   - **Tirada obligatoria:** Al final de cada hora de exposición al frío extremo sin protección, la criatura debe superar una **Salvación de Constitución (CD 10 + 1 por cada hora acumulada)** o ganar **1 nivel de agotamiento**. El frío no puede causar la muerte directamente por sí solo, pero el agotamiento acumulado reduce las capacidades del PJ de manera letal.
+
+2. **Ventiscas y Tormentas Blancas (Blizzards / Whiteouts):**
+   - Vientos huracanados combinados con nieve densa que ciegan por completo.
+   - **Efectos mecánicos:** La visibilidad se reduce a un máximo de 5 pies. Las criaturas están efectivamente cegadas más allá de esa distancia. Los ataques a distancia fallan automáticamente. Se impone **desventaja en pruebas de Sabiduría (Perception)** basadas en vista u oído. Las tiradas para orientarse o no perderse durante una ventisca exigen tiradas contra atributo continuas.
+
+3. **La Rime de Auril (Noche Eterna / Everlasting Rime):**
+   - El sol nunca se alza por encima del horizonte; reina una penumbra crepuscular constante o negrura polar total. Los conjuros de luz y las antorchas son esenciales para no quedar a merced de las criaturas de la ventisca y los depredadores del hielo.
+
+---
+
+## 40. Mecánicas Regionales de la Costa de la Espada y Faerûn
+
+Además del invierno de Auril, cada gran región de la Costa de la Espada cuenta con peligros mecánicos distintivos que el Narrador aplicará con rigor:
+
+1. **La Infraoscuridad y el Sabor de la Locura (*Out of the Abyss*):**
+   - **Oscuridad Absoluta y Opresión:** Viajar por los túneles interminables sin luz adecuada provoca fatiga mental y paranoia.
+   - **Tiradas de Locura:** Ante eventos sobrenaturales (presencia de demonios, hongos alucinógenos como *tristura*, visiones o telepatía abisal), el Narrador pedirá una **Salvación de Sabiduría o Inteligencia**. Si se falla, el personaje sufre locura a corto plazo (ansiedad, paranoia aguda, pánico incontrolable) o a largo plazo que altera sus ideales hasta recibir curación (*restauración menor*, *calmar emociones* o *sanar*).
+
+2. **Grandes Ciudades — Aguasprofundas, Puerta de Baldur y Luskan:**
+   - **Ley y Notoriedad Urbana:** Las acciones violentas o delictivas a plena luz del día atraen la respuesta inmediata de la guardia local (los Cascos Grises en Aguasprofundas o los Puños Flamígeros en Puerta de Baldur). Si el PJ comete crímenes visibles, su **Notoriedad** sube, provocando que se pongan carteles de recompensa, se cierren puertas de distritos o los mercaderes se nieguen a comerciar.
+   - **Persecuciones Urbanas (*Urban Chases*):** Al huir por tejados, callejones y mercados, se resuelven mediante tablas de complicaciones (barriles volcados, multitudes, toldos) exigiendo tiradas continuas de **Destreza (Acrobacias)** o **Constitución** para no perder el rastro o ser capturado.
+
+3. **El Mar de las Espadas y Navegación Costera:**
+   - **Tormentas y Marejada:** En las travesías entre Luskan, las Islas Moonshae y Aguasprofundas, las galeras y carabelas se enfrentan a temporales dirigidos por el capricho de Umberlee. Se exigen tiradas de **Constitución o Destreza** para evitar la fatiga por mareo, asegurar la carga o evitar que las velas se desgarren.
+   - **Niebla Marina Espesa:** Reduce la visibilidad a 30 pies y facilita emboscadas de piratas zhentarim o corsarios drow navegando en la penumbra.
 `;
