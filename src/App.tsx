@@ -1344,6 +1344,17 @@ export default function App() {
     await triggerAIGeneration(continuePrompt, baseMessages);
   };
 
+  const handleSceneTransition = async (transitionPrompt: string) => {
+    if (!transitionPrompt.trim() || !currentPId || !currentChatId || isGenerating || !currentChat) return;
+    const text = transitionPrompt.trim();
+    const updatedMessages: Message[] = [...currentChat.messages, { role: 'user' as const, content: text }];
+    const updatedChat = { ...currentChat, messages: updatedMessages };
+    const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));
+    setCurrentChats(chs);
+    saveLocalChats(currentPId, chs);
+    await triggerAIGeneration(text, updatedMessages);
+  };
+
   const handleDeleteChatMessage = async (index: number, deleteSubsequent: boolean) => {
     if (!currentPId || !currentChatId || !currentChat) return;
 
@@ -2749,6 +2760,7 @@ export default function App() {
               onEditMessage={handleEditChatMessage}
               onRegenerateMessage={handleRegenerateChatMessage}
               onContinueNarrative={handleContinueNarrative}
+              onSceneTransition={handleSceneTransition}
               onDeleteMessage={handleDeleteChatMessage}
               onOpenNovelReader={() => setActiveTab('novel')}
               isBackgroundSyncing={isSyncingMemory}

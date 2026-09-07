@@ -4,6 +4,7 @@ import { Chat, PlayerCharacter, Project, ProjectFile } from '../types';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
 import { CreativeStudioModal } from './CreativeStudioModal';
+import { SceneTransitionModal } from './SceneTransitionModal';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
@@ -25,6 +26,7 @@ import { isNarrativeIncomplete } from '../utils/geminiHelper';
 import {
   BookOpen,
   Dices,
+  FastForward,
   Sparkles,
   Library,
   Paperclip,
@@ -70,6 +72,7 @@ interface ChatMessageItemProps {
   setPreguntaOraculo: (p: string) => void;
   setOraculoAbierto: (open: boolean) => void;
   handleRollRequestClick: (req: RollRequest) => void;
+  onOpenTransitionModal?: () => void;
 }
 
 const ChatMessageItem = React.memo<ChatMessageItemProps>(({
@@ -93,7 +96,8 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   setDeleteModal,
   setPreguntaOraculo,
   setOraculoAbierto,
-  handleRollRequestClick
+  handleRollRequestClick,
+  onOpenTransitionModal
 }) => {
   const isModel = m.role === 'model';
   const rollRequests = isModel ? parseRollRequests(m.content) : [];
@@ -226,6 +230,14 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
               : 'py-1 text-[var(--text-primary)] w-full max-w-[900px] font-lora text-left'
           }
         >
+          {/* Badge visual si es una Transición de Escena / Salto de Tiempo */}
+          {m.role === 'user' && (m.content.includes('[Transición') || m.content.startsWith('⏳')) && (
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-cinzel font-bold text-amber-700 dark:text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 rounded-full mb-1.5 shadow-2xs">
+              <FastForward className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+              <span>Transición de Escena / Salto de Tiempo</span>
+            </div>
+          )}
+
           {/* Cintillo Cinemático de Escena */}
           {isModel && sceneHUD && (
             <SceneHUDCard hud={sceneHUD} messageIndex={idx} />
@@ -433,6 +445,16 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                   >
                     <Play className="w-3.5 h-3.5" /> Continuar
                   </button>
+                  {onOpenTransitionModal && isLastMessage && (
+                    <button
+                      onClick={onOpenTransitionModal}
+                      disabled={isGenerating}
+                      className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
+                      title="Salto de tiempo (descanso largo/corto, horas, días) o cambiar de escena"
+                    >
+                      <FastForward className="w-3.5 h-3.5" /> Salto de Escena
+                    </button>
+                  )}
                 </>
               )}
               {!isModel && (
@@ -520,6 +542,7 @@ export const ChatView: React.FC<{
   onEditMessage: (index: number, newContent: string) => Promise<void> | void;
   onRegenerateMessage: (index: number, updatedUserPrompt?: string) => Promise<void> | void;
   onContinueNarrative: (fromIndex?: number) => Promise<void> | void;
+  onSceneTransition?: (transitionPrompt: string) => Promise<void> | void;
   onDeleteMessage: (index: number, deleteSubsequent: boolean) => Promise<void> | void;
   onUpdatePlayerCharacter?: (pc: PlayerCharacter) => void;
   onOpenNovelReader?: () => void;
@@ -548,6 +571,7 @@ export const ChatView: React.FC<{
   onEditMessage,
   onRegenerateMessage,
   onContinueNarrative,
+  onSceneTransition,
   onDeleteMessage,
   onUpdatePlayerCharacter,
   onOpenNovelReader,
@@ -607,6 +631,9 @@ export const ChatView: React.FC<{
     tab: 'music' | 'image' | 'video' | 'voice';
     sceneText?: string;
   } | null>(null);
+
+  // Modal de Salto de Tiempo / Cambio de Escena
+  const [showTransitionModal, setShowTransitionModal] = useState(false);
 
   // Ventana rápida de emojis temáticos
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -1078,6 +1105,7 @@ export const ChatView: React.FC<{
                     setPreguntaOraculo={setPreguntaOraculo}
                     setOraculoAbierto={setOraculoAbierto}
                     handleRollRequestClick={acciones.handleRollRequestClick}
+                    onOpenTransitionModal={() => setShowTransitionModal(true)}
                   />
                 );
               })
@@ -1108,9 +1136,16 @@ export const ChatView: React.FC<{
           </div>
         )}
 
-        {/* Quick Continue Prompt Bar if there are messages */}
+        {/* Quick Continue & Scene Transition Bar if there are messages */}
         {chat?.messages && chat.messages.length > 0 && !isGenerating && (
-          <div className="max-w-[900px] mx-auto mb-2 flex justify-end">
+          <div className="max-w-[900px] mx-auto mb-2 flex justify-end items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowTransitionModal(true)}
+              className="text-xs font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Avanzar el reloj (descanso largo/corto, horas, días) o cambiar de escenario"
+            >
+              <FastForward className="w-3.5 h-3.5" /> Salto de Tiempo / Escena
+            </button>
             <button
               onClick={() => onContinueNarrative()}
               className="text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--on-accent)] hover:bg-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
@@ -1542,6 +1577,21 @@ export const ChatView: React.FC<{
           }}
         />
       )}
+
+      {/* Scene Transition & Time Skip Modal */}
+      <SceneTransitionModal
+        isOpen={showTransitionModal}
+        onClose={() => setShowTransitionModal(false)}
+        onExecuteTransition={(promptText) => {
+          if (onSceneTransition) {
+            onSceneTransition(promptText);
+          } else {
+            setInputText(promptText);
+            onSendMessage();
+          }
+        }}
+        isGenerating={isGenerating}
+      />
     </div>
   );
 };
