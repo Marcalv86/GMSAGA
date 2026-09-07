@@ -33,6 +33,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   chats = [],
   files = [],
   onUpdateMemory,
+  onUpdateProject,
   isGenerating = false
 }) => {
   const memory: Memory = project.memory || {
@@ -136,6 +137,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           raw_project_memory: newRawMem,
           memory_edits: updatedEdits
         }));
+        await onUpdateProject?.({ lastMemoryUpdate: Date.now() });
         setEditableMemoryText(newRawMem);
       }
       setIsSavedRecently(true);
@@ -187,6 +189,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           ...prev,
           raw_project_memory: newRawMem
         }));
+        await onUpdateProject?.({ lastMemoryUpdate: Date.now() });
         setEditableMemoryText(newRawMem);
       }
       setIsSavedRecently(true);

@@ -1187,18 +1187,16 @@ export default function App() {
         ).catch(() => {});
       }
       // Actualización automática de memoria general estilo Claude/Gemini:
-      // Si la campaña no tiene memoria sintetizada inicial o han transcurrido mensajes,
-      // sintetiza la memoria viva en segundo plano de manera no bloqueante.
+      // Se actualiza automáticamente una vez al día (24 horas) o si no existe memoria inicial.
       if (currentProject) {
         const latestChats = getLocalChats(currentProject.id);
         const effectiveChats = latestChats.length > 0 ? latestChats : currentChats;
-        const totalMsgs = effectiveChats.reduce((acc, c) => acc + (c.messages?.length || 0), 0);
         const lastSyncTime = currentProject.lastMemoryUpdate || 0;
         const msSinceLastSync = Date.now() - lastSyncTime;
         const needsInitialSync = !currentProject.memory?.raw_project_memory;
-        const needsPeriodicSync = totalMsgs > 0 && totalMsgs % 6 === 0 && msSinceLastSync > 120000;
+        const needsDailySync = msSinceLastSync > 24 * 60 * 60 * 1000; // 24 horas
 
-        if (needsInitialSync || needsPeriodicSync) {
+        if (needsInitialSync || needsDailySync) {
           setTimeout(async () => {
             try {
               const newRawMem = await generateClaudeProjectMemory({
