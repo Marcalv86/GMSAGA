@@ -3903,19 +3903,31 @@ export function buildArtNouveauUnifiedPrompt({
   name,
   description = '',
   extraDetails = '',
-  archetype = 'portrait'
+  archetype = 'portrait',
+  framing
 }: {
   subjectType: 'character' | 'npc' | 'player' | 'location' | 'scene' | 'item';
   name: string;
   description?: string;
   extraDetails?: string;
   archetype?: 'portrait' | 'location' | 'scene';
+  framing?: string;
 }): string {
-  const cleanName = name.trim() || (subjectType === 'location' ? 'Lugar Fantástico' : 'Personaje');
+  const cleanName = name.trim() || (subjectType === 'location' ? 'Lugar Fantástico' : subjectType === 'item' ? 'Objeto Mágico' : 'Personaje');
   const descSnippet = description.trim() ? `, ${description.trim().slice(0, 300)}` : '';
   const extra = extraDetails.trim() ? `. Detalles visuales: ${extraDetails.trim()}` : '';
 
+  if (subjectType === 'item') {
+    return `Masterpiece fantasy item and artifact visual development: ${cleanName}${descSnippet}${extra}. Intricate magical relic or forged gear adorned with flowing Art Nouveau golden filigree, celestial engravings, and glowing jewel accents. Elegant decorative parchment framing, stylized modern animation design for young adults, bold graphic shapes with rich painterly textures, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
+  }
+
   if (subjectType === 'location' || archetype === 'location') {
+    if (framing === 'interior') {
+      return `Masterpiece fantasy interior chamber visual development: ${cleanName}${descSnippet}${extra}. Warm atmospheric grand hall, cozy tavern or mystical sanctum with luminous stained-glass windows, carved timber beams, sinuous Art Nouveau wrought-iron candelabras and botanical archways. Modern stylized animation series background painting for young adults, rich painted textures, cozy ambient depth, warm antique amber, brass, and jewel-toned palette, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
+    }
+    if (framing === 'panoramic') {
+      return `Masterpiece wide panoramic fantasy landscape: ${cleanName}${descSnippet}${extra}. Dramatic scenic horizon, sweeping coastal cliffs, ancient mythical forest or sprawling fantasy city under stylized clouds. Art Nouveau vintage illustration infused with modern mature animation cinematography, organic flowing natural elements, bold graphic shapes with rich painterly gouache and oil textures, cohesive fantasy world aesthetic, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
+    }
     return `Masterpiece fantasy architectural environment and location visual development: ${cleanName}${descSnippet}${extra}. Sinuous Art Nouveau organic archways, flowing stone and wrought-iron botanical motifs, warm luminous stained-glass windows, intricate decorative borders and flourishes. Modern stylized animation series background painting for young adults, rich painted textures, atmospheric depth, warm antique amber and jewel-toned palette. Highly cohesive art style, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
   }
 
@@ -3924,11 +3936,24 @@ export function buildArtNouveauUnifiedPrompt({
   }
 
   // Default: Retrato de Personaje / PNJ
+  if (framing === 'token') {
+    return `Masterpiece character token portrait: ${cleanName}${descSnippet}${extra}. Square close-up character token portrait, focused expressive gaze and detailed stylized facial features, circular decorative Art Nouveau border with delicate metallic filigree halo. Modern stylized young-adult animation hero design (Arcane aesthetic meets Mucha), clean sinuous contours, rich volumetric painted lighting, warm antique paper undertones with deep emerald and ruby accents, highly cohesive visual identity, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
+  }
+
+  if (framing === 'medium') {
+    return `Masterpiece character medium-shot portrait: ${cleanName}${descSnippet}${extra}. Expressive medium-shot character portrait from the waist up, confident dynamic swashbuckling posture, stylized angular facial planes and soulful eyes. Ornate fantasy attire adorned with intricate floral and celestial embroidery, flowing cape or garments, framed by delicate Art Nouveau organic flourishes and rim lighting. Modern stylized young-adult animation hero design (Arcane aesthetic meets Mucha), clean sinuous contours, rich volumetric painted lighting, warm antique paper undertones with deep jewel accents, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
+  }
+
+  if (framing === 'full') {
+    return `Masterpiece full-body character illustration: ${cleanName}${descSnippet}${extra}. Dynamic full-length adventurer silhouette, complete fantasy costume, boots, weapons, and traveling gear. Confident stance, expressive stylized facial features, graceful flowing cloak with botanical filigree embroidery, framed against an elegant Art Nouveau decorative backdrop. Modern stylized young-adult animation hero design, bold graphic planar lighting with painterly volumetric shading, warm antique palette, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
+  }
+
+  // Bust / Portrait (Standard)
   return `Masterpiece character portrait: ${cleanName}${descSnippet}${extra}. Expressive character bust, confident posture, stylized angular facial planes and soulful eyes. Ornate fantasy attire adorned with intricate floral and celestial embroidery, framed by a delicate Art Nouveau archway and organic golden filigree halo. Modern stylized young-adult animation hero design (Arcane aesthetic meets Mucha), clean sinuous contours, rich volumetric painted lighting, warm antique paper undertones with deep emerald and ruby accents, highly cohesive visual identity, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
 }
 
 /**
- * Genera una imagen directamente con Imagen 3 / Gemini Image / @google/genai usando la clave de API configurada.
+ * Genera una imagen directamente con Gemini Image / Nano Banana / Imagen usando la clave de API configurada.
  */
 export async function generateImageWithFailover({
   prompt,
@@ -3942,14 +3967,63 @@ export async function generateImageWithFailover({
   const clavesMuertas = new Set<string>();
   let lastError: any = null;
 
+  // Modelos de imagen de Gemini oficiales vía generateContent (Nano Banana / multimodal)
+  const geminiImageModels = [
+    'gemini-3.1-flash-lite-image',
+    'gemini-3.1-flash-image',
+    'gemini-2.5-flash-image'
+  ];
+
   for (const apiKey of clavesDisponibles(todas)) {
     if (apiKey && clavesMuertas.has(apiKey)) continue;
     try {
       const ai = getAIClient(apiKey || undefined);
-      // Intento 1: Imagen 3 (imagen-3.0-generate-002)
+
+      // Intento 1: Modelos de Gemini Image vía generateContent
+      for (const modelName of geminiImageModels) {
+        try {
+          const genResponse = await ai.models.generateContent({
+            model: modelName,
+            contents: {
+              parts: [{ text: prompt }]
+            },
+            config: {
+              imageConfig: {
+                aspectRatio: (aspectRatio as any) || '1:1'
+              }
+            }
+          });
+
+          const candidates = genResponse.candidates;
+          if (candidates && candidates.length > 0) {
+            for (const cand of candidates) {
+              const parts = cand.content?.parts;
+              if (parts) {
+                for (const part of parts) {
+                  if (part.inlineData?.data) {
+                    const mime = part.inlineData.mimeType || 'image/png';
+                    return `data:${mime};base64,${part.inlineData.data}`;
+                  }
+                }
+              }
+            }
+          }
+        } catch (mErr: any) {
+          lastError = mErr;
+          const f = classifyApiError(mErr);
+          // Si es cuota agotada o fallo de clave en esta cuenta, no insistir con más modelos en la misma clave
+          if (f.isRateLimit || f.isInvalidKey || f.isPermissionDenied) {
+            throw mErr;
+          }
+          // Si el modelo específico no está disponible (404), pasar al siguiente
+          console.warn(`Modelo ${modelName} no disponible para imagen:`, mErr?.message || mErr);
+        }
+      }
+
+      // Intento 2: Si los modelos de Gemini fallaron por 404, probar Imagen 3 si estuviera habilitado en Vertex/Cloud
       try {
         const response = await ai.models.generateImages({
-          model: 'imagen-3.0-generate-002',
+          model: 'imagen-3.0-generate',
           prompt,
           config: {
             numberOfImages: 1,
@@ -3965,32 +4039,7 @@ export async function generateImageWithFailover({
           }
         }
       } catch (imagenErr: any) {
-        // Intento 2: gemini-3.1-flash-image vía generateContent (si está disponible para esta clave)
-        try {
-          const genResponse = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-image',
-            contents: {
-              parts: [{ text: prompt }]
-            },
-            config: {
-              imageConfig: {
-                aspectRatio: (aspectRatio as any) || '1:1'
-              }
-            }
-          });
-          const parts = genResponse.candidates?.[0]?.content?.parts;
-          if (parts) {
-            for (const part of parts) {
-              if (part.inlineData?.data) {
-                const mime = part.inlineData.mimeType || 'image/jpeg';
-                return `data:${mime};base64,${part.inlineData.data}`;
-              }
-            }
-          }
-        } catch {
-          // Ambos fallaron para esta llamada
-        }
-        throw imagenErr;
+        // Fallo silencioso de fallback imagen
       }
     } catch (err: any) {
       lastError = err;
@@ -3998,14 +4047,39 @@ export async function generateImageWithFailover({
       if (fallo.isRateLimit && apiKey) markKeyCooldown(apiKey, fallo.retryAfterMs || 60000);
       if ((fallo.isInvalidKey || fallo.isPermissionDenied) && apiKey) clavesMuertas.add(apiKey);
       console.warn('Error generando imagen:', fallo.detail || err);
-      // Si el modelo de imagen no existe para ninguna clave y no hay más claves rotativas
-      if (fallo.isModelMissing && keys.length <= 1) break;
+      // Si el fallo es de cuota o clave en la única clave disponible, salir
+      if ((fallo.isRateLimit || fallo.isModelMissing) && keys.length <= 1) break;
     }
   }
-  throw (
-    lastError ||
-    new Error('No se pudo generar la imagen con el modelo de IA. Verifica tu clave de API en Configuración.')
-  );
+
+  // Si no se obtuvo imagen, formatear un error claro y procesable para el usuario
+  if (lastError) {
+    const f = classifyApiError(lastError);
+    const detailStr = String(f.detail || lastError?.message || '');
+    if (f.isRateLimit || /free_tier.*limit: 0|resource_exhausted|quota exceeded/i.test(detailStr)) {
+      throw new Error(
+        'Tu clave de API de Gemini está en el plan gratuito sin cuota para generación de imágenes (límite 0 de Google para modelos de imagen). En Google AI Studio, la generación de imágenes con IA (gemini-3.1-flash-image / Nano Banana) requiere una clave con facturación habilitada (Pay-as-you-go). Puedes copiar el prompt maestro para usarlo en cualquier generador externo o añadir una clave con facturación en Ajustes.'
+      );
+    }
+    if (f.isModelMissing || /not found|is not supported for predict/i.test(detailStr)) {
+      throw new Error(
+        'Los modelos de generación de imágenes de Gemini (gemini-3.1-flash-lite-image / gemini-3.1-flash-image) no están disponibles con esta clave de Google AI Studio. Verifica los permisos de tu proyecto en aistudio.google.com.'
+      );
+    }
+    if (f.isPermissionDenied) {
+      throw new Error(
+        'Google ha denegado el acceso (Error 403: PERMISSION_DENIED). Comprueba que tu clave de API tenga habilitada la Generative Language API en Google Cloud / AI Studio.'
+      );
+    }
+    if (f.isInvalidKey) {
+      throw new Error(
+        'La clave de API configurada no es válida o ha sido revocada. Revisa tu clave en el menú de Motor / Configuración.'
+      );
+    }
+    throw new Error(f.detail || lastError?.message || 'Error al generar la imagen con el modelo de IA.');
+  }
+
+  throw new Error('No se pudo generar la imagen. Verifica tu clave de API en Configuración.');
 }
 
 export async function analyzeNarrativeStyleFromDocument(

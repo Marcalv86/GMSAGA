@@ -23,7 +23,8 @@ import {
   RefreshCw,
   User,
   Mountain,
-  AlertCircle
+  AlertCircle,
+  Copy
 } from 'lucide-react';
 
 export interface ImagePickerTarget {
@@ -95,23 +96,85 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // AI Generation State
-  const [aiSubjectMode, setAiSubjectMode] = useState<'character' | 'location' | 'scene'>(config.defaultSubjectMode);
-  const [aiAspectRatio, setAiAspectRatio] = useState<'1:1' | '3:4' | '4:3' | '16:9'>(
-    target.type === 'location' ? '4:3' : target.type === 'item' ? '1:1' : '3:4'
+  const isCharacter = target.type === 'player' || target.type === 'npc';
+  const isLocation = target.type === 'location';
+  const isItem = target.type === 'item';
+
+  const framingOptions = useMemo(() => {
+    if (isCharacter) {
+      return [
+        { id: 'bust', label: 'Busto con Orla', desc: 'Halo ornamental Mucha, ideal para fichas', icon: User, ratio: '3:4' as const },
+        { id: 'medium', label: 'Plano Medio', desc: 'Torso y pose de capa y espada', icon: Drama, ratio: '3:4' as const },
+        { id: 'token', label: 'Avatar / Token', desc: 'Primer plano en marco circular', icon: Sparkles, ratio: '1:1' as const },
+        { id: 'full', label: 'Cuerpo Completo', desc: 'Silueta y atuendo aventurero', icon: User, ratio: '3:4' as const }
+      ];
+    }
+    if (isLocation) {
+      return [
+        { id: 'facade', label: 'Fachada o Exterior', desc: 'Torres, arcos y forja Mucha', icon: Castle, ratio: '4:3' as const },
+        { id: 'interior', label: 'Estancia / Interior', desc: 'Salón o sanctum con vidrieras', icon: Castle, ratio: '4:3' as const },
+        { id: 'panoramic', label: 'Vista Panorámica', desc: 'Paisaje amplio cinemático', icon: Mountain, ratio: '16:9' as const }
+      ];
+    }
+    return [
+      { id: 'relic', label: 'Reliquia / Joya', desc: 'Talismán sobre fondo pergamino', icon: Shield, ratio: '1:1' as const },
+      { id: 'gear', label: 'Arma o Artefacto', desc: 'Equipo forjado con filigrana', icon: Shield, ratio: '1:1' as const }
+    ];
+  }, [isCharacter, isLocation]);
+
+  const ratioOptions = useMemo(() => {
+    if (isCharacter) {
+      return [
+        { id: '3:4' as const, label: '3:4 · Retrato Vertical', desc: 'Ideal para ficha y diálogos (Recomendado)' },
+        { id: '1:1' as const, label: '1:1 · Avatar / Token', desc: 'Cuadrado para mapa o miniatura' },
+        { id: '9:16' as const, label: '9:16 · Retrato Alto', desc: 'Formato vertical cinemático' }
+      ];
+    }
+    if (isLocation) {
+      return [
+        { id: '4:3' as const, label: '4:3 · Lugar / Interior', desc: 'Formato estándar de estancias y edificios' },
+        { id: '16:9' as const, label: '16:9 · Panorámico', desc: 'Paisaje o vista cinemática amplia' },
+        { id: '1:1' as const, label: '1:1 · Cuadrado / Mapa', desc: 'Ideal para planos o iconos' }
+      ];
+    }
+    return [
+      { id: '1:1' as const, label: '1:1 · Cuadrado', desc: 'Ideal para objetos y reliquias' },
+      { id: '4:3' as const, label: '4:3 · Horizontal', desc: 'Artefactos alargados o vitrinas' }
+    ];
+  }, [isCharacter, isLocation]);
+
+  const [aiFraming, setAiFraming] = useState<string>(
+    isCharacter ? 'bust' : isLocation ? 'facade' : 'relic'
+  );
+  const [aiAspectRatio, setAiAspectRatio] = useState<'1:1' | '3:4' | '4:3' | '9:16' | '16:9'>(
+    isLocation ? '4:3' : isItem ? '1:1' : '3:4'
   );
   const [extraDetails, setExtraDetails] = useState('');
   const [aiPrompt, setAiPrompt] = useState(() =>
     buildArtNouveauUnifiedPrompt({
-      subjectType: config.defaultSubjectMode,
+      subjectType: isLocation ? 'location' : isItem ? 'item' : 'character',
       name: target.name,
       description: target.desc || '',
       extraDetails: '',
-      archetype: config.defaultSubjectMode === 'character' ? 'portrait' : config.defaultSubjectMode
+      archetype: isLocation ? 'location' : isItem ? 'scene' : 'portrait',
+      framing: isCharacter ? 'bust' : isLocation ? 'facade' : 'relic'
     })
   );
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [generatedAiImage, setGeneratedAiImage] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+
+  const handleCopyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(aiPrompt);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2000);
+      showToast('Prompt maestro copiado al portapapeles', 'success');
+    } catch {
+      showToast('No se pudo copiar automáticamente', 'error');
+    }
+  };
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setFeedbackMsg({ text, type });
@@ -120,16 +183,17 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
     }, 4000);
   };
 
-  // Update prompt when subject mode or extra details change
-  const handleRegeneratePrompt = (newMode?: 'character' | 'location' | 'scene', newDetails?: string) => {
-    const mode = newMode !== undefined ? newMode : aiSubjectMode;
+  // Update prompt when framing or extra details change
+  const handleRegeneratePrompt = (newFraming?: string, newDetails?: string) => {
+    const framing = newFraming !== undefined ? newFraming : aiFraming;
     const details = newDetails !== undefined ? newDetails : extraDetails;
     const p = buildArtNouveauUnifiedPrompt({
-      subjectType: mode,
+      subjectType: isLocation ? 'location' : isItem ? 'item' : 'character',
       name: target.name,
       description: target.desc || '',
       extraDetails: details,
-      archetype: mode === 'character' ? 'portrait' : mode
+      archetype: isLocation ? 'location' : isItem ? 'scene' : 'portrait',
+      framing
     });
     setAiPrompt(p);
   };
@@ -452,25 +516,25 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
               </p>
             </div>
 
-            {/* Subject Mode Selector */}
+            {/* Subject Mode / Framing Selector */}
             <div className="space-y-1.5">
               <label className="block text-xs font-cinzel font-bold text-[var(--text-primary)]">
-                1. Tipo de Ilustración:
+                {isCharacter
+                  ? '1. Enfoque del Retrato:'
+                  : isLocation
+                  ? '1. Tipo de Plano o Estancia:'
+                  : '1. Tipo de Objeto o Reliquia:'}
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2">
-                {[
-                  { id: 'character' as const, label: 'Retrato de Personaje', desc: 'Busto con orla Mucha', icon: User, ratio: '3:4' as const },
-                  { id: 'location' as const, label: 'Lugar o Arquitectura', desc: 'Arcos, vidrieras y forja', icon: Castle, ratio: '4:3' as const },
-                  { id: 'scene' as const, label: 'Escenario Panorámico', desc: 'Composición cinemática', icon: Mountain, ratio: '16:9' as const }
-                ].map(item => {
+              <div className={`grid ${framingOptions.length === 4 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'} gap-1.5 sm:gap-2`}>
+                {framingOptions.map(item => {
                   const Icon = item.icon;
-                  const isSelected = aiSubjectMode === item.id;
+                  const isSelected = aiFraming === item.id;
                   return (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => {
-                        setAiSubjectMode(item.id);
+                        setAiFraming(item.id);
                         setAiAspectRatio(item.ratio);
                         handleRegeneratePrompt(item.id, extraDetails);
                       }}
@@ -501,12 +565,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                 2. Formato / Proporción:
               </label>
               <div className="flex flex-wrap items-center gap-1.5">
-                {[
-                  { id: '3:4' as const, label: '3:4 · Retrato PNJ', desc: 'Ideal para personajes' },
-                  { id: '1:1' as const, label: '1:1 · Cuadrado', desc: 'Fichas y avatares' },
-                  { id: '4:3' as const, label: '4:3 · Lugar', desc: 'Edificios e interiores' },
-                  { id: '16:9' as const, label: '16:9 · Panorámico', desc: 'Vistas cinemáticas' }
-                ].map(r => (
+                {ratioOptions.map(r => (
                   <button
                     key={r.id}
                     type="button"
@@ -532,7 +591,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                 </label>
                 <button
                   type="button"
-                  onClick={() => handleRegeneratePrompt(aiSubjectMode, extraDetails)}
+                  onClick={() => handleRegeneratePrompt(aiFraming, extraDetails)}
                   className="text-[11px] font-cinzel text-[var(--accent)] hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
                 >
                   <RefreshCw className="w-3 h-3" /> Reconstruir Prompt
@@ -543,18 +602,44 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                 value={extraDetails}
                 onChange={e => {
                   setExtraDetails(e.target.value);
-                  handleRegeneratePrompt(aiSubjectMode, e.target.value);
+                  handleRegeneratePrompt(aiFraming, e.target.value);
                 }}
-                placeholder="Ej: capa de terciopelo esmeralda, filigrana dorada, ojos plateados, luna llena..."
+                placeholder={
+                  isCharacter
+                    ? 'Ej: capa de terciopelo esmeralda, filigrana dorada, ojos ambarinos, peinado trenzado...'
+                    : isLocation
+                    ? 'Ej: muelle de piedra negra, faroles de gas encendidos, niebla marina, arcos góticos...'
+                    : 'Ej: empuñadura de hueso tallado, runas púrpuras, filigrana dorada...'
+                }
                 className="w-full bg-[var(--surface-soft)] border border-[var(--user-border)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
               />
             </div>
 
             {/* Prompt Editor */}
             <div className="space-y-1">
-              <label className="block text-xs font-cinzel font-bold text-[var(--text-primary)]">
-                4. Prompt Maestro Art Nouveau (editable):
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-xs font-cinzel font-bold text-[var(--text-primary)]">
+                  4. Prompt Maestro Art Nouveau (editable):
+                </label>
+                <button
+                  type="button"
+                  onClick={handleCopyPrompt}
+                  className="text-[11px] font-cinzel text-[var(--accent)] hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+                  title="Copiar prompt para usarlo en Midjourney, DALL-E u otros generadores"
+                >
+                  {copiedPrompt ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">¡Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copiar Prompt</span>
+                    </>
+                  )}
+                </button>
+              </div>
               <textarea
                 value={aiPrompt}
                 onChange={e => setAiPrompt(e.target.value)}
@@ -565,13 +650,24 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
 
             {/* Error banner if any */}
             {aiError && (
-              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <div className="font-cinzel font-bold">No se pudo completar la generación:</div>
-                  <div className="leading-relaxed">{aiError}</div>
-                  <div className="text-[11px] opacity-85">
-                    Consejo: Abre la rueda de Configuración para verificar que tu clave de API de Gemini esté activa.
+              <div className="p-2.5 sm:p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
+                <div className="space-y-1.5 w-full">
+                  <div className="font-cinzel font-bold text-red-700 dark:text-red-300">
+                    Aviso del generador de ilustraciones:
+                  </div>
+                  <div className="leading-relaxed text-[11px] sm:text-xs text-[var(--text-primary)]">
+                    {aiError}
+                  </div>
+                  <div className="pt-1 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCopyPrompt}
+                      className="px-2.5 py-1 rounded-md bg-[var(--surface)] border border-[var(--user-border)] text-[11px] font-cinzel font-bold text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {copiedPrompt ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedPrompt ? '¡Prompt copiado!' : 'Copiar prompt para generador externo'}</span>
+                    </button>
                   </div>
                 </div>
               </div>
