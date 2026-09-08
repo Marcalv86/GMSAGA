@@ -3892,7 +3892,43 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
 }
 
 /**
- * Genera una imagen directamente con Imagen 3 / @google/genai usando la clave de API configurada.
+ * Definición estilística canónica para la unidad estética:
+ * Art Nouveau vintage mezclado con cartoon estilizado de series de animación modernas para jóvenes adultos (estilo Arcane / Mucha).
+ */
+export const ART_NOUVEAU_ANIMATION_STYLE_DNA =
+  'art nouveau vintage blended with stylized modern animation for young adults (Arcane and Castlevania aesthetic meets Alphonse Mucha poster art), elegant sinuous curvilinear ink linework, decorative floral and organic filigree, bold graphic planar shading with painterly volumetric lighting, expressive facial planes and confident silhouettes, warm antique color palette with rich jewel accents (burnished gold, emerald, cinnabar, dusky indigo, warm parchment cream), cinematic lighting with subtle glowing rim lights, cohesive high fantasy animation visual development concept art, no 3D photorealistic CGI, no plastic rendering, 8k resolution';
+
+export function buildArtNouveauUnifiedPrompt({
+  subjectType,
+  name,
+  description = '',
+  extraDetails = '',
+  archetype = 'portrait'
+}: {
+  subjectType: 'character' | 'npc' | 'player' | 'location' | 'scene' | 'item';
+  name: string;
+  description?: string;
+  extraDetails?: string;
+  archetype?: 'portrait' | 'location' | 'scene';
+}): string {
+  const cleanName = name.trim() || (subjectType === 'location' ? 'Lugar Fantástico' : 'Personaje');
+  const descSnippet = description.trim() ? `, ${description.trim().slice(0, 300)}` : '';
+  const extra = extraDetails.trim() ? `. Detalles visuales: ${extraDetails.trim()}` : '';
+
+  if (subjectType === 'location' || archetype === 'location') {
+    return `Masterpiece fantasy architectural environment and location visual development: ${cleanName}${descSnippet}${extra}. Sinuous Art Nouveau organic archways, flowing stone and wrought-iron botanical motifs, warm luminous stained-glass windows, intricate decorative borders and flourishes. Modern stylized animation series background painting for young adults, rich painted textures, atmospheric depth, warm antique amber and jewel-toned palette. Highly cohesive art style, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
+  }
+
+  if (subjectType === 'scene' || archetype === 'scene') {
+    return `Masterpiece dramatic fantasy scene keyframe: ${cleanName}${descSnippet}${extra}. Wide cinematic composition, decorative stylized clouds and organic flowing natural elements, theatrical rim lighting. Art Nouveau vintage illustration infused with modern mature animation cinematography, bold graphic shapes with rich painterly gouache and oil textures, cohesive fantasy world aesthetic, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
+  }
+
+  // Default: Retrato de Personaje / PNJ
+  return `Masterpiece character portrait: ${cleanName}${descSnippet}${extra}. Expressive character bust, confident posture, stylized angular facial planes and soulful eyes. Ornate fantasy attire adorned with intricate floral and celestial embroidery, framed by a delicate Art Nouveau archway and organic golden filigree halo. Modern stylized young-adult animation hero design (Arcane aesthetic meets Mucha), clean sinuous contours, rich volumetric painted lighting, warm antique paper undertones with deep emerald and ruby accents, highly cohesive visual identity, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
+}
+
+/**
+ * Genera una imagen directamente con Imagen 3 / Gemini Image / @google/genai usando la clave de API configurada.
  */
 export async function generateImageWithFailover({
   prompt,
@@ -3910,21 +3946,51 @@ export async function generateImageWithFailover({
     if (apiKey && clavesMuertas.has(apiKey)) continue;
     try {
       const ai = getAIClient(apiKey || undefined);
-      const response = await ai.models.generateImages({
-        model: 'imagen-3.0-generate-002',
-        prompt,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/jpeg',
-          aspectRatio: (aspectRatio as any) || '1:1'
+      // Intento 1: Imagen 3 (imagen-3.0-generate-002)
+      try {
+        const response = await ai.models.generateImages({
+          model: 'imagen-3.0-generate-002',
+          prompt,
+          config: {
+            numberOfImages: 1,
+            outputMimeType: 'image/jpeg',
+            aspectRatio: (aspectRatio as any) || '1:1'
+          }
+        });
+        if (response.generatedImages && response.generatedImages.length > 0) {
+          const img = response.generatedImages[0];
+          const base64 = img?.image?.imageBytes;
+          if (base64) {
+            return `data:image/jpeg;base64,${base64}`;
+          }
         }
-      });
-      if (response.generatedImages && response.generatedImages.length > 0) {
-        const img = response.generatedImages[0];
-        const base64 = img?.image?.imageBytes;
-        if (base64) {
-          return `data:image/jpeg;base64,${base64}`;
+      } catch (imagenErr: any) {
+        // Intento 2: gemini-3.1-flash-image vía generateContent (si está disponible para esta clave)
+        try {
+          const genResponse = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-image',
+            contents: {
+              parts: [{ text: prompt }]
+            },
+            config: {
+              imageConfig: {
+                aspectRatio: (aspectRatio as any) || '1:1'
+              }
+            }
+          });
+          const parts = genResponse.candidates?.[0]?.content?.parts;
+          if (parts) {
+            for (const part of parts) {
+              if (part.inlineData?.data) {
+                const mime = part.inlineData.mimeType || 'image/jpeg';
+                return `data:${mime};base64,${part.inlineData.data}`;
+              }
+            }
+          }
+        } catch {
+          // Ambos fallaron para esta llamada
         }
+        throw imagenErr;
       }
     } catch (err: any) {
       lastError = err;
@@ -3932,12 +3998,14 @@ export async function generateImageWithFailover({
       if (fallo.isRateLimit && apiKey) markKeyCooldown(apiKey, fallo.retryAfterMs || 60000);
       if ((fallo.isInvalidKey || fallo.isPermissionDenied) && apiKey) clavesMuertas.add(apiKey);
       console.warn('Error generando imagen:', fallo.detail || err);
-      // Si el modelo de imagen no existe para ninguna clave, insistir con las
-      // demás solo alarga la espera para llegar al mismo sitio.
-      if (fallo.isModelMissing) break;
+      // Si el modelo de imagen no existe para ninguna clave y no hay más claves rotativas
+      if (fallo.isModelMissing && keys.length <= 1) break;
     }
   }
-  throw lastError || new Error('No se pudo generar la imagen con el modelo de IA. Verifica tu clave de API.');
+  throw (
+    lastError ||
+    new Error('No se pudo generar la imagen con el modelo de IA. Verifica tu clave de API en Configuración.')
+  );
 }
 
 export async function analyzeNarrativeStyleFromDocument(

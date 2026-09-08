@@ -272,6 +272,8 @@ function buildImagePromptFromScene(
   }
 
   switch (archetype) {
+    case 'art_nouveau_unified':
+      return `Masterpiece fantasy artwork: ${snippet}. Art Nouveau vintage aesthetic blended with stylized modern animation for young adults (Arcane and Castlevania meets Alphonse Mucha poster art), elegant sinuous curvilinear ink linework, decorative botanical filigree, bold graphic planar lighting with painterly volumetric shading, expressive silhouette, warm antique color palette with rich jewel accents (burnished gold, emerald, cinnabar, dusky indigo, warm parchment cream), cinematic glowing rim light${modStr}, highly cohesive art style, 8k resolution`;
     case 'uploaded_images':
       return `Masterpiece high fantasy illustration matching campaign reference art style: ${snippet}. Cohesive color palette, atmospheric fantasy lighting, high detail${modStr}, artstation trending, 8k`;
     case 'character':
@@ -378,7 +380,8 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   }, [sceneText, lastSceneText]);
 
   // Image generation & attachment controls
-  const [imageArchetype, setImageArchetype] = useState<string>('classic');
+  const [imageArchetype, setImageArchetype] = useState<string>('art_nouveau_unified');
+  const [imageAspectRatio, setImageAspectRatio] = useState<'1:1' | '3:4' | '4:3' | '16:9'>('1:1');
   const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
   const [imagePrompt, setImagePrompt] = useState<string>('');
   const [attachedImageUrl, setAttachedImageUrl] = useState<string>('');
@@ -472,7 +475,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
     try {
       const base64Data = await generateImageWithFailover({
         prompt: imagePrompt,
-        aspectRatio: '1:1'
+        aspectRatio: imageAspectRatio
       });
       setAttachedImageUrl(base64Data);
 
@@ -506,6 +509,32 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
     } finally {
       setIsGeneratingImage(false);
     }
+  };
+
+  const handleAssignToNpc = async (npcId: string) => {
+    if (!attachedImageUrl || !project || !onUpdateProject || !npcId) return;
+    const npcs = (project.memory.npcs || []).map(n => n.id === npcId ? { ...n, portrait: attachedImageUrl } : n);
+    await onUpdateProject({
+      memory: {
+        ...project.memory,
+        npcs
+      }
+    });
+    const targetNpc = npcs.find(n => n.id === npcId);
+    setLinkedSuccessMsg({ text: `Retrato asignado a ${targetNpc?.name || 'PNJ'}`, absDay: hoyAbs });
+  };
+
+  const handleAssignToLocation = async (locId: string) => {
+    if (!attachedImageUrl || !project || !onUpdateProject || !locId) return;
+    const locations = (project.memory.locations || []).map(l => l.id === locId ? { ...l, portrait: attachedImageUrl } : l);
+    await onUpdateProject({
+      memory: {
+        ...project.memory,
+        locations
+      }
+    });
+    const targetLoc = locations.find(l => l.id === locId);
+    setLinkedSuccessMsg({ text: `Arte asignado a ${targetLoc?.name || 'Lugar'}`, absDay: hoyAbs });
   };
 
   // Handle direct file upload
@@ -877,6 +906,11 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
+                    {
+                      id: 'art_nouveau_unified',
+                      label: '🌿 Art Nouveau & Animación YA',
+                      desc: 'Mucha + Cartoon estilizado adultos (Arcane)'
+                    },
                     ...(campaignImageFiles.length > 0
                       ? [
                           {
@@ -886,10 +920,10 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                           }
                         ]
                       : []),
-                    { id: 'classic', label: '🎨 Cuadro Épico (D&D)', desc: 'Óleo clásico, luz dramática' },
                     { id: 'character', label: '👤 Retrato de Personaje', desc: 'Primer plano, expresión e indumentaria' },
-                    { id: 'action', label: '⚔️ Acción & Hechizo', desc: 'Movimiento, partículas mágicas y combate' },
+                    { id: 'classic', label: '🎨 Cuadro Épico (D&D)', desc: 'Óleo clásico, luz dramática' },
                     { id: 'landscape', label: '🗺️ Paisaje Panorámico', desc: 'Gran angular, arquitectura y clima' },
+                    { id: 'action', label: '⚔️ Acción & Hechizo', desc: 'Movimiento, partículas mágicas y combate' },
                     { id: 'grimdark', label: '🕯️ Grimdark & Claroscuro', desc: 'Tenebrismo, sombras marcadas, estilo Witcher' },
                     { id: 'woodcut', label: '📜 Grabado Medieval', desc: 'Xilografía clásica en pergamino' }
                   ].map(arch => (
@@ -908,6 +942,34 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                       <div className="text-[10px] text-[var(--text-secondary)] mt-0.5 leading-tight">
                         {arch.desc}
                       </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Aspect Ratio Selector */}
+              <div>
+                <label className="block text-xs font-cinzel font-bold text-[var(--text-primary)] mb-1.5">
+                  Proporción de Imagen:
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { id: '1:1' as const, label: '1:1 (Cuadrado / Diario)' },
+                    { id: '3:4' as const, label: '3:4 (Retrato PNJ)' },
+                    { id: '4:3' as const, label: '4:3 (Lugar / Estancia)' },
+                    { id: '16:9' as const, label: '16:9 (Panorámico / Escena)' }
+                  ].map(r => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setImageAspectRatio(r.id)}
+                      className={`text-xs font-cinzel px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                        imageAspectRatio === r.id
+                          ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] font-bold shadow-2xs'
+                          : 'bg-[var(--surface-soft)] text-[var(--text-secondary)] border-[var(--user-border)] hover:border-[var(--accent)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      {r.label}
                     </button>
                   ))}
                 </div>
@@ -1042,7 +1104,8 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
 
                   {/* Vista previa de la imagen generada o adjunta */}
                   {attachedImageUrl && (
-                    <div className="p-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--bg-color)] flex items-center justify-between gap-3">
+                    <>
+                      <div className="p-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--bg-color)] flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <img
                           src={attachedImageUrl}
@@ -1068,7 +1131,55 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                  )}
+
+                    {/* Acciones de asignación rápida a PNJ o Lugar */}
+                    {((project?.memory?.npcs && project.memory.npcs.length > 0) || (project?.memory?.locations && project.memory.locations.length > 0)) && (
+                      <div className="p-2 rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)] flex flex-wrap items-center gap-3 text-xs">
+                        {project?.memory?.npcs && project.memory.npcs.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-[var(--text-secondary)] font-cinzel font-bold">👤 Asignar a PNJ:</span>
+                            <select
+                              className="text-xs bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-1.5 py-1 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent)]"
+                              defaultValue=""
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  handleAssignToNpc(e.target.value);
+                                  e.target.value = '';
+                                }
+                              }}
+                            >
+                              <option value="" disabled>Seleccionar PNJ...</option>
+                              {project.memory.npcs.map(n => (
+                                <option key={n.id} value={n.id}>{n.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {project?.memory?.locations && project.memory.locations.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-[var(--text-secondary)] font-cinzel font-bold">📍 Asignar a Lugar:</span>
+                            <select
+                              className="text-xs bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-1.5 py-1 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent)]"
+                              defaultValue=""
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  handleAssignToLocation(e.target.value);
+                                  e.target.value = '';
+                                }
+                              }}
+                            >
+                              <option value="" disabled>Seleccionar Lugar...</option>
+                              {project.memory.locations.map(l => (
+                                <option key={l.id} value={l.id}>{l.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
 
                   {/* Imagen adjunta o seleccionada */}
                   <div className="flex flex-wrap items-center gap-2 pt-1">
