@@ -257,7 +257,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
       </div>
 
       {memoryMode === 'character' ? (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
           <MemoryManager
             project={project}
             files={files}

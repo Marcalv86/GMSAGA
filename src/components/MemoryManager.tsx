@@ -1044,44 +1044,37 @@ export const MemoryManager: React.FC<{
         </div>
       )}
 
-      {/* Tab: Notes (Notas Privadas del Director / Modo Narrador) */}
+      {/* Tab: Notes (Cuaderno Oculto del Narrador / IA) */}
       {activeTab === 'notes' && (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] gap-2">
+          <div className="flex flex-wrap justify-between items-center bg-amber-50/80 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50 gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
-                Notas Secretas del Maestro (La IA las consulta con máxima prioridad y se guardan automáticamente):
+              <span className="text-xs text-amber-900 dark:text-amber-200 font-cinzel font-bold">
+                ⚠️ Cuaderno Oculto del Narrador (IA) — Planes Secretos & Spoilers:
               </span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowNarratorNotes(!showNarratorNotes)}
-                className="flex items-center gap-1.5 px-3 py-1 text-xs font-cinzel rounded border border-[var(--user-border)] hover:border-[var(--accent)] hover:text-[var(--accent)] bg-[var(--surface-soft)] transition-all cursor-pointer"
-                title={showNarratorNotes ? 'Ocultar notas para evitar spoilers' : 'Mostrar notas secretas (Modo Narrador)'}
+                className="flex items-center gap-1.5 px-3 py-1 text-xs font-cinzel rounded border border-amber-300 dark:border-amber-800 hover:border-[var(--accent)] hover:text-[var(--accent)] bg-[var(--surface)] transition-all cursor-pointer font-bold text-amber-900 dark:text-amber-200"
+                title={showNarratorNotes ? 'Ocultar notas para evitar spoilers' : 'Revelar cuaderno secreto del GM (Contiene Spoilers)'}
               >
                 {showNarratorNotes ? (
                   <>
-                    <EyeOff className="w-3.5 h-3.5" /> Ocultar notas
+                    <EyeOff className="w-3.5 h-3.5" /> Ocultar cuaderno (Evitar Spoilers)
                   </>
                 ) : (
                   <>
-                    <Eye className="w-3.5 h-3.5" /> Mostrar notas
+                    <Eye className="w-3.5 h-3.5" /> Revelar cuaderno secreto (Contiene Spoilers)
                   </>
                 )}
               </button>
-              {localNotes && showNarratorNotes && (
-                <button
-                  onClick={() => {
-                    setLocalNotes('');
-                    onUpdateMemory(mem => ({ ...mem, manual_notes: '' }));
-                  }}
-                  className="px-2.5 py-1 text-xs font-cinzel text-red-700 hover:text-red-900 border border-red-200 rounded hover:bg-red-50 transition-all cursor-pointer flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Limpiar Notas
-                </button>
-              )}
             </div>
           </div>
+
+          <p className="text-xs text-[var(--text-secondary)] font-lora italic px-1">
+            Este espacio es el cuaderno de trabajo privado del Narrador (IA). Aquí la IA anota y actualiza de forma autónoma sus planes secretos, tramas en la sombra, giros argumentales ocultos y contingencias para mantener el mundo reactivo y coherente. Como jugadora, puedes inspeccionarlo si deseas ver el reverso de la trama, pero recuerda que contiene spoilers de lo que está por venir.
+          </p>
 
           {showNarratorNotes ? (
             <div className="flex flex-col gap-2">
@@ -1089,23 +1082,23 @@ export const MemoryManager: React.FC<{
                 value={localNotes}
                 onChange={e => handleNotesChange(e.target.value)}
                 onBlur={handleNotesBlur}
-                placeholder="Escribe aquí secretos, reglas de casa, revelaciones futuras, giros argumentales o detalles que el Narrador deba tener en cuenta siempre..."
+                placeholder="La IA mantiene aquí sus notas secretas de director de juego..."
                 className="w-full h-[380px] md:h-[480px] bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] p-4 rounded-lg text-base font-lora outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-color)] leading-relaxed shadow-inner"
               />
             </div>
           ) : (
             <div
               onClick={() => setShowNarratorNotes(true)}
-              className="w-full min-h-[260px] md:min-h-[320px] bg-[var(--sidebar-bg)] border-2 border-dashed border-[var(--user-border)] hover:border-[var(--accent)] rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all group"
+              className="w-full min-h-[260px] md:min-h-[320px] bg-[var(--sidebar-bg)] border-2 border-dashed border-amber-300 dark:border-amber-900/50 hover:border-[var(--accent)] rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all group"
             >
-              <div className="p-3.5 rounded-full bg-[var(--surface-soft)] text-[var(--text-secondary)] group-hover:text-[var(--accent)] group-hover:bg-[var(--accent)]/10 transition-colors mb-3">
+              <div className="p-3.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 group-hover:text-[var(--accent)] transition-colors mb-3">
                 <EyeOff className="w-8 h-8" />
               </div>
               <h4 className="font-cinzel text-base font-bold text-[var(--text-primary)] mb-1">
-                Modo Narrador: Notas y Secretos Ocultos
+                Cuaderno Oculto del Narrador (IA) Protegido
               </h4>
               <p className="text-xs text-[var(--text-secondary)] max-w-md mb-4 leading-relaxed">
-                El contenido está oculto de forma predeterminada para evitar spoilers involuntarios durante la partida. La IA conoce estas directrices y las respeta estrictamente.
+                El contenido está oculto para preservar la magia de la aventura y evitar spoilers. Haz clic para revelar los planes secretos que la IA mantiene en la sombra.
               </p>
               <button
                 onClick={(e) => {
@@ -1114,7 +1107,7 @@ export const MemoryManager: React.FC<{
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 text-xs font-cinzel font-bold text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-md shadow-sm transition-all cursor-pointer"
               >
-                <Eye className="w-4 h-4" /> Mostrar notas del Narrador
+                <Eye className="w-4 h-4" /> Revelar cuaderno secreto (Contiene Spoilers)
               </button>
             </div>
           )}
