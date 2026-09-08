@@ -10,7 +10,8 @@ import {
   Eye,
   EyeOff,
   Check,
-  Lock
+  Lock,
+  Dices
 } from 'lucide-react';
 import {
   aDiaAbsoluto,
@@ -29,6 +30,7 @@ interface StatusViewProps {
 
 export const StatusView: React.FC<StatusViewProps> = ({
   project,
+  onUpdate,
   onUpdateMemory
 }) => {
   const memory = project.memory || {
@@ -477,6 +479,51 @@ export const StatusView: React.FC<StatusViewProps> = ({
             </p>
           </div>
         )}
+      </section>
+
+      {/* BLOQUE CONFIGURACIÓN: TIRADAS MANUALES DE PNJS / DM */}
+      <section className="bg-[var(--bg-color)]/70 border border-[var(--glass-border)] rounded-xl p-4 sm:p-5 md:p-6 space-y-4 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-[var(--glass-border)]">
+          <div className="space-y-0.5">
+            <span className="font-cinzel font-bold text-sm sm:text-base text-[var(--accent)] flex items-center gap-2">
+              <Dices className="w-4 h-4 text-[var(--accent)]" />
+              <span>Preferencias de Juego y Tiradas de DM</span>
+            </span>
+            <p className="text-xs text-[var(--text-secondary)] m-0">
+              Personaliza cómo arbitra el sistema las tiradas de los PNJs y adversarios.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-[var(--surface-soft)] border border-[var(--glass-border)] p-4 rounded-xl flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="font-cinzel font-bold text-xs sm:text-sm text-[var(--text-primary)]">
+              Tiradas de PNJs y DM Manuales
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] font-lora m-0">
+              Si está activado, la IA jamás resolverá tiradas de PNJs u oposición en secreto: detendrá la narración y te pedirá que tires los dados tú mismo para garantizar total transparencia y evitar que el Narrador ajuste resultados por la trama.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              if (!onUpdate) return;
+              onUpdate(prev => ({
+                manualDmRolls: !prev.manualDmRolls
+              }));
+            }}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+              project.manualDmRolls ? 'bg-[var(--accent)]' : 'bg-[var(--glass-border)]'
+            }`}
+            role="switch"
+            aria-checked={Boolean(project.manualDmRolls)}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                project.manualDmRolls ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
       </section>
     </div>
   );

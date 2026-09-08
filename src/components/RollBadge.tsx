@@ -2,7 +2,7 @@ import React from 'react';
 import { Dices, Sparkles, AlertTriangle, Flame } from 'lucide-react';
 
 interface RollInfo {
-  type: 'skill' | 'simple' | 'oracle_query' | 'oracle_meaning';
+  type: 'skill' | 'simple' | 'oracle_query' | 'oracle_meaning' | 'dm';
   skillName?: string;
   sides?: number;
   natural?: number;
@@ -12,6 +12,9 @@ interface RollInfo {
   d100Result?: number;
   d100Pair?: [number, number];
   isDouble?: boolean;
+  dmContext?: string;
+  total?: number;
+  modifier?: number;
   rawText: string;
 }
 
@@ -85,6 +88,28 @@ export function parseMessageRolls(text: string): { narrativeText: string; rolls:
     });
   }
 
+  // 5. Tirada DM / PNJ: [Tirada DM (SAB de Dab'nay calibrando intenciones): d20 = 14 + 3 = 17 vs CD 12]
+  const dmRollRegex = /\[\s*Tirada\s+(?:DM|PNJ)\s*\(([^)]+?)\)\s*:\s*d(\d+)\s*=\s*(\d+)(?:\s*\+\s*(\d+))?(?:\s*=\s*(\d+))?(?:\s*(?:vs|contra)\s*(?:CD|DC)\s*(\d+))?\s*\]/gi;
+  while ((match = dmRollRegex.exec(text)) !== null) {
+    const rawText = match[0];
+    const dmContext = match[1].trim();
+    const sides = parseInt(match[2], 10) || 20;
+    const baseRoll = parseInt(match[3], 10);
+    const modifier = match[4] ? parseInt(match[4], 10) : 0;
+    const total = match[5] ? parseInt(match[5], 10) : (baseRoll + modifier);
+    const dc = match[6] ? parseInt(match[6], 10) : undefined;
+    rolls.push({
+      type: 'dm',
+      dmContext,
+      sides,
+      natural: baseRoll,
+      modifier,
+      total,
+      dc,
+      rawText
+    });
+  }
+
   // Eliminar los tags del texto narrativo para que se dibujen como tarjetas ricas
   for (const r of rolls) {
     narrativeText = narrativeText.replace(r.rawText, '').trim();
@@ -94,6 +119,49 @@ export function parseMessageRolls(text: string): { narrativeText: string; rolls:
 }
 
 export const RollBadgeCard: React.FC<{ roll: RollInfo }> = ({ roll }) => {
+  if (roll.type === 'dm') {
+    const isSuccess = roll.dc !== undefined && roll.total !== undefined ? roll.total >= roll.dc : true;
+    return (
+      <div className="my-2 p-3 rounded-xl border border-[var(--glass-border)] bg-[var(--surface-soft)] shadow-sm flex flex-wrap items-center justify-between gap-3 font-lora">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400">
+            <Dices className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--accent)]">
+                Tirada de DM / PNJ
+              </span>
+              {roll.dc !== undefined && (
+                <span className="text-[10px] font-cinzel font-semibold px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--user-border)] text-[var(--text-secondary)]">
+                  CD {roll.dc}
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-[var(--text-secondary)] font-lora italic truncate max-w-xs sm:max-w-md">
+              {roll.dmContext}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 bg-[var(--bg-color)]/80 px-3.5 py-1.5 rounded-lg border border-[var(--user-border)] shadow-inner">
+          <span className="text-[10px] font-cinzel text-[var(--text-secondary)] uppercase">Total</span>
+          <span className="text-base sm:text-lg font-cinzel font-bold text-[var(--accent)]">
+            {roll.total ?? roll.natural}
+          </span>
+          <span className="text-[11px] text-[var(--text-secondary)]">
+            (d{roll.sides || 20}: {roll.natural}{roll.modifier ? ` + ${roll.modifier}` : ''})
+          </span>
+          {roll.dc !== undefined && (
+            <span className={`text-[11px] font-cinzel font-bold px-1.5 py-0.5 rounded ${isSuccess ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : 'text-rose-600 dark:text-rose-400 bg-rose-500/10'}`}>
+              {isSuccess ? 'Éxito' : 'Fallo'}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (roll.type === 'skill') {
     const isCrit = roll.natural === 20;
     const isFumble = roll.natural === 1;

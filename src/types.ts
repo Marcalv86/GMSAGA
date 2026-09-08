@@ -21,6 +21,8 @@ export interface Project {
   diseaseConfig?: DiseaseConfig;
   /** Configuración de control de extensión y ritmo de respuestas del DM (mínimo y máximo de párrafos). */
   narrativeLength?: NarrativeLengthConfig;
+  /** Si es true, la IA no resuelve tiradas de PNJs/DM automáticamente, sino que pide al usuario que las tire. */
+  manualDmRolls?: boolean;
 }
 
 export type NarrativeLengthMode = 'adaptativo' | 'agil' | 'equilibrado' | 'detallado' | 'personalizado';

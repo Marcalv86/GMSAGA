@@ -1278,6 +1278,12 @@ El Narrador debe modular de forma inteligente y autónoma la extensión de cada 
   // después lo vivo. Como el bloque de directivas deja de ser lo último que se
   // lee, al final se repite en dos líneas el compromiso de formato, que es lo
   // que de verdad necesita estar fresco.
+  const manualDmRollsSection = project.manualDmRolls ? `
+### TIRADAS DE DM / PNJS MANUALES (EXIGENCIA DE MESA)
+- **MODO DE TIRADAS MANUALES ACTIVADO:** NUNCA resuelvas tiradas de PNJs, guardias, trampas o del DM de forma automática ni escribas resultados numéricos de dados de PNJs.
+- Cuando un PNJ intente algo, perciba algo, ataque, mienta o compita contra el personaje, o cuando haya una oposición activa, **detén la narración y pide explícitamente al jugador que realice la tirada de dados manual** para el PNJ o la situación (ej. indicando qué atributo o CD debe superar el jugador, o pidiendo que el jugador tire por el PNJ).
+` : '';
+
   const bloqueEstable = `${CORE_INTERFACE_PROTOCOLS}
 
 ### INSTRUCCIONES DE CAMPAÑA (IDENTIDAD Y DIRECTIVAS MAESTRAS DEL NARRADOR)
@@ -1287,6 +1293,8 @@ ${activeInstructions}
 ${activeSystem}
 
 ${diseaseSection}
+
+${manualDmRollsSection}
 
 ### ESTILO NARRATIVO (VOZ Y RITMO NOVELESCO)
 ${activeStyle}
