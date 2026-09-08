@@ -86,6 +86,7 @@ export const InstructionsView: React.FC<{
     project.narrativeLength?.customGuideline || ''
   );
   const [showLengthAdvanced, setShowLengthAdvanced] = useState(false);
+  const [manualDmRolls, setManualDmRolls] = useState<boolean>(project.manualDmRolls || false);
 
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [showProtocolsDetail, setShowProtocolsDetail] = useState(false);
@@ -135,12 +136,25 @@ export const InstructionsView: React.FC<{
     setMaxParagraphs(project.narrativeLength?.maxParagraphs ?? 4);
     setDialoguePacing(project.narrativeLength?.dialoguePacing || 'conciso');
     setCustomLengthGuideline(project.narrativeLength?.customGuideline || '');
+    setManualDmRolls(Boolean(project.manualDmRolls));
     setSaveStatus('saved');
-  }, [project.id, project.instructions, project.system, project.style]);
+  }, [project.id, project.instructions, project.system, project.style, project.manualDmRolls]);
 
   const handleSafetyChange = (newLevel: SafetyThreshold) => {
     setSafetyLevel(newLevel);
     setStoredSafetyLevel(newLevel);
+  };
+
+  const handleToggleManualDmRolls = async (nextVal: boolean) => {
+    setManualDmRolls(nextVal);
+    setSaveStatus('saving');
+    try {
+      await onUpdate({ manualDmRolls: nextVal });
+      setSaveStatus('saved');
+    } catch (err) {
+      console.error('Error updating manualDmRolls:', err);
+      setSaveStatus('unsaved');
+    }
   };
 
   const saveChanges = async (
@@ -170,7 +184,8 @@ export const InstructionsView: React.FC<{
       system: newSys !== undefined ? newSys : system,
       style: newSty !== undefined ? newSty : style,
       diseaseConfig: activeDiseaseCfg,
-      narrativeLength: activeLengthCfg
+      narrativeLength: activeLengthCfg,
+      manualDmRolls: manualDmRolls
     };
 
     setSaveStatus('saving');
@@ -812,6 +827,66 @@ export const InstructionsView: React.FC<{
             </div>
           </div>
         )}
+      </div>
+
+      {/* SECCIÓN: ARBITRAJE DE TIRADAS Y DADOS DE PNJS (MANUAL VS AUTOMÁTICO) */}
+      <div className="bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.25)] rounded-lg p-4 md:p-6 shadow-sm mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-md bg-amber-900/20 text-[var(--accent)] shrink-0">
+              <Dices className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-cinzel text-base md:text-lg m-0 text-[var(--accent)] flex items-center gap-2">
+                Arbitraje de Tiradas y Dados de PNJs
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
+                Configura si el Narrador resuelve en secreto las tiradas de los adversarios o si detiene la narración para que las tires tú manualmente.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap">
+            <span
+              className={`text-[11px] font-cinzel font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${
+                manualDmRolls
+                  ? 'bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/50'
+                  : 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 border-emerald-500/40'
+              }`}
+            >
+              {manualDmRolls ? '🎲 Modo Manual Activo' : '⚡ Modo Automático (Por defecto)'}
+            </span>
+          </div>
+        </div>
+
+        {/* Toggle Box */}
+        <div className="bg-[var(--bg-color)] p-4 rounded-xl border border-[rgba(139,69,19,0.2)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="font-cinzel font-bold text-xs sm:text-sm text-[var(--text-primary)] flex items-center gap-2">
+              <span>Tiradas de PNJs y DM Manuales (Exigencia de Mesa)</span>
+              {manualDmRolls && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono font-bold">
+                  MANUAL
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] font-lora m-0 max-w-2xl leading-relaxed">
+              {manualDmRolls
+                ? 'Activado: La IA jamás resolverá tiradas de PNJs, guardias, trampas o engaños en secreto. Detendrá la narración en seco y te pedirá explícitamente que tires los dados tú mismo con total transparencia.'
+                : 'Desactivado (Automático): La IA utiliza su reserva de dados reales en segundo plano para resolver la perspicacia, ataques y pruebas de los PNJs sin interrumpir el ritmo literario de la escena.'}
+            </p>
+          </div>
+
+          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={manualDmRolls}
+              onChange={e => handleToggleManualDmRolls(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-12 h-6 bg-stone-300 dark:bg-stone-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+          </label>
+        </div>
       </div>
 
       {/* SECCIÓN: CONTROL DE EXTENSIÓN Y RITMO NARRATIVO (PÁRRAFOS MÍNIMO / MÁXIMO) */}

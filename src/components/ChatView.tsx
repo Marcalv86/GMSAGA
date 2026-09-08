@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Chat, PlayerCharacter, Project, ProjectFile } from '../types';
 import { YouTubePreview } from './YouTubePreview';
@@ -78,6 +78,25 @@ interface ChatMessageItemProps {
   onOpenTransitionModal?: () => void;
   project?: Project;
 }
+
+const areChatMessageItemPropsEqual = (
+  prev: ChatMessageItemProps,
+  next: ChatMessageItemProps
+): boolean => {
+  if (prev.m !== next.m && (prev.m.content !== next.m.content || prev.m.role !== next.m.role)) {
+    return false;
+  }
+  if (prev.idx !== next.idx) return false;
+  if (prev.isEditing !== next.isEditing) return false;
+  if (next.isEditing && prev.editDraft !== next.editDraft) return false;
+  if (prev.isLastMessage !== next.isLastMessage) return false;
+  if (prev.isGenerating !== next.isGenerating) return false;
+  if (prev.hasOracle !== next.hasOracle) return false;
+  if (prev.isSearchHit !== next.isSearchHit) return false;
+  if (prev.copiedIndex !== next.copiedIndex) return false;
+  if (prev.project?.manualDmRolls !== next.project?.manualDmRolls) return false;
+  return true;
+};
 
 const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   m,
@@ -521,6 +540,90 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
       )}
     </div>
   );
+}, areChatMessageItemPropsEqual);
+
+interface ChatMessagesListProps {
+  messages: { role: 'user' | 'model'; content: string }[];
+  editingIndex: number | null;
+  editDraft: string;
+  setEditDraft: (v: string) => void;
+  isGenerating: boolean;
+  hasOracle: boolean;
+  hits: number[];
+  activeHit: number;
+  copiedIndex: number | null;
+  acciones: {
+    handleCopyMessage: (idx: number, content: string) => void;
+    handleStartEditing: (idx: number, content: string) => void;
+    handleCancelEditing: () => void;
+    handleSaveEditOnly: (idx: number) => void;
+    handleSaveAndRegenerate: (idx: number) => void;
+    handleRollRequestClick: (req: RollRequest) => void;
+    onContinueNarrative: (fromIndex?: number) => void;
+    onRegenerateMessage: (index: number, updatedUserPrompt?: string) => void;
+  };
+  setDeleteModal: (v: { index: number; role: 'user' | 'model'; isLast: boolean } | null) => void;
+  setPreguntaOraculo: (p: string) => void;
+  setOraculoAbierto: (open: boolean) => void;
+  onOpenTransitionModal: () => void;
+  project?: Project;
+}
+
+const ChatMessagesList = React.memo<ChatMessagesListProps>(({
+  messages,
+  editingIndex,
+  editDraft,
+  setEditDraft,
+  isGenerating,
+  hasOracle,
+  hits,
+  activeHit,
+  copiedIndex,
+  acciones,
+  setDeleteModal,
+  setPreguntaOraculo,
+  setOraculoAbierto,
+  onOpenTransitionModal,
+  project
+}) => {
+  return (
+    <>
+      {messages.map((m, idx) => {
+        const isEditing = editingIndex === idx;
+        const isLastMessage = idx === messages.length - 1;
+        const isSearchHit = hits.length > 0 && hits[activeHit] === idx;
+
+        return (
+          <ChatMessageItem
+            key={idx}
+            m={m}
+            idx={idx}
+            isEditing={isEditing}
+            editDraft={isEditing ? editDraft : ''}
+            setEditDraft={setEditDraft}
+            isLastMessage={isLastMessage}
+            isGenerating={isGenerating}
+            hasOracle={hasOracle}
+            isSearchHit={isSearchHit}
+            copiedIndex={copiedIndex === idx ? idx : null}
+            handleCopyMessage={acciones.handleCopyMessage}
+            handleStartEditing={acciones.handleStartEditing}
+            handleCancelEditing={acciones.handleCancelEditing}
+            handleSaveEditOnly={acciones.handleSaveEditOnly}
+            handleSaveAndRegenerate={acciones.handleSaveAndRegenerate}
+            onContinueNarrative={acciones.onContinueNarrative}
+            onRegenerateMessage={acciones.onRegenerateMessage}
+            setDeleteModal={setDeleteModal}
+            setPreguntaOraculo={setPreguntaOraculo}
+            setOraculoAbierto={setOraculoAbierto}
+            handleRollRequestClick={acciones.handleRollRequestClick}
+            onOpenTransitionModal={onOpenTransitionModal}
+            project={project}
+          />
+        );
+      })}
+    </>
+  );
 });
 
 export const ChatView: React.FC<{
@@ -597,6 +700,9 @@ export const ChatView: React.FC<{
     if (!inputText.trim() || isGenerating) return;
     const text = inputText.trim();
     setInputText('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '38px';
+    }
     onSendMessage(text);
   };
   const [activeRoll, setActiveRoll] = useState<{ sides: number; result: number } | null>(null);
@@ -652,6 +758,12 @@ export const ChatView: React.FC<{
 
   // Modal de Salto de Tiempo / Cambio de Escena
   const [showTransitionModal, setShowTransitionModal] = useState(false);
+  const handleOpenTransitionModal = useCallback(() => {
+    setShowTransitionModal(true);
+  }, []);
+  const handleCloseTransitionModal = useCallback(() => {
+    setShowTransitionModal(false);
+  }, []);
 
   // Ventana rápida de emojis temáticos
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -1107,43 +1219,23 @@ export const ChatView: React.FC<{
                 </p>
               </div>
             ) : (
-              chat.messages.map((m, idx) => {
-                const isEditing = editingIndex === idx;
-                const isLastMessage = idx === chat.messages.length - 1;
-                const isSearchHit = hits.length > 0 && hits[activeHit] === idx;
-
-                return (
-                  <ChatMessageItem
-                    key={idx}
-                    m={m}
-                    idx={idx}
-                    isEditing={isEditing}
-                    // Solo el mensaje en edición necesita el borrador. Pasárselo a
-                    // todos los repintaba a cada tecla pulsada.
-                    editDraft={isEditing ? editDraft : ''}
-                    setEditDraft={setEditDraft}
-                    isLastMessage={isLastMessage}
-                    isGenerating={isGenerating}
-                    hasOracle={Boolean(hasOracle)}
-                    isSearchHit={isSearchHit}
-                    // Solo cambia para el mensaje que se acaba de copiar.
-                    copiedIndex={copiedIndex === idx ? idx : null}
-                    handleCopyMessage={acciones.handleCopyMessage}
-                    handleStartEditing={acciones.handleStartEditing}
-                    handleCancelEditing={acciones.handleCancelEditing}
-                    handleSaveEditOnly={acciones.handleSaveEditOnly}
-                    handleSaveAndRegenerate={acciones.handleSaveAndRegenerate}
-                    onContinueNarrative={acciones.onContinueNarrative}
-                    onRegenerateMessage={acciones.onRegenerateMessage}
-                    setDeleteModal={setDeleteModal}
-                    setPreguntaOraculo={setPreguntaOraculo}
-                    setOraculoAbierto={setOraculoAbierto}
-                    handleRollRequestClick={acciones.handleRollRequestClick}
-                    onOpenTransitionModal={() => setShowTransitionModal(true)}
-                    project={project}
-                  />
-                );
-              })
+              <ChatMessagesList
+                messages={chat.messages}
+                editingIndex={editingIndex}
+                editDraft={editDraft}
+                setEditDraft={setEditDraft}
+                isGenerating={isGenerating}
+                hasOracle={Boolean(hasOracle)}
+                hits={hits}
+                activeHit={activeHit}
+                copiedIndex={copiedIndex}
+                acciones={acciones}
+                setDeleteModal={setDeleteModal}
+                setPreguntaOraculo={setPreguntaOraculo}
+                setOraculoAbierto={setOraculoAbierto}
+                onOpenTransitionModal={handleOpenTransitionModal}
+                project={project}
+              />
             )}
             <div ref={chatEndRef} />
           </div>
@@ -1175,7 +1267,7 @@ export const ChatView: React.FC<{
         {chat?.messages && chat.messages.length > 0 && !isGenerating && (
           <div className="max-w-[900px] mx-auto mb-2 flex justify-end items-center gap-2 flex-wrap">
             <button
-              onClick={() => setShowTransitionModal(true)}
+              onClick={handleOpenTransitionModal}
               className="text-xs font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
               title="Avanzar el reloj (descanso largo/corto, horas, días) o cambiar de escenario"
             >
@@ -1342,6 +1434,33 @@ export const ChatView: React.FC<{
                 {d.label}
               </button>
             ))}
+
+            {/* Acceso directo a Tiradas de PNJs y DM Manuales */}
+            {onUpdateProject && (
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateProject(prev => ({
+                    manualDmRolls: !prev.manualDmRolls
+                  }));
+                }}
+                className={`shrink-0 rounded-lg px-2 sm:px-2.5 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer flex items-center gap-1.5 hover:scale-105 active:scale-95 ml-1 ${
+                  project?.manualDmRolls
+                    ? 'border-amber-500 text-amber-800 dark:text-amber-200 bg-amber-500/20 ring-1 ring-amber-500/50'
+                    : 'border-[var(--user-border)] text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                }`}
+                title={
+                  project?.manualDmRolls
+                    ? 'Tiradas de PNJs: MODO MANUAL ACTIVO (Tú tiras por los PNJs y oposición). Clic para cambiar a Automáticas.'
+                    : 'Tiradas de PNJs: AUTOMÁTICAS (El DM tira en secreto). Clic para cambiar a Manuales.'
+                }
+                aria-label="Alternar modo de tiradas de PNJs"
+              >
+                <Dices className={`w-3.5 h-3.5 ${project?.manualDmRolls ? 'text-amber-600 dark:text-amber-400 animate-pulse' : 'text-[var(--text-secondary)]'}`} />
+                <span className="hidden xs:inline sm:inline">PNJs:</span>
+                <span>{project?.manualDmRolls ? 'Manual' : 'Auto'}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1481,6 +1600,45 @@ export const ChatView: React.FC<{
                         </div>
                       </div>
                     </button>
+
+                    {/* Opción 4: Tiradas de PNJs y DM Manuales */}
+                    {onUpdateProject && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsActionsMenuOpen(false);
+                          onUpdateProject(prev => ({
+                            manualDmRolls: !prev.manualDmRolls
+                          }));
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group border-t border-[var(--glass-border)] mt-0.5 pt-1.5"
+                      >
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                          project?.manualDmRolls
+                            ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40'
+                            : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
+                        }`}>
+                          <Dices className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors flex items-center justify-between">
+                            <span>Tiradas de PNJs</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                              project?.manualDmRolls
+                                ? 'bg-amber-500/20 text-amber-800 dark:text-amber-200'
+                                : 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-200'
+                            }`}>
+                              {project?.manualDmRolls ? 'Manuales' : 'Auto'}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                            {project?.manualDmRolls
+                              ? 'Tú tiras por los PNJs (Transparencia)'
+                              : 'El DM tira en secreto (Fluido)'}
+                          </div>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1490,11 +1648,16 @@ export const ChatView: React.FC<{
               ref={textareaRef}
               value={inputText}
               onChange={e => {
-                setInputText(e.target.value);
-                // Auto-ajustar altura suavemente
+                const val = e.target.value;
+                setInputText(val);
+                // Auto-ajustar altura suavemente evitando reflows innecesarios
                 const target = e.target;
-                target.style.height = 'auto';
-                target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
+                if (!val) {
+                  target.style.height = '38px';
+                } else {
+                  target.style.height = 'auto';
+                  target.style.height = `${Math.min(target.scrollHeight, 220)}px`;
+                }
               }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -1613,7 +1776,7 @@ export const ChatView: React.FC<{
       {/* Scene Transition & Time Skip Modal */}
       <SceneTransitionModal
         isOpen={showTransitionModal}
-        onClose={() => setShowTransitionModal(false)}
+        onClose={handleCloseTransitionModal}
         onExecuteTransition={(promptText) => {
           if (onSceneTransition) {
             onSceneTransition(promptText);

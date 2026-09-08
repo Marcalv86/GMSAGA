@@ -17,6 +17,7 @@ import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
 import { NpcDossierModal } from './NpcDossierModal';
 import { LocationDossierModal } from './LocationDossierModal';
 import { DailyAgendaDiary } from './DailyAgendaDiary';
+import { StatusView } from './StatusView';
 
 import {
   BookOpen,
@@ -1010,24 +1011,39 @@ export const MemoryManager: React.FC<{
         </div>
       )}
 
-      {/* Tab: Status (Estado Actual) */}
+      {/* Tab: Status (Estado Actual y Preferencias de Arbitraje) */}
       {activeTab === 'status' && (
-        <div className="flex flex-col gap-3">
-          <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
-            <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
-              Situación actual de la compañía (dónde están, qué peligros enfrentan, recursos):
-            </span>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
+              <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
+                Situación actual de la compañía (dónde están, qué peligros enfrentan, recursos):
+              </span>
+            </div>
+
+            <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-6 rounded-lg shadow-sm text-base md:text-lg leading-relaxed markdown-body min-h-[100px]">
+              {memory.current_status ? (
+                <ReactMarkdown>{memory.current_status}</ReactMarkdown>
+              ) : (
+                <span className="text-[var(--text-secondary)] italic">
+                  El estado actual de la compañía se actualiza automáticamente con cada respuesta del Narrador.
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-6 rounded-lg shadow-sm text-base md:text-lg leading-relaxed markdown-body min-h-[140px]">
-            {memory.current_status ? (
-              <ReactMarkdown>{memory.current_status}</ReactMarkdown>
-            ) : (
-              <span className="text-[var(--text-secondary)] italic">
-                El estado actual de la compañía se actualiza automáticamente con cada respuesta del Narrador.
-              </span>
-            )}
-          </div>
+          <StatusView
+            project={project}
+            files={files}
+            chats={project.chats}
+            onUpdate={onUpdateProject ? (fields) => {
+              if (typeof fields === 'function') {
+                return onUpdateProject(fields);
+              }
+              return onUpdateProject(() => fields);
+            } : undefined}
+            onUpdateMemory={onUpdateMemory}
+          />
         </div>
       )}
 
