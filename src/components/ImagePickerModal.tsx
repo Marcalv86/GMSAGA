@@ -325,7 +325,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         }
       }}
     >
-      <div className="bg-[var(--bg-color)] p-4 sm:p-6 rounded-2xl shadow-2xl border border-[var(--glass-border)] w-[720px] max-w-full font-lora max-h-[92vh] flex flex-col relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-[var(--bg-color)] p-3.5 sm:p-6 rounded-2xl shadow-2xl border border-[var(--glass-border)] w-[720px] max-w-full font-lora max-h-[94vh] sm:max-h-[92vh] flex flex-col relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Dragging Overlay */}
         {isDragging && (
           <div className="absolute inset-0 bg-[var(--accent)]/20 border-2 border-dashed border-[var(--accent)] z-50 flex flex-col items-center justify-center backdrop-blur-2xs gap-2">
@@ -345,29 +345,29 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         )}
 
         {/* Header */}
-        <div className="flex justify-between items-start mb-3 pb-3 border-b border-[var(--glass-border)]">
-          <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--user-border)] text-[var(--accent)] shrink-0 shadow-2xs">
+        <div className="flex justify-between items-start mb-2.5 pb-2.5 sm:mb-3 sm:pb-3 border-b border-[var(--glass-border)]">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--user-border)] text-[var(--accent)] shrink-0 shadow-2xs">
               {target.type === 'location' ? (
-                <Castle className="w-5 h-5" />
+                <Castle className="w-4 h-4 sm:w-5 sm:h-5" />
               ) : target.type === 'item' ? (
-                <Shield className="w-5 h-5" />
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
               ) : (
-                <Drama className="w-5 h-5" />
+                <Drama className="w-4 h-4 sm:w-5 sm:h-5" />
               )}
             </div>
-            <div>
-              <h4 className="font-cinzel text-base sm:text-lg text-[var(--accent)] font-bold m-0 leading-tight">
+            <div className="min-w-0">
+              <h4 className="font-cinzel text-sm sm:text-lg text-[var(--accent)] font-bold m-0 leading-tight truncate sm:whitespace-normal">
                 {config.modalTitle}
               </h4>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5 m-0">
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] mt-0.5 m-0 line-clamp-1 sm:line-clamp-none">
                 {config.subtitle}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)] transition-all cursor-pointer"
+            className="p-1 sm:p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)] transition-all cursor-pointer shrink-0 ml-1"
             title="Cerrar modal"
           >
             <X className="w-5 h-5" />
@@ -375,19 +375,19 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-1.5 mb-3 border-b border-[var(--user-border)] pb-2 overflow-x-auto shrink-0">
+        <div className="flex items-center gap-1.5 mb-2.5 sm:mb-3 border-b border-[var(--user-border)] pb-2 overflow-x-auto shrink-0 scrollbar-none">
           <button
             type="button"
             onClick={() => setActiveTab('ai')}
-            className={`px-3 py-1.5 rounded-lg font-cinzel text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg font-cinzel text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'ai'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--surface)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <Wand2 className="w-3.5 h-3.5" />
-            <span>🎨 Generar con IA</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-400/25 text-amber-900 dark:text-amber-200 uppercase font-mono font-bold tracking-wider">
+            <Wand2 className="w-3.5 h-3.5 shrink-0" />
+            <span>Generar con IA</span>
+            <span className="hidden sm:inline-flex text-[9px] px-1.5 py-0.5 rounded-full bg-amber-400/25 text-amber-900 dark:text-amber-200 uppercase font-mono font-bold tracking-wider">
               Art Nouveau
             </span>
           </button>
@@ -395,26 +395,26 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('gallery')}
-            className={`px-3 py-1.5 rounded-lg font-cinzel text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg font-cinzel text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'gallery'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--surface)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Galería del Tomo ({allImageFiles.length})</span>
+            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <span>Galería ({allImageFiles.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('upload')}
-            className={`px-3 py-1.5 rounded-lg font-cinzel text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg font-cinzel text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'upload'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--surface)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <UploadCloud className="w-3.5 h-3.5" />
+            <UploadCloud className="w-3.5 h-3.5 shrink-0" />
             <span>Subir / Pegar</span>
           </button>
         </div>
@@ -435,15 +435,15 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
 
         {/* TAB 1: GENERACIÓN CON IA (ESTILO UNIFICADO ART NOUVEAU & ANIMACIÓN) */}
         {activeTab === 'ai' && (
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3.5">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 sm:space-y-3.5">
             {/* Aesthetic Banner */}
-            <div className="p-3 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-emerald-500/5 to-amber-500/10 space-y-1">
-              <div className="flex items-center justify-between gap-2">
+            <div className="p-2.5 sm:p-3 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-emerald-500/5 to-amber-500/10 space-y-1">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <span className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  Estilo Visual Unificado de Campaña
+                  <Palette className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>Estilo Visual de Campaña</span>
                 </span>
-                <span className="text-[10px] font-cinzel font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/30">
+                <span className="text-[10px] font-cinzel font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/30 w-fit whitespace-nowrap">
                   Art Nouveau & Animación YA
                 </span>
               </div>
@@ -457,11 +457,11 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
               <label className="block text-xs font-cinzel font-bold text-[var(--text-primary)]">
                 1. Tipo de Ilustración:
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2">
                 {[
-                  { id: 'character' as const, label: 'Retrato de Personaje', icon: User, ratio: '3:4' as const },
-                  { id: 'location' as const, label: 'Lugar o Arquitectura', icon: Castle, ratio: '4:3' as const },
-                  { id: 'scene' as const, label: 'Escenario Panorámico', icon: Mountain, ratio: '16:9' as const }
+                  { id: 'character' as const, label: 'Retrato de Personaje', desc: 'Busto con orla Mucha', icon: User, ratio: '3:4' as const },
+                  { id: 'location' as const, label: 'Lugar o Arquitectura', desc: 'Arcos, vidrieras y forja', icon: Castle, ratio: '4:3' as const },
+                  { id: 'scene' as const, label: 'Escenario Panorámico', desc: 'Composición cinemática', icon: Mountain, ratio: '16:9' as const }
                 ].map(item => {
                   const Icon = item.icon;
                   const isSelected = aiSubjectMode === item.id;
@@ -474,18 +474,20 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                         setAiAspectRatio(item.ratio);
                         handleRegeneratePrompt(item.id, extraDetails);
                       }}
-                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                      className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center sm:flex-col sm:items-start justify-between sm:justify-start gap-1.5 sm:gap-2 ${
                         isSelected
                           ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] ring-1 ring-[var(--accent)]'
                           : 'border-[var(--user-border)] bg-[var(--surface-soft)] hover:border-[var(--accent)]/50'
                       }`}
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-cinzel font-bold text-[var(--text-primary)]">
-                        <Icon className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        <span>{item.label}</span>
+                      <div className="flex items-center gap-2 text-xs font-cinzel font-bold text-[var(--text-primary)] min-w-0">
+                        <div className={`p-1 rounded-md shrink-0 ${isSelected ? 'bg-[var(--accent)] text-[var(--on-accent)]' : 'bg-[var(--surface)] text-[var(--accent)]'}`}>
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="truncate">{item.label}</span>
                       </div>
-                      <span className="text-[10px] text-[var(--text-secondary)]">
-                        {item.id === 'character' ? 'Busto con orla Mucha' : item.id === 'location' ? 'Arcos y vitrales' : 'Composición cinemática'}
+                      <span className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] shrink-0 sm:shrink">
+                        {item.desc}
                       </span>
                     </button>
                   );
@@ -500,16 +502,16 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
               </label>
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
-                  { id: '3:4' as const, label: '3:4 (Retrato Clásico)', desc: 'Ideal para personajes' },
-                  { id: '1:1' as const, label: '1:1 (Cuadrado / Token)', desc: 'Fichas y avatares' },
-                  { id: '4:3' as const, label: '4:3 (Lugar / Estancia)', desc: 'Edificios e interiores' },
-                  { id: '16:9' as const, label: '16:9 (Panorámico)', desc: 'Vistas cinemáticas' }
+                  { id: '3:4' as const, label: '3:4 · Retrato PNJ', desc: 'Ideal para personajes' },
+                  { id: '1:1' as const, label: '1:1 · Cuadrado', desc: 'Fichas y avatares' },
+                  { id: '4:3' as const, label: '4:3 · Lugar', desc: 'Edificios e interiores' },
+                  { id: '16:9' as const, label: '16:9 · Panorámico', desc: 'Vistas cinemáticas' }
                 ].map(r => (
                   <button
                     key={r.id}
                     type="button"
                     onClick={() => setAiAspectRatio(r.id)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-cinzel font-semibold border transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 sm:py-1.5 rounded-lg text-xs font-cinzel font-semibold border transition-all cursor-pointer whitespace-nowrap ${
                       aiAspectRatio === r.id
                         ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs'
                         : 'border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -523,15 +525,15 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
             </div>
 
             {/* Extra Details Input */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
                 <label className="block text-xs font-cinzel font-bold text-[var(--text-primary)]">
-                  3. Rasgos visuales o detalles específicos (opcional):
+                  3. Rasgos o detalles específicos (opcional):
                 </label>
                 <button
                   type="button"
                   onClick={() => handleRegeneratePrompt(aiSubjectMode, extraDetails)}
-                  className="text-[11px] font-cinzel text-[var(--accent)] hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-[11px] font-cinzel text-[var(--accent)] hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
                 >
                   <RefreshCw className="w-3 h-3" /> Reconstruir Prompt
                 </button>
@@ -544,26 +546,26 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                   handleRegeneratePrompt(aiSubjectMode, e.target.value);
                 }}
                 placeholder="Ej: capa de terciopelo esmeralda, filigrana dorada, ojos plateados, luna llena..."
-                className="w-full bg-[var(--surface-soft)] border border-[var(--user-border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                className="w-full bg-[var(--surface-soft)] border border-[var(--user-border)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
               />
             </div>
 
             {/* Prompt Editor */}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <label className="block text-xs font-cinzel font-bold text-[var(--text-primary)]">
                 4. Prompt Maestro Art Nouveau (editable):
               </label>
               <textarea
                 value={aiPrompt}
                 onChange={e => setAiPrompt(e.target.value)}
-                rows={3}
-                className="w-full bg-[var(--surface-soft)] border border-[var(--user-border)] rounded-lg p-2.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-mono leading-relaxed"
+                rows={2}
+                className="w-full bg-[var(--surface-soft)] border border-[var(--user-border)] rounded-lg p-2 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-mono leading-relaxed resize-y"
               />
             </div>
 
             {/* Error banner if any */}
             {aiError && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs flex items-start gap-2">
+              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <div className="font-cinzel font-bold">No se pudo completar la generación:</div>
@@ -576,11 +578,11 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
             )}
 
             {/* Generated Image Preview or Generate Trigger */}
-            <div className="p-3 rounded-xl border border-[var(--user-border)] bg-[var(--surface)] space-y-3">
+            <div className="p-2.5 sm:p-3 rounded-xl border border-[var(--user-border)] bg-[var(--surface)] space-y-2.5">
               {generatedAiImage ? (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <div className="relative group rounded-xl overflow-hidden border-2 border-[var(--accent)] shadow-lg max-w-[180px] shrink-0 bg-black/10">
+                    <div className="relative group rounded-xl overflow-hidden border-2 border-[var(--accent)] shadow-lg max-w-[140px] sm:max-w-[180px] shrink-0 bg-black/10">
                       <img
                         src={generatedAiImage}
                         alt="Ilustración Art Nouveau generada"
@@ -588,28 +590,28 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                         referrerPolicy="no-referrer"
                       />
                     </div>
-                    <div className="space-y-2 text-center sm:text-left flex-1">
+                    <div className="space-y-2 text-center sm:text-left flex-1 w-full">
                       <div className="text-xs font-cinzel font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 justify-center sm:justify-start">
-                        <Check className="w-4 h-4" /> Ilustración Art Nouveau Creada
+                        <Check className="w-4 h-4 shrink-0" /> Ilustración Art Nouveau Creada
                       </div>
                       <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed m-0">
-                        La obra conserva la unidad estética canónica de la campaña y está lista para vincularse a la ficha y archivarse en el tomo.
+                        La obra conserva la unidad estética canónica y está lista para vincularse a la ficha.
                       </p>
-                      <div className="flex flex-wrap items-center gap-2 pt-1 justify-center sm:justify-start">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
                         <button
                           type="button"
                           onClick={handleAssignGeneratedImage}
                           disabled={isProcessing}
-                          className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] rounded-lg font-cinzel text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition-all"
+                          className="w-full sm:w-auto px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] rounded-lg font-cinzel text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all whitespace-nowrap"
                         >
                           <Check className="w-4 h-4" />
-                          <span>Asignar como Retrato / Imagen</span>
+                          <span>Asignar a la Ficha</span>
                         </button>
                         <button
                           type="button"
                           onClick={handleGenerateAiImage}
                           disabled={isGeneratingAi}
-                          className="px-3 py-2 bg-[var(--surface-soft)] hover:bg-[var(--sidebar-bg)] text-[var(--text-primary)] border border-[var(--user-border)] rounded-lg font-cinzel text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all"
+                          className="w-full sm:w-auto px-3 py-2 bg-[var(--surface-soft)] hover:bg-[var(--sidebar-bg)] text-[var(--text-primary)] border border-[var(--user-border)] rounded-lg font-cinzel text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all whitespace-nowrap"
                         >
                           <RefreshCw className="w-3.5 h-3.5 text-[var(--accent)]" />
                           <span>Generar otra variante</span>
@@ -619,24 +621,24 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div className="text-xs text-[var(--text-secondary)]">
-                    Pulsa para invocar el modelo de generación de imagen con la estética Art Nouveau & Animación YA.
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                  <div className="text-xs text-[var(--text-secondary)] leading-snug">
+                    Pulsa para invocar el modelo con la estética Art Nouveau & Animación YA.
                   </div>
                   <button
                     type="button"
                     onClick={handleGenerateAiImage}
                     disabled={isGeneratingAi || !aiPrompt.trim()}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-[var(--on-accent)] rounded-xl font-cinzel text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
+                    className="w-full sm:w-auto px-4 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-[var(--on-accent)] rounded-xl font-cinzel text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[42px]"
                   >
                     {isGeneratingAi ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                         <span>Dibujando con IA...</span>
                       </>
                     ) : (
                       <>
-                        <Wand2 className="w-4 h-4" />
+                        <Wand2 className="w-4 h-4 shrink-0" />
                         <span>Generar con IA (Art Nouveau)</span>
                       </>
                     )}
@@ -651,15 +653,16 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         {activeTab === 'gallery' && (
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Filter Bar */}
-            <div className="flex items-center justify-between mb-2 px-0.5 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2 px-0.5 shrink-0">
               <span className="text-xs font-cinzel font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[var(--accent)]" /> Galería de la Campaña ({filteredImages.length})
+                <Sparkles className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                <span>Galería ({filteredImages.length})</span>
               </span>
-              <div className="flex gap-1 text-[11px] font-cinzel">
+              <div className="flex flex-wrap items-center gap-1 text-[11px] font-cinzel">
                 <button
                   type="button"
                   onClick={() => setFilterCategory('all')}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-all ${
+                  className={`px-2.5 py-1 rounded-md cursor-pointer transition-all whitespace-nowrap ${
                     filterCategory === 'all'
                       ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs'
                       : 'text-[var(--text-secondary)] hover:bg-[var(--surface)]'
@@ -672,7 +675,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setFilterCategory('map')}
-                      className={`px-2.5 py-1 rounded-md cursor-pointer transition-all ${
+                      className={`px-2.5 py-1 rounded-md cursor-pointer transition-all whitespace-nowrap ${
                         filterCategory === 'map'
                           ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--surface)]'
@@ -683,7 +686,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setFilterCategory('scene')}
-                      className={`px-2.5 py-1 rounded-md cursor-pointer transition-all ${
+                      className={`px-2.5 py-1 rounded-md cursor-pointer transition-all whitespace-nowrap ${
                         filterCategory === 'scene'
                           ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--surface)]'
@@ -696,7 +699,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setFilterCategory('portrait')}
-                    className={`px-2.5 py-1 rounded-md cursor-pointer transition-all ${
+                    className={`px-2.5 py-1 rounded-md cursor-pointer transition-all whitespace-nowrap ${
                       filterCategory === 'portrait'
                         ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-2xs'
                         : 'text-[var(--text-secondary)] hover:bg-[var(--surface)]'
@@ -709,13 +712,13 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
             </div>
 
             {/* Grid */}
-            <div className="flex-1 overflow-y-auto pr-1 min-h-[150px]">
+            <div className="flex-1 overflow-y-auto pr-1 min-h-[140px]">
               {filteredImages.length === 0 ? (
                 <div className="py-8 px-4 text-center text-xs text-[var(--text-secondary)] italic bg-[var(--surface-soft)] rounded-xl border border-[var(--user-border)] leading-relaxed">
                   No hay imágenes en esta categoría. Puedes generar una con IA en la pestaña anterior o subir un archivo local.
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                   {filteredImages.map(img => (
                     <div
                       key={img.id}
@@ -725,7 +728,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                       }}
                       className="group bg-[var(--surface)] rounded-xl border border-[var(--user-border)] overflow-hidden cursor-pointer hover:border-[var(--accent)] hover:shadow-md transition-all flex flex-col"
                     >
-                      <div className="h-28 bg-black/5 overflow-hidden flex items-center justify-center relative">
+                      <div className="h-24 sm:h-28 bg-black/5 overflow-hidden flex items-center justify-center relative">
                         <img
                           src={img.content}
                           alt={img.name}
@@ -737,7 +740,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                         </div>
                       </div>
                       <div
-                        className="p-2 text-[11px] font-cinzel font-bold truncate text-[var(--text-primary)] bg-[var(--sidebar-bg)] border-t border-[var(--user-border)]"
+                        className="p-1.5 sm:p-2 text-[10px] sm:text-[11px] font-cinzel font-bold truncate text-[var(--text-primary)] bg-[var(--sidebar-bg)] border-t border-[var(--user-border)]"
                         title={img.name}
                       >
                         {img.name}
@@ -752,22 +755,23 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
 
         {/* TAB 3: SUBIR O PEGAR IMAGEN LOCAL / URL */}
         {activeTab === 'upload' && (
-          <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-            <div className="p-4 bg-[var(--surface-soft)] border border-[var(--user-border)] rounded-xl space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3 sm:space-y-4">
+            <div className="p-3 sm:p-4 bg-[var(--surface-soft)] border border-[var(--user-border)] rounded-xl space-y-3 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                 <span className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center gap-1.5 uppercase tracking-wider">
-                  <UploadCloud className="w-4 h-4" /> Subida Manual de Imagen
+                  <UploadCloud className="w-4 h-4 shrink-0" />
+                  <span>Subida Manual de Imagen</span>
                 </span>
-                <span className="text-[10px] bg-[var(--surface)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--user-border)] font-cinzel">
+                <span className="text-[10px] bg-[var(--surface)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--user-border)] font-cinzel w-fit">
                   Arrastra o pega con <kbd className="font-mono font-bold text-[var(--text-primary)]">Ctrl + V</kbd>
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3.5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] rounded-lg font-cinzel text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                  className="w-full sm:w-auto px-3.5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] rounded-lg font-cinzel text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                   title="Subir archivo desde tu ordenador"
                 >
                   <FileImage className="w-3.5 h-3.5" />
@@ -777,7 +781,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                 <button
                   type="button"
                   onClick={handlePasteFromClipboardBtn}
-                  className="px-3 py-2 bg-[var(--surface)] hover:bg-[var(--sidebar-bg)] text-[var(--text-primary)] border border-[var(--user-border)] rounded-lg font-cinzel text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                  className="w-full sm:w-auto px-3 py-2 bg-[var(--surface)] hover:bg-[var(--sidebar-bg)] text-[var(--text-primary)] border border-[var(--user-border)] rounded-lg font-cinzel text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                   title="Pegar imagen copiada del portapapeles"
                 >
                   <ClipboardPaste className="w-3.5 h-3.5 text-[var(--accent)]" />
@@ -787,7 +791,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowUrlInput(!showUrlInput)}
-                  className="px-3 py-2 bg-[var(--surface)] hover:bg-[var(--sidebar-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--user-border)] rounded-lg font-cinzel text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                  className="w-full sm:w-auto px-3 py-2 bg-[var(--surface)] hover:bg-[var(--sidebar-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--user-border)] rounded-lg font-cinzel text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                   title="Pegar enlace web directo"
                 >
                   <Link className="w-3.5 h-3.5" />
@@ -829,7 +833,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                   <button
                     type="submit"
                     disabled={!urlInput.trim()}
-                    className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] disabled:opacity-50 rounded-lg font-cinzel text-xs font-bold cursor-pointer transition-all"
+                    className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] disabled:opacity-50 rounded-lg font-cinzel text-xs font-bold cursor-pointer transition-all whitespace-nowrap"
                   >
                     Asignar
                   </button>
@@ -840,21 +844,21 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         )}
 
         {/* Footer */}
-        <div className="flex justify-between items-center gap-2 mt-3 pt-3 border-t border-[var(--glass-border)] shrink-0">
+        <div className="flex justify-between items-center gap-2 mt-2.5 pt-2.5 sm:mt-3 sm:pt-3 border-t border-[var(--glass-border)] shrink-0">
           <button
             type="button"
             onClick={() => {
               onSelectImage('');
               onClose();
             }}
-            className="px-3 py-1.5 text-xs font-cinzel text-red-700 dark:text-red-400 hover:text-red-900 border border-red-200 dark:border-red-900/40 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer transition-all"
+            className="px-3 py-1.5 text-xs font-cinzel text-red-700 dark:text-red-400 hover:text-red-900 border border-red-200 dark:border-red-900/40 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer transition-all whitespace-nowrap"
           >
             Quitar Imagen
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded-lg hover:bg-[var(--surface)] cursor-pointer transition-all"
+            className="px-4 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded-lg hover:bg-[var(--surface)] cursor-pointer transition-all whitespace-nowrap"
           >
             Cerrar
           </button>

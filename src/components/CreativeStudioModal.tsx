@@ -1134,12 +1134,12 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
 
                     {/* Acciones de asignación rápida a PNJ o Lugar */}
                     {((project?.memory?.npcs && project.memory.npcs.length > 0) || (project?.memory?.locations && project.memory.locations.length > 0)) && (
-                      <div className="p-2 rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)] flex flex-wrap items-center gap-3 text-xs">
+                      <div className="p-2 rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)] flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-xs">
                         {project?.memory?.npcs && project.memory.npcs.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-[var(--text-secondary)] font-cinzel font-bold">👤 Asignar a PNJ:</span>
+                          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                            <span className="text-[10px] text-[var(--text-secondary)] font-cinzel font-bold shrink-0">👤 PNJ:</span>
                             <select
-                              className="text-xs bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-1.5 py-1 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent)]"
+                              className="text-xs bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-1.5 py-1 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent)] flex-1 sm:flex-initial sm:max-w-[160px]"
                               defaultValue=""
                               onChange={(e) => {
                                 if (e.target.value) {
@@ -1157,10 +1157,10 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
                         )}
 
                         {project?.memory?.locations && project.memory.locations.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-[var(--text-secondary)] font-cinzel font-bold">📍 Asignar a Lugar:</span>
+                          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                            <span className="text-[10px] text-[var(--text-secondary)] font-cinzel font-bold shrink-0">📍 Lugar:</span>
                             <select
-                              className="text-xs bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-1.5 py-1 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent)]"
+                              className="text-xs bg-[var(--bg-color)] border border-[var(--user-border)] rounded-md px-1.5 py-1 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent)] flex-1 sm:flex-initial sm:max-w-[160px]"
                               defaultValue=""
                               onChange={(e) => {
                                 if (e.target.value) {
