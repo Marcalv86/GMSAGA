@@ -322,54 +322,13 @@ export const MemoryManager: React.FC<{
 
   const [localNotes, setLocalNotes] = useState(memory.manual_notes || '');
   const [showNarratorNotes, setShowNarratorNotes] = useState(false);
-  const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingNotesRef = useRef<string | null>(null);
   const onUpdateMemoryRef = useRef(onUpdateMemory);
   onUpdateMemoryRef.current = onUpdateMemory;
 
   // Sincronizar localNotes si cambia memory.manual_notes externamente (por reseteo, IA o cambio de tomo)
   useEffect(() => {
-    if (pendingNotesRef.current === null) {
-      setLocalNotes(project.memory?.manual_notes || '');
-    }
+    setLocalNotes(project.memory?.manual_notes || '');
   }, [project.memory?.manual_notes]);
-
-  // Flush pending notes if this view unmounts inside the debounce window.
-  useEffect(() => {
-    return () => {
-      if (notesTimerRef.current) {
-        clearTimeout(notesTimerRef.current);
-        notesTimerRef.current = null;
-      }
-      const pending = pendingNotesRef.current;
-      if (pending !== null) {
-        pendingNotesRef.current = null;
-        void onUpdateMemoryRef.current(mem => ({ ...mem, manual_notes: pending }));
-      }
-    };
-  }, []);
-
-  // Notes Handlers
-  const handleNotesChange = (val: string) => {
-    setLocalNotes(val);
-    pendingNotesRef.current = val;
-    if (notesTimerRef.current) {
-      clearTimeout(notesTimerRef.current);
-    }
-    notesTimerRef.current = setTimeout(() => {
-      pendingNotesRef.current = null;
-      onUpdateMemory(mem => ({ ...mem, manual_notes: val }));
-    }, 1200);
-  };
-
-  const handleNotesBlur = () => {
-    if (notesTimerRef.current) {
-      clearTimeout(notesTimerRef.current);
-      notesTimerRef.current = null;
-    }
-    pendingNotesRef.current = null;
-    onUpdateMemory(mem => ({ ...mem, manual_notes: localNotes }));
-  };
 
   // AI Sync Handler
   const handleSyncWithAI = async () => {
@@ -454,11 +413,6 @@ export const MemoryManager: React.FC<{
       message:
         '¿Deseas vaciar y restablecer completamente toda la memoria de la campaña? Esta acción borrará los datos de todas las pestañas: el resumen e hitos del Protagonista, la cronología e hilos de la Agenda, la lista de PNJs y sus afinidades, los Lugares y mapas, las Tramas y misiones activas, el Resumen acumulado, el Estado de la compañía y las Notas del tomo.',
       onConfirm: async () => {
-        if (notesTimerRef.current) {
-          clearTimeout(notesTimerRef.current);
-          notesTimerRef.current = null;
-        }
-        pendingNotesRef.current = null;
         setLocalNotes('');
         setExpandedLocIds(new Set());
         setExpandedQuestIds(new Set());
@@ -1078,13 +1032,21 @@ export const MemoryManager: React.FC<{
 
           {showNarratorNotes ? (
             <div className="flex flex-col gap-2">
-              <textarea
-                value={localNotes}
-                onChange={e => handleNotesChange(e.target.value)}
-                onBlur={handleNotesBlur}
-                placeholder="La IA mantiene aquí sus notas secretas de director de juego..."
-                className="w-full h-[380px] md:h-[480px] bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] p-4 rounded-lg text-base font-lora outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-color)] leading-relaxed shadow-inner"
-              />
+              <div className="w-full min-h-[380px] md:h-[480px] max-h-[600px] overflow-y-auto bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] p-5 rounded-lg text-sm md:text-base font-lora leading-relaxed shadow-inner">
+                {localNotes && localNotes.trim() ? (
+                  <div className="markdown-body">
+                    <ReactMarkdown>{localNotes}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center py-16 text-[var(--text-secondary)]">
+                    <BookOpen className="w-10 h-10 mb-3 opacity-40 text-amber-700" />
+                    <p className="font-cinzel font-semibold text-sm mb-1">El Narrador (IA) aún no ha escrito notas secretas</p>
+                    <p className="text-xs max-w-sm text-[var(--text-secondary)]/80">
+                      A medida que avance la partida y ocurran tramas en la sombra, la IA actualizará este cuaderno privado de forma autónoma.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div
