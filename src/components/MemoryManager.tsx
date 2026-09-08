@@ -206,6 +206,8 @@ export const MemoryManager: React.FC<{
   const [newPcEventTitle, setNewPcEventTitle] = useState('');
   const [newPcEventDesc, setNewPcEventDesc] = useState('');
   const [newPcEventDate, setNewPcEventDate] = useState('');
+  const [milestonesSearchQuery, setMilestonesSearchQuery] = useState('');
+  const [milestonesSortOrder, setMilestonesSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Dossier modals
   const [selectedNpcForDossier, setSelectedNpcForDossier] = useState<NPC | null>(null);
@@ -814,99 +816,130 @@ export const MemoryManager: React.FC<{
                   </div>
                 )}
 
-                {/* Listado de hitos y acontecimientos */}
-                <div className="flex flex-col gap-2">
+                {/* Search & Sort Controls + Scrollable List */}
+                <div className="flex flex-col gap-2.5">
+                  {allPersonalEventsCount > 0 && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <input
+                        type="text"
+                        placeholder="🔍 Buscar en hitos y acontecimientos..."
+                        value={milestonesSearchQuery}
+                        onChange={e => setMilestonesSearchQuery(e.target.value)}
+                        className="flex-1 bg-[var(--surface-soft)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-lora"
+                      />
+                      <button
+                        onClick={() => setMilestonesSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                        className="px-3 py-1.5 bg-[var(--surface-soft)] border border-[var(--glass-border)] hover:border-[var(--accent)] text-xs font-cinzel rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer shrink-0"
+                        title={milestonesSortOrder === 'desc' ? 'Orden: Más recientes primero (Haz clic para invertir)' : 'Orden: Más antiguos primero (Haz clic para invertir)'}
+                      >
+                        {milestonesSortOrder === 'desc' ? '🔽 Recientes' : '🔼 Antiguos'}
+                      </button>
+                    </div>
+                  )}
+
                   {allPersonalEventsCount === 0 ? (
                     <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-4 rounded-lg text-center text-xs text-[var(--text-secondary)] font-lora italic">
                       No hay hitos registrados en la memoria aún. La IA registra automáticamente aquí los sucesos trascendentales y victorias del protagonista durante la aventura, o puedes añadir uno manualmente con el botón superior.
                     </div>
-                  ) : (
-                    <>
-                      {/* Eventos directos del protagonista */}
-                      {(cleanPc.events || []).map((ev, idx) => (
-                        <div
-                          key={ev.id || `ev_${idx}`}
-                          className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-3.5 rounded-lg flex flex-col gap-1 relative group hover:border-[var(--accent)]/40 transition-colors"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--accent)]">
-                                {ev.title}
-                              </span>
-                              {ev.dateOrTime && (
-                                <span className="text-[10px] font-cinzel text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-0.5 rounded border border-[var(--glass-border)]">
-                                  {ev.dateOrTime}
-                                </span>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => {
-                                onUpdateMemory(prev => ({
-                                  ...prev,
-                                  player_character: {
-                                    ...(prev.player_character || { name: 'Aryendell' }),
-                                    events: (prev.player_character?.events || []).filter((_, i) => i !== idx && _.id !== ev.id)
-                                  }
-                                }));
-                              }}
-                              className="text-[var(--text-secondary)] hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                              title="Eliminar este hito"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          {ev.description && (
-                            <p className="text-xs font-lora text-[var(--text-secondary)] leading-relaxed m-0 whitespace-pre-wrap">
-                              {ev.description}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                  ) : (() => {
+                    const pcEventsNormalized = (cleanPc.events || []).map((ev, index) => ({
+                      id: ev.id || `pc_ev_${index}`,
+                      title: ev.title,
+                      description: ev.description || '',
+                      date: ev.dateOrTime || 'Fecha reciente',
+                      timestamp: ev.createdAt || index,
+                      source: 'pc' as const,
+                      mood: '⭐',
+                      originalIndex: index
+                    }));
 
-                      {/* Eventos del timeline personales o hitos */}
-                      {personalTimelineEvents.map((t, idx) => (
-                        <div
-                          key={t.id || `tl_${idx}`}
-                          className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-3.5 rounded-lg flex flex-col gap-1 relative group hover:border-[var(--accent)]/40 transition-colors"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--accent)] flex items-center gap-1.5">
-                                <span>{t.mood || '⭐'}</span>
-                                <span>{t.title}</span>
-                              </span>
-                              {t.date && (
-                                <span className="text-[10px] font-cinzel text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-0.5 rounded border border-[var(--glass-border)]">
-                                  {t.date}
+                    const timelineEventsNormalized = personalTimelineEvents.map((t, index) => ({
+                      id: t.id || `tl_ev_${index}`,
+                      title: t.title,
+                      description: t.summary || '',
+                      date: t.date || 'Cronología',
+                      timestamp: t.absDay || index,
+                      source: 'timeline' as const,
+                      mood: t.mood || '⭐',
+                      originalItem: t
+                    }));
+
+                    const allUnifiedEvents = [...pcEventsNormalized, ...timelineEventsNormalized].sort((a, b) => {
+                      const diff = (b.timestamp || 0) - (a.timestamp || 0);
+                      return milestonesSortOrder === 'desc' ? diff : -diff;
+                    });
+
+                    const filteredEvents = allUnifiedEvents.filter(ev => 
+                      milestonesSearchQuery.trim() === '' ||
+                      (ev.title || '').toLowerCase().includes(milestonesSearchQuery.toLowerCase()) ||
+                      (ev.description || '').toLowerCase().includes(milestonesSearchQuery.toLowerCase()) ||
+                      (ev.date || '').toLowerCase().includes(milestonesSearchQuery.toLowerCase())
+                    );
+
+                    if (filteredEvents.length === 0) {
+                      return (
+                        <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-4 rounded-lg text-center text-xs text-[var(--text-secondary)] font-lora italic">
+                          No se encontraron hitos que coincidan con la búsqueda "{milestonesSearchQuery}".
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="max-h-[480px] overflow-y-auto pr-1 flex flex-col gap-2">
+                        {filteredEvents.map((ev) => (
+                          <div
+                            key={ev.id}
+                            className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-3.5 rounded-lg flex flex-col gap-1 relative group hover:border-[var(--accent)]/40 transition-colors"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--accent)] flex items-center gap-1.5">
+                                  <span>{ev.mood}</span>
+                                  <span>{ev.title}</span>
                                 </span>
-                              )}
-                              <span className="text-[10px] font-cinzel text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                                Hito de Campaña
-                              </span>
-                            </div>
-                            {onUpdateProject && (
+                                {ev.date && (
+                                  <span className="text-[10px] font-cinzel text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-0.5 rounded border border-[var(--glass-border)]">
+                                    {ev.date}
+                                  </span>
+                                )}
+                                {ev.source === 'timeline' && (
+                                  <span className="text-[10px] font-cinzel text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                    Hito de Campaña
+                                  </span>
+                                )}
+                              </div>
                               <button
                                 onClick={() => {
-                                  onUpdateProject(prev => ({
-                                    timeline: (prev.timeline || []).filter(entry => entry.id !== t.id)
-                                  }));
+                                  if (ev.source === 'pc') {
+                                    onUpdateMemory(prev => ({
+                                      ...prev,
+                                      player_character: {
+                                        ...(prev.player_character || { name: 'Aryendell' }),
+                                        events: (prev.player_character?.events || []).filter(e => e.id !== ev.id && e.title !== ev.title)
+                                      }
+                                    }));
+                                  } else if (onUpdateProject) {
+                                    onUpdateProject(prev => ({
+                                      timeline: (prev.timeline || []).filter(entry => entry.id !== ev.id)
+                                    }));
+                                  }
                                 }}
                                 className="text-[var(--text-secondary)] hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                                 title="Eliminar este hito"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
+                            </div>
+                            {ev.description && (
+                              <p className="text-xs font-lora text-[var(--text-secondary)] leading-relaxed m-0 whitespace-pre-wrap">
+                                {ev.description}
+                              </p>
                             )}
                           </div>
-                          {t.summary && (
-                            <p className="text-xs font-lora text-[var(--text-secondary)] leading-relaxed m-0 whitespace-pre-wrap">
-                              {t.summary}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </>
-                  )}
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             );
