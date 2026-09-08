@@ -14,8 +14,10 @@ import {
   RotateCcw,
   Copy,
   Sliders,
-  FileText
+  FileText,
+  User
 } from 'lucide-react';
+import { MemoryManager } from './MemoryManager';
 import { generateClaudeProjectMemory } from '../utils/geminiHelper';
 
 interface SimpleMemoryViewProps {
@@ -34,6 +36,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   files = [],
   onUpdateMemory,
   onUpdateProject,
+  onTriggerAIUpdate,
   isGenerating = false
 }) => {
   const memory: Memory = project.memory || {
@@ -47,6 +50,22 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
 
   // Sub-view: 'view' | 'edit' | 'manage_edits'
   const [memorySubView, setMemorySubView] = useState<'view' | 'edit' | 'manage_edits'>('view');
+  
+  // Top-level memory mode: 'character' (Protagonista & Entidades) vs 'project' (Memoria Persistente de Proyecto)
+  const [memoryMode, setMemoryMode] = useState<'character' | 'project'>(() => {
+    try {
+      return (localStorage.getItem('preferred_memory_view_mode') as any) || 'character';
+    } catch {
+      return 'character';
+    }
+  });
+
+  const handleSwitchMode = (mode: 'character' | 'project') => {
+    setMemoryMode(mode);
+    try {
+      localStorage.setItem('preferred_memory_view_mode', mode);
+    } catch {}
+  };
   
   const [isSavedRecently, setIsSavedRecently] = useState(false);
   const [isCopiedRecently, setIsCopiedRecently] = useState(false);
@@ -207,48 +226,92 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
 
   return (
     <div id="simple-memory-container" className="flex-1 flex flex-col h-full bg-[var(--bg-color)] overflow-hidden">
-      {/* Top Header Bar */}
-      <div id="memory-header-bar" className="px-4 py-3 md:px-6 border-b border-[var(--glass-border)] bg-[var(--surface)] flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] shrink-0">
-            <ScrollText className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-cinzel text-base md:text-lg font-bold text-[var(--text-primary)] leading-tight">
-                Memoria del Proyecto
-              </h2>
-              {isSavedRecently && (
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-cinzel font-semibold animate-pulse">
-                  <Check className="w-3.5 h-3.5" /> Guardado
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-[var(--text-secondary)] font-lora max-w-2xl hidden sm:block">
-              Sintetizador inteligente de contexto persistente (Purpose & context, Current state, Tools & resources).
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
+      {/* Top memory mode toggle bar */}
+      <div id="memory-mode-toggle-bar" className="px-3 sm:px-6 py-2.5 bg-[var(--surface)] border-b border-[var(--glass-border)] flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-1.5 p-1 bg-[color-mix(in_srgb,var(--surface-soft)_80%,transparent)] rounded-lg border border-[var(--glass-border)]">
           <button
-            id="btn-synthesize-memory-top"
-            onClick={handleRegenerateClaudeMemory}
-            disabled={isCurrentlyWorking}
-            className="px-3.5 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-semibold hover:opacity-90 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
-            title="Sintetizar memoria leyendo todas las sesiones y documentos del proyecto"
+            id="tab-btn-character-memory"
+            onClick={() => handleSwitchMode('character')}
+            className={`px-3 py-1.5 rounded-md text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              memoryMode === 'character'
+                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
+            }`}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isCurrentlyWorking ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{isCurrentlyWorking ? 'Sintetizando...' : 'Sintetizar con IA'}</span>
+            <User className="w-3.5 h-3.5" />
+            <span>Memoria del Personaje & Entidades</span>
+          </button>
+          <button
+            id="tab-btn-project-memory"
+            onClick={() => handleSwitchMode('project')}
+            className={`px-3 py-1.5 rounded-md text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              memoryMode === 'project'
+                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
+            }`}
+          >
+            <ScrollText className="w-3.5 h-3.5" />
+            <span>Memoria Persistente de Proyecto</span>
           </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden flex flex-col p-3 md:p-6 font-lora">
-        <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col min-h-0">
-          {/* Memory Card Container */}
-          <div className="flex-1 flex flex-col bg-[var(--surface)] border border-[var(--glass-border)] rounded-2xl shadow-sm overflow-hidden relative">
+      {memoryMode === 'character' ? (
+        <div className="flex-1 overflow-hidden">
+          <MemoryManager
+            project={project}
+            files={files}
+            onUpdateMemory={onUpdateMemory}
+            onUpdateProject={onUpdateProject}
+            onTriggerAIUpdate={onTriggerAIUpdate ? async () => { onTriggerAIUpdate(); } : undefined}
+            isGenerating={isGenerating}
+            hasChats={chats.length > 0}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+          {/* Top Header Bar */}
+          <div id="memory-header-bar" className="px-4 py-3 md:px-6 border-b border-[var(--glass-border)] bg-[var(--surface)] flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--accent)] shrink-0">
+                <ScrollText className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-cinzel text-base md:text-lg font-bold text-[var(--text-primary)] leading-tight">
+                    Memoria del Proyecto
+                  </h2>
+                  {isSavedRecently && (
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-cinzel font-semibold animate-pulse">
+                      <Check className="w-3.5 h-3.5" /> Guardado
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] font-lora max-w-2xl hidden sm:block">
+                  Sintetizador inteligente de contexto persistente (Purpose & context, Current state, Tools & resources).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                id="btn-synthesize-memory-top"
+                onClick={handleRegenerateClaudeMemory}
+                disabled={isCurrentlyWorking}
+                className="px-3.5 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-semibold hover:opacity-90 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                title="Sintetizar memoria leyendo todas las sesiones y documentos del proyecto"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isCurrentlyWorking ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isCurrentlyWorking ? 'Sintetizando...' : 'Sintetizar con IA'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1 overflow-hidden flex flex-col p-3 md:p-6 font-lora">
+            <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col min-h-0">
+              {/* Memory Card Container */}
+              <div className="flex-1 flex flex-col bg-[var(--surface)] border border-[var(--glass-border)] rounded-2xl shadow-sm overflow-hidden relative">
             
             {/* Subview: MANAGE EDITS */}
             {memorySubView === 'manage_edits' ? (
@@ -569,6 +632,8 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           </div>
         </div>
       </div>
+    </div>
+    )}
     </div>
   );
 };

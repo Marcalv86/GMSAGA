@@ -201,6 +201,12 @@ export const MemoryManager: React.FC<{
   // Portrait Linker Modal state
   const [targetForPortraitPicker, setTargetForPortraitPicker] = useState<ImagePickerTarget | null>(null);
 
+  // Character Events / Milestones state
+  const [isAddingPcEvent, setIsAddingPcEvent] = useState(false);
+  const [newPcEventTitle, setNewPcEventTitle] = useState('');
+  const [newPcEventDesc, setNewPcEventDesc] = useState('');
+  const [newPcEventDate, setNewPcEventDate] = useState('');
+
   // Dossier modals
   const [selectedNpcForDossier, setSelectedNpcForDossier] = useState<NPC | null>(null);
 
@@ -700,21 +706,33 @@ export const MemoryManager: React.FC<{
                 </div>
 
                 {/* Level & Progress Bar */}
-                <div className="mt-2.5 flex flex-col gap-1.5 bg-[var(--surface)] p-3 rounded-lg border border-[var(--glass-border)]">
-                  <div className="flex justify-between items-center text-xs font-cinzel">
-                    <span className="font-bold text-[var(--accent)] flex items-center gap-1.5">
-                      <span>{cleanPc.level || 'Nivel 1'}</span>
-                      {cleanPc.class && <span className="text-[var(--text-secondary)] font-normal">({cleanPc.class})</span>}
-                    </span>
-                    <span className="text-[var(--text-secondary)] font-semibold">{cleanPc.levelProgress ?? 40}% para subir de nivel</span>
-                  </div>
-                  <div className="w-full bg-[var(--surface-soft)] rounded-full h-2 overflow-hidden border border-[var(--glass-border)]">
-                    <div 
-                      className="bg-[var(--accent)] h-full transition-all duration-300 rounded-full"
-                      style={{ width: `${cleanPc.levelProgress ?? 40}%` }}
-                    />
-                  </div>
-                </div>
+                {(() => {
+                  const personalTimelineEvents = (project.timeline || []).filter(t => t.tipo === 'personal' || t.hito);
+                  const eventsCount = (cleanPc.events?.length || 0) + personalTimelineEvents.length;
+                  const questsCompleted = (memory.quests || []).filter(q => q.status === 'completada' || q.status === 'completed').length;
+                  const calculatedProgress = Math.min(100, Math.max(5, (eventsCount * 15) + (questsCompleted * 20)));
+                  const currentLevelProgress = cleanPc.levelProgress !== undefined && cleanPc.levelProgress > 0 ? cleanPc.levelProgress : calculatedProgress;
+
+                  return (
+                    <div className="mt-2.5 flex flex-col gap-1.5 bg-[var(--surface)] p-3 rounded-lg border border-[var(--glass-border)]">
+                      <div className="flex justify-between items-center text-xs font-cinzel">
+                        <span className="font-bold text-[var(--accent)] flex items-center gap-1.5">
+                          <span>{cleanPc.level || 'Nivel 1'}</span>
+                          {cleanPc.class && <span className="text-[var(--text-secondary)] font-normal">({cleanPc.class})</span>}
+                        </span>
+                        <span className="text-[var(--text-secondary)] font-semibold">
+                          {currentLevelProgress}% para subir de nivel ({eventsCount} eventos registrados, {questsCompleted} hitos)
+                        </span>
+                      </div>
+                      <div className="w-full bg-[var(--surface-soft)] rounded-full h-2 overflow-hidden border border-[var(--glass-border)]">
+                        <div 
+                          className="bg-[var(--accent)] h-full transition-all duration-300 rounded-full"
+                          style={{ width: `${currentLevelProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="mt-3 text-xs text-[var(--text-secondary)] bg-[var(--surface)]/70 p-3 rounded-lg border border-[var(--glass-border)] font-lora leading-relaxed">
                   Aquí se registran de forma automática los acontecimientos, evolución personal y hechos trascendentales que le van sucediendo a tu personaje. La IA actualiza la memoria viva en cada respuesta a partir de la crónica de juego.
@@ -742,6 +760,203 @@ export const MemoryManager: React.FC<{
               )}
             </div>
           </div>
+
+          {/* Acontecimientos e Hitos de Memoria del Protagonista */}
+          {(() => {
+            const personalTimelineEvents = (project.timeline || []).filter(t => t.tipo === 'personal' || t.hito);
+            const allPersonalEventsCount = (cleanPc.events?.length || 0) + personalTimelineEvents.length;
+
+            return (
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-between items-center bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
+                  <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+                    Acontecimientos e Hitos Registrados del Protagonista ({allPersonalEventsCount}):
+                  </span>
+                  <button
+                    onClick={() => setIsAddingPcEvent(!isAddingPcEvent)}
+                    className="px-2.5 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded-md hover:bg-[var(--accent-hover)] transition-all flex items-center gap-1 cursor-pointer font-bold shadow-xs"
+                  >
+                    <Plus className="w-3 h-3" /> {isAddingPcEvent ? 'Cancelar' : 'Añadir Hito'}
+                  </button>
+                </div>
+
+                {/* Formulario para añadir hito */}
+                {isAddingPcEvent && (
+                  <div className="bg-[var(--surface-soft)] border border-[var(--accent)]/40 p-4 rounded-lg flex flex-col gap-2.5 shadow-sm">
+                    <input
+                      type="text"
+                      placeholder="Título del hito o acontecimiento (ej: Rescate en la nave, Juramento del Círculo...)"
+                      value={newPcEventTitle}
+                      onChange={e => setNewPcEventTitle(e.target.value)}
+                      className="w-full bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-cinzel font-semibold"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Fecha o momento (opcional, ej: 15 de Eleint, Día 3...)"
+                      value={newPcEventDate}
+                      onChange={e => setNewPcEventDate(e.target.value)}
+                      className="w-full bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                    />
+                    <textarea
+                      placeholder="Descripción de lo sucedido y su trascendencia para el personaje..."
+                      value={newPcEventDesc}
+                      onChange={e => setNewPcEventDesc(e.target.value)}
+                      className="w-full bg-[var(--surface)] border border-[var(--glass-border)] rounded-md p-3 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] resize-none h-20 font-lora"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setIsAddingPcEvent(false)}
+                        className="px-3 py-1 text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!newPcEventTitle.trim()) return;
+                          const newEv = {
+                            id: `pcev_${Date.now()}`,
+                            title: newPcEventTitle.trim(),
+                            description: newPcEventDesc.trim(),
+                            dateOrTime: newPcEventDate.trim() || undefined,
+                            createdAt: Date.now()
+                          };
+                          if (onUpdateProject) {
+                            onUpdateProject(prev => ({
+                              timeline: [
+                                ...(prev.timeline || []),
+                                {
+                                  id: newEv.id,
+                                  absDay: 1,
+                                  date: newEv.dateOrTime || 'Fecha actual',
+                                  title: newEv.title,
+                                  summary: newEv.description || newEv.title,
+                                  mood: '⭐',
+                                  tipo: 'personal',
+                                  hito: newEv.title
+                                }
+                              ]
+                            }));
+                          } else {
+                            onUpdateMemory(prev => ({
+                              ...prev,
+                              player_character: {
+                                ...(prev.player_character || { name: 'Aryendell' }),
+                                events: [...(prev.player_character?.events || []), newEv]
+                              }
+                            }));
+                          }
+                          setNewPcEventTitle('');
+                          setNewPcEventDesc('');
+                          setNewPcEventDate('');
+                          setIsAddingPcEvent(false);
+                        }}
+                        disabled={!newPcEventTitle.trim()}
+                        className="px-3.5 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] font-bold rounded-md hover:bg-[var(--accent-hover)] transition-all disabled:opacity-40 cursor-pointer shadow-xs"
+                      >
+                        Guardar Acontecimiento
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Listado de hitos y acontecimientos */}
+                <div className="flex flex-col gap-2">
+                  {allPersonalEventsCount === 0 ? (
+                    <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-4 rounded-lg text-center text-xs text-[var(--text-secondary)] font-lora italic">
+                      No hay hitos registrados en la memoria aún. La IA registra automáticamente aquí los sucesos trascendentales y victorias del protagonista durante la aventura, o puedes añadir uno manualmente con el botón superior.
+                    </div>
+                  ) : (
+                    <>
+                      {/* Eventos directos del protagonista */}
+                      {(cleanPc.events || []).map((ev, idx) => (
+                        <div
+                          key={ev.id || `ev_${idx}`}
+                          className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-3.5 rounded-lg flex flex-col gap-1 relative group hover:border-[var(--accent)]/40 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--accent)]">
+                                {ev.title}
+                              </span>
+                              {ev.dateOrTime && (
+                                <span className="text-[10px] font-cinzel text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-0.5 rounded border border-[var(--glass-border)]">
+                                  {ev.dateOrTime}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => {
+                                onUpdateMemory(prev => ({
+                                  ...prev,
+                                  player_character: {
+                                    ...(prev.player_character || { name: 'Aryendell' }),
+                                    events: (prev.player_character?.events || []).filter((_, i) => i !== idx && _.id !== ev.id)
+                                  }
+                                }));
+                              }}
+                              className="text-[var(--text-secondary)] hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                              title="Eliminar este hito"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          {ev.description && (
+                            <p className="text-xs font-lora text-[var(--text-secondary)] leading-relaxed m-0 whitespace-pre-wrap">
+                              {ev.description}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Eventos del timeline personales o hitos */}
+                      {personalTimelineEvents.map((t, idx) => (
+                        <div
+                          key={t.id || `tl_${idx}`}
+                          className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-3.5 rounded-lg flex flex-col gap-1 relative group hover:border-[var(--accent)]/40 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--accent)] flex items-center gap-1.5">
+                                <span>{t.mood || '⭐'}</span>
+                                <span>{t.title}</span>
+                              </span>
+                              {t.date && (
+                                <span className="text-[10px] font-cinzel text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-0.5 rounded border border-[var(--glass-border)]">
+                                  {t.date}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-cinzel text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                Hito de Campaña
+                              </span>
+                            </div>
+                            {onUpdateProject && (
+                              <button
+                                onClick={() => {
+                                  onUpdateProject(prev => ({
+                                    timeline: (prev.timeline || []).filter(entry => entry.id !== t.id)
+                                  }));
+                                }}
+                                className="text-[var(--text-secondary)] hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                title="Eliminar este hito"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          {t.summary && (
+                            <p className="text-xs font-lora text-[var(--text-secondary)] leading-relaxed m-0 whitespace-pre-wrap">
+                              {t.summary}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Acceso y sincronización con el Diario & Agenda de Campaña */}
           <div className="bg-[var(--sidebar-bg)] p-4 sm:p-5 rounded-xl border border-[var(--user-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
