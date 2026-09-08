@@ -8,7 +8,7 @@ import { SceneTransitionModal } from './SceneTransitionModal';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
-import { parseMessageRolls, RollBadgeCard } from './RollBadge';
+import { parseMessageSegments, RollBadgeCard } from './RollBadge';
 import { parseSceneHUD, SceneHUDCard } from './SceneHUDCard';
 import {
   CALENDARIO_FANTASTICO,
@@ -130,13 +130,11 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
       )
     : m.content;
 
-  // Extraer tiradas estructuradas embebidas en el mensaje (ej: [Tirada de Sigilo: d20 natural = 18 | CD 15])
-  const { narrativeText: textWithoutRolls, rolls } = parseMessageRolls(baseContent);
-  // Extraer el HUD de escena para los mensajes del modelo
-  const { narrativeText, sceneHUD } = isModel
-    ? parseSceneHUD(textWithoutRolls)
-    : { narrativeText: textWithoutRolls, sceneHUD: null };
-  const bodyText = isModel ? formatNarrativeText(narrativeText) : narrativeText;
+  // Extraer el HUD de escena y los segmentos in-line (texto y tiradas en orden cronológico)
+  const { narrativeText: textWithoutHUD, sceneHUD } = isModel
+    ? parseSceneHUD(baseContent)
+    : { narrativeText: baseContent, sceneHUD: null };
+  const segments = parseMessageSegments(textWithoutHUD);
 
   // Detección de elementos técnicos sincronizados en segundo plano
   const hasSyncTags = isModel && (
@@ -250,39 +248,41 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
             <SceneHUDCard hud={sceneHUD} messageIndex={idx} project={project} />
           )}
 
-          {bodyText && (
-            <div className="markdown-body narrative-body">
-              <ReactMarkdown
-                components={{
-                  p: ({ children }) => {
-                    const str = Array.isArray(children)
-                      ? children.map(c => (typeof c === 'string' ? c : '')).join('')
-                      : typeof children === 'string' ? children : '';
-                    const isDialogue = isModel && /^[—–\-"«]/.test(str.trim());
-                    return (
-                      <p className={isDialogue ? 'narrative-dialogue' : undefined}>
-                        {children}
-                      </p>
-                    );
-                  },
-                  strong: ({ children }) => <strong className="narrative-strong">{children}</strong>,
-                  em: ({ children }) => <em className="narrative-em">{children}</em>,
-                  blockquote: ({ children }) => <blockquote className="narrative-quote">{children}</blockquote>
-                }}
-              >
-                {bodyText}
-              </ReactMarkdown>
-            </div>
-          )}
-
-          {/* Tarjetas estilizadas de tiradas embebidas */}
-          {rolls.length > 0 && (
-            <div className={`space-y-1.5 ${bodyText ? 'mt-2.5 pt-2 border-t border-[var(--glass-border)]/60' : ''}`}>
-              {rolls.map((r, rIdx) => (
-                <RollBadgeCard key={`${idx}-rollbadge-${rIdx}`} roll={r} />
-              ))}
-            </div>
-          )}
+          {segments.map((seg, sIdx) => {
+            if (seg.type === 'roll') {
+              return (
+                <div key={`${idx}-seg-${sIdx}`} className="my-2.5">
+                  <RollBadgeCard roll={seg.roll} />
+                </div>
+              );
+            }
+            const formatted = isModel ? formatNarrativeText(seg.content) : seg.content;
+            if (!formatted) return null;
+            return (
+              <div key={`${idx}-seg-${sIdx}`} className="markdown-body narrative-body">
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => {
+                      const str = Array.isArray(children)
+                        ? children.map(c => (typeof c === 'string' ? c : '')).join('')
+                        : typeof children === 'string' ? children : '';
+                      const isDialogue = isModel && /^[—–\-"«]/.test(str.trim());
+                      return (
+                        <p className={isDialogue ? 'narrative-dialogue' : undefined}>
+                          {children}
+                        </p>
+                      );
+                    },
+                    strong: ({ children }) => <strong className="narrative-strong">{children}</strong>,
+                    em: ({ children }) => <em className="narrative-em">{children}</em>,
+                    blockquote: ({ children }) => <blockquote className="narrative-quote">{children}</blockquote>
+                  }}
+                >
+                  {formatted}
+                </ReactMarkdown>
+              </div>
+            );
+          })}
 
           {invitaciones.length > 0 && isLastMessage && !isGenerating && (
             <div className="mt-4 flex flex-col gap-1.5">

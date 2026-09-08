@@ -118,6 +118,123 @@ export function parseMessageRolls(text: string): { narrativeText: string; rolls:
   return { narrativeText, rolls };
 }
 
+export interface TextSegment {
+  type: 'text';
+  content: string;
+}
+
+export interface RollSegment {
+  type: 'roll';
+  roll: RollInfo;
+}
+
+export type MessageSegment = TextSegment | RollSegment;
+
+export function parseMessageSegments(text: string): MessageSegment[] {
+  if (!text) return [];
+
+  const items: Array<{ index: number; endIndex: number; roll: RollInfo }> = [];
+  let match;
+
+  // 1. Tirada de Habilidad
+  const skillRollRegex = /\[\s*Tirada\s+de\s+([^:]+?)\s*:\s*d(\d+)\s+natural\s*=\s*(\d+)(?:\s*[|,]\s*(?:CD|DC)\s*[:=]?\s*(\d+))?\s*\]/gi;
+  while ((match = skillRollRegex.exec(text)) !== null) {
+    const rawText = match[0];
+    const skillName = match[1].trim();
+    const sides = parseInt(match[2], 10) || 20;
+    const natural = parseInt(match[3], 10);
+    const dc = match[4] ? parseInt(match[4], 10) : undefined;
+    items.push({
+      index: match.index,
+      endIndex: match.index + rawText.length,
+      roll: { type: 'skill', skillName, sides, natural, dc, rawText }
+    });
+  }
+
+  // 2. Tirada simple
+  const simpleRollRegex = /\[\s*Tirada\s+d(\d+)\s*:\s*(\d+)\s*\]/gi;
+  while ((match = simpleRollRegex.exec(text)) !== null) {
+    const rawText = match[0];
+    const sides = parseInt(match[1], 10);
+    const natural = parseInt(match[2], 10);
+    items.push({
+      index: match.index,
+      endIndex: match.index + rawText.length,
+      roll: { type: 'simple', sides, natural, rawText }
+    });
+  }
+
+  // 3. Oráculo con pregunta
+  const oracleQueryRegex = /\[\s*Or[aá]culo\s*—\s*[«"']?([^»"'\n|]+?)[»"']?\s*\|\s*probabilidad\s*:\s*([^|\n]+?)\s*\|\s*d100\s*=\s*(\d+)(?:\s*\|\s*D[ÍI]GITOS\s+REPETIDOS)?\s*\]/gi;
+  while ((match = oracleQueryRegex.exec(text)) !== null) {
+    const rawText = match[0];
+    const question = match[1].trim();
+    const probability = match[2].trim();
+    const d100Result = parseInt(match[3], 10);
+    const isDouble = rawText.toUpperCase().includes('DÍGITOS REPETIDOS') || rawText.toUpperCase().includes('DIGITOS REPETIDOS');
+    items.push({
+      index: match.index,
+      endIndex: match.index + rawText.length,
+      roll: { type: 'oracle_query', question, probability, d100Result, isDouble, rawText }
+    });
+  }
+
+  // 4. Oráculo significado
+  const oracleMeaningRegex = /\[\s*Or[aá]culo\s*—\s*descubrir\s+significado\s*\|\s*d100\s*=\s*(\d+)\s+y\s+(\d+)\s*\]/gi;
+  while ((match = oracleMeaningRegex.exec(text)) !== null) {
+    const rawText = match[0];
+    const a = parseInt(match[1], 10);
+    const b = parseInt(match[2], 10);
+    items.push({
+      index: match.index,
+      endIndex: match.index + rawText.length,
+      roll: { type: 'oracle_meaning', d100Pair: [a, b], rawText }
+    });
+  }
+
+  // 5. Tirada DM / PNJ
+  const dmRollRegex = /\[\s*Tirada\s+(?:DM|PNJ)\s*\(([^)]+?)\)\s*:\s*d(\d+)\s*=\s*(\d+)(?:\s*\+\s*(\d+))?(?:\s*=\s*(\d+))?(?:\s*(?:vs|contra)\s*(?:CD|DC)\s*(\d+))?\s*\]/gi;
+  while ((match = dmRollRegex.exec(text)) !== null) {
+    const rawText = match[0];
+    const dmContext = match[1].trim();
+    const sides = parseInt(match[2], 10) || 20;
+    const baseRoll = parseInt(match[3], 10);
+    const modifier = match[4] ? parseInt(match[4], 10) : 0;
+    const total = match[5] ? parseInt(match[5], 10) : (baseRoll + modifier);
+    const dc = match[6] ? parseInt(match[6], 10) : undefined;
+    items.push({
+      index: match.index,
+      endIndex: match.index + rawText.length,
+      roll: { type: 'dm', dmContext, sides, natural: baseRoll, modifier, total, dc, rawText }
+    });
+  }
+
+  items.sort((a, b) => a.index - b.index);
+
+  const segments: MessageSegment[] = [];
+  let currentIndex = 0;
+
+  for (const item of items) {
+    if (item.index > currentIndex) {
+      const textChunk = text.slice(currentIndex, item.index).trim();
+      if (textChunk) {
+        segments.push({ type: 'text', content: textChunk });
+      }
+    }
+    segments.push({ type: 'roll', roll: item.roll });
+    currentIndex = item.endIndex;
+  }
+
+  if (currentIndex < text.length) {
+    const remainingText = text.slice(currentIndex).trim();
+    if (remainingText) {
+      segments.push({ type: 'text', content: remainingText });
+    }
+  }
+
+  return segments;
+}
+
 export const RollBadgeCard: React.FC<{ roll: RollInfo }> = ({ roll }) => {
   if (roll.type === 'dm') {
     const isSuccess = roll.dc !== undefined && roll.total !== undefined ? roll.total >= roll.dc : true;
