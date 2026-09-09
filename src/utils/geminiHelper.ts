@@ -276,6 +276,56 @@ export function modeloDisponible(modelId: string): boolean | null {
   return guardado.modelos.some(m => m.id.toLowerCase() === id);
 }
 
+/**
+ * El tope de tokens de ENTRADA por minuto de la capa gratuita de Google.
+ *
+ * Es el límite que de verdad ata en corto una campaña larga, y no la ventana
+ * del modelo: da igual que quepan un millón de tokens en una petición si la
+ * cuenta del minuto se corta en doscientos cincuenta mil. Además no se «gasta»
+ * con el uso —se reinicia cada minuto—, así que un tomo que pesa más que esto
+ * falla en el PRIMER turno y con una clave recién creada.
+ */
+export const TOPE_TOKENS_POR_MINUTO = 250000;
+
+/** A partir de aquí conviene avisar antes de que Google conteste con un 429. */
+export const AVISO_TOKENS_POR_MINUTO = 180000;
+
+/**
+ * Cuántos tokens admite de entrada un modelo, según Google.
+ *
+ * El catálogo vivo ya trae el `inputTokenLimit` de cada modelo: se preguntó al
+ * abrir la aplicación y está guardado. Si todavía no se ha consultado nunca, se
+ * usa una estimación por familia, y quien pregunte sabrá de dónde sale el
+ * número en vez de comerse una cifra escrita a fuego.
+ */
+export function limiteDeEnvio(modelId: string): { ventana: number; medido: boolean } {
+  const guardado = leerCatalogoModelos();
+  const id = (modelId || '').trim().toLowerCase();
+  const enCatalogo = guardado?.modelos.find(m => m.id.toLowerCase() === id);
+  if (enCatalogo?.entrada && enCatalogo.entrada > 0) {
+    return { ventana: enCatalogo.entrada, medido: true };
+  }
+  // Sin catálogo: lo que anuncia cada familia. Gemma es bastante más pequeña
+  // que Gemini, y dar por hecho el millón de todos era justo el error.
+  const ventana = esModeloAbierto(id) ? 256000 : 1048576;
+  return { ventana, medido: false };
+}
+
+/**
+ * El techo que de verdad manda para un envío: el menor entre lo que le cabe al
+ * modelo y lo que deja pasar la cuota por minuto.
+ */
+export function techoDeEnvio(modelId: string): {
+  limite: number;
+  ventana: number;
+  medido: boolean;
+  mandaLaCuota: boolean;
+} {
+  const { ventana, medido } = limiteDeEnvio(modelId);
+  const limite = Math.min(ventana, TOPE_TOKENS_POR_MINUTO);
+  return { limite, ventana, medido, mandaLaCuota: TOPE_TOKENS_POR_MINUTO < ventana };
+}
+
 export function getStoredAutoFailover(): boolean {
   return localStorage.getItem('gmstudio_auto_failover') !== 'off';
 }
@@ -3932,9 +3982,11 @@ export function describeApiError(err: unknown): string {
     const espera = fallo.retryAfterMs
       ? ` Google pide esperar ${Math.ceil(fallo.retryAfterMs / 1000)} segundos a que venza la ventana del minuto.`
       : ' Espera unos 60 segundos a que venza el minuto actual.';
-    return `⚠️ TOPE DE TOKENS POR MINUTO ALCANZADO (ERROR 429).${espera}
+    return `⚠️ EL ENVÍO NO CABE EN LA CUOTA POR MINUTO (ERROR 429).${espera}
 
-Tu capítulo actual ha acumulado mucho historial y contexto, enviando más de 250.000 tokens de golpe a la capa gratuita de Google (límite TPM: GenerateContentInputTokensPerModelPerMinute).
+NO has gastado ninguna cuota: esto no se agota con el uso. Lo que ocurre es que ESTE TURNO, ÉL SOLO, supera los ${TOPE_TOKENS_POR_MINUTO.toLocaleString('es-ES')} tokens de entrada que la capa gratuita de Google deja pasar por minuto (límite TPM: GenerateContentInputTokensPerModelPerMinute).
+
+⚠️ POR ESO UNA CLAVE NUEVA DA EL MISMO ERROR. Si el tomo pesa más que ese tope, falla en el primer turno con una clave recién creada y sin estrenar: el problema es el tamaño de lo que se manda, no la clave ni el historial de uso. Mira la barra «Capacidad del Tomo» en la barra lateral: te dice cuánto estás mandando y contra qué tope.
 
 📖 SOLUCIÓN RECOMENDADA: CREAR UN «NUEVO CAPÍTULO»
 Para continuar de inmediato y con máxima agilidad:
@@ -3955,7 +4007,7 @@ Para continuar de inmediato y con máxima agilidad:
 
 💡 ¿CÓMO SOLUCIONARLO O CONTINUAR?
 • Si el capítulo lleva muchos mensajes: Crea un «Nuevo Capítulo» para reiniciar los tokens del chat activo conservando todo el progreso.
-• Si es una clave nueva de 0 uso: En Google AI Studio las cuotas pertenecen al PROYECTO de Google Cloud. Crea tu clave seleccionando «Create API key in NEW project».
+• Si es una clave nueva de 0 uso: hay dos motivos posibles. Uno, que el envío sea demasiado grande y no quepa en la cuota por minuto (mira «Capacidad del Tomo»: se ve al momento). Dos, que la clave comparta proyecto con otra ya gastada, porque en Google AI Studio las cuotas pertenecen al PROYECTO de Google Cloud, no a la clave: créala con «Create API key in NEW project».
 • También puedes limitar el tamaño del historial en ⚙️ Motor → Rendimiento → Ventana de Historial.${detalle}`;
   }
   if (fallo.isModelMissing) {

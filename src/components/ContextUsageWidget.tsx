@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, ProjectFile, Chat } from '../types';
 import {
+  AVISO_TOKENS_POR_MINUTO,
+  TOPE_TOKENS_POR_MINUTO,
   countTurnTokens,
   describeApiError,
   getStoredBusquedaLocal,
-  setStoredBusquedaLocal
+  getStoredModel,
+  setStoredBusquedaLocal,
+  techoDeEnvio
 } from '../utils/geminiHelper';
 
 import {
@@ -130,11 +134,31 @@ export const ContextUsageWidget: React.FC<{
 
   // Conversión aproximada para prosa de rol en español: ~3,8 caracteres por token
   const estimatedTokens = Math.round(totalChars / 3.8);
-  const MAX_TOKENS = 1048576;
+
+  /*
+   * CONTRA QUÉ SE MIDE ESTA BARRA.
+   *
+   * Estaba fijada en 1.048.576 tokens, la ventana del modelo más grande, y de
+   * ahí venía el susto: con un tomo de doscientos sesenta mil tokens la barra
+   * decía «25%», todo en orden, mientras Google devolvía un 429 en cada turno.
+   * Porque el que corta no es el tamaño de la ventana, es la CUOTA POR MINUTO
+   * de la capa gratuita, que está en 250.000 tokens de entrada. Un tomo que
+   * pesa más que eso falla en el primer turno y con una clave recién sacada:
+   * no se ha «gastado» nada, sencillamente no cabe.
+   *
+   * Así que se mide contra el menor de los dos topes —el que de verdad va a
+   * saltar— y la ventana real del modelo se pregunta al catálogo de Google en
+   * lugar de darla por hecha, que con Gemma es menos de la cuarta parte.
+   */
+  const modeloDeNarracion = medida?.modelo || getStoredModel();
+  const { limite: MAX_TOKENS, ventana, medido: limiteMedido, mandaLaCuota } =
+    techoDeEnvio(modeloDeNarracion);
 
   // Si se ha medido de verdad contra la API, manda esa cifra; si no, la estimación.
   const tokensMostrados = medida ? medida.total : estimatedTokens;
   const percentage = Math.min(100, (tokensMostrados / MAX_TOKENS) * 100);
+  const pasadaDeCuota = tokensMostrados >= TOPE_TOKENS_POR_MINUTO;
+  const cercaDeCuota = !pasadaDeCuota && tokensMostrados >= AVISO_TOKENS_POR_MINUTO;
 
   return (
     <>
@@ -170,10 +194,41 @@ export const ContextUsageWidget: React.FC<{
         <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] mt-1.5 font-cinzel">
           <span>
             {medida ? '' : '~'}
-            {compact(tokensMostrados)} tokens
+            {compact(tokensMostrados)} / {compact(MAX_TOKENS)} tokens
           </span>
           <span>{medida ? `medido · ${medida.modelo}` : `${compact(totalChars)} car.`}</span>
         </div>
+
+        {/*
+          El aviso que faltaba. Que la barra se ponga roja no basta si no dice
+          POR QUÉ: el 429 de Google se lee como «has gastado tu cuota» y lleva a
+          buscar el problema en la clave, cuando el problema es el tamaño de lo
+          que se manda en cada turno.
+        */}
+        {(pasadaDeCuota || cercaDeCuota) && (
+          <div
+            onClick={() => setIsGuideOpen(true)}
+            className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-snug cursor-pointer ${
+              pasadaDeCuota
+                ? 'border-red-600/50 bg-red-600/10 text-red-700 dark:text-red-300'
+                : 'border-amber-600/50 bg-amber-600/10 text-amber-700 dark:text-amber-300'
+            }`}
+          >
+            {pasadaDeCuota ? (
+              <>
+                <strong>Cada turno superará la cuota por minuto.</strong> Este tomo manda{' '}
+                {compact(tokensMostrados)} tokens y la capa gratuita corta en{' '}
+                {compact(TOPE_TOKENS_POR_MINUTO)} por minuto. Dará error 429 en el primer turno,
+                también con una clave nueva sin usar: no es cuota gastada, es que no cabe.
+              </>
+            ) : (
+              <>
+                <strong>Cerca de la cuota por minuto.</strong> Vas por {compact(tokensMostrados)} de
+                los {compact(TOPE_TOKENS_POR_MINUTO)} tokens por minuto de la capa gratuita.
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Guide & Breakdown Modal */}
@@ -313,14 +368,35 @@ export const ContextUsageWidget: React.FC<{
                     </div>
                   )}
 
-                  <div className="mt-3 pt-3 border-t border-[var(--glass-border)] flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)]">
-                    <span>Ventana del modelo: {compact(MAX_TOKENS)} de tokens</span>
-                    <span>
-                      Te quedan{' '}
-                      <strong className="text-[var(--accent)]">
-                        {compact(MAX_TOKENS - tokensMostrados)}
-                      </strong>
-                    </span>
+                  <div className="mt-3 pt-3 border-t border-[var(--glass-border)] space-y-1.5 text-xs text-[var(--text-secondary)]">
+                    <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                      <span>
+                        Ventana de {modeloDeNarracion}: <strong>{compact(ventana)}</strong> de tokens
+                        {limiteMedido ? '' : ' (estimada: aún no se ha consultado tu clave)'}
+                      </span>
+                      <span>
+                        Te quedan{' '}
+                        <strong className="text-[var(--accent)]">
+                          {compact(Math.max(0, MAX_TOKENS - tokensMostrados))}
+                        </strong>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                      <span>
+                        Cuota por minuto (capa gratuita):{' '}
+                        <strong>{compact(TOPE_TOKENS_POR_MINUTO)}</strong> de tokens de entrada
+                      </span>
+                    </div>
+                    <p className="m-0 text-[11px] leading-snug">
+                      Son dos límites distintos y se confunden con facilidad. La <strong>ventana</strong>{' '}
+                      es cuánto le cabe al modelo <em>en una petición</em>. La <strong>cuota por
+                      minuto</strong> es cuánto te deja mandar Google <em>por minuto</em>, y no se gasta
+                      con el uso: se reinicia cada minuto. Por eso un tomo demasiado grande falla en el
+                      primer turno aunque la clave sea nueva y esté sin estrenar.
+                      {mandaLaCuota
+                        ? ' Ahora mismo el que corta antes es la cuota por minuto, y es contra ese contra el que mide la barra.'
+                        : ' Ahora mismo el que corta antes es la ventana del modelo, y es contra ese contra el que mide la barra.'}
+                    </p>
                   </div>
 
                   {/* Medida real contra la API */}

@@ -91,6 +91,8 @@ import {
   setStoredMemorySyncGranularity,
   syncFullCampaignFromChats,
   fusionarTimeline,
+  AVISO_TOKENS_POR_MINUTO,
+  TOPE_TOKENS_POR_MINUTO,
   generateClaudeProjectMemory,
   isNarrativeIncomplete,
   novelizeUserMessage
@@ -1240,14 +1242,14 @@ export default function App() {
             setChatTokenLoads(prev => ({ ...prev, [currentChatId]: totalTokens }));
           }
 
-          // Aviso proactivo si se acerca al tope de 250.000 tokens por minuto
-          if (totalTokens >= 180000) {
+          // Aviso proactivo si se acerca al tope de tokens por minuto
+          if (totalTokens >= AVISO_TOKENS_POR_MINUTO) {
             setAlertConfig({
               isOpen: true,
-              title: '⚡ Aviso: Capítulo cerca del límite de tokens (250k)',
+              title: `⚡ Aviso: el turno se acerca a la cuota por minuto (${Math.round(TOPE_TOKENS_POR_MINUTO / 1000)}k)`,
               message: `El volumen de este turno ha alcanzado ${totalTokens.toLocaleString('es-ES')} tokens (${usage.entrada ? `${usage.entrada.toLocaleString('es-ES')} de entrada / ` : ''}${usage.salida?.toLocaleString('es-ES') || 0} de salida).
 
-Estás muy cerca del tope de 250.000 tokens por minuto de la capa gratuita de Google. Para que la historia continúe con total fluidez y sin bloqueos de cuota (429), te recomendamos abrir un «Nuevo Capítulo» ahora.
+La capa gratuita de Google deja pasar ${TOPE_TOKENS_POR_MINUTO.toLocaleString('es-ES')} tokens de entrada por minuto. No es una cuota que se gaste: es el tamaño máximo de lo que puedes mandar en un minuto, así que cuando se rebasa falla cada turno, también con una clave nueva. Para que la historia continúe con fluidez y sin bloqueos (429), te recomendamos abrir un «Nuevo Capítulo» ahora.
 
 • El capítulo actual y todos tus mensajes quedan archivados íntegros en tu diario y Crónica.
 • Tu ficha de personaje, inventario, relaciones de PNJs y memoria se conservan al 100%.`,
