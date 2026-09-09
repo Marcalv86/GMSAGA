@@ -7,8 +7,8 @@ import {
   countTurnTokens,
   describeApiError,
   getStoredBusquedaLocal,
+  estimarCargaDelTurno,
   getStoredApiKeys,
-  getStoredHistoryWindow,
   getStoredModel,
   setStoredBusquedaLocal,
   techoDeEnvio
@@ -36,7 +36,9 @@ export const ContextUsageWidget: React.FC<{
   files: ProjectFile[];
   chats: Chat[];
   currentChatId?: string | null;
-}> = ({ project, files, chats, currentChatId }) => {
+  /** Tokens de entrada medidos por Google en el último turno, si los hay. */
+  tokensMedidos?: number;
+}> = ({ project, files, chats, currentChatId, tokensMedidos }) => {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [medida, setMedida] = useState<{
     total: number;
@@ -63,92 +65,27 @@ export const ContextUsageWidget: React.FC<{
 
   if (!project) return null;
 
-  // Breakdown calculations
-  const instructionsChars =
-    (project.instructions?.length || 0) + (project.system?.length || 0) + (project.style?.length || 0);
-
-  const memoryChars =
-    (project.memory?.story?.length || 0) +
-    (project.memory?.current_status?.length || 0) +
-    (project.memory?.manual_notes?.length || 0) +
-    (project.memory?.npcs || []).reduce(
-      (acc, n) => acc + (n.name?.length || 0) + (n.notes?.length || 0) + (n.description?.length || 0),
-      0
-    ) +
-    (project.memory?.quests || []).reduce(
-      (acc, q) => acc + (q.title?.length || 0) + (q.objective?.length || 0) + (q.progress?.length || 0),
-      0
-    ) +
-    (project.memory?.locations || []).reduce(
-      (acc, l) => acc + (l.name?.length || 0) + (l.desc?.length || 0) + (l.notes?.length || 0),
-      0
-    );
-
-  // Un archivo de texto viaja entero salvo que sea una muestra de estilo (su valor
-  // ya se destiló en las directivas) o esté marcado de consulta. Las tablas de
-  // oráculo son la excepción a la excepción: se mandan siempre, porque un oráculo
-  // que hay que pedir no sirve de nada.
-  const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
-  const viajaEntero = (f: ProjectFile) => esTexto(f) && (!f.onDemand || f.category === 'oracle');
-
-  const filesChars = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
-
-  // Lo que NO viaja, contado aparte. Antes simplemente desaparecía del reparto, y
-  // entonces no había manera de comprobar que marcar algo «de consulta» hubiera
-  // servido de algo, ni de saber cuánto te estabas ahorrando.
-  const deConsulta = files.filter(f => esTexto(f) && f.onDemand && f.category !== 'oracle');
-  const deConsultaChars = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
-
-  const mediaCount = files.filter(f => f.isImage || f.isAudio).length;
-
-  // Las imágenes y mapas son decorativos / retratos y ya no viajan ni consumen tokens.
-  const visualChars = 0;
-
   /*
-   * EL CAPÍTULO ACTUAL VIAJA ENTERO, Y ESTO LO OCULTABA.
-   *
-   * Aquí había un tope de 40.000 caracteres para el capítulo en curso, puesto
-   * —según decía el comentario— para reflejar lo que hace `buildTurnPayload` al
-   * enviar. Pero `buildTurnPayload` NO tiene ese tope: manda el capítulo
-   * completo salvo que se haya fijado una «Ventana de Historial» en Motor, y
-   * por defecto está en «todo el capítulo».
-   *
-   * O sea que un capítulo de novecientos mil caracteres se contaba como
-   * cuarenta mil: la barra escondía el 95% de lo que se estaba mandando, y
-   * justo la parte que crece sola. Cada turno reenvía el capítulo entero, así
-   * que el coste por mensaje sube según se juega, y la cuota diaria se acaba en
-   * unos pocos turnos sin que nada lo avisara.
-   *
-   * Ahora se cuenta lo que se manda de verdad, aplicando la misma ventana de
-   * historial que aplica el envío.
+   * El peso del turno sale de `estimarCargaDelTurno`, el mismo cálculo que usa
+   * el aviso del chat. Estaban duplicados y con criterios distintos, así que
+   * enseñaban cifras diferentes de lo mismo: una decía 165 mil y la otra 204
+   * mil, y no había manera de saber cuál era la buena.
    */
-  const PREVIO_MAX = 8000;
-  const largoDe = (c: Chat) => (c.messages || []).reduce((acc, m) => acc + (m.content?.length || 0), 0);
+  const carga = estimarCargaDelTurno({ project, chats, currentChatId, files });
 
-  const capituloActual = chats.find(c => c.id === currentChatId) || chats[chats.length - 1];
-  const ventanaHistorial = getStoredHistoryWindow();
-  const mensajesDelCapitulo = (capituloActual?.messages || []).filter(
-    m => m.content && m.content !== 'Tirando dados...' && m.content !== 'Pensando...'
-  );
-  const mensajesQueViajan =
-    ventanaHistorial === 'all'
-      ? mensajesDelCapitulo
-      : mensajesDelCapitulo.slice(-(parseInt(ventanaHistorial, 10) || mensajesDelCapitulo.length));
-  const escenaChars = mensajesQueViajan.reduce((acc, m) => acc + (m.content?.length || 0), 0);
-  const mensajesRecortados = mensajesDelCapitulo.length - mensajesQueViajan.length;
-
-  const previosChars = Math.min(
-    PREVIO_MAX,
-    chats.filter(c => c.id !== capituloActual?.id).reduce((acc, c) => acc + largoDe(c), 0)
-  );
-  const chatsChars = escenaChars + previosChars;
-
-  // Los fragmentos rescatados sí viajan, así que tienen que contar. Cuánto exacto
-  // depende de la escena y no se sabe hasta el turno; se pone el techo, que es lo
-  // honesto: la barra debe pecar de prudente, no de optimista.
-  const rescateChars = busqueda && deConsulta.length ? 6000 : 0;
-
-  const totalChars = instructionsChars + memoryChars + filesChars + visualChars + chatsChars + rescateChars;
+  const instructionsChars = carga.directivas;
+  const memoryChars = carga.memoria;
+  const filesChars = carga.archivos;
+  const deConsultaChars = carga.archivosDeConsulta;
+  const mediaCount = carga.medios;
+  const chatsChars = carga.capituloActual + carga.capitulosPrevios;
+  const rescateChars = carga.fragmentosRescatados;
+  const totalChars = carga.total;
+  const ventanaHistorial = carga.ventanaHistorial;
+  const mensajesRecortados = carga.mensajesRecortados;
+  // La lista de verdad, que abajo se enumera por nombre.
+  const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
+  const deConsulta = files.filter(f => esTexto(f) && f.onDemand && f.category !== 'oracle');
 
   // Un número como 127.694 no dice nada de un vistazo; 128 mil sí.
   const compact = (n: number) =>
@@ -158,8 +95,7 @@ export const ContextUsageWidget: React.FC<{
         ? `${Math.round(n / 1000).toLocaleString('es-ES')} mil`
         : n.toLocaleString('es-ES');
 
-  // Conversión aproximada para prosa de rol en español: ~3,8 caracteres por token
-  const estimatedTokens = Math.round(totalChars / 3.8);
+  const estimatedTokens = carga.tokens;
 
   /*
    * CONTRA QUÉ SE MIDE ESTA BARRA.
@@ -197,8 +133,15 @@ export const ContextUsageWidget: React.FC<{
   const peticionesHoy = peticionesDeHoy(modeloDeNarracion);
   const cupoApurado = peticionesHoy >= cupoDiario * 0.8;
 
-  // Si se ha medido de verdad contra la API, manda esa cifra; si no, la estimación.
-  const tokensMostrados = medida ? medida.total : estimatedTokens;
+  /*
+   * Manda lo medido de verdad, en este orden: la medición manual del botón «medir
+   * de verdad», luego los tokens de entrada que Google devolvió en el último
+   * turno, y solo si no hay ninguna de las dos, la estimación por caracteres.
+   * Lo importante es que esta barra y la del chat partan del mismo dato.
+   */
+  const medidaDelTurno = medida?.total || tokensMedidos || 0;
+  const tokensMostrados = medidaDelTurno > 0 ? medidaDelTurno : estimatedTokens;
+  const esEstimacion = medidaDelTurno === 0;
   const percentage = Math.min(100, (tokensMostrados / MAX_TOKENS) * 100);
   const pasadaDeCuota = tokensMostrados >= TOPE_TOKENS_POR_MINUTO;
   const cercaDeCuota = !pasadaDeCuota && tokensMostrados >= AVISO_TOKENS_POR_MINUTO;
@@ -236,10 +179,10 @@ export const ContextUsageWidget: React.FC<{
         {/* Tokens & Chars Counter */}
         <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] mt-1.5 font-cinzel">
           <span>
-            {medida ? '' : '~'}
+            {esEstimacion ? '~' : ''}
             {compact(tokensMostrados)} / {compact(MAX_TOKENS)} tokens
           </span>
-          <span>{medida ? `medido · ${medida.modelo}` : `${compact(totalChars)} car.`}</span>
+          <span>{esEstimacion ? `${compact(totalChars)} car.` : `medido · ${modeloDeNarracion}`}</span>
         </div>
 
         {/*
@@ -354,7 +297,7 @@ export const ContextUsageWidget: React.FC<{
                         Icon: MessageSquare,
                         extra:
                           ventanaHistorial === 'all'
-                            ? `El capítulo en curso viaja ENTERO en cada turno (${mensajesQueViajan.length} mensajes). Crece con cada respuesta: en Motor → Rendimiento puedes fijar una «Ventana de Historial» para mandar solo los últimos turnos.`
+                            ? `El capítulo en curso viaja ENTERO en cada turno (${carga.mensajesQueViajan} mensajes). Crece con cada respuesta: en Motor → Rendimiento puedes fijar una «Ventana de Historial» para mandar solo los últimos turnos.`
                             : `Ventana de historial: últimos ${ventanaHistorial} mensajes${mensajesRecortados > 0 ? ` (${mensajesRecortados} más antiguos no viajan)` : ''}.`
                       },
                       {

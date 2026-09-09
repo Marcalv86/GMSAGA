@@ -1200,6 +1200,134 @@ export interface TurnPayload {
  * medir lo mismo que se envía en vez de estimarlo por su cuenta: si el contador y
  * el envío se calculan en dos sitios distintos, acaban discrepando.
  */
+/** Prosa de rol en español: ronda los 3,8 caracteres por token. */
+export const CARACTERES_POR_TOKEN = 3.8;
+
+export interface CargaDelTurno {
+  /** Caracteres que viajan, desglosados para poder enseñar en qué se va. */
+  directivas: number;
+  memoria: number;
+  archivos: number;
+  /** Lo que NO viaja por estar marcado de consulta, para ver lo que se ahorra. */
+  archivosDeConsulta: number;
+  capituloActual: number;
+  capitulosPrevios: number;
+  fragmentosRescatados: number;
+  total: number;
+  /** La misma cifra en tokens, estimada. */
+  tokens: number;
+  // Contexto para explicarlo en la interfaz
+  ventanaHistorial: string;
+  mensajesQueViajan: number;
+  mensajesRecortados: number;
+  documentosDeConsulta: number;
+  medios: number;
+}
+
+/**
+ * Cuánto pesa el turno que se va a enviar.
+ *
+ * Esto vivía duplicado: la barra de la barra lateral lo calculaba de una manera
+ * y el aviso del chat de otra, con la consecuencia inevitable de que enseñaban
+ * cifras distintas para lo mismo —una decía 165 mil y la otra 204 mil— sin que
+ * hubiera forma de saber cuál creerse. Peor: la del chat solo sumaba el capítulo
+ * y los documentos, olvidándose de las directivas y la memoria, que son treinta
+ * y cinco mil tokens fijos en cada turno.
+ *
+ * Un solo cálculo para las dos, con el mismo criterio que aplica
+ * `buildTurnPayload` al enviar de verdad.
+ */
+export function estimarCargaDelTurno({
+  project,
+  chats,
+  currentChatId,
+  files
+}: {
+  project: Project;
+  chats: Chat[];
+  currentChatId?: string | null;
+  files: ProjectFile[];
+}): CargaDelTurno {
+  const directivas =
+    (project.instructions?.length || 0) + (project.system?.length || 0) + (project.style?.length || 0);
+
+  const mem = project.memory;
+  const memoria =
+    (mem?.story?.length || 0) +
+    (mem?.current_status?.length || 0) +
+    (mem?.manual_notes?.length || 0) +
+    (mem?.raw_project_memory?.length || 0) +
+    (mem?.npcs || []).reduce(
+      (acc, n) => acc + (n.name?.length || 0) + (n.notes?.length || 0) + (n.description?.length || 0),
+      0
+    ) +
+    (mem?.quests || []).reduce(
+      (acc, q) => acc + (q.title?.length || 0) + (q.objective?.length || 0) + (q.progress?.length || 0),
+      0
+    ) +
+    (mem?.locations || []).reduce(
+      (acc, l) => acc + (l.name?.length || 0) + (l.desc?.length || 0) + (l.notes?.length || 0),
+      0
+    );
+
+  // Un archivo de texto viaja entero salvo que sea una muestra de estilo (su
+  // valor ya se destiló en las directivas) o esté marcado de consulta. Las
+  // tablas de oráculo son la excepción a la excepción: se mandan siempre,
+  // porque un oráculo que hay que pedir no sirve de nada.
+  const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
+  const viajaEntero = (f: ProjectFile) => esTexto(f) && (!f.onDemand || f.category === 'oracle');
+  const archivos = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
+
+  const deConsulta = files.filter(f => esTexto(f) && f.onDemand && f.category !== 'oracle');
+  const archivosDeConsulta = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
+  const medios = files.filter(f => f.isImage || f.isAudio).length;
+
+  // El capítulo en curso viaja entero salvo que haya ventana de historial.
+  const capitulo = chats.find(c => c.id === currentChatId) || chats[chats.length - 1];
+  const ventanaHistorial = getStoredHistoryWindow();
+  const mensajesDelCapitulo = (capitulo?.messages || []).filter(
+    m => m.content && m.content !== 'Tirando dados...' && m.content !== 'Pensando...'
+  );
+  const viajan =
+    ventanaHistorial === 'all'
+      ? mensajesDelCapitulo
+      : mensajesDelCapitulo.slice(-(parseInt(ventanaHistorial, 10) || mensajesDelCapitulo.length));
+  const capituloActual = viajan.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+
+  // De los capítulos anteriores solo va una cola, con el mismo tope que el envío.
+  const PREVIO_MAX = 8000;
+  const capitulosPrevios = Math.min(
+    PREVIO_MAX,
+    chats
+      .filter(c => c.id !== capitulo?.id)
+      .reduce((acc, c) => acc + (c.messages || []).reduce((a, m) => a + (m.content?.length || 0), 0), 0)
+  );
+
+  // Los fragmentos rescatados sí viajan. Cuánto exacto depende de la escena y no
+  // se sabe hasta el turno: se pone el techo, que es lo honesto. La barra debe
+  // pecar de prudente, no de optimista.
+  const fragmentosRescatados = getStoredBusquedaLocal() && deConsulta.length ? 6000 : 0;
+
+  const total = directivas + memoria + archivos + capituloActual + capitulosPrevios + fragmentosRescatados;
+
+  return {
+    directivas,
+    memoria,
+    archivos,
+    archivosDeConsulta,
+    capituloActual,
+    capitulosPrevios,
+    fragmentosRescatados,
+    total,
+    tokens: Math.round(total / CARACTERES_POR_TOKEN),
+    ventanaHistorial,
+    mensajesQueViajan: viajan.length,
+    mensajesRecortados: mensajesDelCapitulo.length - viajan.length,
+    documentosDeConsulta: deConsulta.length,
+    medios
+  };
+}
+
 export function buildTurnPayload({
   project,
   currentChatId,

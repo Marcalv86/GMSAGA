@@ -92,6 +92,7 @@ import {
   syncFullCampaignFromChats,
   fusionarTimeline,
   AVISO_TOKENS_POR_MINUTO,
+  estimarCargaDelTurno,
   generateClaudeProjectMemory,
   isNarrativeIncomplete,
   novelizeUserMessage
@@ -1236,9 +1237,19 @@ export default function App() {
         },
         setLoadingText,
         onUsageReported: usage => {
-          const totalTokens = usage.total || (usage.entrada + usage.salida);
-          if (currentChatId) {
-            setChatTokenLoads(prev => ({ ...prev, [currentChatId]: totalTokens }));
+          /*
+           * Contra la cuota cuentan los tokens de ENTRADA, no el total.
+           *
+           * Aquí se guardaba `usage.total`, que suma lo enviado y lo que el
+           * Narrador responde. Pero el tope que corta es
+           * `GenerateContentInputTokensPerModelPerMinute`: solo entrada. Meter
+           * la respuesta en la cuenta inflaba la cifra y hacía saltar el aviso
+           * antes de tiempo, además de no coincidir con la barra de la barra
+           * lateral, que sí estima solo lo que se manda.
+           */
+          const tokensDeEntrada = usage.entrada || usage.total || 0;
+          if (currentChatId && tokensDeEntrada > 0) {
+            setChatTokenLoads(prev => ({ ...prev, [currentChatId]: tokensDeEntrada }));
           }
 
           /*
@@ -2461,12 +2472,24 @@ export default function App() {
 
   const currentChapterIndex = currentChats.findIndex(c => c.id === currentChatId);
 
-  // Estimación y monitoreo de tokens para aviso preventivo de cuota Google (250k tokens/min)
+  /*
+   * Lo que pesa el turno, para el aviso de cuota.
+   *
+   * La estimación se hacía aquí a mano y sumaba solo el capítulo y los
+   * documentos: se dejaba fuera las directivas y la memoria, que son unos
+   * treinta y cinco mil tokens fijos en CADA turno. Por eso esta cifra y la de
+   * la barra lateral nunca cuadraban. Ahora las dos salen del mismo cálculo.
+   */
   const currentChatTokenCount = currentChatId ? chatTokenLoads[currentChatId] || 0 : 0;
-  const currentChatChars = (currentChat?.messages || []).reduce((acc, m) => acc + (m.content?.length || 0), 0);
-  const viajaEntero = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample' && (!f.onDemand || f.category === 'oracle');
-  const docsChars = currentFiles.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
-  const estimatedCurrentTokens = Math.round((currentChatChars + docsChars) / 3.8);
+  const cargaEstimada = currentProject
+    ? estimarCargaDelTurno({
+        project: currentProject,
+        chats: currentChats,
+        currentChatId,
+        files: currentFiles
+      })
+    : null;
+  const estimatedCurrentTokens = cargaEstimada?.tokens || 0;
   const effectiveChatTokens = currentChatTokenCount > 0 ? currentChatTokenCount : estimatedCurrentTokens;
   const isCurrentChatNearTokenLimit = effectiveChatTokens >= AVISO_TOKENS_POR_MINUTO;
 
@@ -2835,6 +2858,9 @@ export default function App() {
           files={currentFiles}
           chats={currentChats}
           currentChatId={currentChatId}
+          // La medida real del último turno, para que esta barra y la del chat
+          // digan el mismo número en lugar de cada una el suyo.
+          tokensMedidos={currentChatTokenCount || undefined}
         />
 
         {/* User & Install Footer */}
