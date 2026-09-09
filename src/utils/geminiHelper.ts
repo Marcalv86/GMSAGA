@@ -90,15 +90,24 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     name: 'Gemini 3.5 Flash Lite',
     badge: 'Ultra Rápido · Mínima Cuota',
     desc: 'La opción más rápida y ligera de Google, ideal para sesiones muy ágiles con mínima latencia y mínimo consumo de tokens.'
-  },
-  {
-    id: 'gemma-4-31b-it',
-    name: 'Gemma 4 31B',
-    badge: '⚠️ No apto en capa gratuita',
-    desc: 'Insignia densa de Google DeepMind, sin filtros comerciales. PERO en la capa gratuita solo admite 16.000 tokens de entrada por minuto, y el envío mínimo de esta aplicación (protocolos + instrucciones del Director) ronda los 35.000 aunque la campaña esté vacía. No cabe ni empezando de cero: dará error 429 en el primer turno. Selecciónalo solo si tu clave tiene cuota ampliada.'
   }
 ];
 
+/*
+ * Los modelos abiertos ya no se ofrecen en la aplicación.
+ *
+ * Gemma 4 31B estuvo en la lista y no podía funcionar: en la capa gratuita
+ * admite 16.000 tokens de entrada por minuto y el envío mínimo de un turno
+ * —protocolos de interfaz más instrucciones del Director, que viajan siempre—
+ * ronda los 35.000 con la campaña vacía y sin un solo documento. Más del doble
+ * del tope antes de escribir nada, así que fallaba en el primer turno hiciera
+ * lo que hiciera quien lo eligiera.
+ *
+ * El trato especial se conserva porque el catálogo de la clave puede seguir
+ * nombrando modelos abiertos, y con ellos hay que quitar los filtros de
+ * seguridad que Google rechaza. Si alguna vez vuelven a la lista, esto sigue
+ * siendo lo correcto.
+ */
 export function esModeloAbierto(modelId: string): boolean {
   return /^gemma/i.test(modelId.trim());
 }
@@ -155,11 +164,6 @@ export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
     id: 'gemini-3.6-flash',
     name: 'Gemini 3.6 Flash',
     desc: 'Eficiente y equilibrado'
-  },
-  {
-    id: 'gemma-4-31b-it',
-    name: 'Gemma 4 31B',
-    desc: '⚠️ 16.000 tokens por minuto en capa gratuita: se queda corto para sincronizar memoria o repasar la crónica'
   }
 ];
 
@@ -170,14 +174,10 @@ export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODE
   if (!modelId || isModelDeprecated(modelId)) {
     return fallback;
   }
-  let trimmed = modelId.trim();
-  if (trimmed.toLowerCase() === 'gemma-4-31b') {
-    trimmed = 'gemma-4-31b-it';
-  }
+  const trimmed = modelId.trim();
   const validIds = [
     ...AVAILABLE_MODELS.map(m => m.id),
-    ...AUXILIARY_BACKGROUND_MODELS.map(m => m.id),
-    'gemma-4-31b'
+    ...AUXILIARY_BACKGROUND_MODELS.map(m => m.id)
   ];
   if (!validIds.includes(trimmed)) {
     return fallback;
