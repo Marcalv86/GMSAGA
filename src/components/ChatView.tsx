@@ -1270,23 +1270,39 @@ export const ChatView: React.FC<{
           </div>
         )}
 
-        {/* Quick Continue & Scene Transition Bar if there are messages */}
+        {/*
+          Salto de tiempo y continuar narración.
+
+          Los dos rótulos enteros —«Salto de Tiempo / Escena» y «Continuar
+          Narración»— no caben juntos en una pantalla de móvil, así que el
+          `flex-wrap` los apilaba uno encima del otro y se comían dos filas
+          justo encima del campo de escribir, que es donde menos sitio sobra.
+
+          En pantalla estrecha se acortan los rótulos hasta que caben en una
+          sola fila; el texto completo vuelve en cuanto hay ancho. Acortar la
+          frase es mejor que dejar solo el icono: son dos acciones que no se
+          usan a cada turno y un icono suelto no se reconoce sin probarlo.
+        */}
         {chat?.messages && chat.messages.length > 0 && !isGenerating && (
-          <div className="max-w-[900px] mx-auto mb-2 flex justify-end items-center gap-2 flex-wrap">
+          <div className="max-w-[900px] mx-auto mb-2 flex justify-end items-center gap-2">
             <button
               onClick={handleOpenTransitionModal}
-              className="text-xs font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="shrink-0 min-h-[32px] text-xs font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
               title="Avanzar el reloj (descanso largo/corto, horas, días) o cambiar de escenario"
             >
-              <FastForward className="w-3.5 h-3.5" /> Salto de Tiempo / Escena
+              <FastForward className="w-3.5 h-3.5 shrink-0" />
+              <span className="sm:hidden">Salto</span>
+              <span className="hidden sm:inline">Salto de Tiempo / Escena</span>
             </button>
             {!isLastMessageIncomplete && (
               <button
                 onClick={() => onContinueNarrative()}
-                className="text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--on-accent)] hover:bg-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                className="shrink-0 min-h-[32px] text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--on-accent)] hover:bg-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                 title="Pide al Narrador que continúe narrando la escena actual sin escribir un nuevo mensaje"
               >
-                <Play className="w-3.5 h-3.5" /> Continuar Narración
+                <Play className="w-3.5 h-3.5 shrink-0" />
+                <span className="sm:hidden">Continuar</span>
+                <span className="hidden sm:inline">Continuar Narración</span>
               </button>
             )}
           </div>
