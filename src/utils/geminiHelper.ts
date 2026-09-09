@@ -40,6 +40,7 @@ import {
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 import { logError, logWarn, logInfo } from './logger';
 import { sanitizePlayerCharacter } from './sanitizers';
+import { recuperar, consultaDelTurno } from './localSearch';
 
 // In-app API key & model management (stored locally in the user's browser)
 export interface AIModelOption {
@@ -1150,28 +1151,14 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
   `.trim()
     : 'No hay memoria acumulada aún.';
 
-  // TODOS los documentos de texto subidos a la campaña se envían íntegros y completos.
-  // Sin filtros, sin RAG, sin recortes artificiales: Gemini tiene ventana de contexto masiva.
-  const todosLosDocumentos = files.filter(f => !f.isImage && !f.isAudio);
+  // Clasificación de documentos: "Siempre presentes" vs "De consulta inteligente (On-Demand)"
+  const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
 
-  const filesText = todosLosDocumentos.length > 0
-    ? todosLosDocumentos
-        .map(f => {
-          let texto = `=== DOCUMENTO: ${f.name} ===\n${f.content || ''}`;
-          if (f.analysis && f.analysis.trim().length > 0) {
-            texto += `\n[Notas / Análisis adjunto de ${f.name}]:\n${f.analysis.trim()}`;
-          }
-          return texto;
-        })
-        .join('\n\n')
-    : 'No hay documentos de texto adicionales adjuntos.';
-
-  // Protagonist / Character Sheet Section
+  // Fichas específicas del protagonista
   const pc = project.memory?.player_character;
   const pjSheetFiles = files.filter(
     f =>
-      !f.isImage &&
-      !f.isAudio &&
+      esTexto(f) &&
       (f.category === 'sheet_pj' ||
         f.name.toLowerCase().includes('ficha') ||
         f.name.toLowerCase().includes('personaje') ||
@@ -1181,7 +1168,65 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
         f.name.toLowerCase().includes('pj') ||
         f.name.toLowerCase().includes('oc'))
   );
+  const pjSheetIds = new Set(pjSheetFiles.map(f => f.id));
 
+  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos o fichas del PJ)
+  const deConsulta = files.filter(
+    f => esTexto(f) && Boolean(f.onDemand) && f.category !== 'oracle' && !pjSheetIds.has(f.id)
+  );
+  const deConsultaIds = new Set(deConsulta.map(f => f.id));
+
+  // Documentos "Siempre presentes" (onDemand false o no marcado, u oráculos)
+  // Las fichas del PJ se excluyen de aquí porque se formatean íntegras en pjSection
+  const siemprePresentes = files.filter(
+    f => esTexto(f) && !deConsultaIds.has(f.id) && !pjSheetIds.has(f.id)
+  );
+
+  const filesText = siemprePresentes.length > 0
+    ? siemprePresentes
+        .map(f => {
+          let texto = `=== DOCUMENTO: ${f.name} ===\n${f.content || ''}`;
+          if (f.analysis && f.analysis.trim().length > 0) {
+            texto += `\n[Notas / Análisis adjunto de ${f.name}]:\n${f.analysis.trim()}`;
+          }
+          return texto;
+        })
+        .join('\n\n')
+    : 'No hay documentos de texto adicionales siempre presentes.';
+
+  // Gestión inteligente de documentos de consulta (On-Demand)
+  let deConsultaCatalogo = '';
+  let fragmentosConsultaText = '';
+
+  if (deConsulta.length > 0) {
+    deConsultaCatalogo = `\n\n### 📚 COMPENDIOS Y ARCHIVOS DE CONSULTA EN LA BIBLIOTECA (ON-DEMAND):
+Los siguientes compendios de lore, ambientación y reglas forman parte del archivo del proyecto. Para optimizar tokens y agilizar la respuesta, su texto completo permanece en la biblioteca y sus fragmentos pertinentes se rescatan dinámicamente según lo que suceda en la escena. Si necesitas verificar un dato muy específico no recogido en los fragmentos, indícalo a la jugadora:
+${deConsulta.map(f => `- 📄 **${f.name}**${f.analysis ? `: ${f.analysis.slice(0, 220).trim()}...` : (f.category ? ` [Categoría: ${f.category}]` : '')}`).join('\n')}`;
+
+    if (getStoredBusquedaLocal()) {
+      const ultimosMensajes = currentChat.messages || [];
+      const ultimoMensajeNarrador = [...ultimosMensajes].reverse().find(m => m.role === 'model')?.content;
+      const nombresVivos = [
+        ...(project.memory?.npcs?.map(n => n.name) || []),
+        ...(project.memory?.player_character?.name ? [project.memory.player_character.name] : [])
+      ];
+
+      const consulta = consultaDelTurno({
+        textoJugadora: userText,
+        ultimaNarracion: ultimoMensajeNarrador,
+        nombres: nombresVivos
+      });
+
+      const rescatados = recuperar(deConsulta, consulta, 8000);
+      if (rescatados.length > 0) {
+        fragmentosConsultaText = `### 📖 FRAGMENTOS RELEVANTES RESCATADOS DE ARCHIVOS DE CONSULTA:
+(El sistema ha recuperado estos extractos de tus documentos de consulta por su pertinencia directa con la escena presente):
+${rescatados.map(r => `--- [Fragmento de: ${r.fragmento.fileName}${r.fragmento.titulo ? ` · ${r.fragmento.titulo}` : ''}] ---\n${r.fragmento.texto}`).join('\n\n')}`;
+      }
+    }
+  }
+
+  // Protagonist / Character Sheet Section
   const pjSection = `
 ### 🌟 PROTAGONISTA / PERSONAJE JUGADOR (OC - PROTAGONISTA PRINCIPAL)
 [JERARQUÍA CANÓNICA SUPREMA]:
@@ -1378,7 +1423,8 @@ ${narrativeLengthSection}
 
 ### BASE DE CONOCIMIENTO (DOCUMENTOS, FICHAS Y MATERIAL ADJUNTO)
 Los siguientes archivos forman parte del canon íntegro del mundo y debes utilizarlos como fuente de verdad sobre PNJs, lugares, eventos pasados, reglas, oráculos y ambientación:
-${filesText || 'No hay documentos de texto adicionales adjuntos.'}
+${filesText || 'No hay documentos de texto adicionales siempre presentes.'}
+${deConsultaCatalogo}
 
 ### RESERVA DE DADOS DEL DIRECTOR DE JUEGO (USO EXCLUSIVO DEL NARRADOR)
 Al final de la entrada del turno se adjunta la reserva de dados reales tirados para tus acciones ocultas de PNJ, daño, tablas aleatorias y tiradas enfrentadas. Son de uso exclusivo para el Narrador (NUNCA para las acciones del protagonista). Úsalos en orden y descarta los que no gastes.
@@ -1466,7 +1512,7 @@ ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: l
   // Todo lo que cambia de un turno a otro. Va detrás para no romper el prefijo
   // cacheado, y de paso queda pegado a la escena, que es donde mejor se atiende.
   const bloqueVivo = `
-${pjSection}
+${fragmentosConsultaText ? `${fragmentosConsultaText}\n\n` : ''}${pjSection}
 
 ### CONOCIMIENTO DE LA CAMPAÑA (MEMORIA VIVA)
 ${memoryContext}

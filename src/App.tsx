@@ -1676,6 +1676,8 @@ Estás muy cerca del tope de 250.000 tokens por minuto de la capa gratuita de Go
     if (!currentPId) return;
     const updated = currentFiles.map(f => (f.id === fileId ? { ...f, onDemand } : f));
     setCurrentFiles(updated);
+    // Invalidar caché de tokens medidos para reflejar el nuevo peso de la biblioteca
+    setChatTokenLoads({});
     await saveFilesToDB(currentPId, updated);
   };
 
@@ -2310,7 +2312,8 @@ Estás muy cerca del tope de 250.000 tokens por minuto de la capa gratuita de Go
   // Estimación y monitoreo de tokens para aviso preventivo de cuota Google (250k tokens/min)
   const currentChatTokenCount = currentChatId ? chatTokenLoads[currentChatId] || 0 : 0;
   const currentChatChars = (currentChat?.messages || []).reduce((acc, m) => acc + (m.content?.length || 0), 0);
-  const docsChars = currentFiles.reduce((acc, f) => acc + (f.length || 0), 0);
+  const viajaEntero = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample' && (!f.onDemand || f.category === 'oracle');
+  const docsChars = currentFiles.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
   const estimatedCurrentTokens = Math.round((currentChatChars + docsChars) / 3.8);
   const effectiveChatTokens = currentChatTokenCount > 0 ? currentChatTokenCount : estimatedCurrentTokens;
   const isCurrentChatNearTokenLimit = effectiveChatTokens >= 180000;
