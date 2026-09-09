@@ -417,6 +417,25 @@ export function setStoredBusquedaLocal(activa: boolean): void {
   localStorage.setItem('gmstudio_busqueda_local', activa ? 'on' : 'off');
 }
 
+export type HistoryWindowSetting = 'all' | '10' | '15' | '20' | '30';
+
+/**
+ * Límite de turnos de historial que se envían a Gemini en el capítulo activo.
+ * 'all': envía todos los mensajes del capítulo.
+ * '20': envía los últimos 20 mensajes (ideal para no saturar los 250k tokens/min de la capa gratuita).
+ */
+export function getStoredHistoryWindow(): HistoryWindowSetting {
+  const local = localStorage.getItem('gemini_history_window');
+  if (local && ['all', '10', '15', '20', '30'].includes(local)) {
+    return local as HistoryWindowSetting;
+  }
+  return 'all'; // Por defecto: todo el capítulo
+}
+
+export function setStoredHistoryWindow(val: HistoryWindowSetting): void {
+  localStorage.setItem('gemini_history_window', val);
+}
+
 export function getStoredTemperature(): number {
   const local = localStorage.getItem('gemini_temperature');
   if (local) {
@@ -602,6 +621,8 @@ export interface ApiFailure {
   /** El estado simbólico de Google: RESOURCE_EXHAUSTED, INVALID_ARGUMENT, NOT_FOUND... */
   googleStatus: string;
   isRateLimit: boolean;
+  /** Límite específico de tokens por minuto (input_token_count / TPM 250k) alcanzado */
+  isTokenQuotaLimit: boolean;
   isOverloaded: boolean;
   /** La clave no sirve. SOLO esto justifica retirarla del bolsillo. */
   isInvalidKey: boolean;
@@ -665,12 +686,12 @@ function cuerpoDeError(err: any): { code: number; status: string; message: strin
 function leerRetryInfo(details: any[], texto: string): number {
   for (const d of details || []) {
     const delay = d?.retryDelay ?? d?.retry_delay;
-    if (typeof delay === 'string') {
-      const s = parseFloat(delay);
+    if (typeof delay === 'string' || typeof delay === 'number') {
+      const s = parseFloat(String(delay));
       if (!isNaN(s) && s > 0) return Math.min(Math.round(s * 1000), 120000);
     }
   }
-  const m = texto.match(/retry[_ ]?delay["':\s]+(\d+(?:\.\d+)?)s/i);
+  const m = texto.match(/retry(?:[_ ]?delay["':\s]+| in )(\d+(?:\.\d+)?)s/i);
   if (m) {
     const s = parseFloat(m[1]);
     if (!isNaN(s) && s > 0) return Math.min(Math.round(s * 1000), 120000);
@@ -699,6 +720,11 @@ export function classifyApiError(err: unknown): ApiFailure {
     );
 
   const isRateLimit = status === 429 || gs === 'RESOURCE_EXHAUSTED' || /resource_exhausted|quota|rate limit/i.test(lower);
+  const isTokenQuotaLimit =
+    isRateLimit &&
+    /input_token_count|tokens per minute|tokenspermodelperminute|250000|token_count|quota exceeded for metric/i.test(
+      lower
+    );
 
   const isOverloaded =
     status === 503 ||
@@ -739,6 +765,7 @@ export function classifyApiError(err: unknown): ApiFailure {
     status,
     googleStatus,
     isRateLimit,
+    isTokenQuotaLimit,
     isOverloaded,
     isInvalidKey,
     isPermissionDenied,
@@ -1455,12 +1482,20 @@ Narra la escena respetando las DIRECTIVAS DE RESPUESTA CRÍTICAS de más arriba,
 ${bloqueVivo}`;
 
   // Filter out initial placeholders
-  const historyCompleto = currentChat.messages.filter(
+  let historyCompleto = currentChat.messages.filter(
     m => m.content !== 'Tirando dados...' && m.content !== 'Pensando...'
   );
 
-  // Sesión activa (Capítulo en curso): Se incluye el 100% íntegro de los mensajes
-  // sin ningún recorte ni límite de caracteres, aprovechando la ventana nativa de Gemini (1M-2M tokens).
+  // Ventana de historial configurable para optimizar tokens y evitar límites 429 de la capa gratuita
+  const historyWindow = getStoredHistoryWindow();
+  if (historyWindow !== 'all') {
+    const maxTurns = parseInt(historyWindow, 10);
+    if (!isNaN(maxTurns) && historyCompleto.length > maxTurns) {
+      historyCompleto = historyCompleto.slice(-maxTurns);
+    }
+  }
+
+  // Sesión activa (Capítulo en curso): Se incluye el historial según la ventana configurada
   const contents: any[] = [];
   let lastRole = '';
   for (const m of historyCompleto) {
@@ -1982,8 +2017,15 @@ export async function generateStoryTurnStream({
 
           if (fallo.isRateLimit) {
             markKeyCooldown(currentApiKey, fallo.retryAfterMs || 60000);
-            if (disponibles.slice(k + 1).some(kk => !clavesMuertas.has(kk) && !isKeyInCooldown(kk))) {
+            const hayOtrasClaves = disponibles.slice(k + 1).some(kk => !clavesMuertas.has(kk) && !isKeyInCooldown(kk));
+            if (hayOtrasClaves) {
               setLoadingText(`Cuota agotada en la Clave ${nClave}. Rotando a la siguiente para ${modelDisplayName}...`);
+              break;
+            } else if (fallo.retryAfterMs > 0 && fallo.retryAfterMs <= 15000 && intento < MAX_REINTENTOS_POR_SATURACION) {
+              const segs = Math.ceil(fallo.retryAfterMs / 1000);
+              setLoadingText(`Límite por minuto alcanzado en Google. Esperando ${segs}s para reanudar automáticamente...`);
+              await esperar(fallo.retryAfterMs + 500, signal);
+              continue;
             }
             break;
           }
@@ -2353,6 +2395,11 @@ export async function generateContentWithFailover({
           }
           if (fallo.isRateLimit) {
             if (currentKey) markKeyCooldown(currentKey, fallo.retryAfterMs || 60000);
+            const hayOtrasClaves = disponibles.slice(k + 1).some(kk => !clavesMuertas.has(kk) && !isKeyInCooldown(kk));
+            if (!hayOtrasClaves && fallo.retryAfterMs > 0 && fallo.retryAfterMs <= 15000 && intento < MAX_REINTENTOS_POR_SATURACION) {
+              await esperar(fallo.retryAfterMs + 500, signal);
+              continue;
+            }
             break;
           }
           if (fallo.isBadRequest) {
@@ -3303,11 +3350,35 @@ export function describeApiError(err: unknown): string {
   if (fallo.isPermissionDenied) {
     return `Google ha denegado el acceso al proyecto de tu clave (Error 403: PERMISSION_DENIED).\n\nComprueba en aistudio.google.com que el proyecto siga activo y con la Generative Language API habilitada.${detalle}`;
   }
+  if (fallo.isTokenQuotaLimit) {
+    const espera = fallo.retryAfterMs
+      ? ` Google pide esperar ${Math.ceil(fallo.retryAfterMs / 1000)} segundos a que venza la ventana del minuto.`
+      : ' Espera unos 60 segundos a que venza el minuto actual.';
+    return `⚠️ TOPE DE TOKENS POR MINUTO ALCANZADO (ERROR 429).${espera}
+
+Tu capítulo actual ha acumulado mucho historial y contexto, enviando más de 250.000 tokens de golpe a la capa gratuita de Google (límite TPM: GenerateContentInputTokensPerModelPerMinute).
+
+📖 SOLUCIÓN RECOMENDADA: CREAR UN «NUEVO CAPÍTULO»
+Para continuar de inmediato y con máxima agilidad:
+1. Pulsa el botón «✨ Crear Nuevo Capítulo» (o usa el botón + en la lista de Capítulos).
+2. Todo lo vivido en este capítulo quedará guardado íntegramente en la Crónica / Bitácora del proyecto.
+3. Tu ficha de personaje, inventario, relaciones de PNJs, oráculos y lore se mantendrán 100% intactos.
+4. El chat activo arrancará limpio con 0 tokens acumulados, evitando bloqueos de cuota.
+
+💡 OTRAS OPCIONES:
+• Si prefieres seguir en este mismo capítulo: espera 60 segundos a que Google reinicie la ventana de tokens por minuto y pulsa «Continuar Narración».
+• En ⚙️ Motor → Rendimiento puedes activar la «Ventana de Historial» (ej. últimos 20 turnos) para limitar los tokens que se envían en cada turno.${detalle}`;
+  }
   if (fallo.isRateLimit) {
     const espera = fallo.retryAfterMs
-      ? ` Google pide esperar unos ${Math.ceil(fallo.retryAfterMs / 1000)} segundos.`
-      : ' Espera unos segundos.';
-    return `Todas tus claves han agotado su cuota de peticiones por ahora (Error 429: RESOURCE_EXHAUSTED).${espera} Después pulsa «Continuar Narración».${detalle}`;
+      ? ` Google pide esperar unos ${Math.ceil(fallo.retryAfterMs / 1000)} segundos (límite temporal de peticiones o tokens por minuto).`
+      : ' Espera unos momentos.';
+    return `Se ha alcanzado el límite de cuota en Google (Error 429: RESOURCE_EXHAUSTED).${espera}
+
+💡 ¿CÓMO SOLUCIONARLO O CONTINUAR?
+• Si el capítulo lleva muchos mensajes: Crea un «Nuevo Capítulo» para reiniciar los tokens del chat activo conservando todo el progreso.
+• Si es una clave nueva de 0 uso: En Google AI Studio las cuotas pertenecen al PROYECTO de Google Cloud. Crea tu clave seleccionando «Create API key in NEW project».
+• También puedes limitar el tamaño del historial en ⚙️ Motor → Rendimiento → Ventana de Historial.${detalle}`;
   }
   if (fallo.isModelMissing) {
     return `El modelo seleccionado no existe o tu clave no lo admite (Error ${fallo.status || 404}).\n\nAbre «Motor» y pulsa «Ver los de mi clave» para elegir uno de los que Google te ofrece de verdad.${detalle}`;

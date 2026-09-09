@@ -33,7 +33,10 @@ import {
   testSingleApiKey,
   testAllApiKeys,
   testKeyAgainstModel,
-  ApiKeyDiagnostic
+  ApiKeyDiagnostic,
+  HistoryWindowSetting,
+  getStoredHistoryWindow,
+  setStoredHistoryWindow
 } from '../utils/geminiHelper';
 import { ResumenUso, borrarUso, resumirUso } from '../utils/usageStats';
 
@@ -94,6 +97,10 @@ export interface AlertConfig {
   isOpen: boolean;
   title: string;
   message: string;
+  actionButton?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 export const ApiKeyModal: React.FC<{
@@ -135,6 +142,7 @@ export const ApiKeyModal: React.FC<{
   const [temperature, setTemperature] = useState<number>(getStoredTemperature());
   const [topP, setTopP] = useState<number>(getStoredTopP());
   const [autoFailover, setAutoFailover] = useState<boolean>(getStoredAutoFailover());
+  const [historyWindow, setHistoryWindow] = useState<HistoryWindowSetting>(getStoredHistoryWindow());
   const [autoSyncMemory, setAutoSyncMemory] = useState<boolean>(getStoredAutoSyncMemory());
   const [memorySyncGranularity, setMemorySyncGranularity] = useState<MemorySyncGranularity>(getStoredMemorySyncGranularity());
   const [keyRotationMode, setKeyRotationMode] = useState<KeyRotationMode>(getStoredKeyRotationMode());
@@ -350,6 +358,7 @@ export const ApiKeyModal: React.FC<{
       setTemperature(getStoredTemperature());
       setTopP(getStoredTopP());
       setAutoFailover(getStoredAutoFailover());
+      setHistoryWindow(getStoredHistoryWindow());
       setAutoSyncMemory(getStoredAutoSyncMemory());
       setMemorySyncGranularity(getStoredMemorySyncGranularity());
       setUso(resumirUso());
@@ -375,6 +384,7 @@ export const ApiKeyModal: React.FC<{
     setStoredTemperature(temperature);
     setStoredTopP(topP);
     setStoredAutoFailover(autoFailover);
+    setStoredHistoryWindow(historyWindow);
     setStoredAutoSyncMemory(autoSyncMemory);
     setStoredMemorySyncGranularity(memorySyncGranularity);
     setSavedSuccess(true);
@@ -669,6 +679,49 @@ export const ApiKeyModal: React.FC<{
                     />
                     <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
                   </label>
+                </div>
+              </div>
+
+              {/* Ventana de Historial de Chat / Control de Tokens */}
+              <div className="pt-3 border-t border-[var(--glass-border)]">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--glass-border)] p-3 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
+                      Ventana de Historial de Chat (Ahorro de Tokens)
+                    </label>
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      Anti-429
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
+                    Limita cuántos mensajes del chat activo se envían a la API en cada turno. Si juegas con la capa gratuita de Google (límite de 250.000 tokens/minuto) o tienes un capítulo muy largo, reduce drásticamente el consumo para evitar saturaciones.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+                    {[
+                      { id: 'all', label: 'Todo el capítulo', desc: 'Sin recorte' },
+                      { id: '30', label: '30 turnos', desc: 'Capítulos largos' },
+                      { id: '20', label: '20 turnos', desc: 'Recomendado gratis' },
+                      { id: '10', label: '10 turnos', desc: 'Máximo ahorro' }
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setHistoryWindow(opt.id as HistoryWindowSetting)}
+                        className={`p-2 rounded-md text-left transition-all cursor-pointer border ${
+                          historyWindow === opt.id
+                            ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)]'
+                            : 'bg-[var(--bg-primary)] border-[var(--glass-border)] text-[var(--text-primary)] hover:border-[var(--accent)]/40'
+                        }`}
+                      >
+                        <div className="text-xs font-cinzel font-bold leading-tight">{opt.label}</div>
+                        <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">{opt.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-[var(--text-secondary)] italic m-0 pt-0.5">
+                    * La ficha del personaje, el lore, los oráculos y la memoria general de la campaña siempre se envían íntegros en cualquier modo.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1552,17 +1605,29 @@ export const Modals: React.FC<{
             if (e.target === e.currentTarget) setAlertConfig(null);
           }}
         >
-          <div className="bg-[var(--bg-color)] p-6 rounded-xl shadow-2xl border border-[var(--glass-border)] w-96 max-w-full">
-            <h3 className="font-cinzel text-xl text-[var(--accent)] mb-3">{alertConfig.title}</h3>
-            <p className="text-[var(--text-primary)] mb-6 font-lora text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">
-              {alertConfig.message}
-            </p>
-            <div className="flex justify-end">
+          <div className="bg-[var(--bg-color)] p-6 rounded-xl shadow-2xl border border-[var(--glass-border)] w-[480px] max-w-full max-h-[90vh] flex flex-col">
+            <h3 className="font-cinzel text-lg sm:text-xl text-[var(--accent)] mb-3 shrink-0">{alertConfig.title}</h3>
+            <div className="overflow-y-auto pr-1 mb-6 custom-scrollbar">
+              <p className="text-[var(--text-primary)] font-lora text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">
+                {alertConfig.message}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[var(--glass-border)] shrink-0">
+              {alertConfig.actionButton && (
+                <button
+                  onClick={() => {
+                    alertConfig.actionButton?.onClick();
+                  }}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer text-xs font-cinzel font-bold shadow-xs flex items-center gap-1.5"
+                >
+                  {alertConfig.actionButton.label}
+                </button>
+              )}
               <button
                 onClick={() => setAlertConfig(null)}
                 className="px-5 py-2 bg-[var(--accent)] text-[var(--on-accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors cursor-pointer text-xs font-cinzel font-bold shadow-xs"
               >
-                Aceptar
+                Cerrar
               </button>
             </div>
           </div>

@@ -71,6 +71,7 @@ import {
   analyzeUploadedImage,
   extractNpcFromDocument,
   describeApiError,
+  classifyApiError,
   destilarTablaOraculo,
   classifyFileAuto,
   getStoredApiKey,
@@ -1151,8 +1152,29 @@ export default function App() {
         projectName: currentProject?.name,
         chatName: currentChat?.name
       });
+      const fallo = classifyApiError(error);
+      const isTokenLimit =
+        fallo.isTokenQuotaLimit ||
+        (fallo.isRateLimit &&
+          /token|250000|quota exceeded for metric|input_token_count/i.test(
+            String(error?.message || '') + ' ' + (fallo.detail || '')
+          ));
+
       if (error?.message?.includes('GEMINI_API_KEY') || error?.message?.includes('API key')) {
         setIsApiKeyModalOpen(true);
+      } else if (isTokenLimit) {
+        setAlertConfig({
+          isOpen: true,
+          title: 'Tope de Tokens Alcanzado',
+          message: describeApiError(error),
+          actionButton: {
+            label: '✨ Crear Nuevo Capítulo',
+            onClick: () => {
+              setAlertConfig(null);
+              handleCreateChat();
+            }
+          }
+        });
       } else {
         setAlertConfig({
           isOpen: true,
