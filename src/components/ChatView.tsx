@@ -47,7 +47,6 @@ import {
   Swords,
   Trash2,
   X,
-  Zap,
   Mic,
   MoreHorizontal,
   Copy,
@@ -514,16 +513,21 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
             {/*
               El aviso de sincronización era una etiqueta con texto encima del
               mensaje, y en el móvil acababa metida en la botonera estorbando.
-              Aquí es solo la chispa, al final de la fila y en tono apagado: se
-              ve de un vistazo que el turno actualizó ficha, diario o calendario,
-              y quien quiera el detalle la toca.
+              Se quedó en una chispa al final de la fila… que resultó ser peor:
+              un rayo tiene forma de alarma, y salía en casi todos los turnos
+              para decir algo que no es una alarma, sino una confirmación. Leer
+              una partida con un relámpago parpadeando en cada respuesta cansa.
+
+              Un punto discreto dice lo mismo sin levantar la voz, y quien
+              quiera el detalle lo toca igual.
             */}
             {hasSyncTags && (
               <span
-                className="ml-auto shrink-0 text-amber-600/70 dark:text-amber-400/70 cursor-help"
+                className="ml-auto shrink-0 flex items-center cursor-help"
                 title={`Sincronizado en segundo plano: ${syncItems.join(', ')}`}
+                aria-label={`Sincronizado en segundo plano: ${syncItems.join(', ')}`}
               >
-                <Zap className="w-3.5 h-3.5" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-secondary)]/40" />
               </span>
             )}
           </div>
@@ -1520,19 +1524,23 @@ export const ChatView: React.FC<{
           const tono = pasado
             ? {
                 texto: 'text-red-950 dark:text-red-200',
-                icono: 'text-red-700 dark:text-red-400',
                 relleno: 'bg-red-700 dark:bg-red-500',
                 borde: 'border-red-700/50 hover:bg-red-600/10'
               }
             : {
                 texto: 'text-amber-950 dark:text-amber-100',
-                icono: 'text-amber-700 dark:text-amber-400',
                 relleno: 'bg-amber-600 dark:bg-amber-400',
                 borde: 'border-amber-700/50 hover:bg-amber-600/10'
               };
           return (
             <div className="max-w-[900px] mx-auto mb-2 flex items-center gap-2 sm:gap-2.5">
-              <Zap className={`w-4 h-4 shrink-0 ${tono.icono}`} />
+              {/*
+                Aquí había un rayo ⚡ latiendo. Fuera: en una barra que sale
+                justo encima de donde se escribe, un icono que parpadea no
+                informa de nada que no diga ya el color de la propia barra, y lo
+                único que consigue es tirar del ojo cada vez que se juega un
+                turno. El rótulo y la barra se explican solos.
+              */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline justify-between gap-2 mb-1">
                   <span className={`font-cinzel text-[11px] font-bold truncate ${tono.texto}`}>
