@@ -30,6 +30,9 @@ import {
   hilosQueVencen,
   leerAgenda,
   leerAvanceDeTiempo,
+  leerFechaDeHud,
+  parsearFechaTexto,
+  extraerMinutoDeTexto,
   EntradaDeAgenda,
   leerHilos,
   limpiarEtiquetasDeTiempo,
@@ -2222,6 +2225,14 @@ export interface TiempoReportado {
   presentes: string[];
   /** Cómo han cambiado los vínculos de los personajes habituales. */
   vinculos: VinculoLeido[];
+  /**
+   * La fecha que el Narrador ha escrito en la cabecera de HUD de este mensaje,
+   * tal cual, sin resolver. Es la que ve la jugadora en el chat, así que es la
+   * que debe mandar sobre el calendario.
+   */
+  fechaHud?: string;
+  /** El momento del día de esa misma cabecera: «madrugada», «media tarde». */
+  momentoHud?: string;
 }
 
 async function saveStreamedMessage(
@@ -2256,6 +2267,8 @@ async function saveStreamedMessage(
   const hilos = leerHilos(cleanedText);
   const presentes = leerPresentes(cleanedText);
   const vinculos = leerVinculos(cleanedText);
+  // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
+  const hudDeEsteTurno = leerFechaDeHud(fullText);
   cleanedText = limpiarEtiquetasDePnj(limpiarEtiquetasDeTiempo(cleanedText));
 
   if (definitivo && hilos.length > 0) {
@@ -2268,10 +2281,23 @@ async function saveStreamedMessage(
   if (
     definitivo &&
     onTimeReported &&
-    (avance.encontrado || agenda.length || hilos.length || presentes.length || vinculos.length)
+    (avance.encontrado ||
+      agenda.length ||
+      hilos.length ||
+      presentes.length ||
+      vinculos.length ||
+      hudDeEsteTurno?.fechaTexto)
   ) {
     try {
-      onTimeReported({ minutos: avance.minutos, agenda, hilos, presentes, vinculos });
+      onTimeReported({
+        minutos: avance.minutos,
+        agenda,
+        hilos,
+        presentes,
+        vinculos,
+        fechaHud: hudDeEsteTurno?.fechaTexto,
+        momentoHud: hudDeEsteTurno?.momento
+      });
     } catch (err) {
       logError('threads', 'Error al procesar el reporte de tiempo e hilos de la escena', err, {
         chatName: chat.name,
@@ -2725,6 +2751,98 @@ export function fusionarTimeline(
   return { timeline, agregadas };
 }
 
+export interface AnclaDeHud {
+  /** El número con el que se le presenta al modelo dentro del historial. */
+  n: number;
+  /** La fecha tal cual la escribió el Narrador: «14 de Ches». */
+  fechaTexto: string;
+  /** El momento del día: «madrugada», «media tarde». */
+  momento?: string;
+  lugar?: string;
+  /** Día absoluto ya resuelto contra el calendario de la campaña. */
+  abs: number;
+  /** Minuto del día deducido del momento, si el momento lo permitía. */
+  minute?: number;
+}
+
+/**
+ * Arma el historial que se le manda al modelo y le intercala las fechas que ya
+ * están escritas en el chat.
+ *
+ * Cada vez que cambia la escena, el día o la hora, el Narrador imprime su
+ * cabecera de HUD con la fecha y el momento del día; de un HUD al siguiente
+ * están la hora, el día y lo que ocurrió ese día. La sincronización ignoraba
+ * eso y le pedía al modelo que volviera a deducir a ojo cuántos días habían
+ * pasado desde el principio. Deducir por segunda vez algo que está escrito solo
+ * puede salir peor, y salía peor.
+ *
+ * Aquí se leen esas cabeceras, se resuelven contra el calendario de la campaña
+ * y se numeran. El historial resultante lleva las marcas ⟦HUD n⟧ intercaladas
+ * para que el modelo diga a cuál pertenece cada suceso: la fecha la pone la
+ * aplicación, no él.
+ */
+export function anclarHistorialPorHud(
+  chats: Chat[],
+  cal: CalendarConfig,
+  anoInicial: number
+): { historial: string; mensajes: number; anclas: AnclaDeHud[] } {
+  const sortedChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
+  const anclas: AnclaDeHud[] = [];
+  let historial = '';
+  let mensajes = 0;
+  let anoDeLectura = anoInicial;
+  let ultimoAbsLeido = -Infinity;
+
+  for (const c of sortedChats) {
+    const validMessages = (c.messages || []).filter(
+      m =>
+        m.content &&
+        m.content.trim().length > 0 &&
+        m.content !== 'Pensando...' &&
+        m.content !== 'Tirando dados...'
+    );
+    if (validMessages.length === 0) continue;
+
+    historial += `\n=== SESIÓN / CAPÍTULO: ${c.name} ===\n`;
+    for (const m of validMessages) {
+      if (m.role !== 'user') {
+        const hud = leerFechaDeHud(m.content);
+        const fechaHud = hud?.fechaTexto ? parsearFechaTexto(cal, hud.fechaTexto, anoDeLectura) : null;
+        if (hud?.fechaTexto && fechaHud) {
+          /*
+           * El HUD casi nunca escribe el año. Si una fecha cae antes que la
+           * anterior es que se ha cruzado el fin de año, no que la campaña
+           * retroceda: se prueba con el año siguiente. El tope evita quedarse
+           * dando vueltas con una fecha que no encaje de ninguna manera.
+           */
+          let abs = aDiaAbsoluto(cal, fechaHud);
+          for (let intento = 0; intento < 3 && ultimoAbsLeido > -Infinity && abs < ultimoAbsLeido; intento++) {
+            anoDeLectura += 1;
+            abs = aDiaAbsoluto(cal, { ...fechaHud, year: anoDeLectura });
+          }
+          if (abs >= ultimoAbsLeido) {
+            ultimoAbsLeido = abs;
+            const n = anclas.length + 1;
+            anclas.push({
+              n,
+              fechaTexto: hud.fechaTexto,
+              momento: hud.momento,
+              lugar: hud.lugar,
+              abs,
+              minute: extraerMinutoDeTexto(hud.momento) ?? undefined
+            });
+            historial += `\n⟦HUD ${n} — fecha: ${hud.fechaTexto}${hud.momento ? `, ${hud.momento}` : ''}⟧\n`;
+          }
+        }
+      }
+      historial += `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}\n`;
+      mensajes += 1;
+    }
+  }
+
+  return { historial, mensajes, anclas };
+}
+
 /**
  * Sincronización total e integral de la campaña con IA a partir de todos los chats:
  * - Memoria viva: Historia consolidada, estado actual, tramas activas/completadas, PNJs (sin el protagonista) y lugares.
@@ -2739,49 +2857,6 @@ export async function syncFullCampaignFromChats(
   chats: Chat[],
   _files?: ProjectFile[]
 ): Promise<FullCampaignSyncResult> {
-  const sortedChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
-  let messageCount = 0;
-  let allHistory = '';
-
-  for (const c of sortedChats) {
-    const validMessages = (c.messages || []).filter(
-      m =>
-        m.content &&
-        m.content.trim().length > 0 &&
-        m.content !== 'Pensando...' &&
-        m.content !== 'Tirando dados...'
-    );
-    if (validMessages.length > 0) {
-      allHistory += `\n=== SESIÓN / CAPÍTULO: ${c.name} ===\n`;
-      allHistory += validMessages
-        .map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`)
-        .join('\n');
-      messageCount += validMessages.length;
-    }
-  }
-
-  if (messageCount === 0 || !allHistory.trim()) {
-    throw new Error(
-      'No hay mensajes en la crónica de las sesiones todavía. Juega al menos un turno para que el Narrador pueda analizar y sincronizar la memoria y el diario.'
-    );
-  }
-
-  /*
-   * Con campañas largas no cabe todo, y se manda la cola. Importa decírselo al
-   * modelo: si cree que el fragmento empieza en el día 1 de la campaña, fecha
-   * toda la reconstrucción con semanas de desfase. Sabiendo que está recortado
-   * puede contar hacia atrás desde hoy, que es el extremo que sí conoce.
-   */
-  const historialRecortado = allHistory.length > 400000;
-  const historyToAnalyze = historialRecortado
-    ? allHistory.substring(allHistory.length - 400000)
-    : allHistory;
-
-  const pcName = project.memory?.player_character?.name || '';
-  const pcNotes = project.memory?.player_character
-    ? `Protagonista / Personaje Jugador (OC): "${project.memory.player_character.name}" (${project.memory.player_character.race || ''} ${project.memory.player_character.class || ''})`
-    : '';
-
   const cal: CalendarConfig = (calendarioValido(project.calendar) ? project.calendar : CALENDARIO_HARPTOS)!;
 
   /*
@@ -2810,8 +2885,71 @@ export async function syncFullCampaignFromChats(
   const startAbs = timelinePrevio.length
     ? Math.min(hoyAbs, ...timelinePrevio.map(e => e.absDay))
     : hoyAbs;
-  const initDate = desdeDiaAbsoluto(cal, startAbs);
-  const diasTranscurridos = Math.max(0, hoyAbs - startAbs);
+  const initDateProvisional = desdeDiaAbsoluto(cal, startAbs);
+
+  const { historial: allHistory, mensajes: messageCount, anclas } = anclarHistorialPorHud(
+    chats,
+    cal,
+    currentDate.year
+  );
+
+  /*
+   * Con anclas fiables, el origen y el final de la campaña los marca el HUD y
+   * no la conjetura. Solo se aceptan como fechas absolutas si caen cerca del
+   * reloj de la campaña: si el Narrador escribe años de Faerûn y el proyecto
+   * lleva su propio cómputo desde el año 1, sumar directamente mandaría el
+   * diario a mil años de distancia. En ese caso se aprovecha únicamente la
+   * SEPARACIÓN entre anclas, que sigue siendo información buenísima.
+   */
+  const anclasEnMarco =
+    anclas.length > 0 && Math.abs(anclas[anclas.length - 1].abs - hoyAbs) <= 400;
+  const primeraAnclaAbs = anclas.length ? anclas[0].abs : 0;
+  const baseAbs = anclasEnMarco ? Math.min(startAbs, primeraAnclaAbs) : startAbs;
+  const offsetDeAncla = (a: { abs: number }) =>
+    anclasEnMarco ? a.abs - baseAbs : a.abs - primeraAnclaAbs;
+  const absDeAncla = new Map<number, number>(anclas.map(a => [a.n, baseAbs + offsetDeAncla(a)]));
+  const minutoDeAncla = new Map<number, number | undefined>(anclas.map(a => [a.n, a.minute]));
+
+  const diasTranscurridos = Math.max(
+    0,
+    hoyAbs - baseAbs,
+    ...anclas.map(a => offsetDeAncla(a))
+  );
+
+  const initDate = anclasEnMarco ? desdeDiaAbsoluto(cal, baseAbs) : initDateProvisional;
+
+  const mapaDeAnclas = anclas.length
+    ? anclas
+        .slice(-80)
+        .map(
+          a =>
+            `- HUD ${a.n} → diaOffset ${offsetDeAncla(a)} · ${a.fechaTexto}${a.momento ? `, ${a.momento}` : ''}${a.lugar ? ` · ${a.lugar}` : ''}`
+        )
+        .join('\n')
+    : '';
+
+  if (messageCount === 0 || !allHistory.trim()) {
+    throw new Error(
+      'No hay mensajes en la crónica de las sesiones todavía. Juega al menos un turno para que el Narrador pueda analizar y sincronizar la memoria y el diario.'
+    );
+  }
+
+  /*
+   * Con campañas largas no cabe todo, y se manda la cola. Importa decírselo al
+   * modelo: si cree que el fragmento empieza en el día 1 de la campaña, fecha
+   * toda la reconstrucción con semanas de desfase. Sabiendo que está recortado
+   * puede contar hacia atrás desde hoy, que es el extremo que sí conoce.
+   */
+  const historialRecortado = allHistory.length > 400000;
+  const historyToAnalyze = historialRecortado
+    ? allHistory.substring(allHistory.length - 400000)
+    : allHistory;
+
+  const pcName = project.memory?.player_character?.name || '';
+  const pcNotes = project.memory?.player_character
+    ? `Protagonista / Personaje Jugador (OC): "${project.memory.player_character.name}" (${project.memory.player_character.race || ''} ${project.memory.player_character.class || ''})`
+    : '';
+
 
   /*
    * El modelo no puede alinear su cronología con la que ya hay si no sabe qué
@@ -2821,7 +2959,7 @@ export async function syncFullCampaignFromChats(
    */
   const diasRegistrados = Array.from(
     timelinePrevio.reduce((mapa, e) => {
-      const off = e.absDay - startAbs;
+      const off = e.absDay - baseAbs;
       const previo = mapa.get(off) || [];
       previo.push(e.title || e.hito || e.summary || '');
       mapa.set(off, previo);
@@ -2830,7 +2968,7 @@ export async function syncFullCampaignFromChats(
   )
     .sort((a, b) => a[0] - b[0])
     .slice(-60)
-    .map(([off, textos]) => `- diaOffset ${off} (${fechaLegible(cal, desdeDiaAbsoluto(cal, startAbs + off))}): ${textos.slice(0, 3).map(t => t.slice(0, 70)).join(' / ')}`)
+    .map(([off, textos]) => `- diaOffset ${off} (${fechaLegible(cal, desdeDiaAbsoluto(cal, baseAbs + off))}): ${textos.slice(0, 3).map(t => t.slice(0, 70)).join(' / ')}`)
     .join('\n');
 
   // Entidades previas registradas
@@ -2862,6 +3000,17 @@ CALENDARIO Y LÍNEA TEMPORAL (LÉELO ANTES DE FECHAR NADA):
 - MOMENTO ACTUAL DE LA CAMPAÑA: ${fechaLegible(cal, currentDate)}, hora ${String(Math.floor((currentDate.minute || 0) / 60)).padStart(2, '0')}:${String((currentDate.minute || 0) % 60).padStart(2, '0')}
 - DÍAS TRANSCURRIDOS DESDE EL DÍA 1 HASTA HOY: ${diasTranscurridos} (por tanto el diaOffset válido va de 0 a ${diasTranscurridos})
 
+${mapaDeAnclas
+  ? `\n📌 ANCLAS DE FECHA YA RESUELTAS (la fuente de la verdad):
+El historial lleva intercaladas marcas ⟦HUD n — fecha…⟧. Son las cabeceras que el propio Narrador escribió en su momento, con la fecha real de esa escena, y ya están traducidas al calendario de la campaña:
+${mapaDeAnclas}
+
+CÓMO SE USAN (es la regla más importante de todo este encargo):
+- Todo lo que ocurre entre la marca ⟦HUD n⟧ y la siguiente pertenece a ESA fecha. Ahí están la hora, el día y los sucesos de ese día.
+- Por eso CADA entrada de "timeline" DEBE llevar el campo "hud" con el número de la marca que la precede en el historial. No lo deduzcas por tu cuenta: mira qué marca tiene encima.
+- Solo si un suceso queda antes de la primera marca o no puedes localizarlo, omite "hud" y da un "diaOffset" razonado.
+- Las fechas las pone la aplicación a partir de "hud". Tu trabajo es contar QUÉ pasó y COLOCARLO bajo la marca correcta.\n`
+  : ''}
 ⚠️ REGLA TEMPORAL INVIOLABLE:
 - "diaOffset" se cuenta SIEMPRE desde el PRIMER día de la campaña (diaOffset 0 = ${fechaLegible(cal, initDate)}), NUNCA desde hoy.
 - Lo que narras ya ha ocurrido: ningún acontecimiento puede tener un diaOffset mayor que ${diasTranscurridos}. Si dudas, agrupa en el día más plausible dentro de ese rango.
@@ -2926,6 +3075,7 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
   "resumenCronologia": "Resumen conciso de la cronología recuperada",
   "timeline": [
     {
+      "hud": 1,
       "diaOffset": 0,
       "minute": 540,
       "title": "Título evocador del suceso",
@@ -3081,7 +3231,21 @@ ${historyToAnalyze}`;
    */
   const offsetMaximo = diasTranscurridos > 0 ? diasTranscurridos : Number.MAX_SAFE_INTEGER;
   rawTimeline.forEach((ev: any, idx: number) => {
-    const bruto = typeof ev.diaOffset === 'number' && Number.isFinite(ev.diaOffset) ? Math.round(ev.diaOffset) : 0;
+    /*
+     * El ancla manda. Si el modelo dice bajo qué cabecera de HUD cae el suceso,
+     * la fecha sale de ahí —la escribió el Narrador cuando la escena ocurría— y
+     * no de una cuenta de días hecha a posteriori. El diaOffset solo entra
+     * cuando no hay ancla que valga.
+     */
+    const nAncla = typeof ev.hud === 'number' ? Math.round(ev.hud) : parseInt(String(ev.hud ?? ''), 10);
+    const absPorAncla = Number.isFinite(nAncla) ? absDeAncla.get(nAncla) : undefined;
+
+    const bruto =
+      absPorAncla !== undefined
+        ? absPorAncla - baseAbs
+        : typeof ev.diaOffset === 'number' && Number.isFinite(ev.diaOffset)
+        ? Math.round(ev.diaOffset)
+        : 0;
     const offset = Math.min(offsetMaximo, Math.max(0, bruto));
     if (!eventsByDayOffset.has(offset)) {
       eventsByDayOffset.set(offset, []);
@@ -3091,7 +3255,7 @@ ${historyToAnalyze}`;
 
   // Procesar cada día y asegurar distribución temporal adecuada
   eventsByDayOffset.forEach((items, offset) => {
-    const targetAbs = startAbs + offset;
+    const targetAbs = baseAbs + offset;
     const dateObj = desdeDiaAbsoluto(cal, targetAbs);
     const dateLabel = fechaLegible(cal, dateObj);
     const count = items.length;
@@ -3102,6 +3266,9 @@ ${historyToAnalyze}`;
         minute = Math.round(ev.minute);
       } else if (typeof ev.horaAprox === 'number' && Number.isFinite(ev.horaAprox) && ev.horaAprox >= 0 && ev.horaAprox <= 23) {
         minute = Math.round(ev.horaAprox) * 60;
+      } else if (minutoDeAncla.get(Number(ev.hud)) !== undefined) {
+        // «madrugada», «media tarde»: el momento del día que escribió el HUD.
+        minute = minutoDeAncla.get(Number(ev.hud))!;
       } else {
         // Inferencia temporal de reparto equilibrado entre las 08:30 (510 min) y las 21:30 (1290 min)
         if (count === 1) {
@@ -3166,8 +3333,26 @@ ${historyToAnalyze}`;
    * campaña recién importada). Y ni aun así se permite retroceder.
    */
   let calculatedCurrentDate: CampaignDate | undefined;
+  const ultimaAncla = anclas.length ? anclas[anclas.length - 1] : undefined;
+
+  /*
+   * Salvo en un caso: si el HUD del chat va por delante del reloj de la
+   * aplicación, el que está atrasado es el reloj. La cabecera la escribió el
+   * Narrador mientras la escena ocurría, así que se adelanta el calendario
+   * hasta ahí —nunca hacia atrás— y así el chat y el calendario dicen el mismo
+   * día, que es de lo que se trata.
+   */
+  if (anclasEnMarco && ultimaAncla && baseAbs + offsetDeAncla(ultimaAncla) > hoyAbs) {
+    const alDia = desdeDiaAbsoluto(cal, baseAbs + offsetDeAncla(ultimaAncla));
+    calculatedCurrentDate = {
+      year: alDia.year,
+      dayOfYear: alDia.dayOfYear,
+      minute: ultimaAncla.minute ?? currentDate.minute ?? 720
+    };
+  }
+
   const relojYaEnMarcha = diasTranscurridos > 0 || timelinePrevio.length > 0;
-  if (!relojYaEnMarcha) {
+  if (!calculatedCurrentDate && !relojYaEnMarcha) {
     let propuesta: CampaignDate | undefined;
     if (parsed.fechaFinal && typeof parsed.fechaFinal.dayOfYear === 'number') {
       propuesta = {
@@ -3209,7 +3394,7 @@ ${historyToAnalyze}`;
           desdeHoy !== undefined
             ? hoyAbs + Math.round(desdeHoy)
             : desdeInicio !== undefined
-            ? startAbs + Math.round(desdeInicio)
+            ? baseAbs + Math.round(desdeInicio)
             : hoyAbs + 5;
         const dueAbs = Math.max(hoyAbs + 1, propuesto);
         newThreads.push({

@@ -108,7 +108,8 @@ import {
   extraerMinutoDeTexto,
   fechaLegible,
   iconoDeHito,
-  obtenerInfoRelacion
+  obtenerInfoRelacion,
+  parsearFechaTexto
 } from './utils/campaignCalendar';
 import { actualizarAfinidadNpc } from './utils/affinityProgression';
 import { coincidenNombresNpc, deduplicarListaNpcs } from './utils/npcMatcher';
@@ -688,7 +689,37 @@ export default function App() {
         h.status === 'pending' && h.dueAbsDay <= hoyAbs ? { ...h, status: 'fired' as const } : h
       );
 
-      const nuevaFecha = t.minutos > 0 ? avanzar(cal, fecha, { minutos: t.minutos }) : fecha;
+      const porElReloj = t.minutos > 0 ? avanzar(cal, fecha, { minutos: t.minutos }) : fecha;
+
+      /*
+       * LA FECHA DEL CHAT MANDA SOBRE LA DEL CALENDARIO.
+       *
+       * El Narrador escribe la fecha en la cabecera de HUD de cada escena, y es
+       * la que la jugadora está leyendo. Si esa fecha va por delante de la que
+       * lleva la aplicación —porque se narró un salto de días y la etiqueta
+       * [TIEMPO: +Xd] se quedó corta o no llegó—, el que está equivocado es el
+       * calendario. Se adelanta hasta ahí y así el chat y el calendario dicen
+       * el mismo día.
+       *
+       * Solo hacia delante y solo si el salto es plausible: una fecha absurda
+       * no arrastra la campaña a ninguna parte, y retroceder rompería todo lo
+       * ya anotado.
+       */
+      const nuevaFecha = (() => {
+        if (!t.fechaHud) return porElReloj;
+        const absReloj = aDiaAbsoluto(cal, porElReloj);
+        for (const ano of [porElReloj.year, porElReloj.year + 1]) {
+          const leida = parsearFechaTexto(cal, t.fechaHud, ano);
+          if (!leida) continue;
+          const absHud = aDiaAbsoluto(cal, { ...leida, year: ano });
+          if (absHud > absReloj && absHud - absReloj <= 90) {
+            const minutoHud = extraerMinutoDeTexto(t.momentoHud);
+            return { year: ano, dayOfYear: leida.dayOfYear, minute: minutoHud ?? porElReloj.minute };
+          }
+        }
+        return porElReloj;
+      })();
+
       const nuevoAbs = aDiaAbsoluto(cal, nuevaFecha);
       const diasDeDiferencia = nuevoAbs - hoyAbs;
 

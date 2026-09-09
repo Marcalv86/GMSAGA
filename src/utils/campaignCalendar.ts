@@ -276,8 +276,19 @@ export function parsearFechaTexto(
   const tNorm = sinTildes(texto.trim());
   if (!tNorm) return null;
 
-  // 1. Extraer año si está presente (ej. 1492, 1490, etc.)
-  const matchAno = tNorm.match(/\b(1\d{3}|20\d{2}|\d{1,4})\s*(?:dr|cv|d\.?\s*c\.?|a\.?\s*d\.?)?\b/i);
+  /*
+   * 1. Extraer el año, SOLO si de verdad hay uno.
+   *
+   * El patrón anterior aceptaba cualquier número de hasta cuatro cifras, y
+   * como se quedaba con el primero de la cadena, «14 de Ches» se leía como el
+   * año 14. Eso arruinaba cualquier fecha del HUD, que casi nunca lleva año
+   * escrito: la entrada se archivaba mil cuatrocientos años fuera de sitio.
+   * Ahora hace falta una era detrás (DR, CV, d. C.) o un «de/año» delante de
+   * un número de tres o cuatro cifras.
+   */
+  const matchAno =
+    tNorm.match(/\b(\d{3,4})\s*(?:dr|cv|d\.?\s*c\.?|a\.?\s*d\.?)\b/i) ||
+    tNorm.match(/(?:\bano\s+|\bde\s+)(\d{3,4})\b(?!\s*de\b)/i);
   let year = matchAno ? parseInt(matchAno[1], 10) : anoPorDefecto;
   if (!Number.isFinite(year) || year < 1) year = anoPorDefecto;
 
@@ -286,9 +297,21 @@ export function parsearFechaTexto(
 
   // 2. Extraer día del mes (ej: "1 de...", "I de...", "15 de...", "día 15", "primer día de...")
   let diaNum = 1;
+  /*
+   * Si el día no aparece por ningún lado, no se inventa.
+   *
+   * `diaNum` arrancaba en 1 y la regla 6 de más abajo daba por buena esa
+   * suposición, así que CUALQUIER texto irreconocible —«tarde del mismo día»,
+   * «poco después»— devolvía el día 1 del año en lugar de reconocer que no
+   * sabía la fecha. Con el HUD como fuente de fechas eso era una bomba: una
+   * cabecera sin fecha legible habría mandado la escena al primer día de la
+   * campaña.
+   */
+  let diaExplicito = false;
   const matchDia = tNorm.match(/(?:dia\s+)?(\d{1,3})\s*(?:de|\/|-|\s|$)/i);
   if (matchDia) {
     diaNum = parseInt(matchDia[1], 10);
+    diaExplicito = true;
   } else {
     // Probar números romanos comunes (I..XXXI) al inicio o antes de 'de'
     const matchRomano = tNorm.match(/\b(xxx[i|v|x]*|xx[i|v|x]*|x[i|v|x]*|viii|vii|vi|iv|v|iii|ii|i)\b\s*(?:de|\/|-|\s|$)/i);
@@ -299,15 +322,20 @@ export function parsearFechaTexto(
         xxi: 21, xxii: 22, xxiii: 23, xxiv: 24, xxv: 25, xxvi: 26, xxvii: 27, xxviii: 28, xxix: 29, xxx: 30, xxxi: 31
       };
       const val = romMap[matchRomano[1].toLowerCase()];
-      if (val) diaNum = val;
+      if (val) {
+        diaNum = val;
+        diaExplicito = true;
+      }
     }
   }
 
-  // 3. Comprobar si coincide con un festival
+  // 3. Comprobar si coincide con un festival. Igual que con los meses, el
+  //    nombre canónico lleva el original entre paréntesis —«Pleno Invierno
+  //    (Midwinter)»— y el Narrador escribe solo una de las dos formas.
   if (cal.festivals && cal.festivals.length > 0) {
     for (const fest of cal.festivals) {
       const fNorm = sinTildes(fest.name);
-      if (tNorm.includes(fNorm)) {
+      if (variantesDeNombre(fNorm).some(v => contienePalabra(tNorm, v))) {
         const slotIdx = slots.findIndex(
           s => s.kind === 'festival' && sinTildes(s.festivalName || '') === fNorm
         );
@@ -318,12 +346,26 @@ export function parsearFechaTexto(
     }
   }
 
-  // 4. Comprobar si coincide con alguno de los meses del calendario actual
+  /*
+   * 4. Comprobar si coincide con alguno de los meses del calendario actual.
+   *
+   * Los meses de Harptos vienen escritos con su equivalente entre paréntesis
+   * —«Anochecer (Nightal)», «Altosolar (Alturiak)»— y el Narrador escribe una
+   * sola de las dos formas. Comparar contra el nombre entero no casaba nunca
+   * con lo que hay en el chat, así que la fecha caía a la regla de «solo un
+   * número» y «3 de Anochecer» se leía como el día 3 del año: nueve meses de
+   * error en una sola línea. Se comparan las dos formas por separado, y gana la
+   * coincidencia más larga para que «Ches» no le robe el sitio a un mes cuyo
+   * nombre lo contenga.
+   */
   let matchedMonthIdx = -1;
+  let mejorCoincidencia = 0;
   cal.months.forEach((m, idx) => {
-    const mNorm = sinTildes(m.name);
-    if (tNorm.includes(mNorm)) {
-      matchedMonthIdx = idx;
+    for (const v of variantesDeNombre(sinTildes(m.name))) {
+      if (v.length > mejorCoincidencia && contienePalabra(tNorm, v)) {
+        matchedMonthIdx = idx;
+        mejorCoincidencia = v.length;
+      }
     }
   });
 
@@ -365,7 +407,7 @@ export function parsearFechaTexto(
   }
 
   // 6. Si solo se especificó un número de día (ej: "Día 1", "Día 45")
-  if (diaNum > 0 && diaNum <= slots.length) {
+  if (diaExplicito && diaNum > 0 && diaNum <= slots.length) {
     return { year, dayOfYear: diaNum, minute: 12 * 60 };
   }
 
@@ -383,6 +425,78 @@ export function aDiaAbsolutoDesdeTexto(
   const cDate = parsearFechaTexto(cal, texto, anoPorDefecto);
   if (!cDate) return null;
   return aDiaAbsoluto(cal, cDate);
+}
+
+// ---------------------------------------------------------------- el HUD como fuente de fechas
+
+export interface FechaDeHud {
+  /** La fecha tal cual la escribió el Narrador: «14 de Ches», «Pleno Invierno». */
+  fechaTexto?: string;
+  /** El momento del día: «madrugada», «media tarde», «21:30». */
+  momento?: string;
+  /** El lugar, que viene en la misma línea y sirve para rellenar la entrada. */
+  lugar?: string;
+}
+
+/**
+ * Saca la fecha del HUD de escena que el Narrador imprime al principio del
+ * mensaje.
+ *
+ * Es la mejor fuente de fechas que hay en toda la aplicación y no se estaba
+ * usando: el propio chat lleva escrito «📍 Camarote de popa · bergantín ·
+ * Mar de las Espadas — 14 de Ches, madrugada», y de un HUD al siguiente están
+ * la hora, el día y lo que pasó ese día. Deducir eso por segunda vez con la IA,
+ * pudiendo leerlo, es pedir errores.
+ *
+ * Se reconocen las formas que emite el HUD: la línea 📍 con la fecha tras el
+ * guión largo, el formato antiguo 📅 fecha | ⏳ hora, y las líneas explícitas
+ * «Fecha:» o «Tiempo:».
+ */
+export function leerFechaDeHud(texto?: string): FechaDeHud | null {
+  if (!texto) return null;
+  // El HUD va arriba por contrato; mirar más allá solo invita a confundirlo con
+  // una fecha mencionada de pasada dentro de la prosa.
+  const cabecera = texto.slice(0, 1200);
+
+  const partirFechaYMomento = (v: string): { fechaTexto?: string; momento?: string } => {
+    const trozos = v
+      .split(/,|·|\|/)
+      .map(c => c.trim().replace(/^[*_\s]+|[*_\s]+$/g, ''))
+      .filter(Boolean);
+    if (!trozos.length) return {};
+    return { fechaTexto: trozos[0], momento: trozos.slice(1).join(', ') || undefined };
+  };
+
+  // 📍 Lugar · contenedor · región — fecha, momento
+  const linea = cabecera.match(/^[ \t>*]*📍[ \t]*([^\n\r]+)/m);
+  if (linea) {
+    const [ubicacion, ...resto] = linea[1].split(/—|--|–/);
+    const tiempo = resto.join('—').trim();
+    const lugar = (ubicacion || '')
+      .split(/·|\s+-\s+/)[0]
+      ?.trim()
+      .replace(/^[*_\s]+|[*_\s]+$/g, '');
+    if (tiempo) {
+      const { fechaTexto, momento } = partirFechaYMomento(tiempo);
+      if (fechaTexto) return { fechaTexto, momento, lugar: lugar || undefined };
+    }
+  }
+
+  // 📅 fecha | ⏳ hora  (formato antiguo)
+  const legacy = cabecera.match(/^[ \t>*]*📅[ \t]*([^\n\r]+)/m);
+  if (legacy) {
+    const { fechaTexto, momento } = partirFechaYMomento(legacy[1].replace(/⏳/g, '·'));
+    if (fechaTexto) return { fechaTexto, momento };
+  }
+
+  // Fecha: ... / Tiempo: ...
+  const explicita = cabecera.match(/^[ \t>*]*(?:fecha|tiempo)\s*:\s*([^\n\r]+)/im);
+  if (explicita) {
+    const { fechaTexto, momento } = partirFechaYMomento(explicita[1]);
+    if (fechaTexto) return { fechaTexto, momento };
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------- etiquetas del Narrador
@@ -609,6 +723,32 @@ export function leerAgenda(texto: string): EntradaDeAgenda[] {
     out.push(entrada);
   }
   return out;
+}
+
+/**
+ * Las formas en que puede aparecer escrito el nombre de un mes o un festival.
+ *
+ * El calendario los guarda con su original entre paréntesis —«Anochecer
+ * (Nightal)», «Pleno Invierno (Midwinter)»— pero en el chat se escribe una sola
+ * de las dos, así que hay que reconocer las tres: la completa y cada mitad.
+ */
+function variantesDeNombre(nombreNormalizado: string): string[] {
+  const variantes = new Set<string>([nombreNormalizado]);
+  const sinParentesis = nombreNormalizado.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  if (sinParentesis) variantes.add(sinParentesis);
+  const dentro = nombreNormalizado.match(/\(([^)]+)\)/);
+  if (dentro?.[1]?.trim()) variantes.add(dentro[1].trim());
+  return [...variantes].filter(Boolean);
+}
+
+/** Si el texto contiene ese nombre como palabra suelta, no como trozo de otra. */
+function contienePalabra(texto: string, palabra: string): boolean {
+  return new RegExp(`(^|[^a-z0-9])${escaparRegex(palabra)}([^a-z0-9]|$)`).test(texto);
+}
+
+/** Escapa un texto para poder meterlo dentro de una expresión regular. */
+function escaparRegex(v: string): string {
+  return v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** Sin tildes y en minúsculas, para comparar palabras sin sorpresas. */
