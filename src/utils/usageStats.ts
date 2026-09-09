@@ -86,6 +86,94 @@ export function registrarUso(
   guardar(registro);
 }
 
+// ---------------------------------------------------------------- peticiones del día
+
+const CLAVE_DIA = 'gmstudio_peticiones_dia';
+
+interface ContadorDiario {
+  fecha: string;
+  /** Peticiones del día por modelo, sumando todas las claves. */
+  porModelo: Record<string, number>;
+  /** Y desglosadas por clave, porque cada clave tiene su propio cupo. */
+  porClave: Record<string, Record<string, number>>;
+}
+
+/** La fecha local en formato AAAA-MM-DD, que es como se agrupa el día. */
+function hoy(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Una huella corta y estable de la clave, para poder contar por clave sin
+ * guardarla. Nunca se escribe la clave en el contador: solo este número.
+ */
+export function huellaDeClave(clave: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < clave.length; i++) {
+    h ^= clave.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+function leerContador(): ContadorDiario {
+  const vacio: ContadorDiario = { fecha: hoy(), porModelo: {}, porClave: {} };
+  try {
+    const raw = localStorage.getItem(CLAVE_DIA);
+    if (!raw) return vacio;
+    const parsed: ContadorDiario = JSON.parse(raw);
+    if (!parsed || parsed.fecha !== hoy()) return vacio;
+    return {
+      fecha: parsed.fecha,
+      porModelo: parsed.porModelo || {},
+      porClave: parsed.porClave || {}
+    };
+  } catch {
+    return vacio;
+  }
+}
+
+/**
+ * Cuántas peticiones lleva hoy cada modelo.
+ *
+ * El límite que de verdad se nota en la capa gratuita no son los tokens: son las
+ * peticiones por día, y en los Flash de la familia 3.x son VEINTE por clave.
+ * Veinte turnos y se acabó la jornada, con el mismo error 429 que da quedarse
+ * sin tokens por minuto y sin nada que distinga un caso del otro. Sin llevar la
+ * cuenta no hay manera de saber si te queda partida.
+ *
+ * La cuenta de Google va por hora del Pacífico y esta por la hora local, así que
+ * pueden no reiniciarse a la vez. Sirve para saber por dónde vas, no para
+ * discutirle a Google.
+ */
+export function peticionesDeHoy(modelo: string): number {
+  return leerContador().porModelo[modelo] || 0;
+}
+
+/** Lo mismo, desglosado por clave: cada una tiene su propio cupo diario. */
+export function peticionesPorClaveDeHoy(modelo: string): Record<string, number> {
+  return leerContador().porClave[modelo] || {};
+}
+
+/** Suma una petición. Se llama una vez por turno o tarea de fondo que sale bien. */
+export function apuntarPeticion(modelo: string, clave?: string): void {
+  if (!modelo) return;
+  try {
+    const contador = leerContador();
+    contador.porModelo[modelo] = (contador.porModelo[modelo] || 0) + 1;
+    if (clave) {
+      const huella = huellaDeClave(clave);
+      const delModelo = contador.porClave[modelo] || {};
+      delModelo[huella] = (delModelo[huella] || 0) + 1;
+      contador.porClave[modelo] = delModelo;
+    }
+    localStorage.setItem(CLAVE_DIA, JSON.stringify(contador));
+  } catch {
+    // Sin sitio en localStorage: la cuenta del día no vale romper el turno.
+  }
+}
+
 export function borrarUso(modelo?: string): void {
   if (!modelo) {
     try {

@@ -15,7 +15,7 @@ import {
 } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
-import { registrarUso } from './usageStats';
+import { apuntarPeticion, registrarUso } from './usageStats';
 import {
   CALENDARIO_HARPTOS,
   aDiaAbsoluto,
@@ -276,14 +276,52 @@ export function modeloDisponible(modelId: string): boolean | null {
   return guardado.modelos.some(m => m.id.toLowerCase() === id);
 }
 
+export interface LimitesDeCuota {
+  /** Peticiones por minuto. */
+  rpm: number;
+  /** Tokens de entrada por minuto. */
+  tpm: number;
+  /** Peticiones por día. El que de verdad decide cuánto puedes jugar. */
+  rpd: number;
+}
+
 /**
- * El tope de tokens de ENTRADA por minuto de la capa gratuita de Google.
+ * Los topes de la capa gratuita, que NO son iguales para todos los modelos.
  *
- * Es el límite que de verdad ata en corto una campaña larga, y no la ventana
- * del modelo: da igual que quepan un millón de tokens en una petición si la
- * cuenta del minuto se corta en doscientos cincuenta mil. Además no se «gasta»
- * con el uso —se reinicia cada minuto—, así que un tomo que pesa más que esto
- * falla en el PRIMER turno y con una clave recién creada.
+ * Aquí se daba por hecho un único tope de 250.000 tokens por minuto para todo,
+ * y es falso en los dos sentidos: los modelos abiertos tienen una ventana de
+ * minuto muchísimo más pequeña (16.000 tokens, no 250.000), y los Flash de la
+ * familia 3.x tienen un tope diario de VEINTE peticiones que no depende de los
+ * tokens en absoluto.
+ *
+ * Ese tope diario es el que decide cuánto se puede jugar en un día, y es el que
+ * pasaba desapercibido: veinte turnos y se acaba la jornada con el mismo error
+ * 429 que da quedarse sin tokens por minuto, sin nada que distinga un caso del
+ * otro. Flash Lite da quinientos al día, veinticinco veces más.
+ *
+ * Los números salen del panel de límites de Google AI Studio (Modelo · RPM ·
+ * TPM · RPD). Google los cambia sin avisar, así que se toman como orientación
+ * para avisar a tiempo, no como una verdad inmutable.
+ */
+const LIMITES_CAPA_GRATUITA: { patron: RegExp; limites: LimitesDeCuota }[] = [
+  // Modelos abiertos: muchas peticiones, pero muy poco tokens por minuto.
+  { patron: /^gemma/i, limites: { rpm: 30, tpm: 16000, rpd: 14400 } },
+  // Flash Lite: el caballo de batalla para volumen.
+  { patron: /flash-lite/i, limites: { rpm: 15, tpm: 250000, rpd: 500 } },
+  // Flash de la familia 3.x: los mejores para narrar y los más racionados.
+  { patron: /gemini-3/i, limites: { rpm: 5, tpm: 250000, rpd: 20 } }
+];
+
+const LIMITES_POR_DEFECTO: LimitesDeCuota = { rpm: 5, tpm: 250000, rpd: 20 };
+
+export function limitesGratuitos(modelId: string): LimitesDeCuota {
+  const id = (modelId || '').trim();
+  return LIMITES_CAPA_GRATUITA.find(l => l.patron.test(id))?.limites || LIMITES_POR_DEFECTO;
+}
+
+/**
+ * El tope de tokens por minuto del modelo por defecto. Se conserva para los
+ * avisos genéricos; para un modelo concreto hay que usar `limitesGratuitos`.
  */
 export const TOPE_TOKENS_POR_MINUTO = 250000;
 
@@ -320,10 +358,12 @@ export function techoDeEnvio(modelId: string): {
   ventana: number;
   medido: boolean;
   mandaLaCuota: boolean;
+  cuota: LimitesDeCuota;
 } {
   const { ventana, medido } = limiteDeEnvio(modelId);
-  const limite = Math.min(ventana, TOPE_TOKENS_POR_MINUTO);
-  return { limite, ventana, medido, mandaLaCuota: TOPE_TOKENS_POR_MINUTO < ventana };
+  const cuota = limitesGratuitos(modelId);
+  const limite = Math.min(ventana, cuota.tpm);
+  return { limite, ventana, medido, mandaLaCuota: cuota.tpm < ventana, cuota };
 }
 
 export function getStoredAutoFailover(): boolean {
@@ -2070,6 +2110,10 @@ export async function generateStoryTurnStream({
             });
           }
 
+          // La petición se apunta aunque Google no haya devuelto datos de uso:
+          // el cupo diario se gasta igual, y es el cupo lo que se está contando.
+          apuntarPeticion(currentModel, currentApiKey || undefined);
+
           if (uso) {
             const huboBusqueda =
               getStoredBusquedaLocal() &&
@@ -2545,6 +2589,10 @@ export async function generateContentWithFailover({
               throw firstErr;
             }
           }
+          // Una tarea de fondo gasta cupo diario igual que un turno narrado, y
+          // se le va sin que nadie la vea: si el cupo se cuenta solo al narrar,
+          // la cuenta miente justo en la parte invisible.
+          apuntarPeticion(model, currentKey || undefined);
           return res;
         } catch (err: any) {
           // Distinguir «lo hemos cortado nosotros por plazo» de «lo ha cortado la jugadora».

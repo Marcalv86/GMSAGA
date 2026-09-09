@@ -7,11 +7,13 @@ import {
   countTurnTokens,
   describeApiError,
   getStoredBusquedaLocal,
+  getStoredApiKeys,
   getStoredHistoryWindow,
   getStoredModel,
   setStoredBusquedaLocal,
   techoDeEnvio
 } from '../utils/geminiHelper';
+import { peticionesDeHoy } from '../utils/usageStats';
 
 import {
   BookOpen,
@@ -175,8 +177,25 @@ export const ContextUsageWidget: React.FC<{
    * lugar de darla por hecha, que con Gemma es menos de la cuarta parte.
    */
   const modeloDeNarracion = medida?.modelo || getStoredModel();
-  const { limite: MAX_TOKENS, ventana, medido: limiteMedido, mandaLaCuota } =
+  const { limite: MAX_TOKENS, ventana, medido: limiteMedido, mandaLaCuota, cuota } =
     techoDeEnvio(modeloDeNarracion);
+
+  /*
+   * EL CUPO DIARIO, QUE ES EL QUE DECIDE CUÁNTO SE PUEDE JUGAR.
+   *
+   * Los Flash de la familia 3.x dan veinte peticiones al día por clave en la
+   * capa gratuita. Veinte. Y cuando se acaban, Google devuelve el mismo error
+   * 429 que cuando te pasas de tokens por minuto, sin nada que distinga un caso
+   * del otro: se busca el problema en el tamaño del envío y no está ahí.
+   *
+   * Cada clave lleva su propio cupo y son independientes entre sí, así que con
+   * varias claves el techo del día se multiplica. La app las rota sola, de modo
+   * que lo honesto es enseñar el total.
+   */
+  const numeroDeClaves = Math.max(1, getStoredApiKeys().length);
+  const cupoDiario = cuota.rpd * numeroDeClaves;
+  const peticionesHoy = peticionesDeHoy(modeloDeNarracion);
+  const cupoApurado = peticionesHoy >= cupoDiario * 0.8;
 
   // Si se ha medido de verdad contra la API, manda esa cifra; si no, la estimación.
   const tokensMostrados = medida ? medida.total : estimatedTokens;
@@ -229,6 +248,25 @@ export const ContextUsageWidget: React.FC<{
           buscar el problema en la clave, cuando el problema es el tamaño de lo
           que se manda en cada turno.
         */}
+        {cupoApurado && (
+          <div
+            onClick={() => setIsGuideOpen(true)}
+            className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-snug cursor-pointer ${
+              peticionesHoy >= cupoDiario
+                ? 'border-red-600/50 bg-red-600/10 text-red-700 dark:text-red-300'
+                : 'border-amber-600/50 bg-amber-600/10 text-amber-700 dark:text-amber-300'
+            }`}
+          >
+            <strong>
+              {peticionesHoy >= cupoDiario ? 'Cupo del día agotado' : 'Cupo del día casi agotado'}
+            </strong>{' '}
+            — {peticionesHoy} de {cupoDiario} peticiones con {modeloDeNarracion}
+            {numeroDeClaves > 1 ? ` (${cuota.rpd} × ${numeroDeClaves} claves)` : ''}. Si te da 429 no es
+            por el tamaño del envío: es que se acabaron los turnos de hoy con este modelo. Flash Lite
+            tiene un cupo mucho mayor.
+          </div>
+        )}
+
         {(pasadaDeCuota || cercaDeCuota) && (
           <div
             onClick={() => setIsGuideOpen(true)}
@@ -410,8 +448,23 @@ export const ContextUsageWidget: React.FC<{
                     </div>
                     <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
                       <span>
-                        Cuota por minuto (capa gratuita):{' '}
-                        <strong>{compact(TOPE_TOKENS_POR_MINUTO)}</strong> de tokens de entrada
+                        Tokens por minuto (capa gratuita):{' '}
+                        <strong>{compact(cuota.tpm)}</strong> de entrada
+                      </span>
+                      <span>
+                        Peticiones por minuto: <strong>{cuota.rpm}</strong>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                      <span>
+                        Peticiones por DÍA: <strong>{cuota.rpd}</strong> por clave
+                        {numeroDeClaves > 1 ? ` · ${cupoDiario} con tus ${numeroDeClaves} claves` : ''}
+                      </span>
+                      <span>
+                        Hoy llevas{' '}
+                        <strong className={peticionesHoy >= cupoDiario ? 'text-red-500' : 'text-[var(--accent)]'}>
+                          {peticionesHoy}
+                        </strong>
                       </span>
                     </div>
                     <p className="m-0 text-[11px] leading-snug">
@@ -423,6 +476,14 @@ export const ContextUsageWidget: React.FC<{
                       {mandaLaCuota
                         ? ' Ahora mismo el que corta antes es la cuota por minuto, y es contra ese contra el que mide la barra.'
                         : ' Ahora mismo el que corta antes es la ventana del modelo, y es contra ese contra el que mide la barra.'}
+                    </p>
+                    <p className="m-0 text-[11px] leading-snug">
+                      Y hay un tercer límite que no tiene nada que ver con el tamaño:{' '}
+                      <strong>las peticiones por día</strong>. Con {modeloDeNarracion} son {cuota.rpd} por
+                      clave, y al agotarse Google devuelve exactamente el mismo error 429 que cuando el
+                      envío es demasiado grande. Si la barra de arriba va holgada y aun así falla, mira
+                      esta cuenta antes que ninguna otra cosa. Las tareas de fondo (sincronizar memoria,
+                      novelizar, deducir fechas) también gastan de aquí.
                     </p>
                   </div>
 
