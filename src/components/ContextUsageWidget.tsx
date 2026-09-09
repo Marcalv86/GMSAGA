@@ -7,6 +7,7 @@ import {
   countTurnTokens,
   describeApiError,
   getStoredBusquedaLocal,
+  getStoredHistoryWindow,
   getStoredModel,
   setStoredBusquedaLocal,
   techoDeEnvio
@@ -101,16 +102,39 @@ export const ContextUsageWidget: React.FC<{
   // Las imágenes y mapas son decorativos / retratos y ya no viajan ni consumen tokens.
   const visualChars = 0;
 
-  // Los mismos topes que aplica `buildTurnPayload` al enviar. Antes se sumaban
-  // TODOS los mensajes de TODOS los capítulos, así que en una campaña larga la
-  // barra daba un susto que no se correspondía con nada: del historial solo viaja
-  // el tramo reciente del capítulo actual más una cola de los anteriores.
+  /*
+   * EL CAPÍTULO ACTUAL VIAJA ENTERO, Y ESTO LO OCULTABA.
+   *
+   * Aquí había un tope de 40.000 caracteres para el capítulo en curso, puesto
+   * —según decía el comentario— para reflejar lo que hace `buildTurnPayload` al
+   * enviar. Pero `buildTurnPayload` NO tiene ese tope: manda el capítulo
+   * completo salvo que se haya fijado una «Ventana de Historial» en Motor, y
+   * por defecto está en «todo el capítulo».
+   *
+   * O sea que un capítulo de novecientos mil caracteres se contaba como
+   * cuarenta mil: la barra escondía el 95% de lo que se estaba mandando, y
+   * justo la parte que crece sola. Cada turno reenvía el capítulo entero, así
+   * que el coste por mensaje sube según se juega, y la cuota diaria se acaba en
+   * unos pocos turnos sin que nada lo avisara.
+   *
+   * Ahora se cuenta lo que se manda de verdad, aplicando la misma ventana de
+   * historial que aplica el envío.
+   */
   const PREVIO_MAX = 8000;
-  const ESCENA_MAX = 40000;
   const largoDe = (c: Chat) => (c.messages || []).reduce((acc, m) => acc + (m.content?.length || 0), 0);
 
   const capituloActual = chats.find(c => c.id === currentChatId) || chats[chats.length - 1];
-  const escenaChars = capituloActual ? Math.min(ESCENA_MAX, largoDe(capituloActual)) : 0;
+  const ventanaHistorial = getStoredHistoryWindow();
+  const mensajesDelCapitulo = (capituloActual?.messages || []).filter(
+    m => m.content && m.content !== 'Tirando dados...' && m.content !== 'Pensando...'
+  );
+  const mensajesQueViajan =
+    ventanaHistorial === 'all'
+      ? mensajesDelCapitulo
+      : mensajesDelCapitulo.slice(-(parseInt(ventanaHistorial, 10) || mensajesDelCapitulo.length));
+  const escenaChars = mensajesQueViajan.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+  const mensajesRecortados = mensajesDelCapitulo.length - mensajesQueViajan.length;
+
   const previosChars = Math.min(
     PREVIO_MAX,
     chats.filter(c => c.id !== capituloActual?.id).reduce((acc, c) => acc + largoDe(c), 0)
@@ -287,10 +311,13 @@ export const ContextUsageWidget: React.FC<{
                         extra: mediaCount > 0 ? `${mediaCount} imágenes o audios (decorativos, no consumen tokens)` : undefined
                       },
                       {
-                        label: 'Capítulos (solo el tramo reciente)',
+                        label: 'Capítulo actual + cola de los anteriores',
                         chars: chatsChars,
                         Icon: MessageSquare,
-                        extra: undefined
+                        extra:
+                          ventanaHistorial === 'all'
+                            ? `El capítulo en curso viaja ENTERO en cada turno (${mensajesQueViajan.length} mensajes). Crece con cada respuesta: en Motor → Rendimiento puedes fijar una «Ventana de Historial» para mandar solo los últimos turnos.`
+                            : `Ventana de historial: últimos ${ventanaHistorial} mensajes${mensajesRecortados > 0 ? ` (${mensajesRecortados} más antiguos no viajan)` : ''}.`
                       },
                       {
                         label: 'Fragmentos rescatados de los de consulta',
