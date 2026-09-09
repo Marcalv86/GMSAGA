@@ -94,8 +94,8 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
   {
     id: 'gemma-4-31b-it',
     name: 'Gemma 4 31B',
-    badge: 'Open Weight · Razonamiento Denso',
-    desc: 'Insignia densa multimodal de 30.7B parámetros de Google DeepMind. Razonamiento avanzado, rol narrativo sin filtros comerciales y ventana de 256K tokens.'
+    badge: '⚠️ No apto en capa gratuita',
+    desc: 'Insignia densa de Google DeepMind, sin filtros comerciales. PERO en la capa gratuita solo admite 16.000 tokens de entrada por minuto, y el envío mínimo de esta aplicación (protocolos + instrucciones del Director) ronda los 35.000 aunque la campaña esté vacía. No cabe ni empezando de cero: dará error 429 en el primer turno. Selecciónalo solo si tu clave tiene cuota ampliada.'
   }
 ];
 
@@ -159,7 +159,7 @@ export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
   {
     id: 'gemma-4-31b-it',
     name: 'Gemma 4 31B',
-    desc: 'Open weight denso de 30.7B parámetros para tareas de fondo'
+    desc: '⚠️ 16.000 tokens por minuto en capa gratuita: se queda corto para sincronizar memoria o repasar la crónica'
   }
 ];
 
