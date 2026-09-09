@@ -27,6 +27,7 @@ import { formatRollResult } from '../utils/rollRequests';
 import { TOPE_TOKENS_POR_MINUTO, isNarrativeIncomplete } from '../utils/geminiHelper';
 
 import {
+  BookCheck,
   BookOpen,
   Dices,
   FastForward,
@@ -658,6 +659,8 @@ export const ChatView: React.FC<{
   isNearTokenLimit?: boolean;
   chatTokensCount?: number;
   onCreateNewChat?: () => void;
+  /** Si este capítulo ya está cerrado, es decir, si hay otro después. */
+  estaCerrado?: boolean;
 }> = ({
   chat,
   chapterIndex,
@@ -687,7 +690,8 @@ export const ChatView: React.FC<{
   onNavigateToDiary,
   isNearTokenLimit,
   chatTokensCount,
-  onCreateNewChat
+  onCreateNewChat,
+  estaCerrado
 }) => {
   const [inputText, setInputText] = useState('');
 
@@ -1250,6 +1254,27 @@ export const ChatView: React.FC<{
       </div>
 
       {/* Input area */}
+      {/*
+        El sello de cierre.
+
+        Un capítulo cerrado no se distinguía de uno en curso: se abría y tenía
+        el mismo aspecto, con su campo de escribir esperando, aunque la partida
+        siguiera tres capítulos más adelante. Aquí queda claro dónde termina lo
+        vivido, en la misma línea donde el relato da paso a los controles.
+      */}
+      {estaCerrado && (
+        <div className="px-2.5 sm:px-4 md:px-8 pt-3">
+          <div className="max-w-[900px] mx-auto flex items-center gap-3 text-[var(--accent)]">
+            <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[var(--accent)]/35" />
+            <span className="flex items-center gap-1.5 font-cinzel text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.18em] opacity-75 shrink-0">
+              <BookCheck className="w-3.5 h-3.5" />
+              Fin del capítulo
+            </span>
+            <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[var(--accent)]/35" />
+          </div>
+        </div>
+      )}
+
       <div className="px-2.5 sm:px-4 md:px-8 pt-2.5 pb-4 md:py-5 border-t border-dashed border-[var(--glass-border)] bg-gradient-to-t from-[color-mix(in_srgb,var(--sidebar-bg)_95%,transparent)] to-transparent">
         {/* Mientras narra: aviso discreto y botón de detener, sin tapar el texto */}
         {isStreaming && (

@@ -6,6 +6,7 @@ import {
   Menu,
   Moon,
   Paperclip,
+  BookCheck,
   Plus,
   Save,
   Scroll,
@@ -2803,8 +2804,16 @@ export default function App() {
             </button>
           </div>
 
-          {currentChats.map(c => {
+          {currentChats.map((c, idx) => {
             const isSelected = c.id === currentChatId;
+            /*
+             * Un capítulo está cerrado cuando ya hay otro después: cerrar es
+             * justamente abrir el siguiente. Se deduce de la posición en lugar
+             * de guardar una marca nueva, para que los capítulos que ya
+             * existían aparezcan sellados sin tener que tocar nada de lo
+             * guardado.
+             */
+            const estaCerrado = idx < currentChats.length - 1;
             return (
               <div
                 key={c.id}
@@ -2825,6 +2834,12 @@ export default function App() {
                   <Scroll className="w-3.5 h-3.5 shrink-0 opacity-70" />
                   <span className="truncate">{c.name}</span>
                 </span>
+                {estaCerrado && (
+                  <BookCheck
+                    className={`w-3.5 h-3.5 shrink-0 mr-1 ${isSelected ? 'opacity-80' : 'opacity-45'}`}
+                    aria-label="Capítulo cerrado"
+                  />
+                )}
                 <button
                   type="button"
                   onClick={e => {
@@ -2995,6 +3010,10 @@ export default function App() {
               isNearTokenLimit={isCurrentChatNearTokenLimit}
               chatTokensCount={effectiveChatTokens}
               onCreateNewChat={handleCreateChat}
+              estaCerrado={
+                currentChats.length > 1 &&
+                currentChats.findIndex(c => c.id === currentChatId) < currentChats.length - 1
+              }
             />
           )}
 
