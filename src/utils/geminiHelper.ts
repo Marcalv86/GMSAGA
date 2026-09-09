@@ -15,7 +15,12 @@ import {
 } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
-import { apuntarPeticion, registrarUso } from './usageStats';
+import {
+  apuntarPeticion,
+  cupoDiarioAgotado,
+  marcarCupoDiarioAgotado,
+  registrarUso
+} from './usageStats';
 import {
   CALENDARIO_HARPTOS,
   aDiaAbsoluto,
@@ -717,6 +722,15 @@ export interface ApiFailure {
   /** El estado simbólico de Google: RESOURCE_EXHAUSTED, INVALID_ARGUMENT, NOT_FOUND... */
   googleStatus: string;
   isRateLimit: boolean;
+  /**
+   * Se acabaron las peticiones del DÍA para este modelo (RPD).
+   *
+   * Es un 429 idéntico al de tokens por minuto pero no se arregla esperando un
+   * minuto ni recortando el envío: hasta mañana, ese modelo con esa clave no
+   * vuelve. Distinguirlo permite saltar al siguiente modelo en lugar de
+   * insistir contra una puerta que ya no abre hoy.
+   */
+  isDailyQuota: boolean;
   /** Límite específico de tokens por minuto (input_token_count / TPM 250k) alcanzado */
   isTokenQuotaLimit: boolean;
   isOverloaded: boolean;
@@ -816,8 +830,13 @@ export function classifyApiError(err: unknown): ApiFailure {
     );
 
   const isRateLimit = status === 429 || gs === 'RESOURCE_EXHAUSTED' || /resource_exhausted|quota|rate limit/i.test(lower);
+  const isDailyQuota =
+    isRateLimit &&
+    /per\s*day|perday|requests_per_day|requestsperday|free_tier_requests|daily limit|per-day/i.test(lower);
+
   const isTokenQuotaLimit =
     isRateLimit &&
+    !isDailyQuota &&
     /input_token_count|tokens per minute|tokenspermodelperminute|250000|token_count|quota exceeded for metric/i.test(
       lower
     );
@@ -861,6 +880,7 @@ export function classifyApiError(err: unknown): ApiFailure {
     status,
     googleStatus,
     isRateLimit,
+    isDailyQuota,
     isTokenQuotaLimit,
     isOverloaded,
     isInvalidKey,
@@ -1913,6 +1933,13 @@ export async function generateStoryTurnStream({
     for (let k = 0; k < disponibles.length && !saltarAlSiguienteModelo; k++) {
       const currentApiKey = disponibles[k];
       if (clavesMuertas.has(currentApiKey)) continue;
+      /*
+       * Si ya se supo hoy que este modelo con esta clave agotó su cupo diario,
+       * no se vuelve a llamar: no se recupera esperando. Cada modelo tiene su
+       * propio cupo, así que lo que hay que hacer es llegar cuanto antes al
+       * siguiente de la cadena, que sí tiene turnos.
+       */
+      if (cupoDiarioAgotado(currentModel, currentApiKey)) continue;
 
       const nClave = numeroDeClave(currentApiKey, k);
       const keyLabel = etiquetaDeClave(nClave);
@@ -2224,6 +2251,10 @@ export async function generateStoryTurnStream({
             break;
           }
 
+          if (fallo.isDailyQuota) {
+            marcarCupoDiarioAgotado(currentModel, currentApiKey);
+            continue;
+          }
           if (fallo.isRateLimit) {
             markKeyCooldown(currentApiKey, fallo.retryAfterMs || 60000);
             const hayOtrasClaves = disponibles.slice(k + 1).some(kk => !clavesMuertas.has(kk) && !isKeyInCooldown(kk));
@@ -2526,6 +2557,8 @@ export async function generateContentWithFailover({
     for (let k = 0; k < disponibles.length && !saltarAlSiguienteModelo; k++) {
       const currentKey = disponibles[k];
       if (currentKey && clavesMuertas.has(currentKey)) continue;
+      // El cupo del día no vuelve por esperar: al siguiente modelo de la cadena.
+      if (cupoDiarioAgotado(model, currentKey)) continue;
       if (sinTiempo()) break;
 
       const ai = getAIClient(currentKey || undefined);
@@ -2630,6 +2663,10 @@ export async function generateContentWithFailover({
           }
           if (fallo.isInvalidKey || fallo.isPermissionDenied) {
             if (currentKey) clavesMuertas.add(currentKey);
+            break;
+          }
+          if (fallo.isDailyQuota) {
+            marcarCupoDiarioAgotado(model, currentKey || undefined);
             break;
           }
           if (fallo.isRateLimit) {
@@ -4025,6 +4062,19 @@ export function describeApiError(err: unknown): string {
   }
   if (fallo.isPermissionDenied) {
     return `Google ha denegado el acceso al proyecto de tu clave (Error 403: PERMISSION_DENIED).\n\nComprueba en aistudio.google.com que el proyecto siga activo y con la Generative Language API habilitada.${detalle}`;
+  }
+  if (fallo.isDailyQuota) {
+    return `📅 SE HAN ACABADO LAS PETICIONES DE HOY PARA ESTE MODELO (ERROR 429).
+
+Este no se arregla esperando un minuto ni recortando el envío: la capa gratuita de Google reparte un número de peticiones POR DÍA y por modelo, y en los Flash de la familia 3.x son 20 por clave. Al agotarse, ese modelo con esa clave no vuelve hasta mañana.
+
+✅ LO BUENO: CADA MODELO TIENE SU PROPIO CUPO.
+Que se haya acabado el de un modelo no toca el de los demás. La app ya salta sola al siguiente de la cadena de respaldo (3.8 → 3.7 → 3.6 → 3.5 → Flash Lite) y no volverá a insistir hoy contra el que se agotó.
+
+💡 SI QUIERES MÁS PARTIDA HOY:
+• Cambia a Gemini 3.5 Flash Lite en ⚙️ Motor: su cupo diario es de 500 peticiones, veinticinco veces mayor.
+• Añade más claves de API en «Motor»: cada clave lleva su propio cupo y la app las rota sola.
+• Recuerda que las tareas de fondo (sincronizar memoria, novelizar, deducir fechas) también gastan de este cupo. Puedes darles un modelo distinto al de narrar.${detalle}`;
   }
   if (fallo.isTokenQuotaLimit) {
     const espera = fallo.retryAfterMs

@@ -174,6 +174,65 @@ export function apuntarPeticion(modelo: string, clave?: string): void {
   }
 }
 
+// ---------------------------------------------------------------- cupos agotados hoy
+
+const CLAVE_AGOTADOS = 'gmstudio_cupos_agotados';
+
+interface CuposAgotados {
+  fecha: string;
+  /** Pares «modelo|huella de clave» que ya han agotado su cupo del día. */
+  pares: string[];
+}
+
+function leerAgotados(): CuposAgotados {
+  const vacio: CuposAgotados = { fecha: hoy(), pares: [] };
+  try {
+    const raw = localStorage.getItem(CLAVE_AGOTADOS);
+    if (!raw) return vacio;
+    const parsed: CuposAgotados = JSON.parse(raw);
+    if (!parsed || parsed.fecha !== hoy() || !Array.isArray(parsed.pares)) return vacio;
+    return parsed;
+  } catch {
+    return vacio;
+  }
+}
+
+/**
+ * Apunta que este modelo, con esta clave, ya no da más hoy.
+ *
+ * El cupo diario no se recupera esperando: insistir contra él quema una petición
+ * y un poco de paciencia cada vez, y en una cadena de respaldo con varias claves
+ * eso son cinco intentos inútiles antes de llegar al modelo que sí funciona.
+ * Cada modelo lleva su propio cupo, así que saltar al siguiente no es rendirse:
+ * es donde está la partida que queda.
+ */
+export function marcarCupoDiarioAgotado(modelo: string, clave?: string): void {
+  if (!modelo) return;
+  try {
+    const agotados = leerAgotados();
+    const par = `${modelo}|${clave ? huellaDeClave(clave) : '*'}`;
+    if (!agotados.pares.includes(par)) {
+      agotados.pares.push(par);
+      localStorage.setItem(CLAVE_AGOTADOS, JSON.stringify({ fecha: hoy(), pares: agotados.pares }));
+    }
+  } catch {
+    /* sin sitio: se seguirá intentando, que es lo de antes */
+  }
+}
+
+export function cupoDiarioAgotado(modelo: string, clave?: string): boolean {
+  if (!modelo) return false;
+  const pares = leerAgotados().pares;
+  return (
+    pares.includes(`${modelo}|*`) || (clave ? pares.includes(`${modelo}|${huellaDeClave(clave)}`) : false)
+  );
+}
+
+/** Los modelos que hoy ya no dan más con NINGUNA de las claves que se le pasen. */
+export function modelosSinCupoHoy(modelos: string[], claves: string[]): string[] {
+  return modelos.filter(m => claves.length > 0 && claves.every(c => cupoDiarioAgotado(m, c)));
+}
+
 export function borrarUso(modelo?: string): void {
   if (!modelo) {
     try {
