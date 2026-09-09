@@ -253,8 +253,8 @@ export const ContextUsageWidget: React.FC<{
             onClick={() => setIsGuideOpen(true)}
             className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-snug cursor-pointer ${
               peticionesHoy >= cupoDiario
-                ? 'border-red-600/50 bg-red-600/10 text-red-700 dark:text-red-300'
-                : 'border-amber-600/50 bg-amber-600/10 text-amber-700 dark:text-amber-300'
+                ? 'border-red-700/60 bg-red-600/15 text-red-950 dark:text-red-200'
+                : 'border-amber-700/60 bg-amber-500/20 text-amber-950 dark:text-amber-100'
             }`}
           >
             <strong>
@@ -272,8 +272,8 @@ export const ContextUsageWidget: React.FC<{
             onClick={() => setIsGuideOpen(true)}
             className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-snug cursor-pointer ${
               pasadaDeCuota
-                ? 'border-red-600/50 bg-red-600/10 text-red-700 dark:text-red-300'
-                : 'border-amber-600/50 bg-amber-600/10 text-amber-700 dark:text-amber-300'
+                ? 'border-red-700/60 bg-red-600/15 text-red-950 dark:text-red-200'
+                : 'border-amber-700/60 bg-amber-500/20 text-amber-950 dark:text-amber-100'
             }`}
           >
             {pasadaDeCuota ? (

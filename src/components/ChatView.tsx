@@ -1463,9 +1463,9 @@ export const ChatView: React.FC<{
                     manualDmRolls: !prev.manualDmRolls
                   }));
                 }}
-                className={`shrink-0 rounded-lg px-2 sm:px-2.5 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer flex items-center gap-1.5 hover:scale-105 active:scale-95 ml-1 ${
+                className={`shrink-0 rounded-lg px-2 sm:px-2.5 py-1 text-xs font-cinzel font-bold border transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 hover:scale-105 active:scale-95 ml-1 min-w-[34px] sm:min-w-0 ${
                   project?.manualDmRolls
-                    ? 'border-amber-500 text-amber-800 dark:text-amber-200 bg-amber-500/20 ring-1 ring-amber-500/50'
+                    ? 'border-amber-600 text-amber-950 dark:text-amber-100 bg-amber-500/25 ring-1 ring-amber-500/60'
                     : 'border-[var(--user-border)] text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
                 }`}
                 title={
@@ -1475,14 +1475,19 @@ export const ChatView: React.FC<{
                 }
                 aria-label="Alternar modo de tiradas de PNJs"
               >
-                <Dices className={`w-3.5 h-3.5 ${project?.manualDmRolls ? 'text-amber-600 dark:text-amber-400 animate-pulse' : 'text-[var(--text-secondary)]'}`} />
                 {/*
-                  «PNJs:» se ocultaba en el móvil con una variante `xs:` que este
-                  proyecto no tiene definida, así que el botón se quedaba en un
-                  «Auto» suelto sin decir auto de qué. Ahora que la fila se
-                  reparte hay sitio de sobra para el rótulo entero.
+                  En el móvil, solo el icono.
+                  
+                  Con el rótulo entero la fila no cabía y este botón se cortaba
+                  contra el borde derecho: quedaba un «Manua» a medias, que es
+                  peor que no poner nada. Los siete dados y el oráculo ya se
+                  comen el ancho, así que aquí se hace lo mismo que con el
+                  oráculo —icono suelto— y el estado lo cuenta el color: apagado
+                  cuando tira el Director, ámbar encendido y latiendo cuando
+                  tiras tú. El rótulo vuelve en cuanto hay sitio.
                 */}
-                <span>PNJs: {project?.manualDmRolls ? 'Manual' : 'Auto'}</span>
+                <Dices className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${project?.manualDmRolls ? 'text-amber-700 dark:text-amber-300 animate-pulse' : 'text-[var(--text-secondary)]'}`} />
+                <span className="hidden sm:inline">PNJs: {project?.manualDmRolls ? 'Manual' : 'Auto'}</span>
               </button>
             )}
           </div>
@@ -1507,18 +1512,23 @@ export const ChatView: React.FC<{
           const usados = chatTokensCount || TOPE_TOKENS_POR_MINUTO;
           const porcentaje = Math.min(100, (usados / TOPE_TOKENS_POR_MINUTO) * 100);
           const pasado = usados >= TOPE_TOKENS_POR_MINUTO;
+          /*
+           * El tema claro es pergamino (#f4ecd8), no blanco, así que los ámbares
+           * medios se le funden encima y el texto deja de leerse. En claro hace
+           * falta bajar mucho el tono; en oscuro, subirlo.
+           */
           const tono = pasado
             ? {
-                texto: 'text-red-700 dark:text-red-300',
-                icono: 'text-red-600 dark:text-red-400',
-                relleno: 'bg-red-600',
-                borde: 'border-red-600/40 hover:bg-red-600/10'
+                texto: 'text-red-950 dark:text-red-200',
+                icono: 'text-red-700 dark:text-red-400',
+                relleno: 'bg-red-700 dark:bg-red-500',
+                borde: 'border-red-700/50 hover:bg-red-600/10'
               }
             : {
-                texto: 'text-amber-700 dark:text-amber-300',
-                icono: 'text-amber-600 dark:text-amber-400',
-                relleno: 'bg-amber-500',
-                borde: 'border-amber-600/40 hover:bg-amber-600/10'
+                texto: 'text-amber-950 dark:text-amber-100',
+                icono: 'text-amber-700 dark:text-amber-400',
+                relleno: 'bg-amber-600 dark:bg-amber-400',
+                borde: 'border-amber-700/50 hover:bg-amber-600/10'
               };
           return (
             <div className="max-w-[900px] mx-auto mb-2 flex items-center gap-2 sm:gap-2.5">

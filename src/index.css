@@ -5,6 +5,26 @@
   --font-lora: 'Lora', serif;
 }
 
+/*
+ * QUÉ SIGNIFICA `dark:` EN ESTA APLICACIÓN.
+ *
+ * El tema lo elige la jugadora con el botón de la luna y se aplica poniendo
+ * `data-theme` en el <html>. Pero las utilidades `dark:` de Tailwind, si nadie
+ * dice lo contrario, no miran eso: miran `prefers-color-scheme`, o sea el modo
+ * del sistema operativo. Eran dos interruptores independientes gobernando los
+ * mismos colores.
+ *
+ * Con el móvil en modo oscuro y la aplicación en tema de día —que es como
+ * arranca— salían los fondos de pergamino claro de las variables de arriba y,
+ * encima, los trescientos y pico colores de texto pensados para fondo oscuro.
+ * Texto claro sobre fondo claro: media interfaz ilegible sin haber tocado nada.
+ * Y al revés igual, con el sistema en claro y la aplicación de noche.
+ *
+ * Esta línea ata `dark:` al tema de la aplicación, que es el único que la
+ * jugadora ha elegido.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 :root {
   --bg-color: #f4ecd8;
   --sidebar-bg: #e8dcc4;
