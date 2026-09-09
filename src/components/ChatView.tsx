@@ -402,14 +402,14 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                     Respuesta incompleta o interrumpida
                   </span>
                   <span className="text-[11px] text-[var(--text-secondary)]">
-                    El relato se interrumpió antes de concluir la escena.
+                    El relato se interrumpió antes de concluir la escena. Complétalo para cerrar la narración limpiamente en este mismo mensaje sin duplicar chats.
                   </span>
                 </div>
               </div>
               <button
                 onClick={() => onContinueNarrative(idx)}
                 className="px-3 py-1.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] text-[var(--on-accent)] rounded-lg font-cinzel font-bold text-xs shadow-xs hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Continúa y concluye exactamente esta narración sin perder el texto previo"
+                title="Continúa y concluye exactamente esta narración en este mismo mensaje sin duplicar el chat"
               >
                 <Play className="w-3.5 h-3.5 fill-current" /> Continuar y Completar
               </button>
@@ -445,16 +445,6 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
             >
               {isModel && (
                 <>
-                  {isIncomplete && (
-                    <button
-                      onClick={() => onContinueNarrative(idx)}
-                      disabled={isGenerating}
-                      className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold hover:underline cursor-pointer disabled:opacity-40"
-                      title="Reanudar y completar frase interrumpida"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-current" /> Completar Frase
-                    </button>
-                  )}
                   <button
                     onClick={() => onRegenerateMessage(idx)}
                     disabled={isGenerating}
@@ -463,14 +453,16 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> Rehacer
                   </button>
-                  <button
-                    onClick={() => onContinueNarrative(idx)}
-                    disabled={isGenerating}
-                    className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
-                    title="Pedir al Narrador que continúe y profundice en esta escena"
-                  >
-                    <Play className="w-3.5 h-3.5" /> Continuar
-                  </button>
+                  {!isIncomplete && (
+                    <button
+                      onClick={() => onContinueNarrative(idx)}
+                      disabled={isGenerating}
+                      className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
+                      title="Pedir al Narrador que continúe y profundice en esta escena"
+                    >
+                      <Play className="w-3.5 h-3.5" /> Continuar
+                    </button>
+                  )}
                   {onOpenTransitionModal && isLastMessage && (
                     <button
                       onClick={onOpenTransitionModal}
@@ -770,6 +762,11 @@ export const ChatView: React.FC<{
   const handleCloseTransitionModal = useCallback(() => {
     setShowTransitionModal(false);
   }, []);
+
+  const lastMessage = chat?.messages && chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null;
+  const isLastMessageIncomplete = Boolean(
+    lastMessage && lastMessage.role === 'model' && isNarrativeIncomplete(lastMessage.content)
+  );
 
   // Ventana rápida de emojis temáticos
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -1279,13 +1276,15 @@ export const ChatView: React.FC<{
             >
               <FastForward className="w-3.5 h-3.5" /> Salto de Tiempo / Escena
             </button>
-            <button
-              onClick={() => onContinueNarrative()}
-              className="text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--on-accent)] hover:bg-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
-              title="Pide al Narrador que continúe narrando la escena actual sin escribir un nuevo mensaje"
-            >
-              <Play className="w-3.5 h-3.5" /> Continuar Narración
-            </button>
+            {!isLastMessageIncomplete && (
+              <button
+                onClick={() => onContinueNarrative()}
+                className="text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--on-accent)] hover:bg-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Pide al Narrador que continúe narrando la escena actual sin escribir un nuevo mensaje"
+              >
+                <Play className="w-3.5 h-3.5" /> Continuar Narración
+              </button>
+            )}
           </div>
         )}
 
@@ -1471,7 +1470,7 @@ export const ChatView: React.FC<{
         </div>
 
         {/* Aviso preventivo de saturación de tokens */}
-        {isNearTokenLimit && (
+        {isNearTokenLimit && !isLastMessageIncomplete && (
           <div className="max-w-[900px] mx-auto mb-2 px-3.5 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-xs">
             <div className="flex items-center gap-2.5 min-w-0">
               <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />

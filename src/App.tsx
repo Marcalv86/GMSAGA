@@ -1007,7 +1007,14 @@ export default function App() {
     return formatoSignificado();
   };
 
-  const triggerAIGeneration = async (userPrompt: string, baseMessages?: Message[]) => {
+  const triggerAIGeneration = async (
+    userPrompt: string,
+    baseMessages?: Message[],
+    options?: {
+      appendToMessageIndex?: number;
+      initialPrefix?: string;
+    }
+  ) => {
     if (!currentProject || !currentChatId) return;
 
     if (!hasConfiguredApiKey()) {
@@ -1019,6 +1026,8 @@ export default function App() {
     setIsStreamingTurn(true);
     setLoadingText('Consultando los archivos del tomo y tejiendo la trama...');
 
+    const isAppending = options?.appendToMessageIndex !== undefined;
+
     const volcarPendiente = () => {
       const pendiente = textoPendienteRef.current;
       if (pendiente === null) return;
@@ -1028,12 +1037,17 @@ export default function App() {
         prev.map(c => {
           if (c.id !== currentChatId) return c;
           const msgs = [...c.messages];
-          const last = msgs[msgs.length - 1];
-          if (last && last.role === 'model') {
-            if (last.content === visible) return c;
-            msgs[msgs.length - 1] = { ...last, content: visible };
+          if (isAppending && options?.appendToMessageIndex !== undefined && msgs[options.appendToMessageIndex]) {
+            if (msgs[options.appendToMessageIndex].content === visible) return c;
+            msgs[options.appendToMessageIndex] = { ...msgs[options.appendToMessageIndex], content: visible };
           } else {
-            msgs.push({ role: 'model', content: visible });
+            const last = msgs[msgs.length - 1];
+            if (last && last.role === 'model') {
+              if (last.content === visible) return c;
+              msgs[msgs.length - 1] = { ...last, content: visible };
+            } else {
+              msgs.push({ role: 'model', content: visible });
+            }
           }
           return { ...c, messages: msgs };
         })
@@ -1045,10 +1059,12 @@ export default function App() {
       if (!targetChat) return;
 
       const currentList = baseMessages || targetChat.messages;
-      const placeholderChat = {
-        ...targetChat,
-        messages: [...currentList, { role: 'model' as const, content: 'Tirando dados...' }]
-      };
+      const placeholderChat = isAppending
+        ? { ...targetChat, messages: currentList }
+        : {
+            ...targetChat,
+            messages: [...currentList, { role: 'model' as const, content: 'Tirando dados...' }]
+          };
       const chs = currentChats.map(c => (c.id === currentChatId ? placeholderChat : c));
       setCurrentChats(chs);
       saveLocalChats(currentProject.id, chs);
@@ -1098,6 +1114,8 @@ export default function App() {
         files: currentFiles,
         userText: userPrompt,
         signal: controller.signal,
+        initialPrefix: options?.initialPrefix,
+        targetMessageIndex: options?.appendToMessageIndex,
         // El estado del protagonista lo lleva el Narrador, no el jugador.
         onStateReported: state => {
           void handleUpdateMemory(mem => ({
@@ -1112,7 +1130,10 @@ export default function App() {
           }));
         },
         onTimeReported: t => {
-          const modelMsgIdx = currentList.length; // index of the model message being added
+          const modelMsgIdx =
+            isAppending && options?.appendToMessageIndex !== undefined
+              ? options.appendToMessageIndex
+              : currentList.length;
           void handleTimeReported(t, { msgIndex: modelMsgIdx });
         },
         // Refresco de pantalla en CADA fragmento: se vuelca inmediatamente cuando
@@ -1167,17 +1188,19 @@ Estás muy cerca del tope de 250.000 tokens por minuto de la capa gratuita de Go
       });
     } catch (error: any) {
       console.error('Error generating AI story:', error);
-      // Limpiar el mensaje de placeholder "Tirando dados..." si falló la llamada
-      setCurrentChats(prev =>
-        prev.map(c => {
-          if (c.id !== currentChatId) return c;
-          const msgs = [...c.messages];
-          if (msgs.length > 0 && msgs[msgs.length - 1].content === 'Tirando dados...') {
-            msgs.pop();
-          }
-          return { ...c, messages: msgs };
-        })
-      );
+      if (!isAppending) {
+        // Limpiar el mensaje de placeholder "Tirando dados..." si falló la llamada
+        setCurrentChats(prev =>
+          prev.map(c => {
+            if (c.id !== currentChatId) return c;
+            const msgs = [...c.messages];
+            if (msgs.length > 0 && msgs[msgs.length - 1].content === 'Tirando dados...') {
+              msgs.pop();
+            }
+            return { ...c, messages: msgs };
+          })
+        );
+      }
       logError('gemini_stream', 'Error durante la generación del turno narrativo', error, {
         projectName: currentProject?.name,
         chatName: currentChat?.name
@@ -1369,16 +1392,27 @@ Estás muy cerca del tope de 250.000 tokens por minuto de la capa gratuita de Go
       });
     }
 
+    const isIncomplete = Boolean(
+      targetMsg && targetMsg.role === 'model' && isNarrativeIncomplete(targetMsg.content)
+    );
+
     let continuePrompt =
       '[Continúa la narración de forma fluida, profundizando en la escena, las reacciones del entorno y las consecuencias de lo ocurrido.]';
 
-    // Si la narración quedó a medias o cortada por fallo de red, se le instruye exactamente desde la última palabra
-    if (targetMsg && targetMsg.role === 'model' && isNarrativeIncomplete(targetMsg.content)) {
+    let options: { appendToMessageIndex?: number; initialPrefix?: string } | undefined = undefined;
+
+    // Si la narración quedó a medias o cortada por fallo de red o límite de tokens,
+    // se reanuda fusionándose en el MISMO mensaje sin duplicar el chat.
+    if (isIncomplete && targetMsg) {
       const anchor = targetMsg.content.trim().slice(-160).trim();
       continuePrompt = `[SISTEMA - REANUDACIÓN DE ESCENA]: El último fragmento del relato se interrumpió abruptamente antes de concluir. El último texto fue: "${anchor}". Continúa el relato EXACTAMENTE a partir de ese punto sin repetir nada previo, concluyendo las frases y la escena con fluidez y los registros correspondientes.`;
+      options = {
+        appendToMessageIndex: targetIdx,
+        initialPrefix: targetMsg.content.trim()
+      };
     }
 
-    await triggerAIGeneration(continuePrompt, baseMessages);
+    await triggerAIGeneration(continuePrompt, baseMessages, options);
   };
 
   const handleSceneTransition = async (transitionPrompt: string) => {

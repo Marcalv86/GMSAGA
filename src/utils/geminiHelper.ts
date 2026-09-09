@@ -1154,11 +1154,12 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
   // Clasificación de documentos: "Siempre presentes" vs "De consulta inteligente (On-Demand)"
   const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
 
-  // Fichas específicas del protagonista
+  // Fichas específicas del protagonista que viajan íntegras (solo si no están marcadas de consulta)
   const pc = project.memory?.player_character;
   const pjSheetFiles = files.filter(
     f =>
       esTexto(f) &&
+      !f.onDemand &&
       (f.category === 'sheet_pj' ||
         f.name.toLowerCase().includes('ficha') ||
         f.name.toLowerCase().includes('personaje') ||
@@ -1170,9 +1171,9 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
   );
   const pjSheetIds = new Set(pjSheetFiles.map(f => f.id));
 
-  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos o fichas del PJ)
+  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos)
   const deConsulta = files.filter(
-    f => esTexto(f) && Boolean(f.onDemand) && f.category !== 'oracle' && !pjSheetIds.has(f.id)
+    f => esTexto(f) && Boolean(f.onDemand) && f.category !== 'oracle'
   );
   const deConsultaIds = new Set(deConsulta.map(f => f.id));
 
@@ -1648,8 +1649,13 @@ async function intentarCompletarNarrativa({
   const anclaje = fullText.slice(-160).trim();
   const promptCont = `[SISTEMA - REANUDACIÓN DE ESCENA]: La respuesta se interrumpió antes de concluir el relato. El último fragmento escrito fue: "${anclaje}". Continúa el relato EXACTAMENTE a partir de la última palabra sin repetir nada del texto previo, concluyendo de forma natural las frases, la escena y los registros internos finales.`;
 
+  // Para evitar sobrepasar la cuota por minuto de tokens (250k TPM)
+  // con un reenvío íntegro de cientos de miles de tokens de compendios,
+  // la continuación solo necesita las directivas del sistema (en config)
+  // y los intercambios más recientes.
+  const contextSlices = contentsBase.length > 2 ? contentsBase.slice(-2) : contentsBase;
   const continuationContents = [
-    ...contentsBase,
+    ...contextSlices,
     { role: 'model', parts: [{ text: fullText }] },
     { role: 'user', parts: [{ text: promptCont }] }
   ];
@@ -1664,11 +1670,24 @@ async function intentarCompletarNarrativa({
     });
 
     let lastSave = Date.now();
+    let isFirstChunk = true;
 
     for await (const chunk of contStream) {
       if (signal?.aborted) break;
-      const textPart = chunk.text ?? '';
+      let textPart = chunk.text ?? '';
       if (textPart) {
+        if (isFirstChunk) {
+          isFirstChunk = false;
+          // Si el modelo repite las últimas palabras del anclaje, recortarlas
+          const lastWords = anclaje.split(/\s+/).slice(-6);
+          for (let i = lastWords.length; i >= 2; i--) {
+            const needle = lastWords.slice(-i).join(' ');
+            if (textPart.trimStart().startsWith(needle)) {
+              textPart = textPart.trimStart().slice(needle.length);
+              break;
+            }
+          }
+        }
         fullText += textPart;
         onChunk(fullText);
       }
@@ -1722,7 +1741,9 @@ export async function generateStoryTurnStream({
   onTimeReported,
   onUsageReported,
   setLoadingText,
-  onSaveMessage
+  onSaveMessage,
+  initialPrefix,
+  targetMessageIndex
 }: {
   project: Project;
   currentChatId: string;
@@ -1741,6 +1762,10 @@ export async function generateStoryTurnStream({
   /** El Narrador informa de cambios en el inventario o monedas del protagonista. */
   setLoadingText: (text: string) => void;
   onSaveMessage?: (updatedChat: Chat) => Promise<void> | void;
+  /** Prefijo inicial si se está continuando o completando un mensaje previo */
+  initialPrefix?: string;
+  /** Índice del mensaje objetivo a actualizar en lugar de añadir uno nuevo */
+  targetMessageIndex?: number;
 }) {
   const currentChat = chats.find(c => c.id === currentChatId);
   if (!currentChat) throw new Error('Sesión no encontrada.');
@@ -1771,7 +1796,7 @@ export async function generateStoryTurnStream({
   let ultimoFallo: ApiFailure | null = null;
 
   const persistir = (texto: string, definitivo: boolean) =>
-    saveStreamedMessage(currentChat, texto, onSaveMessage, onStateReported, onTimeReported, definitivo);
+    saveStreamedMessage(currentChat, texto, onSaveMessage, onStateReported, onTimeReported, definitivo, targetMessageIndex);
 
   for (let modelIndex = 0; modelIndex < failoverChain.length; modelIndex++) {
     const currentModel = failoverChain[modelIndex];
@@ -1799,10 +1824,8 @@ export async function generateStoryTurnStream({
       for (let intento = 0; intento <= MAX_REINTENTOS_POR_SATURACION; intento++) {
         if (signal?.aborted) return;
 
-        // Cada intento arranca con la hoja en blanco. Si el anterior dejó a
-        // medias un puñado de letras, arrastrarlas pegaría el arranque de una
-        // narración con el cuerpo de otra distinta.
-        let fullText = '';
+        // Cada intento arranca con la hoja en blanco (o el prefijo si es continuación de mensaje).
+        let fullText = initialPrefix || '';
         let recibioTexto = false;
         let motivoDeCierre = '';
         let bloqueoDePrompt = '';
@@ -1910,13 +1933,39 @@ export async function generateStoryTurnStream({
 
           let lastSaveTime = Date.now();
           let uso: any = null;
+          let isFirstChunk = true;
 
           for await (const chunk of responseStream) {
             if (signal?.aborted) break;
-            const textPart = chunk.text ?? '';
+            let textPart = chunk.text ?? '';
             if (textPart) {
+              if (isFirstChunk && initialPrefix) {
+                isFirstChunk = false;
+                const prefixTrim = initialPrefix.trim();
+                const anchor = prefixTrim.slice(-60);
+                const words = anchor.split(/\s+/).slice(-5);
+                for (let i = words.length; i >= 2; i--) {
+                  const needle = words.slice(-i).join(' ');
+                  if (textPart.trimStart().startsWith(needle)) {
+                    textPart = textPart.trimStart().slice(needle.length);
+                    break;
+                  }
+                }
+                const sep =
+                  prefixTrim &&
+                  !prefixTrim.endsWith(' ') &&
+                  !textPart.startsWith(' ') &&
+                  !textPart.startsWith('\n') &&
+                  !textPart.startsWith('.') &&
+                  !textPart.startsWith(',') &&
+                  !textPart.startsWith(';')
+                    ? ' '
+                    : '';
+                fullText = prefixTrim + sep + textPart;
+              } else {
+                fullText += textPart;
+              }
               recibioTexto = true;
-              fullText += textPart;
               onChunk(fullText);
             }
             const candidato = (chunk as any).candidates?.[0];
@@ -2179,7 +2228,8 @@ async function saveStreamedMessage(
    * y puede reaplicarse, pero el tiempo se acumula: si se reportara en cada
    * guardado parcial, una sola escena adelantaría el reloj media docena de veces.
    */
-  definitivo = false
+  definitivo = false,
+  targetMessageIndex?: number
 ) {
   let cleanedText = fullText;
   let chatName = chat.name;
@@ -2229,7 +2279,9 @@ async function saveStreamedMessage(
   if (state && onStateReported) onStateReported(state);
 
   const newMessages = [...chat.messages];
-  if (newMessages.length > 0 && newMessages[newMessages.length - 1].role === 'model') {
+  if (targetMessageIndex !== undefined && newMessages[targetMessageIndex]) {
+    newMessages[targetMessageIndex] = { ...newMessages[targetMessageIndex], content: cleanedText };
+  } else if (newMessages.length > 0 && newMessages[newMessages.length - 1].role === 'model') {
     newMessages[newMessages.length - 1].content = cleanedText;
   } else {
     newMessages.push({ role: 'model', content: cleanedText });
