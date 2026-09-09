@@ -125,7 +125,11 @@ Al final de tu respuesta (tras la narración pura), incluye las siguientes etiqu
      b) **DESCANSO LARGO (fin del día, 8 horas / acampar o dormir hasta el alba):** Cuando concluyan la jornada, acampen o duerman. En ese único turno emites UNA sola entrada consolidando los hechos más memorables de todo el día y la noche de descanso (ej: \`[AGENDA: Montamos el campamento junto al arroyo; repasé el mapa a la luz de las brasas antes de caer rendido | lugar: Campamento del Arroyo | hito: descanso — Descanso largo]\`).
      c) **SALTO TEMPORAL NARRATIVO O INCONSCIENCIA:** Si por trama transcurren días enteros de convalecencia, coma o viaje largo.
 6. \`[HILO: título | vence en 15d | qué ocurrirá | oculto]\` — Cuando quede un reloj o evento con fecha límite activa.
-7. \`[ESTADO: PG actuales/máximos | CA valor | condiciones: lista o ninguna]\` — SIEMPRE en último lugar. Refleja daño, curación, enfermedades, agotamiento, venenos y heridas persistentes. Si no hubo daño, curación ni nuevas condiciones, repite fielmente los valores anteriores sin alterarlos.
+7. \`[AVANCE: X/Y hacia Nivel N]\` y \`[NIVEL: N]\` — La contabilidad de hitos, que la interfaz LEE y guarda en la ficha.
+   - \`[AVANCE: 2/3 hacia Nivel 3]\` al cerrar una sesión o jornada con hito, para que la barra de progreso del HUD y de la Memoria digan la verdad. Puedes añadir qué hito se anotó tras una barra vertical: \`[AVANCE: 2/3 hacia Nivel 3 | Pacto con la bruja del vado]\`.
+   - \`[NIVEL: 3]\` ÚNICAMENTE en el turno en que el protagonista sube de nivel. La cuenta de hitos se reinicia sola al recibirla.
+   - Sin estas etiquetas la aplicación no puede llevar la cuenta y el personaje se queda congelado sin que nadie lo note. No las emitas en turnos ordinarios: solo al anotar un hito o al subir.
+8. \`[ESTADO: PG actuales/máximos | CA valor | condiciones: lista o ninguna]\` — SIEMPRE en último lugar. Refleja daño, curación, enfermedades, agotamiento, venenos y heridas persistentes. Si no hubo daño, curación ni nuevas condiciones, repite fielmente los valores anteriores sin alterarlos.
 
 ---
 

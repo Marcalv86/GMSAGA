@@ -257,6 +257,17 @@ export interface PlayerCharacter {
   subclass?: string;
   level?: string;
   levelProgress?: number; // 0-100 percentage towards next level
+  /**
+   * Hitos anotados hacia el siguiente nivel, tal como los lleva el Narrador.
+   *
+   * El avance por hitos se llevaba solo en la cabeza del modelo: las
+   * instrucciones exigían una línea `[Avance: 2/3]` que nadie leía, así que la
+   * cuenta se perdía al cambiar de capítulo y el HUD se inventaba un
+   * porcentaje a partir de eventos y misiones. Guardarlo aquí es lo que
+   * convierte esa cuenta en algo que sobrevive a la sesión.
+   */
+  hitosActuales?: number;
+  hitosParaSubir?: number;
   background?: string;
   alignment?: string;
   experience?: string;

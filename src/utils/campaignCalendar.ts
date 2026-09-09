@@ -502,6 +502,8 @@ export function leerFechaDeHud(texto?: string): FechaDeHud | null {
 // ---------------------------------------------------------------- etiquetas del Narrador
 
 const TIEMPO_RE = /\[\s*TIEMPO\s*:\s*([^\]]+)\]/gi;
+const AVANCE_RE = /\[\s*AVANCE\s*:\s*([^\]]+)\]/gi;
+const NIVEL_RE = /\[\s*NIVEL\s*:\s*([^\]]+)\]/gi;
 const AGENDA_RE = /\[\s*AGENDA\s*:\s*([^\]]+)\]/gi;
 const HILO_RE = /\[\s*HILO\s*:\s*([^\]]+)\]/gi;
 
@@ -749,6 +751,70 @@ function contienePalabra(texto: string, palabra: string): boolean {
 /** Escapa un texto para poder meterlo dentro de una expresión regular. */
 function escaparRegex(v: string): string {
   return v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ---------------------------------------------------------------- progreso de nivel
+
+export interface AvanceDeNivel {
+  /** Hitos anotados hacia el siguiente nivel. */
+  hitos?: number;
+  /** Cuántos hacen falta para subir. */
+  necesarios?: number;
+  /** El nivel al que se sube, si el Narrador lo dice. */
+  nivelDestino?: string;
+  /** El nivel alcanzado, cuando la etiqueta anuncia una subida consumada. */
+  nivelAlcanzado?: string;
+  /** Qué hito se ha anotado, si viene explicado. */
+  hito?: string;
+}
+
+/**
+ * Lee el progreso de nivel que el Narrador escribe al cerrar una sesión.
+ *
+ * Las instrucciones del Director llevan tiempo exigiendo una línea
+ * `[Avance: 2/3 hacia Nivel 3]` en cada fin de sesión, con el argumento —suyo,
+ * y correcto— de que sin ella el progreso se evapora entre sesiones y el
+ * personaje se queda congelado sin que nadie se dé cuenta. Lo que faltaba es
+ * que alguien la leyera: la aplicación nunca lo hizo, así que la cuenta vivía
+ * en la cabeza del modelo y se perdía en cuanto cambiaba el capítulo.
+ *
+ * Se aceptan las dos formas que salen de forma natural:
+ *   [Avance: 2/3 hacia Nivel 3]   [AVANCE: 2/3]   [Avance: 2 de 3]
+ *   [NIVEL: 4]                    [NIVEL: Nivel 4 — Druida]
+ */
+export function leerAvanceDeNivel(texto: string): AvanceDeNivel | null {
+  if (!texto || !texto.includes('[')) return null;
+  const out: AvanceDeNivel = {};
+
+  AVANCE_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = AVANCE_RE.exec(texto)) !== null) {
+    const cuerpo = m[1].trim();
+    const fraccion = cuerpo.match(/(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})/i);
+    if (fraccion) {
+      const hitos = parseInt(fraccion[1], 10);
+      const necesarios = parseInt(fraccion[2], 10);
+      // Un denominador de cero o una cuenta imposible se descarta entera: es
+      // mejor no saber el progreso que enseñar uno inventado.
+      if (necesarios > 0 && hitos >= 0 && hitos <= necesarios * 2) {
+        out.hitos = hitos;
+        out.necesarios = necesarios;
+      }
+    }
+    const destino = cuerpo.match(/hacia\s+(?:el\s+)?(?:nivel\s*)?([\w\s.'-]{1,24})/i);
+    if (destino) out.nivelDestino = `Nivel ${destino[1].trim().replace(/^nivel\s*/i, '')}`;
+    const hito = cuerpo.split('|')[1];
+    if (hito?.trim()) out.hito = hito.trim();
+  }
+
+  NIVEL_RE.lastIndex = 0;
+  while ((m = NIVEL_RE.exec(texto)) !== null) {
+    const cuerpo = m[1].trim();
+    const num = cuerpo.match(/(\d{1,2})/);
+    if (num) out.nivelAlcanzado = `Nivel ${num[1]}`;
+  }
+
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 /** Sin tildes y en minúsculas, para comparar palabras sin sorpresas. */
@@ -1029,6 +1095,8 @@ export function limpiarEtiquetasDeTiempo(texto: string): string {
     .replace(TIEMPO_RE, '')
     .replace(AGENDA_RE, '')
     .replace(HILO_RE, '')
+    .replace(AVANCE_RE, '')
+    .replace(NIVEL_RE, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')

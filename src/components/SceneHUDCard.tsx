@@ -247,14 +247,28 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud, project }) => {
   const fullLocation = [hud.location, hud.subLocation, hud.region].filter(Boolean).join(' · ');
   const fullTime = [hud.date, hud.timeOfDay].filter(Boolean).join(' · ');
 
-  // Calcular progreso de nivel e hitos a partir de la memoria y eventos
+  /*
+   * EL PROGRESO DE NIVEL, CUANDO SE SABE DE VERDAD.
+   *
+   * Aquí se inventaba un porcentaje cuando no había dato:
+   * `min(100, max(15, eventos*15 + misiones*25))`. Una fórmula que no tiene
+   * nada que ver con el avance por hitos que definen las instrucciones del
+   * Director, y que además nunca bajaba de un 15% ni al empezar la partida.
+   * Enseñaba una barra convincente que no medía nada, y encima escondía que
+   * la cuenta real no se estaba llevando.
+   *
+   * Ahora la barra sale solo si el Narrador ha anotado el avance con
+   * `[Avance: X/Y]`. Sin dato no hay barra: se dice que no se está llevando la
+   * cuenta, que es la información útil.
+   */
   const pc = project?.memory?.player_character;
-  const eventsCount = pc?.events?.length || 0;
-  const questsCompleted = project?.memory?.quests?.filter(q => q.status === 'Completada')?.length || 0;
-  const levelProgress = pc?.levelProgress !== undefined && pc.levelProgress > 0 
-    ? pc.levelProgress 
-    : Math.min(100, Math.max(15, (eventsCount * 15) + (questsCompleted * 25)));
   const characterLevel = pc?.level || 'Nivel 1';
+  const hitos = pc?.hitosActuales;
+  const paraSubir = pc?.hitosParaSubir;
+  const hayCuenta = typeof hitos === 'number' && typeof paraSubir === 'number' && paraSubir > 0;
+  const levelProgress = hayCuenta
+    ? Math.max(0, Math.min(100, Math.round((hitos! / paraSubir!) * 100)))
+    : pc?.levelProgress ?? 0;
 
   return (
     <div className="w-full mb-3 select-none transition-all duration-200">
@@ -446,15 +460,25 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud, project }) => {
                     Progreso de Hitos y Experiencia ({characterLevel})
                   </span>
                   <span className="font-semibold text-[var(--text-secondary)]">
-                    {levelProgress}% para subir de nivel ({eventsCount} eventos registrados, {questsCompleted} hitos)
+                    {hayCuenta
+                      ? `${hitos} de ${paraSubir} hitos · ${levelProgress}%`
+                      : 'sin cuenta anotada todavía'}
                   </span>
                 </div>
-                <div className="w-full bg-[var(--surface)] rounded-full h-2 overflow-hidden border border-[var(--glass-border)]">
-                  <div 
-                    className="bg-gradient-to-r from-[var(--accent)] to-amber-500 h-full transition-all duration-300 rounded-full"
-                    style={{ width: `${levelProgress}%` }}
-                  />
-                </div>
+                {hayCuenta ? (
+                  <div className="w-full bg-[var(--surface)] rounded-full h-2 overflow-hidden border border-[var(--glass-border)]">
+                    <div
+                      className="bg-gradient-to-r from-[var(--accent)] to-amber-500 h-full transition-all duration-300 rounded-full"
+                      style={{ width: `${levelProgress}%` }}
+                    />
+                  </div>
+                ) : (
+                  <p className="m-0 text-[10px] text-[var(--text-secondary)] leading-snug">
+                    El Narrador anota el avance al cerrar sesión con una línea{' '}
+                    <span className="font-mono">[Avance: 2/3]</span>. En cuanto lo haga, aquí saldrá la
+                    cuenta real de hitos.
+                  </p>
+                )}
               </div>
             </div>
           </div>

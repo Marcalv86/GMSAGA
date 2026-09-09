@@ -664,11 +664,20 @@ export const MemoryManager: React.FC<{
 
                 {/* Level & Progress Bar */}
                 {(() => {
-                  const personalTimelineEvents = (project.timeline || []).filter(t => t.tipo === 'personal' || t.hito);
-                  const eventsCount = (cleanPc.events?.length || 0) + personalTimelineEvents.length;
-                  const questsCompleted = (memory.quests || []).filter(q => q.status === 'completada' || q.status === 'completed').length;
-                  const calculatedProgress = Math.min(100, Math.max(5, (eventsCount * 15) + (questsCompleted * 20)));
-                  const currentLevelProgress = cleanPc.levelProgress !== undefined && cleanPc.levelProgress > 0 ? cleanPc.levelProgress : calculatedProgress;
+                  /*
+                   * La misma barra inventada que había en el HUD, con otra
+                   * fórmula: `eventos*15 + misiones*20`, con un suelo del 5%.
+                   * Ni medía el avance por hitos ni coincidía con la del HUD,
+                   * así que las dos pantallas daban porcentajes distintos del
+                   * mismo personaje. Ahora las dos leen la cuenta real que
+                   * anota el Narrador, y si no la hay, lo dicen.
+                   */
+                  const hitos = cleanPc.hitosActuales;
+                  const paraSubir = cleanPc.hitosParaSubir;
+                  const hayCuenta = typeof hitos === 'number' && typeof paraSubir === 'number' && paraSubir > 0;
+                  const currentLevelProgress = hayCuenta
+                    ? Math.max(0, Math.min(100, Math.round((hitos! / paraSubir!) * 100)))
+                    : cleanPc.levelProgress ?? 0;
 
                   return (
                     <div className="mt-2.5 flex flex-col gap-1.5 bg-[var(--surface)] p-3 rounded-lg border border-[var(--glass-border)]">
@@ -678,15 +687,26 @@ export const MemoryManager: React.FC<{
                           {cleanPc.class && <span className="text-[var(--text-secondary)] font-normal">({cleanPc.class})</span>}
                         </span>
                         <span className="text-[var(--text-secondary)] font-semibold">
-                          {currentLevelProgress}% para subir de nivel ({eventsCount} eventos registrados, {questsCompleted} hitos)
+                          {hayCuenta
+                            ? `${hitos} de ${paraSubir} hitos · ${currentLevelProgress}%`
+                            : 'sin cuenta de hitos anotada'}
                         </span>
                       </div>
-                      <div className="w-full bg-[var(--surface-soft)] rounded-full h-2 overflow-hidden border border-[var(--glass-border)]">
-                        <div 
-                          className="bg-[var(--accent)] h-full transition-all duration-300 rounded-full"
-                          style={{ width: `${currentLevelProgress}%` }}
-                        />
-                      </div>
+                      {hayCuenta ? (
+                        <div className="w-full bg-[var(--surface-soft)] rounded-full h-2 overflow-hidden border border-[var(--glass-border)]">
+                          <div
+                            className="bg-[var(--accent)] h-full transition-all duration-300 rounded-full"
+                            style={{ width: `${currentLevelProgress}%` }}
+                          />
+                        </div>
+                      ) : (
+                        <p className="m-0 text-[11px] text-[var(--text-secondary)] leading-snug">
+                          El Narrador lleva la cuenta al cerrar sesión con una línea{' '}
+                          <span className="font-mono">[Avance: 2/3 hacia Nivel 3]</span>, y al subir con{' '}
+                          <span className="font-mono">[NIVEL: 3]</span>. En cuanto lo anote, aquí saldrá el
+                          avance real.
+                        </p>
+                      )}
                     </div>
                   );
                 })()}

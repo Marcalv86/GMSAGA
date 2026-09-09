@@ -30,6 +30,7 @@ import {
   MapMarker,
   VisualMemoryItem,
   NPC,
+  PlayerCharacter,
   ScheduledThread,
   TimelineEntry
 } from './types';
@@ -104,6 +105,7 @@ import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/
 import { RollRequest, rollDie } from './utils/rollRequests';
 import { Probabilidad, formatoSignificado, nuevaConsulta } from './utils/oracle';
 import {
+  AvanceDeNivel,
   aDiaAbsoluto,
   avanzar,
   calendarioValido,
@@ -828,9 +830,56 @@ export default function App() {
       }
 
       let mem = conVinculos(p, hoyAbs);
+      mem = conAvanceDeNivel(mem, t.avanceDeNivel);
 
       return { currentDate: nuevaFecha, threads, timeline, memory: mem };
     });
+  };
+
+  /**
+   * Guarda el avance por hitos que el Narrador ha anotado este turno.
+   *
+   * Las instrucciones del Director exigen desde siempre una línea
+   * `[Avance: 2/3 hacia Nivel 3]` al cerrar sesión, con el argumento de que sin
+   * ella el progreso se evapora y el personaje se queda congelado. Tenían razón
+   * y pasaba exactamente eso: nadie la leía, así que la cuenta vivía en la
+   * cabeza del modelo y se perdía al cambiar de capítulo.
+   *
+   * El porcentaje se calcula a partir de la fracción real, no se estima. Si el
+   * Narrador anuncia la subida con `[NIVEL: 4]`, se cambia el nivel y la cuenta
+   * de hitos vuelve a cero, que es lo que significa haber subido.
+   */
+  const conAvanceDeNivel = (mem: Project['memory'], avance?: AvanceDeNivel): Project['memory'] => {
+    if (!avance || !mem) return mem;
+    const pc = mem.player_character;
+    if (!pc) return mem;
+
+    const subeDeNivel = Boolean(avance.nivelAlcanzado);
+    const hitos = subeDeNivel ? 0 : avance.hitos;
+    const necesarios = avance.necesarios ?? pc.hitosParaSubir;
+
+    const actualizado: PlayerCharacter = {
+      ...pc,
+      level: avance.nivelAlcanzado || pc.level,
+      hitosActuales: hitos ?? pc.hitosActuales,
+      hitosParaSubir: necesarios,
+      levelProgress:
+        hitos !== undefined && necesarios
+          ? Math.max(0, Math.min(100, Math.round((hitos / necesarios) * 100)))
+          : subeDeNivel
+          ? 0
+          : pc.levelProgress
+    };
+
+    if (subeDeNivel) {
+      logInfo(
+        'memory_sync',
+        `Subida de nivel: ${avance.nivelAlcanzado}`,
+        `El Narrador ha anunciado la subida a ${avance.nivelAlcanzado}. La cuenta de hitos vuelve a empezar.`
+      );
+    }
+
+    return { ...mem, player_character: actualizado };
   };
 
   /**

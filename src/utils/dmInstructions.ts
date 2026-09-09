@@ -421,7 +421,7 @@ El avance de nivel se otorga por hitos narrativos. **⛔ «Hito» NO significa �
 
 ### ⛔ Contabilidad visible (para que esto no se olvide otra vez)
 
-- **Lleva la cuenta y enséñala.** En cada \`[Fin de Sesión]\` (§7) incluye una línea de avance: \`[Avance: 2/3 hacia Nivel 3]\`, más una frase de qué hito se ha anotado ese día. Sin esa línea, el progreso se evapora entre sesiones y el personaje se queda congelado.
+- **Lleva la cuenta y enséñala.** En cada \`[Fin de Sesión]\` (§7) incluye una línea de avance: \`[Avance: 2/3 hacia Nivel 3]\`, más una frase de qué hito se ha anotado ese día. **La interfaz LEE esa etiqueta y la guarda en la ficha**, así que es lo que hace que la barra de progreso del HUD y de la Memoria digan la verdad; sin ella el progreso se evapora entre sesiones y el personaje se queda congelado. Cuando el protagonista suba de nivel, emite además \`[NIVEL: 3]\` en ese turno: la cuenta de hitos se reinicia sola al recibirla.
 - **Ritmo de referencia** (una sesión ≈ un día de juego): **Niveles 1-4 → cada 2-3 sesiones con hito. Niveles 5-10 → cada 3-4. A partir de 11 → cada 4-5.** Una sesión cuenta como sesión con hito si ha pasado **cualquiera** de las cosas de la lista de arriba.
 - **⛔ Techo de estancamiento:** si se acumulan **más de 4 sesiones seguidas sin subir de nivel** en niveles bajos, revisa la cuenta. O has estado sin anotar hitos que sí ocurrieron, o el ritmo de la campaña se ha atascado — y las dos cosas se corrigen, no se dejan correr.
 - **Los hitos de poder siguen su propia regla:** los saltos mayores (subclase, primeras transformaciones nuevas, rasgos importantes) se desencadenan **en escena y por emergencia narrativa**, no como trámite de ficha — eso no cambia.

@@ -36,6 +36,8 @@ import {
   leerAgenda,
   leerAvanceDeTiempo,
   leerFechaDeHud,
+  leerAvanceDeNivel,
+  AvanceDeNivel,
   parsearFechaTexto,
   extraerMinutoDeTexto,
   EntradaDeAgenda,
@@ -1834,7 +1836,7 @@ export function isNarrativeIncomplete(text: string): boolean {
 
   // Si termina con etiquetas de cierre, estado o tirada formales, ha concluido formalmente
   const tailText = clean.slice(-250);
-  if (/\[(?:ESTADO|TIEMPO|AGENDA|HILO|PRESENTES|VINCULO|AFINIDAD|Petición de Tirada|Petición de Salvación|Tirada DM|Tirada)[^\]]*\]\s*$/i.test(tailText)) {
+  if (/\[(?:ESTADO|TIEMPO|AGENDA|HILO|PRESENTES|VINCULO|AFINIDAD|AVANCE|NIVEL|Petición de Tirada|Petición de Salvación|Tirada DM|Tirada)[^\]]*\]\s*$/i.test(tailText)) {
     return false;
   }
 
@@ -2486,6 +2488,8 @@ export interface TiempoReportado {
   fechaHud?: string;
   /** El momento del día de esa misma cabecera: «madrugada», «media tarde». */
   momentoHud?: string;
+  /** Progreso hacia el siguiente nivel, si el Narrador lo ha anotado. */
+  avanceDeNivel?: AvanceDeNivel;
 }
 
 async function saveStreamedMessage(
@@ -2522,6 +2526,7 @@ async function saveStreamedMessage(
   const vinculos = leerVinculos(cleanedText);
   // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
   const hudDeEsteTurno = leerFechaDeHud(fullText);
+  const avanceDeNivel = leerAvanceDeNivel(cleanedText) || undefined;
   cleanedText = limpiarEtiquetasDePnj(limpiarEtiquetasDeTiempo(cleanedText));
 
   if (definitivo && hilos.length > 0) {
@@ -2539,7 +2544,8 @@ async function saveStreamedMessage(
       hilos.length ||
       presentes.length ||
       vinculos.length ||
-      hudDeEsteTurno?.fechaTexto)
+      hudDeEsteTurno?.fechaTexto ||
+      avanceDeNivel)
   ) {
     try {
       onTimeReported({
@@ -2549,7 +2555,8 @@ async function saveStreamedMessage(
         presentes,
         vinculos,
         fechaHud: hudDeEsteTurno?.fechaTexto,
-        momentoHud: hudDeEsteTurno?.momento
+        momentoHud: hudDeEsteTurno?.momento,
+        avanceDeNivel
       });
     } catch (err) {
       logError('threads', 'Error al procesar el reporte de tiempo e hilos de la escena', err, {
@@ -4417,7 +4424,7 @@ export function parseStateTag(text: string): {
 export function limpiarParaMostrar(texto: string): string {
   if (!texto || !texto.includes('[')) return texto;
   return texto
-    .replace(/\[(?:ESTADO|TIEMPO|AGENDA|HILO|CHAPTER|PRESENTES|VINCULO|AFINIDAD)\b[^\]]*\]/gi, '')
+    .replace(/\[(?:ESTADO|TIEMPO|AGENDA|HILO|CHAPTER|PRESENTES|VINCULO|AFINIDAD|AVANCE|NIVEL)\b[^\]]*\]/gi, '')
     // Una etiqueta a medio llegar: se esconde hasta que se sepa cómo acaba.
     .replace(/\[(?:E(?:S(?:T(?:A(?:D(?:O)?)?)?)?)?|T(?:I(?:E(?:M(?:P(?:O)?)?)?)?)?|A(?:G(?:E(?:N(?:D(?:A)?)?)?)?)?|H(?:I(?:L(?:O)?)?)?|C(?:H(?:A(?:P(?:T(?:E(?:R)?)?)?)?)?)?|P(?:R(?:E(?:S(?:E(?:N(?:T(?:E(?:S)?)?)?)?)?)?)?)?|V(?:I(?:N(?:C(?:U(?:L(?:O)?)?)?)?)?)?)[^\]]*$/i, '')
     .replace(/[ \t]{2,}/g, ' ');
