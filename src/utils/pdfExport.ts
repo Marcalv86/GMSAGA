@@ -5,7 +5,9 @@ import { stripRollRequests, stripStateTag } from './rollRequests';
 export interface ExportNovelOptions {
   scope?: 'current' | 'all';
   showPlayerActions?: boolean;
+  playerActionsMode?: 'novelized' | 'original' | 'hidden';
   onProgress?: (text: string) => void;
+  format?: 'md' | 'txt';
 }
 
 /**
@@ -28,8 +30,8 @@ function sanitizeTextForPdf(text: string): string {
  * Limpia el contenido de un mensaje eliminando tiradas mecánicas y etiquetas
  * para dejar únicamente la prosa narrativa.
  */
-function cleanMessageForNovel(msg: Message): string {
-  let text = msg.content || '';
+function cleanMessageForNovel(msg: Message, useNovelized: boolean = true): string {
+  let text = (useNovelized && msg.role === 'user' && msg.novelContent) ? msg.novelContent : (msg.content || '');
   text = stripStateTag(text);
   text = stripRollRequests(text);
   text = stripInternalTagsAndHeaders(text);
@@ -44,7 +46,14 @@ export async function exportNovelToPDF(
   chats: Chat[],
   options: ExportNovelOptions = {}
 ): Promise<void> {
-  const { scope = 'current', showPlayerActions = true, onProgress = () => {} } = options;
+  const {
+    scope = 'current',
+    showPlayerActions = true,
+    playerActionsMode = 'novelized',
+    onProgress = () => {}
+  } = options;
+
+  const shouldIncludePlayer = showPlayerActions && playerActionsMode !== 'hidden';
 
   onProgress('Iniciando motor de maquetación editorial...');
   const { jsPDF } = await import('jspdf');
@@ -189,7 +198,7 @@ export async function exportNovelToPDF(
     currentY += 10;
 
     // Mensajes del capítulo
-    const visibleMessages = showPlayerActions
+    const visibleMessages = shouldIncludePlayer
       ? chapter.messages
       : chapter.messages.filter(m => m.role === 'model');
 
@@ -204,11 +213,12 @@ export async function exportNovelToPDF(
 
     for (const msg of visibleMessages) {
       const isUser = msg.role === 'user';
-      const cleanText = sanitizeTextForPdf(cleanMessageForNovel(msg));
+      const isNovelized = isUser && Boolean(msg.novelContent && playerActionsMode !== 'original');
+      const cleanText = sanitizeTextForPdf(cleanMessageForNovel(msg, isNovelized));
       if (!cleanText.trim()) continue;
 
-      if (isUser) {
-        // Formato para turno del Jugador
+      if (isUser && !isNovelized) {
+        // Formato para turno del Jugador en bruto (sin novelar o solicitado en crudo)
         pdf.setFont('times', 'italic');
         pdf.setFontSize(10);
         pdf.setTextColor(90, 60, 50);
@@ -228,7 +238,7 @@ export async function exportNovelToPDF(
         pdf.text(playerLines, marginLeft + 6, currentY + 1.5);
         currentY += blockHeight + 4;
       } else {
-        // Formato para prosa del Narrador (Novela)
+        // Formato para prosa de Novela (tanto Narrador como réplica novelada del protagonista)
         pdf.setFont('times', 'normal');
         pdf.setFontSize(10.8);
         pdf.setTextColor(30, 25, 25);
@@ -299,9 +309,15 @@ export async function exportNovelToPDF(
 export function exportNovelToMarkdown(
   project: Project,
   chats: Chat[],
-  options: { scope?: 'current' | 'all'; showPlayerActions?: boolean; format?: 'md' | 'txt' } = {}
+  options: ExportNovelOptions = {}
 ): void {
-  const { scope = 'current', showPlayerActions = true, format = 'md' } = options;
+  const {
+    scope = 'current',
+    showPlayerActions = true,
+    playerActionsMode = 'novelized',
+    format = 'md'
+  } = options;
+  const shouldIncludePlayer = showPlayerActions && playerActionsMode !== 'hidden';
   const chaptersToExport = scope === 'all' ? chats : chats.slice(0, 1);
 
   let output = '';
@@ -324,14 +340,15 @@ export function exportNovelToMarkdown(
       output += `\n--- CAPÍTULO ${idx + 1}: ${chapTitle.toUpperCase()} ---\n\n`;
     }
 
-    const msgs = showPlayerActions ? chap.messages : chap.messages.filter(m => m.role === 'model');
+    const msgs = shouldIncludePlayer ? chap.messages : chap.messages.filter(m => m.role === 'model');
 
     msgs.forEach(m => {
       const isUser = m.role === 'user';
-      const cleanText = cleanMessageForNovel(m);
+      const isNovelized = isUser && Boolean(m.novelContent && playerActionsMode !== 'original');
+      const cleanText = cleanMessageForNovel(m, isNovelized);
       if (!cleanText.trim()) return;
 
-      if (isUser) {
+      if (isUser && !isNovelized) {
         if (format === 'md') {
           output += `> **[Jugador]:** *${cleanText}*\n\n`;
         } else {

@@ -442,6 +442,8 @@ export interface Message {
   role: 'user' | 'model';
   content: string;
   timestamp?: string;
+  /** Versión novelada y literaria de la respuesta del jugador para lectura y maquetación de novela */
+  novelContent?: string;
 }
 
 export interface GlobalGrimorio {

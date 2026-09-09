@@ -91,7 +91,8 @@ import {
   setStoredMemorySyncGranularity,
   syncFullCampaignFromChats,
   generateClaudeProjectMemory,
-  isNarrativeIncomplete
+  isNarrativeIncomplete,
+  novelizeUserMessage
 } from './utils/geminiHelper';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
@@ -971,10 +972,62 @@ export default function App() {
     });
   };
 
+  const handleUpdateChatMessages = (chatId: string, updatedMessages: Message[]) => {
+    if (!currentPId) return;
+    const newChats = currentChats.map(c => (c.id === chatId ? { ...c, messages: updatedMessages } : c));
+    setCurrentChats(newChats);
+    saveLocalChats(currentPId, newChats);
+  };
+
   // Messaging & Turn Generation
   const handleSendMessage = async (textToSend: string) => {
     const text = textToSend.trim();
     if (!text || !currentPId || !currentChatId || isGenerating) return;
+
+    // Novelización en segundo plano de la respuesta para el formato Novela
+    if (currentProject) {
+      const targetChatId = currentChatId;
+      const targetProj = currentProject;
+      setTimeout(async () => {
+        try {
+          const chs = getLocalChats(targetProj.id);
+          const chat = chs.find(c => c.id === targetChatId);
+          if (!chat) return;
+          const uIdx = chat.messages
+            .map((m, i) => ({ m, i }))
+            .reverse()
+            .find(({ m }) => m.role === 'user' && m.content === text && !m.novelContent)?.i;
+          if (uIdx !== undefined && uIdx >= 0) {
+            const prevModel = [...chat.messages.slice(0, uIdx)]
+              .reverse()
+              .find(m => m.role === 'model')?.content;
+            const nextModel = chat.messages.slice(uIdx + 1).find(m => m.role === 'model')?.content;
+            const novelText = await novelizeUserMessage({
+              rawInput: text,
+              project: targetProj,
+              previousNarrative: prevModel,
+              nextNarrative: nextModel
+            });
+            if (novelText) {
+              setCurrentChats(prev => {
+                const updated = prev.map(c => {
+                  if (c.id !== targetChatId) return c;
+                  const msgs = [...c.messages];
+                  if (msgs[uIdx] && msgs[uIdx].role === 'user') {
+                    msgs[uIdx] = { ...msgs[uIdx], novelContent: novelText };
+                  }
+                  return { ...c, messages: msgs };
+                });
+                saveLocalChats(targetProj.id, updated);
+                return updated;
+              });
+            }
+          }
+        } catch {
+          // Silencioso en segundo plano
+        }
+      }, 1800);
+    }
 
     if (currentChat) {
       const updatedMessages = [...currentChat.messages, { role: 'user' as const, content: text }];
@@ -2862,6 +2915,7 @@ Estás muy cerca del tope de 250.000 tokens por minuto de la capa gratuita de Go
                 currentChatId={currentChatId}
                 onSelectChat={id => setCurrentChatId(id)}
                 onBackToChat={() => setActiveTab('chat')}
+                onUpdateChatMessages={handleUpdateChatMessages}
               />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-[var(--text-secondary)] font-cinzel gap-3">

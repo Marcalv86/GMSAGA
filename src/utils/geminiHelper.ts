@@ -10,8 +10,10 @@ import {
   CalendarConfig,
   CampaignDate,
   TimelineEntry,
-  ScheduledThread
+  ScheduledThread,
+  Message
 } from '../types';
+import { stripRollRequests, stripStateTag } from './rollRequests';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import { registrarUso } from './usageStats';
 import {
@@ -5167,4 +5169,147 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con este formato:
     diasDetectados: diasUnicos
   };
 }
+
+/**
+ * Transforma una respuesta o acción en bruto de la jugadora en prosa literaria
+ * cinematográfica, sensorial y elegante para la edición en formato novela.
+ */
+export async function novelizeUserMessage({
+  rawInput,
+  project,
+  previousNarrative,
+  nextNarrative,
+  signal
+}: {
+  rawInput: string;
+  project: Project;
+  previousNarrative?: string;
+  nextNarrative?: string;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const cleanInput = stripStateTag(stripRollRequests(rawInput)).trim();
+  if (!cleanInput) return '';
+
+  const pc = project.memory?.player_character;
+  const pcName = pc?.name || 'la protagonista';
+  const pcDetails = [
+    pc?.gender ? `Género: ${pc.gender}` : '',
+    pc?.race ? `Raza: ${pc.race}` : '',
+    pc?.class ? `Clase: ${pc.class}` : '',
+    pc?.summary ? `Personalidad: ${pc.summary}` : ''
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  const prompt = `Eres una novelista literaria de alta fantasía y capa y espada (ambientación Reinos Olvidados / Forgotten Realms, estilo R.A. Salvatore y literatura madura, cinematográfica e inmersiva).
+
+Tu misión:
+En una partida de rol interactiva, la jugadora escribió una respuesta/acción/diálogo en bruto para su personaje:
+<<<RESPUESTA EN BRUTO DE LA JUGADORA>>>
+${cleanInput}
+<<<FIN DE RESPUESTA>>>
+
+Reescribe esta intervención para la EDICIÓN NOVELA de la crónica, transformándola en prosa literaria de primer orden para que se lea como parte de un libro publicado.
+
+DATOS DEL PERSONAJE PROTAGONISTA:
+- Nombre: ${pcName}
+${pcDetails ? `- Rasgos: ${pcDetails}` : ''}
+
+${previousNarrative ? `ESCENA INMEDIATA ANTERIOR:\n${previousNarrative.slice(-550).trim()}\n` : ''}
+${nextNarrative ? `DESENLACE O RESPUESTA POSTERIOR:\n${nextNarrative.slice(0, 550).trim()}\n` : ''}
+
+DIRECTRICES EDITORIALES INVIOLABLES:
+1. FIDELIDAD ABSOLUTA AL JUGADOR: Mantén exactamente la intención, los diálogos, las emociones y las decisiones que la jugadora expresó en su respuesta. No cambies lo que decidió hacer; únicamente embellece su ejecución con lenguaje corporal, sensorialidad, tensión y cadencia novelesca.
+2. ENFOQUE LITERARIO: Escribe en tercera persona centrada en la perspectiva de ${pcName} (o adaptada a la voz de la novela).
+3. DIÁLOGOS DE NOVELA: Si la jugadora habla, usa la raya larga de diálogo (—) e incisos de habla expresivos.
+4. CERO MECÁNICAS: Si había tiradas, números o metatexto de juego ("tiro percepción", "[Tirada: 14]", "habilidad", "salvación"), tradúcelo a acciones físicas o sentidos aguzados sin dados ni jerga de mesa.
+5. CONCISIÓN Y PROPORCIÓN: Genera entre 1 y 3 párrafos breves y elegantes, proporcionales a la acción. Debe ensamblar con perfecta fluidez entre la escena previa y la posterior.
+6. CERO METATEXTO: Devuelve ÚNICAMENTE el texto narrativo resultante, sin introducciones ("Aquí tienes la versión..."), sin saludos y sin comillas exteriores.`;
+
+  const modelo = getBackgroundTaskModel();
+  const response = await generateContentWithFailover({
+    primaryModel: modelo,
+    contents: prompt,
+    config: {
+      temperature: 0.65
+    },
+    signal
+  });
+
+  let text = (response.text || '').trim();
+  // Limpiar posibles bloques de código o comillas envolventes
+  if (text.startsWith('```') && text.endsWith('```')) {
+    text = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+  }
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith('«') && text.endsWith('»')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    text = text.slice(1, -1).trim();
+  }
+  return text;
+}
+
+/**
+ * Modela y transforma en lote todas las respuestas del jugador en una lista de mensajes
+ * que aún no hayan sido noveladas (o forzando todas si forceAll es true).
+ */
+export async function batchNovelizeMessages({
+  messages,
+  project,
+  forceAll = false,
+  onProgress,
+  signal
+}: {
+  messages: Message[];
+  project: Project;
+  forceAll?: boolean;
+  onProgress?: (current: number, total: number, messageIndex: number) => void;
+  signal?: AbortSignal;
+}): Promise<Message[]> {
+  const userIndices = messages
+    .map((m, idx) => ({ m, idx }))
+    .filter(({ m }) => m.role === 'user' && (forceAll || !m.novelContent));
+
+  if (userIndices.length === 0) {
+    return messages;
+  }
+
+  const updatedMessages = [...messages];
+  let processed = 0;
+  const total = userIndices.length;
+
+  for (const { m, idx } of userIndices) {
+    if (signal?.aborted) break;
+    onProgress?.(processed + 1, total, idx);
+
+    // Contexto inmediato anterior y posterior
+    const previousModelMsg = [...messages.slice(0, idx)].reverse().find(msg => msg.role === 'model')?.content;
+    const nextModelMsg = messages.slice(idx + 1).find(msg => msg.role === 'model')?.content;
+
+    try {
+      const novelText = await novelizeUserMessage({
+        rawInput: m.content,
+        project,
+        previousNarrative: previousModelMsg,
+        nextNarrative: nextModelMsg,
+        signal
+      });
+
+      if (novelText) {
+        updatedMessages[idx] = {
+          ...updatedMessages[idx],
+          novelContent: novelText
+        };
+      }
+    } catch (err: any) {
+      console.error(`Error al novelar mensaje ${idx}:`, err);
+    }
+    processed++;
+  }
+
+  return updatedMessages;
+}
+
 

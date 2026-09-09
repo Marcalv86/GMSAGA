@@ -1,30 +1,64 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, Chat } from '../types';
+import { Project, Chat, Message } from '../types';
 import { stripRollRequests, stripStateTag } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
 import { exportNovelToPDF, exportNovelToMarkdown } from '../utils/pdfExport';
-import { Swords, Shield, FileDown, BookOpen, FileText, Check, Loader2 } from 'lucide-react';
+import { novelizeUserMessage, batchNovelizeMessages } from '../utils/geminiHelper';
+import {
+  Swords,
+  Shield,
+  FileDown,
+  BookOpen,
+  FileText,
+  Check,
+  Loader2,
+  Sparkles,
+  Eye,
+  EyeOff,
+  Edit3,
+  RefreshCw,
+  X
+} from 'lucide-react';
 
 type ReaderTheme = 'parchment' | 'dark' | 'sepia' | 'light';
+export type PlayerActionsMode = 'novelized' | 'original' | 'hidden';
 
-export const NovelReaderView: React.FC<{
+export interface NovelReaderViewProps {
   project: Project;
   chats: Chat[];
   currentChatId: string | null;
   onSelectChat: (chatId: string) => void;
   onBackToChat: () => void;
-}> = ({ project, chats = [], currentChatId, onSelectChat, onBackToChat }) => {
+  onUpdateChatMessages?: (chatId: string, messages: Message[]) => void;
+}
+
+export const NovelReaderView: React.FC<NovelReaderViewProps> = ({
+  project,
+  chats = [],
+  currentChatId,
+  onSelectChat,
+  onBackToChat,
+  onUpdateChatMessages
+}) => {
   const [selectedScope, setSelectedScope] = useState<'current' | 'all'>('current');
   const [theme, setTheme] = useState<ReaderTheme>('parchment');
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
-  const [showPlayerActions, setShowPlayerActions] = useState(true);
+  const [playerActionsMode, setPlayerActionsMode] = useState<PlayerActionsMode>('novelized');
   const [isExporting, setIsExporting] = useState(false);
+
+  // Estados interactivos para novelización y edición
+  const [novelizingIdx, setNovelizingIdx] = useState<string | null>(null);
+  const [isBatchNovelizing, setIsBatchNovelizing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+  const [editingIdx, setEditingIdx] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [expandedOriginals, setExpandedOriginals] = useState<Record<string, boolean>>({});
 
   const safeChats = Array.isArray(chats) ? chats : [];
   const activeChat = safeChats.find(c => c.id === currentChatId) || safeChats[0];
 
-  // Theme styling definitions
+  // Definiciones de paletas para los temas de lectura
   const themeStyles = {
     parchment: {
       bg: 'bg-[#f4ecd8]',
@@ -77,17 +111,129 @@ export const NovelReaderView: React.FC<{
     xl: 'text-[22px] leading-[1.85]'
   };
 
-  // Prepare chapters to render
+  // Preparar capítulos a renderizar
   const chaptersToRender = selectedScope === 'all' ? safeChats : activeChat ? [activeChat] : [];
 
-  // Compute total word count
+  // Calcular número total de palabras
   const totalWords = chaptersToRender.reduce((acc, ch) => {
-    return acc + (ch?.messages || []).reduce((mAcc, m) => mAcc + (m?.content || '').split(/\s+/).filter(Boolean).length, 0);
+    return (
+      acc +
+      (ch?.messages || []).reduce(
+        (mAcc, m) =>
+          mAcc +
+          (playerActionsMode === 'novelized' && m.novelContent ? m.novelContent : m?.content || '')
+            .split(/\s+/)
+            .filter(Boolean).length,
+        0
+      )
+    );
   }, 0);
   const readingTimeMin = Math.max(1, Math.round(totalWords / 200));
 
+  // Conteo de respuestas del jugador pendientes de novelar
+  const pendingCount = chaptersToRender.reduce((acc, ch) => {
+    return acc + (ch?.messages || []).filter(m => m.role === 'user' && !m.novelContent).length;
+  }, 0);
+
+  const pcName = project.memory?.player_character?.name || 'la protagonista';
+
   const [exportProgress, setExportProgress] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<'pdf' | 'md' | null>(null);
+
+  const toggleOriginal = (key: string) => {
+    setExpandedOriginals(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleNovelizeSingle = async (chapter: Chat, msgIndex: number) => {
+    const key = `${chapter.id}_${msgIndex}`;
+    setNovelizingIdx(key);
+    try {
+      const rawMsg = chapter.messages[msgIndex];
+      if (!rawMsg || rawMsg.role !== 'user') return;
+
+      const prevModel = [...chapter.messages.slice(0, msgIndex)]
+        .reverse()
+        .find(m => m.role === 'model')?.content;
+      const nextModel = chapter.messages.slice(msgIndex + 1).find(m => m.role === 'model')?.content;
+
+      const novelText = await novelizeUserMessage({
+        rawInput: rawMsg.content,
+        project,
+        previousNarrative: prevModel,
+        nextNarrative: nextModel
+      });
+
+      if (novelText && onUpdateChatMessages) {
+        const updatedMessages = [...chapter.messages];
+        updatedMessages[msgIndex] = {
+          ...rawMsg,
+          novelContent: novelText
+        };
+        onUpdateChatMessages(chapter.id, updatedMessages);
+      }
+    } catch (err: any) {
+      console.error('Error al novelar mensaje:', err);
+      alert('No se pudo generar la prosa novelada: ' + (err?.message || 'Error de conexión'));
+    } finally {
+      setNovelizingIdx(null);
+    }
+  };
+
+  const handleBatchNovelize = async (forceAll: boolean = false) => {
+    if (chaptersToRender.length === 0 || isBatchNovelizing) return;
+    setIsBatchNovelizing(true);
+    try {
+      for (const chapter of chaptersToRender) {
+        const userMsgsToProcess = chapter.messages.filter(m => m.role === 'user' && (forceAll || !m.novelContent));
+        if (userMsgsToProcess.length === 0) continue;
+
+        const updatedMessages = await batchNovelizeMessages({
+          messages: chapter.messages,
+          project,
+          forceAll,
+          onProgress: (curr, tot) => {
+            setBatchProgress({ current: curr, total: tot });
+          }
+        });
+
+        if (onUpdateChatMessages) {
+          onUpdateChatMessages(chapter.id, updatedMessages);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error en novelización por lote:', err);
+    } finally {
+      setIsBatchNovelizing(false);
+      setBatchProgress(null);
+    }
+  };
+
+  const handleStartEdit = (
+    chapterId: string,
+    msgIndex: number,
+    currentNovelContent?: string,
+    rawContent?: string
+  ) => {
+    setEditingIdx(`${chapterId}_${msgIndex}`);
+    setEditDraft(currentNovelContent || rawContent || '');
+  };
+
+  const handleSaveEdit = (chapter: Chat, msgIndex: number) => {
+    if (!onUpdateChatMessages) return;
+    const updatedMessages = [...chapter.messages];
+    updatedMessages[msgIndex] = {
+      ...updatedMessages[msgIndex],
+      novelContent: editDraft.trim()
+    };
+    onUpdateChatMessages(chapter.id, updatedMessages);
+    setEditingIdx(null);
+    setEditDraft('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIdx(null);
+    setEditDraft('');
+  };
 
   const handleExportPDF = async () => {
     if (chaptersToRender.length === 0) return;
@@ -96,7 +242,8 @@ export const NovelReaderView: React.FC<{
     try {
       await exportNovelToPDF(project, chaptersToRender, {
         scope: selectedScope,
-        showPlayerActions,
+        showPlayerActions: playerActionsMode !== 'hidden',
+        playerActionsMode,
         onProgress: msg => setExportProgress(msg)
       });
       setExportSuccess('pdf');
@@ -115,7 +262,8 @@ export const NovelReaderView: React.FC<{
     try {
       exportNovelToMarkdown(project, chaptersToRender, {
         scope: selectedScope,
-        showPlayerActions,
+        showPlayerActions: playerActionsMode !== 'hidden',
+        playerActionsMode,
         format: 'md'
       });
       setExportSuccess('md');
@@ -145,7 +293,10 @@ export const NovelReaderView: React.FC<{
             >
               <Swords className="w-3.5 h-3.5" /> <span>Jugar</span>
             </button>
-            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo lectura de novela activo">
+            <span
+              className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs"
+              title="Modo lectura de novela activo"
+            >
               <BookOpen className="w-3.5 h-3.5" /> <span>Novela</span>
             </span>
           </div>
@@ -205,14 +356,76 @@ export const NovelReaderView: React.FC<{
             </select>
           )}
 
+          {/* Mode Selector for Player Actions */}
+          <div className="flex bg-black/10 rounded-lg p-0.5 border border-black/10 text-xs font-cinzel">
+            <button
+              onClick={() => setPlayerActionsMode('novelized')}
+              className={`px-2 sm:px-2.5 py-1 rounded transition-all cursor-pointer flex items-center gap-1 ${
+                playerActionsMode === 'novelized'
+                  ? `${currentTheme.pageBg} ${currentTheme.text} font-bold shadow-xs`
+                  : `${currentTheme.subtext} hover:opacity-100`
+              }`}
+              title="Prosa Novelada: transforma las respuestas de la jugadora en literatura bella y fluida"
+            >
+              <Sparkles className="w-3 h-3 text-[var(--accent)]" />
+              <span className="hidden md:inline">Prosa Novelada</span>
+              <span className="md:hidden">Novela</span>
+            </button>
+            <button
+              onClick={() => setPlayerActionsMode('original')}
+              className={`px-2 sm:px-2.5 py-1 rounded transition-all cursor-pointer flex items-center gap-1 ${
+                playerActionsMode === 'original'
+                  ? `${currentTheme.pageBg} ${currentTheme.text} font-bold shadow-xs`
+                  : `${currentTheme.subtext} hover:opacity-100`
+              }`}
+              title="Originales: ver las respuestas en bruto escritas en el chat"
+            >
+              <Shield className="w-3 h-3" />
+              <span className="hidden md:inline">Originales</span>
+              <span className="md:hidden">Bruto</span>
+            </button>
+            <button
+              onClick={() => setPlayerActionsMode('hidden')}
+              className={`px-2 sm:px-2.5 py-1 rounded transition-all cursor-pointer flex items-center gap-1 ${
+                playerActionsMode === 'hidden'
+                  ? `${currentTheme.pageBg} ${currentTheme.text} font-bold shadow-xs`
+                  : `${currentTheme.subtext} hover:opacity-100`
+              }`}
+              title="Ocultar: omitir los turnos de la jugadora y leer solo la narración continua"
+            >
+              <EyeOff className="w-3 h-3" />
+              <span className="hidden md:inline">Ocultar</span>
+              <span className="md:hidden">Off</span>
+            </button>
+          </div>
+
+          {/* Batch Novelize button if there are pending raw responses */}
+          {playerActionsMode === 'novelized' && pendingCount > 0 && (
+            <button
+              onClick={() => handleBatchNovelize(false)}
+              disabled={isBatchNovelizing}
+              className="text-xs font-cinzel font-bold px-2 sm:px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              title={`Transformar ${pendingCount} respuestas del jugador en prosa literaria con IA`}
+            >
+              {isBatchNovelizing ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Sparkles className="w-3 h-3" />
+              )}
+              <span>
+                {isBatchNovelizing
+                  ? `Novelando (${batchProgress?.current || 1}/${batchProgress?.total || pendingCount})...`
+                  : `Novelar (${pendingCount})`}
+              </span>
+            </button>
+          )}
+
           {/* Font Size Selector */}
           <div className="flex items-center gap-0.5 sm:gap-1 bg-black/10 rounded-lg p-0.5 text-xs">
             <button
               onClick={() => setFontSize('sm')}
               className={`w-6 h-6 rounded flex items-center justify-center font-bold cursor-pointer ${
-                fontSize === 'sm'
-                  ? `${currentTheme.pageBg} ${currentTheme.text} shadow-xs`
-                  : `${currentTheme.subtext}`
+                fontSize === 'sm' ? `${currentTheme.pageBg} ${currentTheme.text} shadow-xs` : `${currentTheme.subtext}`
               }`}
               title="Texto Pequeño"
             >
@@ -221,9 +434,7 @@ export const NovelReaderView: React.FC<{
             <button
               onClick={() => setFontSize('md')}
               className={`w-6 h-6 rounded flex items-center justify-center font-bold cursor-pointer ${
-                fontSize === 'md'
-                  ? `${currentTheme.pageBg} ${currentTheme.text} shadow-xs`
-                  : `${currentTheme.subtext}`
+                fontSize === 'md' ? `${currentTheme.pageBg} ${currentTheme.text} shadow-xs` : `${currentTheme.subtext}`
               }`}
               title="Texto Mediano"
             >
@@ -232,9 +443,7 @@ export const NovelReaderView: React.FC<{
             <button
               onClick={() => setFontSize('lg')}
               className={`w-6 h-6 rounded flex items-center justify-center font-bold cursor-pointer ${
-                fontSize === 'lg'
-                  ? `${currentTheme.pageBg} ${currentTheme.text} shadow-xs`
-                  : `${currentTheme.subtext}`
+                fontSize === 'lg' ? `${currentTheme.pageBg} ${currentTheme.text} shadow-xs` : `${currentTheme.subtext}`
               }`}
               title="Texto Grande"
             >
@@ -277,19 +486,6 @@ export const NovelReaderView: React.FC<{
               aria-label="Tema Claro"
             />
           </div>
-
-          {/* Toggle player dialogs */}
-          <button
-            onClick={() => setShowPlayerActions(!showPlayerActions)}
-            className={`text-xs px-2 sm:px-2.5 py-1 rounded border ${currentTheme.border} ${
-              showPlayerActions ? currentTheme.badgeBg : 'opacity-60'
-            } transition-all cursor-pointer font-cinzel flex items-center gap-1.5`}
-            title="Mostrar u ocultar los turnos de acción del jugador"
-            aria-label="Acciones de jugador"
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{showPlayerActions ? 'Acciones: ON' : 'Acciones: OFF'}</span>
-          </button>
 
           {/* Export to Markdown / Text */}
           <button
@@ -353,7 +549,7 @@ export const NovelReaderView: React.FC<{
               {project.name}
             </h1>
             <p className={`font-cinzel text-xs md:text-sm tracking-wider uppercase ${currentTheme.subtext}`}>
-              Una crónica de tu campaña
+              Una crónica de tu campaña en los Reinos Olvidados
             </p>
             <div className="flex justify-center items-center gap-4 text-xs mt-4 opacity-75 font-lora">
               <span>{totalWords.toLocaleString('es-ES')} palabras</span>
@@ -368,10 +564,11 @@ export const NovelReaderView: React.FC<{
 
           {/* Chapters Content */}
           {chaptersToRender.map((chapter, cIdx) => {
-            // Filter messages based on player actions preference
-            const visibleMessages = showPlayerActions
-              ? chapter.messages
-              : chapter.messages.filter(m => m.role === 'model');
+            // Filtrar mensajes según preferencia
+            const visibleMessages =
+              playerActionsMode === 'hidden'
+                ? chapter.messages.filter(m => m.role === 'model')
+                : chapter.messages;
 
             return (
               <div key={chapter.id} className="flex flex-col gap-6">
@@ -396,24 +593,182 @@ export const NovelReaderView: React.FC<{
                 <div className="flex flex-col gap-5">
                   {visibleMessages.length === 0 ? (
                     <p className="text-center italic opacity-60 py-6">
-                      Este capítulo aún no tiene relato escrito.
+                      Este capítulo aún no contiene narración registrada.
                     </p>
                   ) : (
                     visibleMessages.map((msg, mIdx) => {
                       const isUser = msg.role === 'user';
+                      const msgKey = `${chapter.id}_${mIdx}`;
+                      const isEditing = editingIdx === msgKey;
+                      const isThisNovelizing = novelizingIdx === msgKey;
+                      const isExpanded = Boolean(expandedOriginals[msgKey]);
 
                       if (isUser) {
+                        // MODO 1: Prosa Novelada con IA
+                        if (playerActionsMode === 'novelized') {
+                          if (msg.novelContent) {
+                            return (
+                              <div
+                                key={mIdx}
+                                className="relative my-3 pl-4 pr-3 py-2 rounded-r-lg border-l-2 border-[var(--accent)]/50 bg-black/[0.03] group transition-all"
+                              >
+                                <div className="flex items-center justify-between gap-2 mb-1.5 opacity-70 group-hover:opacity-100 transition-opacity flex-wrap">
+                                  <div className="flex items-center gap-1.5 text-[11px] font-cinzel font-semibold tracking-wider text-[var(--accent)]">
+                                    <Sparkles className="w-3 h-3 text-[var(--accent)]" />
+                                    <span>{pcName ? `Réplica de ${pcName}` : 'Acción Novelada'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => toggleOriginal(msgKey)}
+                                      className="text-[11px] px-2 py-0.5 rounded hover:bg-black/10 transition-colors flex items-center gap-1 cursor-pointer"
+                                      title="Ver u ocultar el texto original en bruto que enviaste en la partida"
+                                    >
+                                      {isExpanded ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                      <span>{isExpanded ? 'Ocultar original' : 'Ver original'}</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleStartEdit(chapter.id, mIdx, msg.novelContent, msg.content)}
+                                      className="text-[11px] px-2 py-0.5 rounded hover:bg-black/10 transition-colors flex items-center gap-1 cursor-pointer"
+                                      title="Editar esta prosa manualmente"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                      <span>Editar</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleNovelizeSingle(chapter, mIdx)}
+                                      disabled={isThisNovelizing}
+                                      className="text-[11px] px-2 py-0.5 rounded hover:bg-black/10 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                      title="Pedirle a la IA que reescriba esta acción con mejor prosa"
+                                    >
+                                      <RefreshCw className={`w-3 h-3 ${isThisNovelizing ? 'animate-spin' : ''}`} />
+                                      <span>Reescribir</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {isEditing ? (
+                                  <div className="space-y-2 mt-2">
+                                    <textarea
+                                      value={editDraft}
+                                      onChange={e => setEditDraft(e.target.value)}
+                                      rows={3}
+                                      className="w-full p-2.5 rounded border border-current/30 bg-white/60 dark:bg-black/40 text-sm font-lora outline-none focus:border-[var(--accent)]"
+                                      placeholder="Escribe la versión literaria de esta acción..."
+                                    />
+                                    <div className="flex justify-end gap-2 text-xs font-cinzel">
+                                      <button
+                                        onClick={handleCancelEdit}
+                                        className="px-2.5 py-1 rounded border border-current/30 hover:bg-black/10 cursor-pointer flex items-center gap-1"
+                                      >
+                                        <X className="w-3 h-3" /> Cancelar
+                                      </button>
+                                      <button
+                                        onClick={() => handleSaveEdit(chapter, mIdx)}
+                                        className="px-3 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold cursor-pointer flex items-center gap-1"
+                                      >
+                                        <Check className="w-3 h-3" /> Guardar Prosa
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className={`${fontSizeClasses[fontSize]} text-left sm:text-justify`}>
+                                    <div className="markdown-body narrative-body space-y-2">
+                                      <ReactMarkdown
+                                        components={{
+                                          p: ({ children }) => {
+                                            const str = Array.isArray(children)
+                                              ? children.map(c => (typeof c === 'string' ? c : '')).join('')
+                                              : typeof children === 'string'
+                                              ? children
+                                              : '';
+                                            const isDialogue = /^[—–\-"«]/.test(str.trim());
+                                            return (
+                                              <p className={isDialogue ? 'narrative-dialogue font-medium' : undefined}>
+                                                {children}
+                                              </p>
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        {formatNarrativeText(stripStateTag(stripRollRequests(msg.novelContent)))}
+                                      </ReactMarkdown>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {isExpanded && (
+                                  <div className="mt-2.5 pt-2 border-t border-dashed border-current/20 text-xs italic opacity-75 font-lora">
+                                    <span className="font-cinzel not-italic font-bold tracking-wider mr-1 text-[10px] uppercase">
+                                      Original en partida:
+                                    </span>
+                                    «{msg.content}»
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // Si aún no está novelado, mostrar tarjeta con botón directo para embellecer
+                          return (
+                            <div
+                              key={mIdx}
+                              className="my-2.5 p-3.5 rounded-lg border border-dashed border-amber-600/40 bg-amber-50/60 dark:bg-amber-950/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm"
+                            >
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <Shield className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                                <div>
+                                  <div className="text-[11px] font-cinzel tracking-wider text-amber-700 dark:text-amber-400 font-bold mb-0.5">
+                                    Respuesta en bruto de la partida
+                                  </div>
+                                  <div className="italic leading-relaxed font-lora opacity-90">
+                                    «{msg.content}»
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                <button
+                                  onClick={() => handleStartEdit(chapter.id, mIdx, '', msg.content)}
+                                  className="text-xs px-2.5 py-1 rounded border border-current/30 hover:bg-black/10 transition-colors font-cinzel cursor-pointer"
+                                  title="Escribir la versión novelada manualmente"
+                                >
+                                  Redactar
+                                </button>
+                                <button
+                                  onClick={() => handleNovelizeSingle(chapter, mIdx)}
+                                  disabled={isThisNovelizing}
+                                  className="text-xs px-3 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold shadow-xs hover:brightness-110 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                  title="Transformar esta respuesta en prosa de novela con IA"
+                                >
+                                  {isThisNovelizing ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>{isThisNovelizing ? 'Novelando...' : 'Novelar con IA'}</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // MODO 2: Originales en bruto
                         return (
                           <div
                             key={mIdx}
                             className={`my-2 p-3.5 rounded-lg border border-dashed border-current/25 bg-black/5 flex items-start gap-2.5 text-sm`}
                           >
-                            <Shield className="w-4 h-4 shrink-0 mt-0.5" />
-                            <div className="flex-1 italic leading-relaxed font-lora">{msg.content}</div>
+                            <Shield className="w-4 h-4 shrink-0 mt-0.5 opacity-70" />
+                            <div className="flex-1 italic leading-relaxed font-lora">
+                              <span className="font-cinzel not-italic font-bold text-[11px] uppercase mr-2 opacity-75">
+                                [Jugador]
+                              </span>
+                              {msg.content}
+                            </div>
                           </div>
                         );
                       }
 
+                      // Turno del Narrador / Modelo
                       return (
                         <div key={mIdx} className={`${fontSizeClasses[fontSize]} text-left sm:text-justify`}>
                           <div className="markdown-body narrative-body space-y-4">
@@ -422,17 +777,19 @@ export const NovelReaderView: React.FC<{
                                 p: ({ children }) => {
                                   const str = Array.isArray(children)
                                     ? children.map(c => (typeof c === 'string' ? c : '')).join('')
-                                    : typeof children === 'string' ? children : '';
+                                    : typeof children === 'string'
+                                    ? children
+                                    : '';
                                   const isDialogue = /^[—–\-"«]/.test(str.trim());
                                   return (
-                                    <p className={isDialogue ? 'narrative-dialogue' : undefined}>
-                                      {children}
-                                    </p>
+                                    <p className={isDialogue ? 'narrative-dialogue' : undefined}>{children}</p>
                                   );
                                 },
                                 strong: ({ children }) => <strong className="narrative-strong">{children}</strong>,
                                 em: ({ children }) => <em className="narrative-em">{children}</em>,
-                                blockquote: ({ children }) => <blockquote className="narrative-quote">{children}</blockquote>
+                                blockquote: ({ children }) => (
+                                  <blockquote className="narrative-quote">{children}</blockquote>
+                                )
                               }}
                             >
                               {formatNarrativeText(stripStateTag(stripRollRequests(msg.content)))}
@@ -454,7 +811,7 @@ export const NovelReaderView: React.FC<{
 
           {/* Book Epilogue Footer */}
           <div className="text-center pt-10 mt-auto border-t border-dashed border-current/20 text-xs opacity-60 font-cinzel tracking-wider">
-            Fin de la Crónica Registrada • GM Studio
+            Fin de la Crónica Registrada • Forgotten Realms GM Studio
           </div>
         </div>
       </div>
