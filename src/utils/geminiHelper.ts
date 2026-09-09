@@ -67,11 +67,33 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     name: 'Gemini 3.6 Flash',
     badge: 'Eficiente · Alta Estabilidad',
     desc: 'Versión ágil y contrastada de Flash para turnos consistentes y excelente gestión de contexto.'
+  },
+  {
+    id: 'gemini-3.5-flash',
+    name: 'Gemini 3.5 Flash',
+    badge: 'Equilibrado · Máxima Eficiencia',
+    desc: 'Modelo equilibrado de la familia Gemini 3 para escala masiva, razonamiento multimodal rápido y excelente ratio velocidad/calidad.'
+  },
+  {
+    id: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash Lite',
+    badge: 'Ultra Rápido · Mínima Cuota',
+    desc: 'La opción más rápida y ligera de Google, ideal para sesiones muy ágiles con mínima latencia y mínimo consumo de tokens.'
+  },
+  {
+    id: 'gemma-4-31b-it',
+    name: 'Gemma 4 31B',
+    badge: 'Open Weight · Razonamiento Denso',
+    desc: 'Insignia densa multimodal de 30.7B parámetros de Google DeepMind. Razonamiento avanzado, rol narrativo sin filtros comerciales y ventana de 256K tokens.'
   }
 ];
 
 export function esModeloAbierto(modelId: string): boolean {
   return /^gemma/i.test(modelId.trim());
+}
+
+export function esGemma4(modelId: string): boolean {
+  return /^gemma-4/i.test(modelId.trim());
 }
 
 export function isModelDeprecated(modelId: string): boolean {
@@ -104,6 +126,11 @@ export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
     desc: 'Ultra rápido y consumo mínimo de cuota (Ideal para resúmenes y memoria persistente)'
   },
   {
+    id: 'gemini-3.5-flash',
+    name: 'Gemini 3.5 Flash',
+    desc: 'Equilibrado y eficiente para análisis y resúmenes de sesión'
+  },
+  {
     id: 'gemini-3.8-flash',
     name: 'Gemini 3.8 Flash',
     desc: 'Última generación ultra rápida'
@@ -117,6 +144,11 @@ export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
     id: 'gemini-3.6-flash',
     name: 'Gemini 3.6 Flash',
     desc: 'Eficiente y equilibrado'
+  },
+  {
+    id: 'gemma-4-31b-it',
+    name: 'Gemma 4 31B',
+    desc: 'Open weight denso de 30.7B parámetros para tareas de fondo'
   }
 ];
 
@@ -127,10 +159,14 @@ export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODE
   if (!modelId || isModelDeprecated(modelId)) {
     return fallback;
   }
-  const trimmed = modelId.trim();
+  let trimmed = modelId.trim();
+  if (trimmed.toLowerCase() === 'gemma-4-31b') {
+    trimmed = 'gemma-4-31b-it';
+  }
   const validIds = [
     ...AVAILABLE_MODELS.map(m => m.id),
-    ...AUXILIARY_BACKGROUND_MODELS.map(m => m.id)
+    ...AUXILIARY_BACKGROUND_MODELS.map(m => m.id),
+    'gemma-4-31b'
   ];
   if (!validIds.includes(trimmed)) {
     return fallback;
@@ -252,7 +288,9 @@ export function getModelFailoverChain(initialModel: string): string[] {
   const standardFallbacks = [
     'gemini-3.8-flash',
     'gemini-3.7-flash',
-    'gemini-3.6-flash'
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite'
   ];
   // Con el respaldo apagado se usa el modelo elegido y punto. Antes esta rama
   // devolvía exactamente la misma cadena que la de abajo, así que el interruptor
@@ -343,14 +381,24 @@ export function setStoredThinkingLevel(level: ThinkingLevelSetting): void {
 }
 
 export function getThinkingBudgetConfig(thinkingSetting: ThinkingLevelSetting, modelId?: string) {
-  // Models in Gemini 2.5 and Gemma series do not support thinkingConfig
-  if (modelId && !modelId.includes('3.7') && !modelId.includes('3.1') && !modelId.includes('gemini-3')) {
-    return undefined;
+  // Los modelos Gemini 2.5 y Gemma antiguos (Gemma 2/3) no admiten thinkingConfig.
+  // La familia Gemini 3.x (3.8, 3.7, 3.6, 3.5) y Gemma 4 31B admiten razonamiento configurable.
+  if (modelId) {
+    const isGemini3 =
+      modelId.includes('3.8') ||
+      modelId.includes('3.7') ||
+      modelId.includes('3.6') ||
+      modelId.includes('3.5') ||
+      modelId.includes('gemini-3');
+    const isGemma4Model = esGemma4(modelId);
+    if (!isGemini3 && !isGemma4Model) {
+      return undefined;
+    }
   }
   if (thinkingSetting === 'HIGH') return { thinkingBudget: 4096 };
   if (thinkingSetting === 'LOW') return { thinkingBudget: 1024 };
   if (thinkingSetting === 'MINIMAL') return { thinkingBudget: 0 };
-  return undefined; // AUTO: let Gemini 3 model dynamically determine reasoning budget
+  return undefined; // AUTO: el modelo decide dinámicamente el presupuesto de razonamiento
 }
 
 /**
@@ -1706,6 +1754,7 @@ export async function generateStoryTurnStream({
           const topPSetting = getStoredTopP();
 
           const abierto = esModeloAbierto(currentModel);
+          const gemma4 = esGemma4(currentModel);
           const config: any = {
             systemInstruction: sys,
             temperature: tempSetting,
@@ -1715,16 +1764,65 @@ export async function generateStoryTurnStream({
           };
 
           const thinkingBudget = getThinkingBudgetConfig(thinkingSetting, currentModel);
-          if (thinkingBudget && !abierto) {
+          if (thinkingBudget && (!abierto || gemma4)) {
             config.thinkingConfig = thinkingBudget;
           }
           currentConfig = config;
 
-          const responseStream = await ai.models.generateContentStream({
-            model: currentModel,
-            contents,
-            config
-          });
+          let responseStream: any;
+          try {
+            responseStream = await ai.models.generateContentStream({
+              model: currentModel,
+              contents,
+              config
+            });
+          } catch (streamErr: any) {
+            const errStr = String(streamErr?.message || '').toLowerCase();
+            // Adaptación de resiliencia para modelos abiertos / Gemma:
+            // Si el endpoint de la API rechaza systemInstruction o thinkingConfig, lo adaptamos
+            // dinámicamente inyectando la directiva de sistema en el primer turno de usuario.
+            if (
+              abierto &&
+              (errStr.includes('systeminstruction') ||
+                errStr.includes('system_instruction') ||
+                errStr.includes('thinkingconfig') ||
+                errStr.includes('thinking_config'))
+            ) {
+              const fallbackConfig = { ...config };
+              let fallbackContents = [...contents];
+              if (errStr.includes('systeminstruction') || errStr.includes('system_instruction')) {
+                delete fallbackConfig.systemInstruction;
+                if (fallbackContents.length > 0 && fallbackContents[0].role === 'user') {
+                  fallbackContents[0] = {
+                    ...fallbackContents[0],
+                    parts: [
+                      {
+                        text: `[DIRECTIVAS DE SISTEMA Y REGLAS DE CAMPAÑA]:\n${sys}\n\n` + (fallbackContents[0].parts?.[0]?.text || '')
+                      },
+                      ...fallbackContents[0].parts.slice(1)
+                    ]
+                  };
+                } else {
+                  fallbackContents = [
+                    { role: 'user', parts: [{ text: `[DIRECTIVAS DE SISTEMA]:\n${sys}` }] },
+                    ...fallbackContents
+                  ];
+                }
+              }
+              if (errStr.includes('thinkingconfig') || errStr.includes('thinking_config')) {
+                delete fallbackConfig.thinkingConfig;
+              }
+              currentConfig = fallbackConfig;
+              currentContents = fallbackContents;
+              responseStream = await ai.models.generateContentStream({
+                model: currentModel,
+                contents: fallbackContents,
+                config: fallbackConfig
+              });
+            } else {
+              throw streamErr;
+            }
+          }
 
           let lastSaveTime = Date.now();
           let uso: any = null;
@@ -2159,16 +2257,23 @@ export async function generateContentWithFailover({
         if (signal?.aborted) throw new Error('Tarea cancelada.');
 
         const abierto = esModeloAbierto(model);
-        const supportsThinking = model.includes('3.7') || model.includes('3.1') || model.includes('gemini-3');
+        const gemma4 = esGemma4(model);
+        const supportsThinking =
+          model.includes('3.8') ||
+          model.includes('3.7') ||
+          model.includes('3.6') ||
+          model.includes('3.5') ||
+          model.includes('gemini-3') ||
+          gemma4;
         const cleanedConfig: any = {
           ...config,
-          thinkingConfig: supportsThinking && !abierto ? config.thinkingConfig : undefined,
+          thinkingConfig: supportsThinking && (!abierto || gemma4) ? config.thinkingConfig : undefined,
           ...(abierto
             ? {
                 safetySettings: undefined,
-                tools: undefined,
-                thinkingConfig: undefined,
-                responseMimeType: undefined
+                tools: gemma4 ? config.tools : undefined,
+                thinkingConfig: gemma4 ? config.thinkingConfig : undefined,
+                responseMimeType: gemma4 ? config.responseMimeType : undefined
               }
             : {})
         };

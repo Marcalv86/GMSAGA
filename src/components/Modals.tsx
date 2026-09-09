@@ -477,7 +477,7 @@ export const ApiKeyModal: React.FC<{
                 Selecciona el Modelo de Narración Principal:
               </label>
 
-              <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+              <div className="flex flex-col gap-2 max-h-84 md:max-h-96 overflow-y-auto pr-1">
                 {AVAILABLE_MODELS.map(m => {
                   const isSelected = selectedModel === m.id;
                   return (
