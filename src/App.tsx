@@ -991,28 +991,31 @@ export default function App() {
   const handleCreateChat = () => {
     if (!currentPId || !currentProject) return;
 
-    // Al cerrar o abrir nuevo capítulo, el resumen final de la sesión se guarda en la memoria persistente (story)
-    if (currentChat && currentChat.messages && currentChat.messages.length > 0) {
-      const chatSummaryParts = currentChat.messages
-        .filter(m => m.role === 'model')
-        .slice(-6)
-        .map(m => m.content.replace(/\[(ESTADO|TIEMPO|AGENDA|HILO|PRESENTES|VINCULO|AFINIDAD|Petición de Tirada|Tirada)[^\]]*\]/g, '').trim())
-        .filter(Boolean);
-
-      if (chatSummaryParts.length > 0) {
-        const chapterTitle = currentChat.name || `Capítulo ${currentChats.length}`;
-        const autoSummary = `\n\n### Resumen de cierre: ${chapterTitle}\n` + chatSummaryParts.join(' ').substring(0, 1500) + '...';
-        
-        const updatedMemory = {
-          ...currentProject.memory,
-          story: (currentProject.memory.story || '') + autoSummary
-        };
-        
-        const updatedProjects = projects.map(p => p.id === currentPId ? { ...p, memory: updatedMemory } : p);
-        setProjects(updatedProjects);
-        saveLocalProjects(updatedProjects);
-      }
-    }
+    /*
+     * AL CERRAR CAPÍTULO YA NO SE PEGA NADA A LA MEMORIA.
+     *
+     * Aquí se cogían los seis últimos mensajes del Narrador, se juntaban y se
+     * añadían al final de `memory.story` cortados a 1.500 caracteres. Tres
+     * cosas iban mal, y la tercera es la que zanja el asunto:
+     *
+     * 1. No era un resumen. Eran los últimos párrafos en bruto, cortados a
+     *    mitad de palabra. Guardaba el final del capítulo, no el capítulo.
+     * 2. Crecía sin freno. `story` viaja en CADA turno, así que cada capítulo
+     *    cerrado añadía unos cuatrocientos tokens permanentes a todos los
+     *    turnos siguientes, para siempre.
+     * 3. Y no servía de nada: `syncFullCampaignFromChats` REEMPLAZA `story`
+     *    con su versión consolidada (`story: parsed.story || ...`). O sea que
+     *    todo lo acumulado aquí desaparecía en la siguiente sincronización.
+     *    Engordaba cada petición hasta que algo lo borraba en silencio.
+     *
+     * Lo que de verdad conserva la campaña ya existe y está mejor hecho: el
+     * `story` que reescribe la sincronización, el diario día a día, y los PNJs,
+     * tramas y lugares de la memoria viva. Un pegado que no sobrevive a la
+     * primera sincronización no es memoria persistente; es lastre.
+     *
+     * (Consolidar de verdad al cerrar —resumen generado y `story` reescrita con
+     * un tope— es trabajo aparte, y va con la revisión de la memoria.)
+     */
 
     const newChatId = 'cap_' + Date.now();
     const newChat: Chat = {
