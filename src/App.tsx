@@ -984,51 +984,6 @@ export default function App() {
     const text = textToSend.trim();
     if (!text || !currentPId || !currentChatId || isGenerating) return;
 
-    // Novelización en segundo plano de la respuesta para el formato Novela
-    if (currentProject) {
-      const targetChatId = currentChatId;
-      const targetProj = currentProject;
-      setTimeout(async () => {
-        try {
-          const chs = getLocalChats(targetProj.id);
-          const chat = chs.find(c => c.id === targetChatId);
-          if (!chat) return;
-          const uIdx = chat.messages
-            .map((m, i) => ({ m, i }))
-            .reverse()
-            .find(({ m }) => m.role === 'user' && m.content === text && !m.novelContent)?.i;
-          if (uIdx !== undefined && uIdx >= 0) {
-            const prevModel = [...chat.messages.slice(0, uIdx)]
-              .reverse()
-              .find(m => m.role === 'model')?.content;
-            const nextModel = chat.messages.slice(uIdx + 1).find(m => m.role === 'model')?.content;
-            const novelText = await novelizeUserMessage({
-              rawInput: text,
-              project: targetProj,
-              previousNarrative: prevModel,
-              nextNarrative: nextModel
-            });
-            if (novelText) {
-              setCurrentChats(prev => {
-                const updated = prev.map(c => {
-                  if (c.id !== targetChatId) return c;
-                  const msgs = [...c.messages];
-                  if (msgs[uIdx] && msgs[uIdx].role === 'user') {
-                    msgs[uIdx] = { ...msgs[uIdx], novelContent: novelText };
-                  }
-                  return { ...c, messages: msgs };
-                });
-                saveLocalChats(targetProj.id, updated);
-                return updated;
-              });
-            }
-          }
-        } catch {
-          // Silencioso en segundo plano
-        }
-      }, 1800);
-    }
-
     if (currentChat) {
       const updatedMessages = [...currentChat.messages, { role: 'user' as const, content: text }];
       const updatedChat = { ...currentChat, messages: updatedMessages };
@@ -1239,6 +1194,52 @@ Estás muy cerca del tope de 250.000 tokens por minuto de la capa gratuita de Go
           });
         }
       });
+
+      // Novelización en segundo plano de la respuesta tras concluir con éxito la generación
+      if (currentProject && currentChatId && userPrompt && !userPrompt.startsWith('[Continúa') && !userPrompt.startsWith('⏳ [')) {
+        const targetChatId = currentChatId;
+        const targetProj = currentProject;
+        const targetPrompt = userPrompt;
+        setTimeout(async () => {
+          try {
+            const chs = getLocalChats(targetProj.id);
+            const chat = chs.find(c => c.id === targetChatId);
+            if (!chat) return;
+            const uIdx = chat.messages
+              .map((m, i) => ({ m, i }))
+              .reverse()
+              .find(({ m }) => m.role === 'user' && m.content === targetPrompt && !m.novelContent)?.i;
+            if (uIdx !== undefined && uIdx >= 0) {
+              const prevModel = [...chat.messages.slice(0, uIdx)]
+                .reverse()
+                .find(m => m.role === 'model')?.content;
+              const nextModel = chat.messages.slice(uIdx + 1).find(m => m.role === 'model')?.content;
+              const novelText = await novelizeUserMessage({
+                rawInput: targetPrompt,
+                project: targetProj,
+                previousNarrative: prevModel,
+                nextNarrative: nextModel
+              });
+              if (novelText) {
+                setCurrentChats(prev => {
+                  const updated = prev.map(c => {
+                    if (c.id !== targetChatId) return c;
+                    const msgs = [...c.messages];
+                    if (msgs[uIdx] && msgs[uIdx].role === 'user') {
+                      msgs[uIdx] = { ...msgs[uIdx], novelContent: novelText };
+                    }
+                    return { ...c, messages: msgs };
+                  });
+                  saveLocalChats(targetProj.id, updated);
+                  return updated;
+                });
+              }
+            }
+          } catch {
+            // Silencioso en segundo plano
+          }
+        }, 1000);
+      }
     } catch (error: any) {
       console.error('Error generating AI story:', error);
       if (!isAppending) {

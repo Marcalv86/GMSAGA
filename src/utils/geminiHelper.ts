@@ -1583,14 +1583,15 @@ export function isNarrativeIncomplete(text: string): boolean {
   if (raw.length < 15) return false;
   if (raw === 'Tirando dados...' || raw === 'Pensando...') return false;
 
-  // Si contiene etiquetas de cierre, estado o tirada, ha concluido formalmente
-  if (/\[(?:ESTADO|TIEMPO|AGENDA|HILO|PRESENTES|VINCULO|AFINIDAD|Petición de Tirada|Tirada)\b/i.test(raw)) {
-    return false;
-  }
-
   // Quitar etiquetas informativas de capítulos
   const clean = raw.replace(/\[CHAPTER:[^\]]*\]/gi, '').trim();
   if (clean.length < 15) return false;
+
+  // Si termina con etiquetas de cierre, estado o tirada formales, ha concluido formalmente
+  const tailText = clean.slice(-250);
+  if (/\[(?:ESTADO|TIEMPO|AGENDA|HILO|PRESENTES|VINCULO|AFINIDAD|Petición de Tirada|Petición de Salvación|Tirada DM|Tirada)[^\]]*\]\s*$/i.test(tailText)) {
+    return false;
+  }
 
   // Si termina con cierre formal de turno o estímulo cinematográfico
   if (/< ?¿?Qué haces\?? ?>/i.test(clean) || /———◆———/i.test(clean)) return false;
