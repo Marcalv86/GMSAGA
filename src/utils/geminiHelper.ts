@@ -1674,6 +1674,7 @@ export async function generateStoryTurnStream({
   signal,
   onStateReported,
   onTimeReported,
+  onUsageReported,
   setLoadingText,
   onSaveMessage
 }: {
@@ -1689,6 +1690,8 @@ export async function generateStoryTurnStream({
   onStateReported?: (state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] }) => void;
   /** El Narrador informa de cuánto tiempo ha pasado y de qué queda en marcha. */
   onTimeReported?: (t: TiempoReportado) => void;
+  /** Informa de los tokens consumidos en el turno (entrada, salida, total). */
+  onUsageReported?: (usage: { entrada: number; salida: number; total: number }) => void;
   /** El Narrador informa de cambios en el inventario o monedas del protagonista. */
   setLoadingText: (text: string) => void;
   onSaveMessage?: (updatedChat: Chat) => Promise<void> | void;
@@ -1926,6 +1929,13 @@ export async function generateStoryTurnStream({
               },
               huboBusqueda ? `con búsqueda${isFallback ? ' (respaldo)' : ''}` : isFallback ? 'respaldo' : undefined
             );
+
+            if (onUsageReported) {
+              const entrada = uso.promptTokenCount || 0;
+              const salida = (uso.candidatesTokenCount ?? uso.responseTokenCount) || 0;
+              const total = uso.totalTokenCount || (entrada + salida);
+              onUsageReported({ entrada, salida, total });
+            }
           }
 
           await persistir(fullText.trim(), true);

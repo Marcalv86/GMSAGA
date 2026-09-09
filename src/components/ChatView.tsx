@@ -659,6 +659,9 @@ export const ChatView: React.FC<{
   files?: ProjectFile[];
   onUpdateProject?: (updater: Partial<Project> | ((prev: Project) => Partial<Project>)) => Promise<void> | void;
   onNavigateToDiary?: (absDay?: number) => void;
+  isNearTokenLimit?: boolean;
+  chatTokensCount?: number;
+  onCreateNewChat?: () => void;
 }> = ({
   chat,
   chapterIndex,
@@ -685,7 +688,10 @@ export const ChatView: React.FC<{
   project,
   files = [],
   onUpdateProject,
-  onNavigateToDiary
+  onNavigateToDiary,
+  isNearTokenLimit,
+  chatTokensCount,
+  onCreateNewChat
 }) => {
   const [inputText, setInputText] = useState('');
 
@@ -1463,6 +1469,30 @@ export const ChatView: React.FC<{
             )}
           </div>
         </div>
+
+        {/* Aviso preventivo de saturación de tokens */}
+        {isNearTokenLimit && (
+          <div className="max-w-[900px] mx-auto mb-2 px-3.5 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
+              <div className="leading-snug">
+                <span className="font-cinzel font-bold">Capítulo extenso (~{Math.round((chatTokensCount || 200000) / 1000)}k tokens): </span>
+                <span className="opacity-90">Te acercas al tope de cuota por minuto de Google (250k). Te recomendamos abrir un nuevo capítulo para continuar con fluidez.</span>
+              </div>
+            </div>
+            {onCreateNewChat && (
+              <button
+                type="button"
+                onClick={onCreateNewChat}
+                className="shrink-0 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-cinzel font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 ml-auto sm:ml-0"
+                title="Abrir nuevo capítulo manteniendo toda la memoria, ficha e inventario"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Nuevo Capítulo</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Input Field & Attachments */}
         <div className="max-w-[900px] mx-auto relative">

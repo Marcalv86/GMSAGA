@@ -196,6 +196,9 @@ export default function App() {
     type?: 'upload' | 'sync' | 'analysis' | 'general';
   }>({ active: false });
 
+  // Monitoreo de carga de tokens por capítulo para advertencias proactivas (tope 250k de Google)
+  const [chatTokenLoads, setChatTokenLoads] = useState<Record<string, number>>({});
+
   // Protección del almacenamiento: sin esto el navegador puede borrar la campaña
   // por su cuenta cuando anda justo de espacio.
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
@@ -1127,6 +1130,33 @@ export default function App() {
           });
         },
         setLoadingText,
+        onUsageReported: usage => {
+          const totalTokens = usage.total || (usage.entrada + usage.salida);
+          if (currentChatId) {
+            setChatTokenLoads(prev => ({ ...prev, [currentChatId]: totalTokens }));
+          }
+
+          // Aviso proactivo si se acerca al tope de 250.000 tokens por minuto
+          if (totalTokens >= 180000) {
+            setAlertConfig({
+              isOpen: true,
+              title: '⚡ Aviso: Capítulo cerca del límite de tokens (250k)',
+              message: `El volumen de este turno ha alcanzado ${totalTokens.toLocaleString('es-ES')} tokens (${usage.entrada ? `${usage.entrada.toLocaleString('es-ES')} de entrada / ` : ''}${usage.salida?.toLocaleString('es-ES') || 0} de salida).
+
+Estás muy cerca del tope de 250.000 tokens por minuto de la capa gratuita de Google. Para que la historia continúe con total fluidez y sin bloqueos de cuota (429), te recomendamos abrir un «Nuevo Capítulo» ahora.
+
+• El capítulo actual y todos tus mensajes quedan archivados íntegros en tu diario y Crónica.
+• Tu ficha de personaje, inventario, relaciones de PNJs y memoria se conservan al 100%.`,
+              actionButton: {
+                label: '✨ Crear Nuevo Capítulo',
+                onClick: () => {
+                  setAlertConfig(null);
+                  handleCreateChat();
+                }
+              }
+            });
+          }
+        },
         onSaveMessage: (updatedChat: Chat) => {
           setCurrentChats(prev => {
             const updatedChs = prev.map(c => (c.id === currentChatId ? updatedChat : c));
@@ -2277,6 +2307,14 @@ export default function App() {
 
   const currentChapterIndex = currentChats.findIndex(c => c.id === currentChatId);
 
+  // Estimación y monitoreo de tokens para aviso preventivo de cuota Google (250k tokens/min)
+  const currentChatTokenCount = currentChatId ? chatTokenLoads[currentChatId] || 0 : 0;
+  const currentChatChars = (currentChat?.messages || []).reduce((acc, m) => acc + (m.content?.length || 0), 0);
+  const docsChars = currentFiles.reduce((acc, f) => acc + (f.length || 0), 0);
+  const estimatedCurrentTokens = Math.round((currentChatChars + docsChars) / 3.8);
+  const effectiveChatTokens = currentChatTokenCount > 0 ? currentChatTokenCount : estimatedCurrentTokens;
+  const isCurrentChatNearTokenLimit = effectiveChatTokens >= 180000;
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg-color)] text-[var(--text-primary)] font-lora relative">
       {/* Sutil viñeteado para efecto de inmersión / iluminación central */}
@@ -2773,6 +2811,9 @@ export default function App() {
               files={currentFiles}
               onUpdateProject={handleUpdateProjectField}
               onNavigateToDiary={() => setActiveTab('memory')}
+              isNearTokenLimit={isCurrentChatNearTokenLimit}
+              chatTokensCount={effectiveChatTokens}
+              onCreateNewChat={handleCreateChat}
             />
           )}
 
