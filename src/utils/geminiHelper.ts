@@ -3866,14 +3866,33 @@ ${relato}`;
   let texto = (respuesta.text || '').trim();
   if (!texto) throw new Error('El modelo no devolvió ninguna crónica.');
 
-  // Vallas de código y preámbulos del tipo «Aquí tienes la crónica:».
-  texto = texto
-    .replace(/^```(?:\w+)?\n?/, '')
-    .replace(/\n?```$/, '')
-    .replace(/^\s*(?:aqu[ií] tienes|te dejo|esta es)[^\n:]{0,60}:\s*/i, '')
-    .trim();
+  texto = limpiarTextoGenerado(texto);
 
   return recortarConSentido(texto, TOPE_CRONICA_CARACTERES);
+}
+
+/**
+ * Tope duro de la memoria general del proyecto.
+ *
+ * Esta es LA memoria que llega al Narrador durante la partida: de todo lo que
+ * la aplicación guarda, `buildTurnPayload` solo envía esta, tus notas, tus
+ * directivas manuales y la ficha. La crónica, los PNJs, las tramas y los
+ * lugares no viajan. Eso la hace el campo más importante que hay… y el más
+ * caro, porque va en cada petición.
+ *
+ * Ocho mil caracteres son unos dos mil cien tokens. Da para las tres secciones
+ * con holgura y evita que un documento que crece sin vigilancia acabe costando
+ * un turno de cada tres.
+ */
+export const TOPE_MEMORIA_PROYECTO_CARACTERES = 8000;
+
+/** Quita vallas de código y preámbulos del tipo «Aquí tienes la memoria:». */
+function limpiarTextoGenerado(texto: string): string {
+  return texto
+    .replace(/^```(?:\w+)?\n?/, '')
+    .replace(/\n?```$/, '')
+    .replace(/^\s*(?:aqu[ií] tienes|te dejo|esta es|claro[,.]?)[^\n:]{0,80}:\s*/i, '')
+    .trim();
 }
 
 export async function generateClaudeProjectMemory({
@@ -3939,20 +3958,33 @@ export async function generateClaudeProjectMemory({
 - Rasgos/Notas: ${pc.summary || pc.notes || 'Ninguna'}
 ` : '';
 
-  const prompt = `Eres el sintetizador de memoria de proyecto para este entorno de rol (D&D 5e / Forgotten Realms).
-Tu tarea es generar o actualizar la MEMORIA PERSISTENTE DEL PROYECTO (en formato estructurado Markdown, exactamente como la memoria de proyectos de Claude).
+  /*
+   * NADA DE AMBIENTACIÓN ESCRITA A FUEGO.
+   *
+   * Este prompt nombraba Forgotten Realms, Bregan D'aerthe, Luskan,
+   * Menzoberranzan y «la crueldad canónica de los drow», y pedía describir las
+   * ataduras del protagonista. Eran los detalles de UNA campaña metidos en una
+   * función que las sirve todas: cualquier otra —una espacial, una moderna—
+   * habría recibido esas premisas como si fueran suyas, y el modelo tiende a
+   * darlas por buenas. La ambientación tiene que salir de lo que se le pasa
+   * abajo, no de aquí.
+   */
+  const prompt = `Eres el sintetizador de memoria de proyecto de una aplicación de rol narrativo.
+Tu tarea es generar o actualizar la MEMORIA PERSISTENTE DEL PROYECTO, en Markdown y con la misma estructura que la memoria de proyectos de Claude.
 
-Debes sintetizar y redactar un documento sintético, riguroso, inmersivo y conciso con EXACTAMENTE estas tres secciones principales en Markdown:
+⚠️ LA AMBIENTACIÓN SALE DE LOS DATOS DE ABAJO, NO DE TU IMAGINACIÓN. No des por hecho ningún mundo, sistema, tono ni tipo de personaje: toma todo eso del nombre de la campaña, las directivas, la ficha, los documentos y el historial. Si algo no consta, no lo inventes: omítelo.
+
+Redacta un documento conciso y riguroso con EXACTAMENTE estas tres secciones en Markdown:
 
 ### Purpose & context
-- Párrafo fluido explicando quién es el jugador, el personaje protagonista (nombre, clase, raza, trasfondo), compañeros o invocaciones directas, universo/ambientación (Forgotten Realms, Bregan D'aerthe, Luskan, Menzoberranzan, etc.), y estilo narrativo (prosa atmosférica, tiradas ocultas integradas).
-- Subsección "Key worldbuilding parameters established:" con viñetas concisas que reflejen las reglas de ambientación, tono, crueldad canónica de los drow, etc.
+- Párrafo fluido: quién juega, el personaje protagonista (nombre, clase o rol, especie o procedencia, trasfondo), acompañantes habituales, el mundo y la época en que transcurre, y el estilo de narración que pide la campaña.
+- Subsección "Key worldbuilding parameters established:" con viñetas breves de las reglas de ambientación y tono que la campaña haya fijado.
 
 ### Current state
-- Párrafo conciso y descriptivo del estado exacto en el que se encuentra la sesión activa: situación física inmediata del protagonista (ataduras, salud, pertrechos), acompañantes presentes, ubicación actual, peligros o descubrimientos inmediatos.
+- Párrafo conciso con el punto exacto en el que está la partida: dónde está el protagonista, cómo está, quién le acompaña, y qué peligros, deudas o descubrimientos tiene encima ahora mismo.
 
 ### Tools & resources
-- Lista en viñetas de las herramientas, fichas, módulos y documentos reales cargados en el proyecto.
+- Viñetas con las herramientas, fichas, módulos y documentos realmente cargados en el proyecto.
 
 INFORMACIÓN DEL PROYECTO:
 - Nombre: ${project.name}
@@ -3975,7 +4007,8 @@ ${recentHistory.length > 0 ? recentHistory.slice(-90000) : 'No hay historial de 
 REGLAS DE SALIDA:
 - Genera EXCLUSIVAMENTE el texto en Markdown estructurado con las 3 secciones (### Purpose & context, ### Current state, ### Tools & resources).
 - NO incluyas introducciones como "Aquí tienes la memoria:", ni etiquetas de bloque de código json o markdown \`\`\`. Devuelve el texto Markdown directo.
-- Si las directivas del usuario modifican parámetros (ej. dejar de usar oráculo, eliminar bardo/taller creativo, cambiar reglas), intéggralas y refléjalas fielmente en el contenido.`;
+- MÁXIMO ${TOPE_MEMORIA_PROYECTO_CARACTERES} CARACTERES. Este documento viaja al Narrador en CADA turno de la partida, así que lo que sobre aquí se paga en todas las peticiones. Si no cabe todo, condensa: quédate con lo que sigue teniendo consecuencias y suelta el detalle que ya no las tenga.
+- Si las directivas del usuario modifican parámetros (ej. dejar de usar oráculo, eliminar bardo/taller creativo, cambiar reglas), intégralas y refléjalas fielmente en el contenido.`;
 
   try {
     const bgModel = getBackgroundTaskModel();
@@ -3989,8 +4022,14 @@ REGLAS DE SALIDA:
       } as any
     });
 
-    const generated = (response.text || '').trim();
-    return generated;
+    const generated = limpiarTextoGenerado((response.text || '').trim());
+    if (!generated) throw new Error('El modelo no devolvió ninguna memoria.');
+    /*
+     * El tope se aplica aquí, no solo pidiéndoselo al modelo. Un límite que
+     * depende de que la IA se porte bien no es un límite, y este documento se
+     * paga en cada turno de la partida.
+     */
+    return recortarConSentido(generated, TOPE_MEMORIA_PROYECTO_CARACTERES);
   } catch (err) {
     console.error('Error al generar la memoria del proyecto:', err);
     throw err;

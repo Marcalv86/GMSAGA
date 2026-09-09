@@ -18,7 +18,11 @@ import {
   User
 } from 'lucide-react';
 import { MemoryManager } from './MemoryManager';
-import { generateClaudeProjectMemory, extractAiDirectives } from '../utils/geminiHelper';
+import {
+  generateClaudeProjectMemory,
+  extractAiDirectives,
+  TOPE_MEMORIA_PROYECTO_CARACTERES
+} from '../utils/geminiHelper';
 
 interface SimpleMemoryViewProps {
   project: Project;
@@ -475,6 +479,27 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                   <span className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
                     <FileText className="w-4 h-4" />
                     <span>Editor de Memoria (Markdown)</span>
+                    {/*
+                      El tamaño, a la vista mientras se escribe.
+
+                      Este documento es el único canal de memoria que llega al
+                      Narrador durante la partida, y viaja ENTERO en cada turno.
+                      Lo que se añada aquí se paga en todas las peticiones, y sin
+                      un contador no hay manera de notarlo hasta que la cuota
+                      empieza a fallar. Lo escrito a mano no se recorta —es tuyo—
+                      pero sí se avisa.
+                    */}
+                    <span
+                      className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                        editableMemoryText.length > TOPE_MEMORIA_PROYECTO_CARACTERES
+                          ? 'bg-amber-500/20 text-amber-950 dark:text-amber-100 border-amber-700/50'
+                          : 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 border-emerald-700/40'
+                      }`}
+                      title={`Esta memoria viaja entera al Narrador en cada turno. Recomendado: hasta ${TOPE_MEMORIA_PROYECTO_CARACTERES.toLocaleString('es-ES')} caracteres (~${Math.round(TOPE_MEMORIA_PROYECTO_CARACTERES / 3.8 / 100) / 10} mil tokens por turno).`}
+                    >
+                      {editableMemoryText.length.toLocaleString('es-ES')} /{' '}
+                      {TOPE_MEMORIA_PROYECTO_CARACTERES.toLocaleString('es-ES')} car.
+                    </span>
                   </span>
                   <div className="flex items-center gap-2">
                     <button
