@@ -303,6 +303,7 @@ export interface ProjectMemoryEdit {
   id: string;
   text: string;
   createdAt: number;
+  source?: 'user' | 'ai';
 }
 
 export interface Memory {

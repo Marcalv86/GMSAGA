@@ -935,7 +935,31 @@ export default function App() {
 
   // Chapter / Chat Management
   const handleCreateChat = () => {
-    if (!currentPId) return;
+    if (!currentPId || !currentProject) return;
+
+    // Al cerrar o abrir nuevo capítulo, el resumen final de la sesión se guarda en la memoria persistente (story)
+    if (currentChat && currentChat.messages && currentChat.messages.length > 0) {
+      const chatSummaryParts = currentChat.messages
+        .filter(m => m.role === 'model')
+        .slice(-6)
+        .map(m => m.content.replace(/\[(ESTADO|TIEMPO|AGENDA|HILO|PRESENTES|VINCULO|AFINIDAD|Petición de Tirada|Tirada)[^\]]*\]/g, '').trim())
+        .filter(Boolean);
+
+      if (chatSummaryParts.length > 0) {
+        const chapterTitle = currentChat.name || `Capítulo ${currentChats.length}`;
+        const autoSummary = `\n\n### Resumen de cierre: ${chapterTitle}\n` + chatSummaryParts.join(' ').substring(0, 1500) + '...';
+        
+        const updatedMemory = {
+          ...currentProject.memory,
+          story: (currentProject.memory.story || '') + autoSummary
+        };
+        
+        const updatedProjects = projects.map(p => p.id === currentPId ? { ...p, memory: updatedMemory } : p);
+        setProjects(updatedProjects);
+        saveLocalProjects(updatedProjects);
+      }
+    }
+
     const newChatId = 'cap_' + Date.now();
     const newChat: Chat = {
       id: newChatId,

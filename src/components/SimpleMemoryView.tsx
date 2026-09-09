@@ -18,7 +18,7 @@ import {
   User
 } from 'lucide-react';
 import { MemoryManager } from './MemoryManager';
-import { generateClaudeProjectMemory } from '../utils/geminiHelper';
+import { generateClaudeProjectMemory, extractAiDirectives } from '../utils/geminiHelper';
 
 interface SimpleMemoryViewProps {
   project: Project;
@@ -70,6 +70,40 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   const [isSavedRecently, setIsSavedRecently] = useState(false);
   const [isCopiedRecently, setIsCopiedRecently] = useState(false);
   const [isLocalUpdating, setIsLocalUpdating] = useState(false);
+  const [isExtractingAi, setIsExtractingAi] = useState(false);
+
+  const handleExtractAiDirectives = async () => {
+    if (isExtractingAi || isLocalUpdating) return;
+    setIsExtractingAi(true);
+    try {
+      const effectiveChats = chats.length > 0 ? chats : project.chats || [];
+      const effectiveFiles = files.length > 0 ? files : project.files || [];
+      const extracted = await extractAiDirectives({
+        chats: effectiveChats,
+        files: effectiveFiles,
+        project
+      });
+      if (extracted.length > 0) {
+        const existingTexts = new Set((memory.memory_edits || []).map(e => e.text));
+        const newEdits: ProjectMemoryEdit[] = extracted
+          .filter(t => !existingTexts.has(t))
+          .map((t, idx) => ({
+            id: `ai_edit_${Date.now()}_${idx}`,
+            text: t,
+            createdAt: Date.now(),
+            source: 'ai' as const
+          }));
+        if (newEdits.length > 0) {
+          const updatedEdits = [...(memory.memory_edits || []), ...newEdits];
+          handleFieldChange('memory_edits', updatedEdits);
+        }
+      }
+    } catch (err) {
+      console.error('Error extracting AI directives:', err);
+    } finally {
+      setIsExtractingAi(false);
+    }
+  };
 
   // Raw text editor state
   const rawMemoryText = memory.raw_project_memory || '';
@@ -347,26 +381,41 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                 </div>
 
                 {/* Add manual directive input */}
-                <div className="flex gap-2">
-                  <input
-                    id="input-manual-edit"
-                    type="text"
-                    placeholder="Ej: Las instrucciones han cambiado, no usar el oráculo a partir de ahora..."
-                    value={newManualEditInput}
-                    onChange={e => setNewManualEditInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleAddManualEditOnly();
-                    }}
-                    className="flex-1 bg-[color-mix(in_srgb,var(--bg-color)_60%,transparent)] border border-[var(--glass-border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                  />
-                  <button
-                    id="btn-add-manual-edit"
-                    onClick={handleAddManualEditOnly}
-                    disabled={!newManualEditInput.trim()}
-                    className="px-4 py-2 bg-[var(--accent)] text-[var(--on-accent)] rounded-xl text-xs font-cinzel font-semibold disabled:opacity-40 cursor-pointer"
-                  >
-                    Añadir
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      id="input-manual-edit"
+                      type="text"
+                      placeholder="Ej: Las instrucciones han cambiado, no usar el oráculo a partir de ahora..."
+                      value={newManualEditInput}
+                      onChange={e => setNewManualEditInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleAddManualEditOnly();
+                      }}
+                      className="flex-1 bg-[color-mix(in_srgb,var(--bg-color)_60%,transparent)] border border-[var(--glass-border)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                    />
+                    <button
+                      id="btn-add-manual-edit"
+                      onClick={handleAddManualEditOnly}
+                      disabled={!newManualEditInput.trim()}
+                      className="px-4 py-2 bg-[var(--accent)] text-[var(--on-accent)] rounded-xl text-xs font-cinzel font-semibold disabled:opacity-40 cursor-pointer"
+                    >
+                      Añadir
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-[var(--text-secondary)] font-cinzel">
+                      Tanto tú como la IA podéis registrar directivas.
+                    </span>
+                    <button
+                      onClick={handleExtractAiDirectives}
+                      disabled={isExtractingAi}
+                      className="px-3 py-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 text-xs font-cinzel font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${isExtractingAi ? 'animate-spin' : ''}`} />
+                      <span>{isExtractingAi ? 'Analizando...' : '🤖 Extraer directivas con IA'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* List of active edits */}
@@ -381,7 +430,19 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                         key={edit.id}
                         className="bg-[color-mix(in_srgb,var(--bg-color)_50%,transparent)] border border-[var(--glass-border)] rounded-xl p-3.5 flex items-start justify-between gap-3 text-xs leading-relaxed text-[var(--text-primary)]"
                       >
-                        <div className="flex-1 whitespace-pre-wrap">{edit.text}</div>
+                        <div className="flex-1 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            {edit.source === 'ai' ? (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 border border-amber-500/20 font-cinzel font-bold">🤖 IA</span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 font-cinzel font-bold">👤 Tú</span>
+                            )}
+                            <span className="text-[10px] text-[var(--text-secondary)]">
+                              {new Date(edit.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="whitespace-pre-wrap">{edit.text}</div>
+                        </div>
                         <button
                           onClick={() => handleDeleteEdit(edit.id)}
                           className="text-red-500 hover:text-red-700 p-1 cursor-pointer shrink-0 transition-colors"

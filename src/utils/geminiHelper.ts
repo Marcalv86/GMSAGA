@@ -5253,6 +5253,77 @@ DIRECTRICES EDITORIALES INVIOLABLES:
 }
 
 /**
+ * Extrae automáticamente directivas clave, reglas o pactos de la partida usando IA
+ * para añadirlas a la lista de Directivas Manuales de Memoria.
+ */
+export async function extractAiDirectives({
+  chats,
+  files,
+  project
+}: {
+  chats: Chat[];
+  files: ProjectFile[];
+  project: Project;
+}): Promise<string[]> {
+  const recentHistory = chats
+    .flatMap(c => (c.messages || []).map(m => `${m.role.toUpperCase()}: ${m.content}`))
+    .slice(-30)
+    .join('\n');
+
+  const fileSummaryList = files.length > 0
+    ? files.map(f => `- **${f.name}**: ${f.content?.slice(0, 200) || ''}`).join('\n')
+    : 'Sin documentos adicionales.';
+
+  const prompt = `Eres el director de juego y sintetizador de reglas de la campaña de rol "${project.name}" (D&D 5e / Forgotten Realms).
+Analiza el historial reciente y los documentos de referencia para extraer entre 1 y 4 directrices, reglas de juego, pactos, restricciones o hechos capitales clave que la IA (Narrador) DEBE recordar de forma estricta en adelante.
+
+DOCUMENTOS DE REFERENCIA:
+${fileSummaryList}
+
+HISTORIAL RECIENTE:
+${recentHistory || 'Sin historial reciente.'}
+
+REGLA DE SALIDA:
+Devuelve un JSON estricto con un array de strings bajo la clave "directives":
+{
+  "directives": [
+    "Directriz o regla clave 1",
+    "Directriz o regla clave 2"
+  ]
+}
+No devuelvas texto adicional ni bloques de markdown que no sean el JSON.`;
+
+  try {
+    const bgModel = getBackgroundTaskModel();
+    const safetySetting = getStoredSafetyLevel();
+    const response = await generateContentWithFailover({
+      primaryModel: bgModel,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+        ...(esModeloAbierto(bgModel) ? {} : { safetySettings: buildSafetySettings(safetySetting) })
+      } as any
+    });
+
+    const text = response.text?.trim() || '';
+    if (!text) return [];
+    let clean = text;
+    if (clean.startsWith('```')) {
+      clean = clean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    }
+    const parsed = JSON.parse(clean);
+    if (Array.isArray(parsed.directives)) {
+      return parsed.directives.map((d: any) => String(d).trim()).filter(Boolean);
+    }
+    return [];
+  } catch (err) {
+    console.error('Error al extraer directivas con IA:', err);
+    return [];
+  }
+}
+
+/**
  * Modela y transforma en lote todas las respuestas del jugador en una lista de mensajes
  * que aún no hayan sido noveladas (o forzando todas si forceAll es true).
  */
