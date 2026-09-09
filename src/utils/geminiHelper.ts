@@ -2559,6 +2559,65 @@ export interface FullCampaignSyncResult {
 }
 
 /**
+ * Deduplica entradas de cronología e hitos repetidos (ej. llegada a un puerto duplicada en días distintos).
+ */
+export function deduplicateTimeline(timeline: TimelineEntry[]): TimelineEntry[] {
+  if (!timeline || timeline.length === 0) return [];
+
+  const sorted = [...timeline].sort((a, b) => {
+    if (a.absDay !== b.absDay) return a.absDay - b.absDay;
+    return (a.minute ?? 720) - (b.minute ?? 720);
+  });
+
+  const seenHitos = new Set<string>();
+  const seenTitlesAbsDay = new Set<string>();
+  const result: TimelineEntry[] = [];
+
+  for (const entry of sorted) {
+    const titleNorm = (entry.title || '').trim().toLowerCase();
+    const hitoNorm = (entry.hito || '').trim().toLowerCase();
+
+    // Preserve manual entries or diary entries
+    if (entry.tipo === 'diario' || (entry.images && entry.images.length > 0) || entry.autoria === 'jugadora') {
+      result.push(entry);
+      continue;
+    }
+
+    // Check duplicate major milestones (hito) across days
+    if (hitoNorm && hitoNorm.length > 3) {
+      if (seenHitos.has(hitoNorm)) {
+        continue;
+      }
+      seenHitos.add(hitoNorm);
+    }
+
+    // Check duplicate milestone arrivals across days (e.g. arrival at Luskan / port)
+    if (titleNorm && titleNorm.length > 4) {
+      const isMilestoneArrival = titleNorm.includes('llegada') || titleNorm.includes('puerto') || titleNorm.includes('luskan') || titleNorm.includes('partida') || titleNorm.includes('destino');
+      if (isMilestoneArrival) {
+        const alreadyExists = result.some(r => {
+          const rTitle = (r.title || '').trim().toLowerCase();
+          return (rTitle.includes('llegada') || rTitle.includes('puerto') || rTitle.includes('luskan')) && r.absDay < entry.absDay;
+        });
+        if (alreadyExists) {
+          continue;
+        }
+      }
+
+      const keyAbsDayTitle = `${entry.absDay}_${titleNorm}`;
+      if (seenTitlesAbsDay.has(keyAbsDayTitle)) {
+        continue;
+      }
+      seenTitlesAbsDay.add(keyAbsDayTitle);
+    }
+
+    result.push(entry);
+  }
+
+  return result;
+}
+
+/**
  * Sincronización total e integral de la campaña con IA a partir de todos los chats:
  * - Memoria viva: Historia consolidada, estado actual, tramas activas/completadas, PNJs (sin el protagonista) y lugares.
  * - Diario & Cronología día a día: Días transcurridos, acontecimientos, hitos, clima, lugares y estado anímico.
@@ -2891,17 +2950,15 @@ ${historyToAnalyze}`;
     e => (e.images && e.images.length > 0) || e.tipo === 'diario'
   );
 
-  // Fusionar y ordenar cronológicamente
-  const combinedTimeline = [...newTimelineEntries];
+  // Fusionar, deduplicar y ordenar cronológicamente
+  const rawCombined = [...newTimelineEntries];
   manualUserEntries.forEach(manual => {
-    if (!combinedTimeline.some(c => c.id === manual.id)) {
-      combinedTimeline.push(manual);
+    if (!rawCombined.some(c => c.id === manual.id)) {
+      rawCombined.push(manual);
     }
   });
-  combinedTimeline.sort((a, b) => {
-    if (a.absDay !== b.absDay) return a.absDay - b.absDay;
-    return (a.minute ?? 720) - (b.minute ?? 720);
-  });
+
+  const combinedTimeline = deduplicateTimeline(rawCombined);
 
   // CurrentDate final
   let calculatedCurrentDate: CampaignDate = initDate;
