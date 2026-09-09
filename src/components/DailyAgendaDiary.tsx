@@ -554,9 +554,24 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
               <CalendarDays className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent)] shrink-0" />
               Diario & Agenda de Campaña
             </span>
-            <span className="text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--glass-border)] font-cinzel font-semibold flex items-center gap-1.5 flex-wrap">
-              <span>{cal.name}</span>
-              <span>·</span>
+            {/*
+              La fecha de la campaña, en una etiqueta.
+
+              Era una píldora `rounded-full` con el nombre del calendario, la
+              fecha larga y la hora dentro. En el escritorio cabe en una línea y
+              queda bien; en el móvil el texto envuelve a tres y una caja de
+              tres líneas con las esquinas completamente redondeadas parece un
+              globo abollado. Se le bajan las esquinas a `rounded-lg`, que
+              aguanta bien envuelva o no.
+
+              Y el nombre del calendario —«Cómputo de Harptos (Reinos Olvidados
+              / Faerûn)»— se queda para el escritorio: es lo más largo de la
+              línea, se elige una vez por campaña y no se vuelve a mirar. Lo que
+              de verdad se consulta aquí es qué día y qué hora es.
+            */}
+            <span className="text-[11px] sm:text-xs px-2.5 py-1 rounded-lg bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--glass-border)] font-cinzel font-semibold flex items-center gap-1.5 flex-wrap">
+              <span className="hidden sm:inline">{cal.name}</span>
+              <span className="hidden sm:inline">·</span>
               <span className="text-[var(--accent)] font-bold">📅 {fechaLegible(cal, fechaSegura)}</span>
               <span>⏳ {horaLegible(fechaSegura.minute)}</span>
             </span>
@@ -892,14 +907,20 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                   className="px-2 sm:px-2.5 py-1 text-xs font-cinzel hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] rounded transition-colors cursor-pointer flex items-center gap-1"
                   title="Día anterior"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Anterior</span>
+                  {/*
+                    `xs:` no existe en este proyecto, así que este rótulo estaba
+                    oculto en TODAS las anchuras, escritorio incluido: la clase
+                    ni siquiera se genera. Con `sm:` aparece donde hay sitio y en
+                    el móvil se queda la flecha sola, que es lo que se buscaba.
+                  */}
+                  <ChevronLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Anterior</span>
                 </button>
                 <button
                   onClick={() => irADiaRelativo(1)}
                   className="px-2 sm:px-2.5 py-1 text-xs font-cinzel hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] rounded transition-colors cursor-pointer flex items-center gap-1"
                   title="Día siguiente"
                 >
-                  <span className="hidden xs:inline">Siguiente</span> <ChevronRight className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Siguiente</span> <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 

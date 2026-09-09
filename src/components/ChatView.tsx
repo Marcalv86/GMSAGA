@@ -1391,8 +1391,22 @@ export const ChatView: React.FC<{
             </div>
           )}
 
-          {/* Barra de dados con estilizado temático por dado */}
-          <div className="w-full flex gap-1 sm:gap-1.5 md:gap-2 items-center justify-start sm:justify-center overflow-x-auto no-scrollbar scrollbar-none py-0.5 px-0.5">
+          {/*
+            Barra de dados.
+
+            Estaba en una sola fila con desbordamiento horizontal y la barra de
+            desplazamiento oculta. En el móvil, que es donde más se juega, la
+            fila no cabe: el oráculo, siete dados y el interruptor de tiradas de
+            PNJs suman bastante más que la pantalla, así que lo último se salía
+            por la derecha y no había nada que lo indicara —la barra estaba
+            escondida a propósito—. El botón de PNJs, sencillamente, no existía
+            para quien no supiera que había que deslizar.
+
+            Ahora en pantalla estrecha se reparte en dos filas y todo queda a la
+            vista y al alcance del pulgar. Desde `sm` vuelve a caber en una sola
+            y se centra como antes.
+          */}
+          <div className="w-full flex flex-wrap justify-center gap-1.5 sm:flex-nowrap sm:gap-1.5 md:gap-2 items-center sm:justify-center sm:overflow-x-auto no-scrollbar scrollbar-none py-0.5 px-0.5">
             {hasOracle && (
               <button
                 onClick={() => setOraculoAbierto(v => !v)}
@@ -1462,8 +1476,13 @@ export const ChatView: React.FC<{
                 aria-label="Alternar modo de tiradas de PNJs"
               >
                 <Dices className={`w-3.5 h-3.5 ${project?.manualDmRolls ? 'text-amber-600 dark:text-amber-400 animate-pulse' : 'text-[var(--text-secondary)]'}`} />
-                <span className="hidden xs:inline sm:inline">PNJs:</span>
-                <span>{project?.manualDmRolls ? 'Manual' : 'Auto'}</span>
+                {/*
+                  «PNJs:» se ocultaba en el móvil con una variante `xs:` que este
+                  proyecto no tiene definida, así que el botón se quedaba en un
+                  «Auto» suelto sin decir auto de qué. Ahora que la fila se
+                  reparte hay sitio de sobra para el rótulo entero.
+                */}
+                <span>PNJs: {project?.manualDmRolls ? 'Manual' : 'Auto'}</span>
               </button>
             )}
           </div>
@@ -1471,36 +1490,56 @@ export const ChatView: React.FC<{
 
         {/*
           Aviso de saturación de tokens.
-          
+
           Era un bloque de dos líneas con su párrafo explicativo, encima del
           campo de escribir y en cada turno a partir del aviso. La explicación
           se lee una vez y a partir de ahí solo estorba justo donde se juega:
           lo que hace falta saber de un vistazo es cuánto queda, y eso lo dice
           mejor una barra que un párrafo.
+
+          Se juega sobre todo en el móvil, así que manda la pantalla estrecha:
+          el botón tiene el alto de un dedo (no los veinte píxeles que salían
+          de un texto de diez), el rótulo y la cifra se acortan en vez de
+          apretarse unos contra otros, y la barra queda a lo ancho para que se
+          lea de un golpe de vista y no haya que apuntar a nada.
         */}
         {isNearTokenLimit && !isLastMessageIncomplete && (() => {
           const usados = chatTokensCount || TOPE_TOKENS_POR_MINUTO;
           const porcentaje = Math.min(100, (usados / TOPE_TOKENS_POR_MINUTO) * 100);
           const pasado = usados >= TOPE_TOKENS_POR_MINUTO;
+          const tono = pasado
+            ? {
+                texto: 'text-red-700 dark:text-red-300',
+                icono: 'text-red-600 dark:text-red-400',
+                relleno: 'bg-red-600',
+                borde: 'border-red-600/40 hover:bg-red-600/10'
+              }
+            : {
+                texto: 'text-amber-700 dark:text-amber-300',
+                icono: 'text-amber-600 dark:text-amber-400',
+                relleno: 'bg-amber-500',
+                borde: 'border-amber-600/40 hover:bg-amber-600/10'
+              };
           return (
-            <div className="max-w-[900px] mx-auto mb-2 flex items-center gap-2.5">
-              <Zap
-                className={`w-3.5 h-3.5 shrink-0 ${pasado ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}
-              />
+            <div className="max-w-[900px] mx-auto mb-2 flex items-center gap-2 sm:gap-2.5">
+              <Zap className={`w-4 h-4 shrink-0 ${tono.icono}`} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline justify-between gap-2 mb-1">
-                  <span
-                    className={`font-cinzel text-[10px] font-bold truncate ${pasado ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}
-                  >
-                    {pasado ? 'Capítulo por encima del tope' : 'Capítulo cerca del tope'}
+                  <span className={`font-cinzel text-[11px] font-bold truncate ${tono.texto}`}>
+                    {/* En el móvil no cabe la frase entera y truncada no dice nada. */}
+                    <span className="sm:hidden">{pasado ? 'Sobre el tope' : 'Cerca del tope'}</span>
+                    <span className="hidden sm:inline">
+                      {pasado ? 'Capítulo por encima del tope' : 'Capítulo cerca del tope'}
+                    </span>
                   </span>
-                  <span className="font-mono text-[10px] tabular-nums opacity-70 shrink-0">
-                    {Math.round(usados / 1000)}k / {Math.round(TOPE_TOKENS_POR_MINUTO / 1000)}k por minuto
+                  <span className="font-mono text-[11px] tabular-nums opacity-70 shrink-0">
+                    {Math.round(usados / 1000)}k/{Math.round(TOPE_TOKENS_POR_MINUTO / 1000)}k
+                    <span className="hidden sm:inline"> por minuto</span>
                   </span>
                 </div>
-                <div className="w-full h-1 rounded-full bg-[var(--glass-border)] overflow-hidden">
+                <div className="w-full h-1.5 rounded-full bg-[var(--glass-border)] overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${pasado ? 'bg-red-600' : 'bg-amber-500'}`}
+                    className={`h-full rounded-full transition-all duration-500 ${tono.relleno}`}
                     style={{ width: `${Math.max(3, porcentaje)}%` }}
                   />
                 </div>
@@ -1509,11 +1548,11 @@ export const ChatView: React.FC<{
                 <button
                   type="button"
                   onClick={onCreateNewChat}
-                  className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-cinzel font-bold transition-colors cursor-pointer border ${
-                    pasado
-                      ? 'border-red-600/40 text-red-700 dark:text-red-300 hover:bg-red-600/10'
-                      : 'border-amber-600/40 text-amber-700 dark:text-amber-300 hover:bg-amber-600/10'
-                  }`}
+                  // 40px de alto: lo que hace falta para acertarle con el pulgar.
+                  // El texto va entero incluso en el móvil, que «Cerrar» a secas
+                  // no dice qué se cierra y esto queda justo encima del campo de
+                  // escribir: la duda ahí se paga cara.
+                  className={`shrink-0 min-h-[40px] px-3 flex items-center rounded-lg border text-[11px] font-cinzel font-bold transition-all active:scale-95 cursor-pointer ${tono.texto} ${tono.borde}`}
                   title="Cierra este capítulo y abre uno nuevo. La memoria, la ficha, el inventario y el diario se conservan enteros; lo único que se reinicia es el historial que viaja en cada turno."
                 >
                   Cerrar capítulo

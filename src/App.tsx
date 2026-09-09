@@ -2930,7 +2930,7 @@ export default function App() {
               title={`Modelo activo: ${currentActiveModel} — Clic para cambiar de modelo o configurar API Keys`}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="truncate font-semibold text-[11px] sm:text-xs hidden xs:inline sm:inline">
+              <span className="truncate font-semibold text-[11px] sm:text-xs hidden sm:inline">
                 {AVAILABLE_MODELS.find(m => m.id === currentActiveModel)?.name || currentActiveModel}
               </span>
             </button>
