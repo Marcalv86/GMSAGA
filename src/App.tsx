@@ -46,7 +46,7 @@ import { InstallAppModal } from './components/InstallAppModal';
 import { LocalStorageModal } from './components/LocalStorageModal';
 import { ImportCampaignModal } from './components/ImportCampaignModal';
 import { Logger } from './components/Logger';
-import { logError } from './utils/logger';
+import { logError, logInfo, logWarn } from './utils/logger';
 import { sanitizeProjectMemory } from './utils/sanitizers';
 import { ExtractedCampaignResult } from './utils/campaignImporter';
 import { writeCampaignToDisk } from './utils/diskBackup';
@@ -92,6 +92,7 @@ import {
   setStoredMemorySyncGranularity,
   syncFullCampaignFromChats,
   fusionarTimeline,
+  consolidarCronicaAlCerrarCapitulo,
   AVISO_TOKENS_POR_MINUTO,
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
@@ -987,6 +988,52 @@ export default function App() {
     }));
   };
 
+  /**
+   * Deja la crónica al día con el capítulo que se acaba de cerrar.
+   *
+   * Va en segundo plano a propósito: cerrar un capítulo tiene que ser
+   * instantáneo. Si la consolidación fallara —sin clave, sin cuota, sin red— no
+   * pasa nada grave: la crónica se queda como estaba y la sincronización
+   * general la pondrá al día cuando toque. Por eso no interrumpe con un aviso;
+   * se apunta en el registro y ya.
+   */
+  const consolidarCronicaEnSegundoPlano = async (pId: string, capitulo: Chat, proyecto: Project) => {
+    if (!hasConfiguredApiKey()) return;
+    setTopProgress({ active: true, label: 'Poniendo la crónica al día…', type: 'sync' });
+    try {
+      const cronica = await consolidarCronicaAlCerrarCapitulo({ project: proyecto, capitulo });
+      if (!cronica) return;
+      /*
+       * Se actualiza por id y con el estado más reciente, no con el que hubiera
+       * cuando arrancó la petición: entre que se pide y se responde, la jugadora
+       * puede haber cambiado de campaña o seguido escribiendo.
+       */
+      setProjects(prev => {
+        const actualizados = prev.map(p =>
+          p.id === pId
+            ? { ...p, memory: sanitizeProjectMemory({ ...(p.memory || {}), story: cronica }) }
+            : p
+        );
+        saveLocalProjects(actualizados);
+        return actualizados;
+      });
+      logInfo(
+        'memory_sync',
+        `Crónica actualizada al cerrar «${capitulo.name}»`,
+        `La crónica de la campaña se ha reescrito incorporando el capítulo (${cronica.length} caracteres).`,
+        { projectName: proyecto.name }
+      );
+    } catch (err) {
+      logWarn(
+        'memory_sync',
+        'No se pudo poner la crónica al día al cerrar el capítulo',
+        describeApiError(err)
+      );
+    } finally {
+      setTopProgress({ active: false, label: '' });
+    }
+  };
+
   // Chapter / Chat Management
   const handleCreateChat = () => {
     if (!currentPId || !currentProject) return;
@@ -1029,6 +1076,12 @@ export default function App() {
     saveLocalChats(currentPId, updated);
     setCurrentChatId(newChatId);
     setActiveTab('chat');
+
+    // Y con el capítulo ya cerrado detrás, se pone la crónica al día.
+    const capituloCerrado = currentChat;
+    if (capituloCerrado && (capituloCerrado.messages || []).length > 0) {
+      void consolidarCronicaEnSegundoPlano(currentPId, capituloCerrado, currentProject);
+    }
   };
 
   const handleDeleteChat = (chatId: string) => {

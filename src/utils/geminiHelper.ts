@@ -3710,6 +3710,120 @@ export async function syncMemoryFromChats(project: Project, chats: Chat[], files
  * con las 3 secciones canónicas (Purpose & context, Current state, Tools & resources)
  * y respetando estrictamente las directivas manuales de "Dile a la IA qué recordar u olvidar".
  */
+/**
+ * Tope duro de la crónica consolidada.
+ *
+ * `memory.story` viaja en CADA turno, así que su tamaño no es un detalle de
+ * presentación: es un impuesto que se paga en todas las peticiones de la
+ * campaña. Diez mil caracteres son unos dos mil seiscientos tokens, suficiente
+ * para una crónica que se lea entera y poco para que estorbe. El detalle fino
+ * vive en el diario, que no viaja.
+ *
+ * El tope se aplica en código, no solo pidiéndoselo al modelo: un límite que
+ * depende de que la IA se porte bien no es un límite.
+ */
+export const TOPE_CRONICA_CARACTERES = 10000;
+
+/**
+ * Recorta por el final de un párrafo o una frase, nunca a mitad de palabra.
+ *
+ * Se exporta porque es la red de seguridad del tope: si el modelo devuelve el
+ * doble de lo pedido, esto es lo único que impide que la crónica engorde, y una
+ * red de seguridad sin prueba no es una red.
+ */
+export function recortarConSentido(texto: string, tope: number): string {
+  const limpio = texto.trim();
+  if (limpio.length <= tope) return limpio;
+
+  const cortado = limpio.slice(0, tope);
+  const finParrafo = cortado.lastIndexOf('\n\n');
+  if (finParrafo > tope * 0.6) return cortado.slice(0, finParrafo).trim();
+
+  const finFrase = Math.max(cortado.lastIndexOf('. '), cortado.lastIndexOf('.\n'));
+  if (finFrase > tope * 0.5) return cortado.slice(0, finFrase + 1).trim();
+
+  const finPalabra = cortado.lastIndexOf(' ');
+  return (finPalabra > 0 ? cortado.slice(0, finPalabra) : cortado).trim() + '…';
+}
+
+/**
+ * Reescribe la crónica de la campaña incorporando el capítulo que se cierra.
+ *
+ * REESCRIBE, no añade. Es toda la diferencia. Pegar el resumen de cada capítulo
+ * al final de `memory.story` la hace crecer sin freno, y como esa crónica viaja
+ * en cada turno, cada capítulo cerrado encarece para siempre todos los turnos
+ * siguientes. Y encima no duraba: la sincronización general reemplaza `story`
+ * entera, así que lo acumulado desaparecía a la primera.
+ *
+ * Aquí se le da al modelo la crónica que hay y el capítulo recién cerrado, y se
+ * le pide una sola crónica que los integre. La campaña avanza, el texto se
+ * reordena y el tamaño se queda donde estaba. Es lo que hace una memoria de
+ * proyecto que funciona: consolidar, no apilar.
+ *
+ * Corre en el modelo de tareas de fondo: una petición por capítulo cerrado, que
+ * frente a los cupos diarios no es nada.
+ */
+export async function consolidarCronicaAlCerrarCapitulo({
+  project,
+  capitulo
+}: {
+  project: Project;
+  capitulo: Chat;
+}): Promise<string> {
+  const mensajes = (capitulo.messages || []).filter(
+    m => m.content && m.content.trim() && m.content !== 'Pensando...' && m.content !== 'Tirando dados...'
+  );
+  if (mensajes.length === 0) throw new Error('El capítulo no tiene nada que consolidar.');
+
+  // Las etiquetas internas no aportan nada a una crónica y gastan sitio.
+  const relato = mensajes
+    .map(m => `${m.role === 'user' ? 'Jugadora' : 'Narrador'}: ${stripStateTag(limpiarEtiquetasDeTiempo(m.content))}`)
+    .join('\n')
+    .slice(-120000);
+
+  const cronicaActual = (project.memory?.story || '').trim();
+  const pc = project.memory?.player_character;
+
+  const prompt = `Eres el Cronista de esta campaña de rol. Acaba de cerrarse un capítulo y tu tarea es DEJAR LA CRÓNICA AL DÍA.
+
+⚠️ REESCRIBE, NO AÑADAS. No devuelvas el capítulo resumido por separado ni lo pegues al final de lo que ya había: entrégame UNA SOLA crónica continua que ya incluya lo ocurrido en este capítulo, reordenando y condensando lo anterior donde haga falta. Lo viejo puede resumirse más para dejar sitio a lo nuevo; eso es exactamente lo que se espera de ti.
+
+REGLAS:
+- Máximo ${TOPE_CRONICA_CARACTERES} caracteres. Si no cabe todo, condensa lo más antiguo y conserva lo que sigue teniendo consecuencias abiertas.
+- Prosa narrativa en pasado, en el idioma del relato. Nada de listas, encabezados de capítulo ni comentarios sobre tu propio trabajo.
+- Cuenta lo que PASÓ y lo que quedó en marcha: decisiones, pérdidas, alianzas, promesas pendientes, enemigos hechos. Fuera el detalle de escena, que ya vive en el diario.
+- No inventes nada que no esté en los textos que te doy.
+- Responde ÚNICAMENTE con el texto de la crónica.
+
+${pc?.name ? `PROTAGONISTA: ${pc.name}${pc.class ? ` (${pc.class})` : ''}\n` : ''}
+${cronicaActual ? `CRÓNICA ACTUAL (a reescribir, no a conservar palabra por palabra):\n${cronicaActual}` : 'CRÓNICA ACTUAL: todavía no hay ninguna; esta será la primera.'}
+
+=== CAPÍTULO QUE SE CIERRA: ${capitulo.name || 'Capítulo'} ===
+${relato}`;
+
+  const modelo = getBackgroundTaskModel();
+  const respuesta = await generateContentWithFailover({
+    primaryModel: modelo,
+    contents: prompt,
+    config: {
+      temperature: 0.3,
+      ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    } as any
+  });
+
+  let texto = (respuesta.text || '').trim();
+  if (!texto) throw new Error('El modelo no devolvió ninguna crónica.');
+
+  // Vallas de código y preámbulos del tipo «Aquí tienes la crónica:».
+  texto = texto
+    .replace(/^```(?:\w+)?\n?/, '')
+    .replace(/\n?```$/, '')
+    .replace(/^\s*(?:aqu[ií] tienes|te dejo|esta es)[^\n:]{0,60}:\s*/i, '')
+    .trim();
+
+  return recortarConSentido(texto, TOPE_CRONICA_CARACTERES);
+}
+
 export async function generateClaudeProjectMemory({
   project,
   chats,
