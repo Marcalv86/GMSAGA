@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   AVAILABLE_MODELS,
   AUXILIARY_BACKGROUND_MODELS,
+  limitesGratuitos,
   DEFAULT_MODEL_ID,
   DEFAULT_BACKGROUND_MODEL_ID,
   getStoredSafetyLevel,
@@ -621,11 +622,29 @@ export const ApiKeyModal: React.FC<{
                   Modelo para Tareas Auxiliares (Resúmenes y Memoria Persistente):
                 </label>
                 <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                  Utilizado para la sincronización de memoria persistente, resúmenes de sesión, extracción de fichas y tareas en segundo plano.
+                  Utilizado para la sincronización de memoria persistente, resúmenes de sesión, extracción de fichas,
+                  la prosa novelada y la crónica que se consolida al cerrar capítulo.
+                </p>
+                {/*
+                  El cupo diario, escrito al lado de cada opción.
+
+                  Elegir aquí un modelo de narración parece inofensivo y no lo
+                  es: la prosa novelada se genera después de CADA turno, así que
+                  con un modelo de veinte peticiones al día se gasta una por
+                  mensaje escrito. Con el mismo modelo arriba y aquí, los veinte
+                  turnos diarios se quedan en diez. Eso no se deduce mirando una
+                  lista de nombres, así que se dice.
+                */}
+                <p className="text-[11px] m-0 leading-relaxed rounded-lg border border-amber-700/50 bg-amber-500/15 text-amber-950 dark:text-amber-100 px-2.5 py-2">
+                  <strong>Estas tareas gastan cupo diario igual que un turno de partida.</strong> La prosa novelada se
+                  genera tras cada mensaje, así que un modelo de 20 peticiones al día se agota a la misma velocidad a la
+                  que juegas. Flash Lite tiene 500 al día: por eso es el que viene puesto.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {AUXILIARY_BACKGROUND_MODELS.map(bgm => {
                     const isBgSelected = selectedBackgroundModel === bgm.id;
+                    const cupo = limitesGratuitos(bgm.id);
+                    const cupoJusto = cupo.rpd < 100;
                     return (
                       <div
                         key={bgm.id}
@@ -645,9 +664,24 @@ export const ApiKeyModal: React.FC<{
                             className="accent-[var(--accent)]"
                           />
                           {bgm.name}
+                          <span
+                            className={`ml-auto shrink-0 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              cupoJusto
+                                ? 'bg-amber-500/20 text-amber-950 dark:text-amber-100 border border-amber-700/50'
+                                : 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 border border-emerald-700/40'
+                            }`}
+                            title={`Capa gratuita: ${cupo.rpd} peticiones al día por clave con este modelo`}
+                          >
+                            {cupo.rpd}/día
+                          </span>
                         </div>
                         <p className="text-[10px] text-[var(--text-secondary)] pl-4 m-0 mt-0.5">
                           {bgm.desc}
+                          {cupoJusto && (
+                            <span className="block mt-0.5 text-amber-800 dark:text-amber-300 font-semibold">
+                              Ojo: cada resumen, novelización o cierre de capítulo te quitará un turno de partida.
+                            </span>
+                          )}
                         </p>
                       </div>
                     );
