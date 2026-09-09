@@ -173,6 +173,46 @@ export const CalendarView: React.FC<{
     });
   };
 
+  /*
+   * Recogida de escombros.
+   *
+   * Durante un tiempo la sincronización con el chat anclaba la reconstrucción
+   * en la fecha ACTUAL en lugar de en el primer día de la campaña, así que lo
+   * ya vivido acababa archivado en días que todavía no habían llegado. Eso ya
+   * está corregido, pero las anotaciones mal fechadas siguen en el diario de
+   * quien pulsó el botón, y no hay forma de deducir a qué día pertenecía cada
+   * una. Se ofrece barrerlas de una vez, respetando siempre lo escrito a mano.
+   */
+  const anotacionesEnElFuturo = useMemo(() => {
+    if (!cal || !fecha) return [];
+    const hoyAbs = aDiaAbsoluto(cal, fecha);
+    return (project.timeline || []).filter(
+      t =>
+        t.absDay > hoyAbs &&
+        t.autoria !== 'jugadora' &&
+        t.tipo !== 'diario' &&
+        !t.id?.startsWith('manual_') &&
+        !(t.images && t.images.length > 0)
+    );
+  }, [cal, fecha, project.timeline]);
+
+  const handleLimpiarFuturo = () => {
+    setShowLimpiezaMenu(false);
+    const aBorrar = new Set(anotacionesEnElFuturo.map(t => t.id));
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Limpiar anotaciones fechadas en el futuro',
+      message:
+        `Hay ${aBorrar.size} ${aBorrar.size === 1 ? 'anotación del Narrador fechada' : 'anotaciones del Narrador fechadas'} por delante del día actual de la campaña, ` +
+        `casi siempre restos de una sincronización antigua que colocaba mal las fechas. ¿Las elimino? ` +
+        `Tus notas escritas a mano y las entradas con imágenes no se tocan, y después puedes volver a pulsar «Sincronizar con el Chat» para recolocarlas bien.`,
+      onConfirm: async () => {
+        await onUpdate({ timeline: (project.timeline || []).filter(t => !aBorrar.has(t.id)) });
+        setConfirmDialog(null);
+      }
+    });
+  };
+
   const handleReiniciarADia1 = () => {
     setShowLimpiezaMenu(false);
     setConfirmDialog({
@@ -811,6 +851,15 @@ export const CalendarView: React.FC<{
                         <Trash2 className="w-3.5 h-3.5 shrink-0" />
                         <span>Vaciar toda la cronología (0 entradas)</span>
                       </button>
+                      {anotacionesEnElFuturo.length > 0 && (
+                        <button
+                          onClick={handleLimpiarFuturo}
+                          className="w-full text-left px-3 py-2 rounded-lg text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 flex items-center gap-2 cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                          <span>Limpiar {anotacionesEnElFuturo.length} anotación(es) con fecha futura</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setShowLimpiezaMenu(false);

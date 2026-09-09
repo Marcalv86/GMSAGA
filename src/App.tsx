@@ -90,6 +90,7 @@ import {
   setStoredKeyRotationMode,
   setStoredMemorySyncGranularity,
   syncFullCampaignFromChats,
+  fusionarTimeline,
   generateClaudeProjectMemory,
   isNarrativeIncomplete,
   novelizeUserMessage
@@ -106,6 +107,7 @@ import {
   desdeDiaAbsoluto,
   extraerMinutoDeTexto,
   fechaLegible,
+  iconoDeHito,
   obtenerInfoRelacion
 } from './utils/campaignCalendar';
 import { actualizarAfinidadNpc } from './utils/affinityProgression';
@@ -117,6 +119,18 @@ const ViewLoader = () => (
     Desplegando pergaminos...
   </div>
 );
+
+/**
+ * El titular de una anotación del diario cuando el Narrador no ha dado ninguno:
+ * la primera frase del resumen, recortada para que quepa en una celda.
+ */
+const primeraFrase = (texto?: string): string | undefined => {
+  const limpio = (texto || '').trim();
+  if (!limpio) return undefined;
+  const corte = limpio.search(/[.;:!?]\s/);
+  const frase = corte > 0 ? limpio.slice(0, corte) : limpio;
+  return frase.length > 70 ? `${frase.slice(0, 67).trimEnd()}…` : frase;
+};
 
 const LOCAL_PROJECTS_KEY = 'gmstudio_local_projects';
 const LOCAL_CHATS_PREFIX = 'gmstudio_local_chats_';
@@ -713,9 +727,9 @@ export default function App() {
 
           let resolvedMinute = entrada.minute;
           if (resolvedMinute === undefined || resolvedMinute === null) {
-            const extracted = extraerMinutoDeTexto(
-              `${entrada.resumen} ${entrada.hito || ''} ${entrada.lugar || ''}`
-            );
+            // El lugar queda fuera del rastreo: un nombre propio como «Posada del
+            // Mediodía» no dice a qué hora ocurrió nada.
+            const extracted = extraerMinutoDeTexto(`${entrada.resumen} ${entrada.hito || ''}`);
             if (extracted !== null) {
               resolvedMinute = extracted;
             } else {
@@ -733,10 +747,16 @@ export default function App() {
             id: `dia_${entryAbsDay}_${i}_${Math.random().toString(36).slice(2, 7)}`,
             absDay: entryAbsDay,
             date: fechaLegible(cal, entryFecha),
+            // Sin titular, la celda del calendario se queda muda y el diario
+            // enseña el resumen entero. Si el Narrador no lo da, se toma la
+            // primera frase del resumen, que es de donde saldría a mano.
+            title: entrada.titulo || primeraFrase(entrada.resumen),
             summary: entrada.resumen,
             lugar: entrada.lugar,
             clima: entrada.clima,
             hito: entrada.hito,
+            mood: entrada.mood || iconoDeHito(entrada.hito) || '📖',
+            autoria: 'narrador' as const,
             minute: resolvedMinute,
             tipo: entrada.tipo,
             timeSkipDays: diasDeDiferencia >= 2 ? diasDeDiferencia : undefined,
@@ -1995,37 +2015,35 @@ Estás muy cerca del tope de 250.000 tokens por minuto de la capa gratuita de Go
         (getLocalProjects().find(p => p.id === currentPId)?.timeline) ??
         currentProject.timeline ??
         [];
-      const diasConAlgo = new Set(previas.map(t => t.absDay));
       const notasConservadas = previas.filter(
         t => t.autoria === 'jugadora' || (!t.autoria && t.id.startsWith('manual_'))
       ).length;
-      const aAnadir = (syncResult.timeline || []).filter(t => !diasConAlgo.has(t.absDay));
-      const jornadasNuevas = new Set(aAnadir.map(t => t.absDay)).size;
+      const { agregadas } = fusionarTimeline(previas, syncResult.timeline || []);
+      const anotacionesNuevas = agregadas.length;
+      const jornadasNuevas = new Set(
+        agregadas.filter(t => !previas.some(p => p.absDay === t.absDay)).map(t => t.absDay)
+      ).size;
 
-      await handleUpdateProjectField(p => {
-        const base = p.timeline || [];
-        const yaHay = new Set(base.map(t => t.absDay));
-        return {
-          memory: sanitizeProjectMemory({
-            ...(p.memory || {}),
-            ...syncResult.memory
-          }),
-          timeline: [
-            ...base,
-            ...(syncResult.timeline || []).filter(t => !yaHay.has(t.absDay))
-          ].sort((a, b) => a.absDay - b.absDay),
-          currentDate: syncResult.currentDate || p.currentDate,
-          threads: syncResult.threads || p.threads,
-          calendar: p.calendar || syncResult.calendar
-        };
-      });
+      await handleUpdateProjectField(p => ({
+        memory: sanitizeProjectMemory({
+          ...(p.memory || {}),
+          ...syncResult.memory
+        }),
+        timeline: fusionarTimeline(p.timeline || [], syncResult.timeline || []).timeline,
+        currentDate: syncResult.currentDate || p.currentDate,
+        threads: syncResult.threads || p.threads,
+        calendar: p.calendar || syncResult.calendar
+      }));
 
       setAlertConfig({
         isOpen: true,
         title: '¡Sincronización Total con IA Completada!',
         message:
           `Se ha repasado toda la campaña a partir de las sesiones jugadas:\n\n` +
-          `• ${jornadasNuevas} ${jornadasNuevas === 1 ? 'jornada nueva' : 'jornadas nuevas'} en el diario, con sus horas deducidas.\n` +
+          `• ${anotacionesNuevas} ${anotacionesNuevas === 1 ? 'anotación nueva' : 'anotaciones nuevas'} en el diario, con sus horas deducidas` +
+          (jornadasNuevas > 0
+            ? ` (${jornadasNuevas} ${jornadasNuevas === 1 ? 'jornada' : 'jornadas'} que no tenían nada escrito).\n`
+            : `.\n`) +
           `• ${syncResult.totalNpcs} PNJs con afinidad y notas.\n` +
           `• ${syncResult.totalQuests} tramas y misiones.\n` +
           `• ${syncResult.totalLocations} lugares registrados.\n` +

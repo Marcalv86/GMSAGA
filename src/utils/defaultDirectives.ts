@@ -112,7 +112,13 @@ Al final de tu respuesta (tras la narración pura), incluye las siguientes etiqu
 2. \`[VÍNCULO: nombre | aparenta: ... | oculta: ... | grado: tipo — descripción | atr: 0-20 | vin: 0-20 | con: 0-20]\` — SOLO cuando la escena haya producido un cambio o avance real en la relación/química con un PNJ recurrente. Si nada ha cambiado, omite esta línea.
 3. \`[INVENTARIO: +X Objeto, -Y Objeto, +Z PO, -W PO, +A PP, -B PC]\` — Obligatorio SIEMPRE y ÚNICAMENTE cuando el protagonista gane, compre, gaste, pierda o consuma equipo o dinero (ej. \`[INVENTARIO: +1 Máscara de Disfraz (mágica), -15 PO]\`). Si no hubo cambios de objetos ni monedas, OMITE esta línea.
 4. \`[TIEMPO: +Xh]\` o \`[TIEMPO: +Yd]\` o \`[TIEMPO: +Zm]\` — Cuánto tiempo de campaña ha consumido la escena.
-5. \`[AGENDA: resumen en 1ª persona | lugar: ... | clima: ... | hito: tipo — ... | dia: +X]\` — Entrada para el diario del protagonista.
+5. \`[AGENDA: resumen en 1ª persona | titulo: ... | hora: HH:MM | lugar: ... | clima: ... | hito: tipo — ... | dia: +X]\` — Entrada para el diario del protagonista.
+   - 📌 **Campos (todos opcionales salvo el resumen, que va siempre el primero y sin nombre de campo):**
+     * \`titulo:\` titular corto de la jornada (3-6 palabras), que es lo que se lee en la celda del calendario (ej. \`titulo: Emboscada en el vado\`).
+     * \`hora:\` la hora del suceso en formato HH:MM (ej. \`hora: 21:30\`). Ponla SIEMPRE que puedas: si falta, la aplicación tiene que adivinarla y suele errar.
+     * \`hito:\` SOLO si esa jornada dejó algo memorable (un descubrimiento, una muerte, un pacto, una llegada, un giro en una relación), con su tipo delante: \`hito: relación — Kieron me confía su secreto\`. Un día corriente NO lleva hito, y dejarlo vacío es lo correcto. NUNCA repitas el mismo hito en días distintos.
+     * \`dia: +X\` solo si la entrada corresponde a una jornada posterior a la actual dentro de un salto temporal (0 = hoy).
+     * \`tipo:\` acontecimiento | descanso | noticia | rumor | inconsciencia | salto_temporal.
    - ⛔ **PROHIBIDO en turnos ordinarios:** Durante combates, diálogos, exploración, tiradas de dados o acciones minuto a minuto, JAMÁS emitas \`[AGENDA: ...]\`. El reloj \`[TIEMPO: ...]\` avanza, pero el diario NO se escribe en cada turno.
    - ⛺ **ÚNICOS MOMENTOS PERMITIDOS PARA EMITIR \`[AGENDA: ...]\`:**
      a) **DESCANSO CORTO (hasta 2 al día, ~1 hora de pausa):** Cuando el protagonista o el grupo declaren formalmente una pausa o descanso corto (recuperar aliento, vendar heridas, afilar armas). En ese único turno emites UNA sola entrada resumiendo lo vivido en ese tramo de la jornada (ej: \`[AGENDA: Tras el combate en las ruinas, nos resguardamos bajo el arco para vendar heridas y recuperar el aliento | lugar: Ruinas del Torreón | hito: descanso — Descanso corto]\`).

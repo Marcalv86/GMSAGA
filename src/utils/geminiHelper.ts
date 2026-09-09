@@ -1283,7 +1283,11 @@ ${
     const hoyAbs = aDiaAbsoluto(cal, fecha);
     const vencen = hilosQueVencen(project.threads || [], hoyAbs);
     const enMarcha = hilosPendientes(project.threads || []).filter(h => h.dueAbsDay > hoyAbs);
-    const diario = (project.timeline || []).slice(-8);
+    // Ordenado antes de recortar: el diario no siempre llega ordenado, y
+    // «los últimos ocho» de una lista sin orden son ocho días al azar.
+    const diario = [...(project.timeline || [])]
+      .sort((a, b) => (a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay))
+      .slice(-8);
 
     calendarioSection = `
 ### CALENDARIO Y PASO DEL TIEMPO
@@ -2558,8 +2562,68 @@ export interface FullCampaignSyncResult {
   totalLocations: number;
 }
 
+/** Categorías que el diario sabe pintar. Cualquier otra cosa es un acontecimiento. */
+const TIPOS_DE_ENTRADA = new Set<string>([
+  'acontecimiento',
+  'hito',
+  'descubrimiento',
+  'secreto',
+  'descanso',
+  'noticia',
+  'rumor',
+  'inconsciencia',
+  'salto_temporal',
+  'diario',
+  'personal',
+  'escena'
+]);
+
+/** Texto comparable: sin tildes, sin puntuación y con los espacios colapsados. */
+function claveComparable(v?: string): string {
+  return (v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
- * Deduplica entradas de cronología e hitos repetidos (ej. llegada a un puerto duplicada en días distintos).
+ * Las primeras palabras de un texto, que es lo que permite reconocer dos
+ * redacciones del mismo suceso sin exigir que coincidan letra por letra.
+ */
+function huellaDeTexto(v?: string, palabras = 10): string {
+  const limpio = claveComparable(v);
+  if (!limpio) return '';
+  return limpio.split(' ').slice(0, palabras).join(' ');
+}
+
+/** Identificador estable a partir del contenido: la misma entrada, el mismo id. */
+function hashCorto(v: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < v.length; i++) {
+    h ^= v.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+/**
+ * Quita entradas repetidas del diario.
+ *
+ * Aquí se ha pecado de celo. La versión anterior tiraba por la borda cualquier
+ * entrada cuyo título hablase de una llegada, una partida o un puerto si ya
+ * había otra parecida en toda la campaña —y llevaba escrito el nombre de una
+ * ciudad concreta en el código—, de modo que desembarcar en tres ciudades
+ * distintas dejaba constancia de una sola. También borraba hitos repetidos
+ * aunque estuvieran a meses de distancia: en una campaña larga se vuelve a
+ * acampar, se vuelve a zarpar y se vuelve a discutir con la misma persona.
+ *
+ * Lo que se descarta ahora es solo el duplicado de verdad: el mismo suceso
+ * apuntado dos veces el mismo día, o reescrito con otras palabras a un día de
+ * distancia, que es lo que produce una resincronización. Lo escrito a mano por
+ * la jugadora no entra nunca en el sorteo.
  */
 export function deduplicateTimeline(timeline: TimelineEntry[]): TimelineEntry[] {
   if (!timeline || timeline.length === 0) return [];
@@ -2569,52 +2633,96 @@ export function deduplicateTimeline(timeline: TimelineEntry[]): TimelineEntry[] 
     return (a.minute ?? 720) - (b.minute ?? 720);
   });
 
-  const seenHitos = new Set<string>();
-  const seenTitlesAbsDay = new Set<string>();
   const result: TimelineEntry[] = [];
+  const vistas = new Map<string, number>(); // huella -> último día en que se vio
 
   for (const entry of sorted) {
-    const titleNorm = (entry.title || '').trim().toLowerCase();
-    const hitoNorm = (entry.hito || '').trim().toLowerCase();
-
-    // Preserve manual entries or diary entries
-    if (entry.tipo === 'diario' || (entry.images && entry.images.length > 0) || entry.autoria === 'jugadora') {
+    // Lo de la jugadora es intocable: no se puede reconstruir desde ningún chat.
+    const esDeLaJugadora =
+      entry.autoria === 'jugadora' ||
+      entry.tipo === 'diario' ||
+      entry.id?.startsWith('manual_') ||
+      (entry.images && entry.images.length > 0);
+    if (esDeLaJugadora) {
       result.push(entry);
       continue;
     }
 
-    // Check duplicate major milestones (hito) across days
-    if (hitoNorm && hitoNorm.length > 3) {
-      if (seenHitos.has(hitoNorm)) {
-        continue;
-      }
-      seenHitos.add(hitoNorm);
+    const huellas = [
+      huellaDeTexto(entry.title, 8),
+      huellaDeTexto(entry.summary, 12),
+      huellaDeTexto(entry.hito, 8)
+    ].filter(h => h.length > 6);
+
+    // Sin texto reconocible no hay forma de comparar: se conserva.
+    if (huellas.length === 0) {
+      result.push(entry);
+      continue;
     }
 
-    // Check duplicate milestone arrivals across days (e.g. arrival at Luskan / port)
-    if (titleNorm && titleNorm.length > 4) {
-      const isMilestoneArrival = titleNorm.includes('llegada') || titleNorm.includes('puerto') || titleNorm.includes('luskan') || titleNorm.includes('partida') || titleNorm.includes('destino');
-      if (isMilestoneArrival) {
-        const alreadyExists = result.some(r => {
-          const rTitle = (r.title || '').trim().toLowerCase();
-          return (rTitle.includes('llegada') || rTitle.includes('puerto') || rTitle.includes('luskan')) && r.absDay < entry.absDay;
-        });
-        if (alreadyExists) {
-          continue;
-        }
-      }
+    const repetida = huellas.some(h => {
+      const dia = vistas.get(h);
+      // El mismo suceso el mismo día, o reescrito con un día de desfase por una
+      // resincronización. Más allá de eso es un suceso nuevo que se le parece.
+      return dia !== undefined && Math.abs(dia - entry.absDay) <= 1;
+    });
+    if (repetida) continue;
 
-      const keyAbsDayTitle = `${entry.absDay}_${titleNorm}`;
-      if (seenTitlesAbsDay.has(keyAbsDayTitle)) {
-        continue;
-      }
-      seenTitlesAbsDay.add(keyAbsDayTitle);
-    }
-
+    huellas.forEach(h => vistas.set(h, entry.absDay));
     result.push(entry);
   }
 
   return result;
+}
+
+/**
+ * Mete en el diario lo que la sincronización haya deducido sin pisar nada de lo
+ * que ya había.
+ *
+ * La fusión se hacía por jornadas: si un día tenía aunque fuese una línea
+ * escrita, todo lo reconstruido para ese día se tiraba entero. En la práctica
+ * eso significaba que la sincronización solo servía para días completamente en
+ * blanco, y como casi ninguno lo está en una campaña jugada, el botón parecía
+ * no hacer nada —o peor, colocaba las jornadas nuevas en fechas equivocadas—.
+ *
+ * Ahora se compara entrada por entrada: se añade lo que no esté ya contado,
+ * aunque sea un suceso más de un día que ya tenía dos apuntes, y se descarta lo
+ * que solo sea la misma escena redactada de otra manera.
+ */
+export function fusionarTimeline(
+  existentes: TimelineEntry[],
+  nuevas: TimelineEntry[]
+): { timeline: TimelineEntry[]; agregadas: TimelineEntry[] } {
+  const base = [...(existentes || [])];
+  const ids = new Set(base.map(e => e.id));
+  const huellas = new Map<string, number>();
+
+  const huellasDe = (e: TimelineEntry) =>
+    [huellaDeTexto(e.title, 8), huellaDeTexto(e.summary, 12), huellaDeTexto(e.hito, 8)].filter(
+      h => h.length > 6
+    );
+
+  base.forEach(e => huellasDe(e).forEach(h => huellas.set(h, e.absDay)));
+
+  const agregadas: TimelineEntry[] = [];
+  for (const nueva of nuevas || []) {
+    if (!nueva || ids.has(nueva.id)) continue;
+    const propias = huellasDe(nueva);
+    const yaContado = propias.some(h => {
+      const dia = huellas.get(h);
+      return dia !== undefined && Math.abs(dia - nueva.absDay) <= 1;
+    });
+    if (yaContado) continue;
+    propias.forEach(h => huellas.set(h, nueva.absDay));
+    ids.add(nueva.id);
+    agregadas.push(nueva);
+  }
+
+  const timeline = [...base, ...agregadas].sort((a, b) =>
+    a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay
+  );
+
+  return { timeline, agregadas };
 }
 
 /**
@@ -2658,8 +2766,16 @@ export async function syncFullCampaignFromChats(
     );
   }
 
-  const historyToAnalyze =
-    allHistory.length > 400000 ? allHistory.substring(allHistory.length - 400000) : allHistory;
+  /*
+   * Con campañas largas no cabe todo, y se manda la cola. Importa decírselo al
+   * modelo: si cree que el fragmento empieza en el día 1 de la campaña, fecha
+   * toda la reconstrucción con semanas de desfase. Sabiendo que está recortado
+   * puede contar hacia atrás desde hoy, que es el extremo que sí conoce.
+   */
+  const historialRecortado = allHistory.length > 400000;
+  const historyToAnalyze = historialRecortado
+    ? allHistory.substring(allHistory.length - 400000)
+    : allHistory;
 
   const pcName = project.memory?.player_character?.name || '';
   const pcNotes = project.memory?.player_character
@@ -2667,10 +2783,55 @@ export async function syncFullCampaignFromChats(
     : '';
 
   const cal: CalendarConfig = (calendarioValido(project.calendar) ? project.calendar : CALENDARIO_HARPTOS)!;
-  const initDate = project.currentDate && Number.isFinite(project.currentDate.year)
+
+  /*
+   * DÓNDE EMPIEZA LA CAMPAÑA, QUE NO ES DONDE ESTÁ AHORA.
+   *
+   * Aquí se anclaba todo en `project.currentDate`, que es el momento presente
+   * de la partida, y luego se sumaba el `diaOffset` que devolvía el modelo
+   * contando desde el primer día. Resultado: la reconstrucción del pasado
+   * aterrizaba entera en el futuro. En una campaña de cuarenta días, el primer
+   * capítulo se apuntaba en el día cuarenta y el resto más allá; y como la
+   * fecha final también se recalculaba desde ahí, cada pulsación del botón
+   * empujaba el calendario unas semanas más lejos. Por eso «no acertaba ni
+   * queriendo»: no es que dedujera mal los sucesos, es que los archivaba en
+   * días que no existían todavía.
+   *
+   * El origen real es el primer día del que ya hay algo escrito; si el diario
+   * está vacío, la fecha actual sirve de origen porque la campaña acaba de
+   * empezar.
+   */
+  const currentDate = project.currentDate && Number.isFinite(project.currentDate.year)
     ? project.currentDate
     : { year: 1492, dayOfYear: 1, minute: 540 };
-  const startAbs = aDiaAbsoluto(cal, initDate);
+  const hoyAbs = aDiaAbsoluto(cal, currentDate);
+
+  const timelinePrevio = (project.timeline || []).filter(e => Number.isFinite(e.absDay));
+  const startAbs = timelinePrevio.length
+    ? Math.min(hoyAbs, ...timelinePrevio.map(e => e.absDay))
+    : hoyAbs;
+  const initDate = desdeDiaAbsoluto(cal, startAbs);
+  const diasTranscurridos = Math.max(0, hoyAbs - startAbs);
+
+  /*
+   * El modelo no puede alinear su cronología con la que ya hay si no sabe qué
+   * hay. Se le pasa el mapa de jornadas ya registradas con su offset, para que
+   * reutilice esos mismos números en lugar de inventarse una numeración
+   * paralela y duplicar días enteros.
+   */
+  const diasRegistrados = Array.from(
+    timelinePrevio.reduce((mapa, e) => {
+      const off = e.absDay - startAbs;
+      const previo = mapa.get(off) || [];
+      previo.push(e.title || e.hito || e.summary || '');
+      mapa.set(off, previo);
+      return mapa;
+    }, new Map<number, string[]>())
+  )
+    .sort((a, b) => a[0] - b[0])
+    .slice(-60)
+    .map(([off, textos]) => `- diaOffset ${off} (${fechaLegible(cal, desdeDiaAbsoluto(cal, startAbs + off))}): ${textos.slice(0, 3).map(t => t.slice(0, 70)).join(' / ')}`)
+    .join('\n');
 
   // Entidades previas registradas
   const listExisting = <T extends { id: string }>(items: T[], describe: (i: T) => string) =>
@@ -2695,10 +2856,19 @@ Tu cometido es analizar TODO el historial de sesiones y capítulos para SINCRONI
 3. Fecha de campaña y reloj final tras la última escena.
 4. Hilos narrativos y consecuencias programadas pendientes.
 
-CALENDARIO DE LA CAMPAÑA:
+CALENDARIO Y LÍNEA TEMPORAL (LÉELO ANTES DE FECHAR NADA):
 - Calendario: ${cal.name} (${diasPorAno(cal)} días/año)
-- Fecha inicial de referencia: Día ${initDate.dayOfYear}, Año ${initDate.year} (${fechaLegible(cal, initDate)})
+- DÍA 1 DE LA CAMPAÑA (diaOffset 0): ${fechaLegible(cal, initDate)}
+- MOMENTO ACTUAL DE LA CAMPAÑA: ${fechaLegible(cal, currentDate)}, hora ${String(Math.floor((currentDate.minute || 0) / 60)).padStart(2, '0')}:${String((currentDate.minute || 0) % 60).padStart(2, '0')}
+- DÍAS TRANSCURRIDOS DESDE EL DÍA 1 HASTA HOY: ${diasTranscurridos} (por tanto el diaOffset válido va de 0 a ${diasTranscurridos})
 
+⚠️ REGLA TEMPORAL INVIOLABLE:
+- "diaOffset" se cuenta SIEMPRE desde el PRIMER día de la campaña (diaOffset 0 = ${fechaLegible(cal, initDate)}), NUNCA desde hoy.
+- Lo que narras ya ha ocurrido: ningún acontecimiento puede tener un diaOffset mayor que ${diasTranscurridos}. Si dudas, agrupa en el día más plausible dentro de ese rango.
+${historialRecortado
+  ? `- ⚠️ EL HISTORIAL DE ABAJO ESTÁ RECORTADO: arranca a mitad de campaña, así que su primer mensaje NO es el diaOffset 0. Lo único seguro es que el ÚLTIMO mensaje corresponde al diaOffset ${diasTranscurridos} (hoy): fecha hacia atrás desde ahí y apóyate en las jornadas ya registradas para situarte.`
+  : `- El primer mensaje del historial corresponde a diaOffset 0. El último, a diaOffset ${diasTranscurridos}.`}
+${diasRegistrados ? `\nJORNADAS YA REGISTRADAS EN EL DIARIO (reutiliza estos mismos diaOffset para esos días; añade solo lo que falte y NO reescribas lo ya anotado):\n${diasRegistrados}\n` : ''}
 ${existingState}
 
 REGLA ANTI-DUPLICADOS (CRÍTICA):
@@ -2762,20 +2932,25 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
       "summary": "Resumen narrativo de lo ocurrido en esta escena en 1-3 frases.",
       "lugar": "Ubicación",
       "clima": "Atmósfera o clima",
-      "hito": "Hito destacado si aplica",
+      "hito": "tipo — texto breve (ej. \"combate — Victoria en el molino\", \"relación — Kieron confía en mí\"). Omítelo si la jornada no dejó nada memorable.",
       "mood": "⚔️",
-      "tipo": "acontecimiento"
+      "tipo": "acontecimiento | hito | descubrimiento | secreto | descanso | noticia | rumor | inconsciencia | salto_temporal"
     }
   ],
   "hilosPendientes": [
     {
       "title": "Título del hilo o consecuencia",
       "effect": "Qué sucederá al vencer el plazo",
-      "venceEnDiasDesdeInicio": 4,
+      "venceEnDiasDesdeHoy": 4,
       "hidden": false
     }
   ]
 }
+
+SOBRE LOS HITOS Y LOS HILOS:
+- "hito" es lo memorable de esa jornada, no un resumen de la escena: un descubrimiento, una muerte, un pacto, una llegada, un giro en una relación. Un día corriente no tiene hito, y dejarlo vacío es la respuesta correcta.
+- No repitas el mismo hito en días distintos: si la llegada a una ciudad ya está anotada, el día siguiente allí no vuelve a ser "llegada".
+- "hilosPendientes" son SOLO consecuencias que aún NO han ocurrido y vencen en el FUTURO, contando en días desde HOY (${fechaLegible(cal, currentDate)}). No incluyas aquí nada que ya se haya resuelto en el historial.
 
 HISTORIAL COMPLETO DE PARTIDA:
 ${historyToAnalyze}`;
@@ -2897,8 +3072,17 @@ ${historyToAnalyze}`;
 
   // Agrupar por día para distribuir horas en caso de que falten o coincidan
   const eventsByDayOffset = new Map<number, any[]>();
+  /*
+   * El pasado no se archiva en el futuro. Si el modelo se pasa de frenada con
+   * el offset —y con historiales largos se pasa— la entrada se pega al día de
+   * hoy en lugar de aterrizar en una fecha que aún no ha llegado. Cuando la
+   * campaña todavía no ha movido el reloj no hay tope que aplicar: es el caso
+   * de una partida importada cuyo calendario se estrena con esta sincronización.
+   */
+  const offsetMaximo = diasTranscurridos > 0 ? diasTranscurridos : Number.MAX_SAFE_INTEGER;
   rawTimeline.forEach((ev: any, idx: number) => {
-    const offset = typeof ev.diaOffset === 'number' && Number.isFinite(ev.diaOffset) ? Math.max(0, Math.round(ev.diaOffset)) : 0;
+    const bruto = typeof ev.diaOffset === 'number' && Number.isFinite(ev.diaOffset) ? Math.round(ev.diaOffset) : 0;
+    const offset = Math.min(offsetMaximo, Math.max(0, bruto));
     if (!eventsByDayOffset.has(offset)) {
       eventsByDayOffset.set(offset, []);
     }
@@ -2912,7 +3096,7 @@ ${historyToAnalyze}`;
     const dateLabel = fechaLegible(cal, dateObj);
     const count = items.length;
 
-    items.forEach(({ ev, idx }, iInDay) => {
+    items.forEach(({ ev }, iInDay) => {
       let minute: number;
       if (typeof ev.minute === 'number' && Number.isFinite(ev.minute) && ev.minute >= 0 && ev.minute <= 1439) {
         minute = Math.round(ev.minute);
@@ -2928,17 +3112,24 @@ ${historyToAnalyze}`;
         }
       }
 
+      const summary = String(ev.summary || ev.resumen || '').trim();
+      if (!summary && !ev.title) return;
+
       newTimelineEntries.push({
-        id: `ai_entry_${targetAbs}_${idx}_${Date.now().toString(36)}`,
+        // El id se deriva del contenido: sincronizar dos veces la misma jornada
+        // devuelve el mismo identificador, y así la fusión reconoce que ya
+        // estaba en lugar de apuntarla otra vez.
+        id: `ai_entry_${targetAbs}_${hashCorto(`${targetAbs}|${huellaDeTexto(ev.title, 8)}|${huellaDeTexto(summary, 12)}`)}`,
         absDay: targetAbs,
         date: dateLabel,
         title: ev.title ? String(ev.title).trim() : undefined,
-        summary: String(ev.summary || ev.resumen || '').trim(),
+        summary,
         lugar: ev.lugar ? String(ev.lugar).trim() : undefined,
         clima: ev.clima ? String(ev.clima).trim() : undefined,
         hito: ev.hito ? String(ev.hito).trim() : undefined,
         mood: ev.mood || '📖',
-        tipo: ev.tipo || 'acontecimiento',
+        tipo: TIPOS_DE_ENTRADA.has(String(ev.tipo)) ? ev.tipo : 'acontecimiento',
+        autoria: 'narrador',
         minute
       });
     });
@@ -2947,7 +3138,11 @@ ${historyToAnalyze}`;
   // Preservar entradas manuales de la usuaria o que contengan imágenes adjuntas
   const existingTimeline = project.timeline || [];
   const manualUserEntries = existingTimeline.filter(
-    e => (e.images && e.images.length > 0) || e.tipo === 'diario'
+    e =>
+      (e.images && e.images.length > 0) ||
+      e.tipo === 'diario' ||
+      e.autoria === 'jugadora' ||
+      e.id?.startsWith('manual_')
   );
 
   // Fusionar, deduplicar y ordenar cronológicamente
@@ -2960,22 +3155,38 @@ ${historyToAnalyze}`;
 
   const combinedTimeline = deduplicateTimeline(rawCombined);
 
-  // CurrentDate final
-  let calculatedCurrentDate: CampaignDate = initDate;
-  if (parsed.fechaFinal && typeof parsed.fechaFinal.dayOfYear === 'number') {
-    calculatedCurrentDate = {
-      year: typeof parsed.fechaFinal.year === 'number' ? parsed.fechaFinal.year : initDate.year,
-      dayOfYear: Math.max(1, Math.min(diasPorAno(cal), parsed.fechaFinal.dayOfYear)),
-      minute: typeof parsed.fechaFinal.minute === 'number' ? parsed.fechaFinal.minute : 1260
-    };
-  } else if (combinedTimeline.length > 0) {
-    const lastEntry = combinedTimeline[combinedTimeline.length - 1];
-    const lastDateObj = desdeDiaAbsoluto(cal, lastEntry.absDay);
-    calculatedCurrentDate = {
-      year: lastDateObj.year,
-      dayOfYear: lastDateObj.dayOfYear,
-      minute: lastEntry.minute ?? 1260
-    };
+  /*
+   * EL RELOJ DE LA CAMPAÑA NO SE TOCA SI YA ESTABA EN MARCHA.
+   *
+   * La fecha actual la lleva el Narrador turno a turno con [TIEMPO: +Xh], y esa
+   * cuenta es la buena. Sustituirla por la que dedujera el modelo al repasar el
+   * historial hacía saltar el calendario semanas adelante en cada
+   * sincronización. Solo se propone una fecha cuando no había nada que
+   * proteger: un diario vacío y un reloj que aún no ha avanzado (típico de una
+   * campaña recién importada). Y ni aun así se permite retroceder.
+   */
+  let calculatedCurrentDate: CampaignDate | undefined;
+  const relojYaEnMarcha = diasTranscurridos > 0 || timelinePrevio.length > 0;
+  if (!relojYaEnMarcha) {
+    let propuesta: CampaignDate | undefined;
+    if (parsed.fechaFinal && typeof parsed.fechaFinal.dayOfYear === 'number') {
+      propuesta = {
+        year: typeof parsed.fechaFinal.year === 'number' ? parsed.fechaFinal.year : initDate.year,
+        dayOfYear: Math.max(1, Math.min(diasPorAno(cal), parsed.fechaFinal.dayOfYear)),
+        minute: typeof parsed.fechaFinal.minute === 'number' ? parsed.fechaFinal.minute : 1260
+      };
+    } else if (combinedTimeline.length > 0) {
+      const lastEntry = combinedTimeline[combinedTimeline.length - 1];
+      const lastDateObj = desdeDiaAbsoluto(cal, lastEntry.absDay);
+      propuesta = {
+        year: lastDateObj.year,
+        dayOfYear: lastDateObj.dayOfYear,
+        minute: lastEntry.minute ?? 1260
+      };
+    }
+    if (propuesta && aDiaAbsoluto(cal, propuesta) >= hoyAbs) {
+      calculatedCurrentDate = propuesta;
+    }
   }
 
   // Hilos narrativos pendientes
@@ -2985,8 +3196,22 @@ ${historyToAnalyze}`;
       const title = String(h.title || 'Consecuencia programada').trim();
       const alreadyHas = newThreads.some(t => t.title.toLowerCase().trim() === title.toLowerCase());
       if (!alreadyHas) {
-        const offset = typeof h.venceEnDiasDesdeInicio === 'number' ? h.venceEnDiasDesdeInicio : 5;
-        const dueAbs = startAbs + offset;
+        /*
+         * Un hilo pendiente vence por delante, no por detrás. Se cuenta desde
+         * hoy; si viene con el campo antiguo —días desde el inicio— se traduce,
+         * y si aun así cae en el pasado se empuja al día siguiente: un plazo ya
+         * vencido en el momento de crearlo se dispararía en el turno siguiente
+         * sin que nunca hubiera estado en marcha.
+         */
+        const desdeHoy = typeof h.venceEnDiasDesdeHoy === 'number' ? h.venceEnDiasDesdeHoy : undefined;
+        const desdeInicio = typeof h.venceEnDiasDesdeInicio === 'number' ? h.venceEnDiasDesdeInicio : undefined;
+        const propuesto =
+          desdeHoy !== undefined
+            ? hoyAbs + Math.round(desdeHoy)
+            : desdeInicio !== undefined
+            ? startAbs + Math.round(desdeInicio)
+            : hoyAbs + 5;
+        const dueAbs = Math.max(hoyAbs + 1, propuesto);
         newThreads.push({
           id: `ai_thread_${dueAbs}_${idx}_${Date.now().toString(36)}`,
           title,
@@ -5070,8 +5295,20 @@ export async function resincronizarCronologiaDesdeChat({
     .join('\n\n')
     .slice(0, 95000);
 
-  const initDate = project.currentDate || fechaInicial(1);
-  const startAbs = aDiaAbsoluto(cal, initDate);
+  /*
+   * Mismo anclaje que la sincronización general: el origen es el primer día del
+   * que ya hay algo escrito, no el momento presente de la partida. Contar los
+   * offsets desde «hoy» archivaba el pasado en el futuro.
+   */
+  const fechaActual = project.currentDate || fechaInicial(1);
+  const hoyAbs = aDiaAbsoluto(cal!, fechaActual);
+  const timelinePrevio = (project.timeline || []).filter(e => Number.isFinite(e.absDay));
+  const startAbs = timelinePrevio.length
+    ? Math.min(hoyAbs, ...timelinePrevio.map(e => e.absDay))
+    : hoyAbs;
+  const initDate = desdeDiaAbsoluto(cal!, startAbs);
+  const diasTranscurridos = Math.max(0, hoyAbs - startAbs);
+  const offsetMaximo = diasTranscurridos > 0 ? diasTranscurridos : Number.MAX_SAFE_INTEGER;
 
   const prompt = `Eres el Archivero y Cronista Maestro de esta campaña de rol.
 Tu misión es LEER TODO EL HISTORIAL DE PARTIDA (capítulos, escenas, descansos, viajes y combates) y RECONSTRUIR LA CRONOLOGÍA DÍA A DÍA con total coherencia temporal.
@@ -5080,7 +5317,9 @@ CALENDARIO DE LA CAMPAÑA:
 - Nombre: ${cal.name}
 - Días por año: ${diasPorAno(cal)}
 - Meses: ${cal.months.map(m => `${m.name} (${m.days}d)`).join(', ')}
-- Fecha de inicio estimada: Día ${initDate.dayOfYear}, Año ${initDate.year}, Hora ${Math.floor(initDate.minute / 60)}:00
+- DÍA 1 DE LA CAMPAÑA (diaOffset 0): ${fechaLegible(cal!, initDate)}
+- MOMENTO ACTUAL: ${fechaLegible(cal!, fechaActual)}
+- Días transcurridos desde el día 1 hasta hoy: ${diasTranscurridos} (el diaOffset válido va de 0 a ${diasTranscurridos}; nada de lo ya ocurrido puede fecharse más allá)
 
 HISTORIAL DE LA PARTIDA:
 ${roleoTexto}
@@ -5160,7 +5399,8 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con este formato:
   const entries: TimelineEntry[] = [];
   if (Array.isArray(parsed.entradas)) {
     parsed.entradas.forEach((e: any, idx: number) => {
-      const offset = typeof e.diaOffset === 'number' ? Math.max(0, e.diaOffset) : idx;
+      const bruto = typeof e.diaOffset === 'number' ? Math.round(e.diaOffset) : idx;
+      const offset = Math.min(offsetMaximo, Math.max(0, bruto));
       const targetAbs = startAbs + offset;
       const entryDateObj = desdeDiaAbsoluto(cal, targetAbs);
       const minute = typeof e.minute === 'number' ? e.minute : (typeof e.horaAprox === 'number' ? e.horaAprox * 60 : 720);
@@ -5174,7 +5414,10 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con este formato:
         clima: e.clima ? String(e.clima).trim() : undefined,
         hito: e.hito ? String(e.hito).trim() : undefined,
         minute,
-        tipo: e.tipo || 'sesion'
+        // 'sesion', 'viaje' y 'combate' no son categorías que el diario sepa
+        // pintar: lo que no reconoce se guarda como acontecimiento.
+        tipo: TIPOS_DE_ENTRADA.has(String(e.tipo)) ? e.tipo : 'acontecimiento',
+        autoria: 'narrador'
       });
     });
   }
@@ -5203,7 +5446,8 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con este formato:
   if (Array.isArray(parsed.hilosPendientes)) {
     parsed.hilosPendientes.forEach((h: any, idx: number) => {
       const offset = typeof h.venceEnDiasDesdeInicio === 'number' ? h.venceEnDiasDesdeInicio : 5;
-      const dueAbs = startAbs + offset;
+      // Un plazo pendiente vence por delante: si sale en el pasado, se empuja.
+      const dueAbs = Math.max(hoyAbs + 1, startAbs + Math.round(offset));
       newThreads.push({
         id: `resync_thread_${dueAbs}_${idx}_${Date.now().toString(36)}`,
         title: String(h.title || 'Consecuencia pendiente').trim(),

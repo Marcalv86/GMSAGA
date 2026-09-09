@@ -425,14 +425,27 @@ export function leerAvanceDeTiempo(texto: string): { minutos: number; encontrado
 }
 
 export interface EntradaDeAgenda {
+  /** Encabezado corto de la jornada. El calendario lo usa como titular. */
+  titulo?: string;
   resumen: string;
   lugar?: string;
   clima?: string;
   hito?: string;
+  /** Emoticono de ánimo, para que la celda del calendario diga algo de un vistazo. */
+  mood?: string;
   diaOffset?: number;
   hora?: string;
   minute?: number;
-  tipo?: 'acontecimiento' | 'noticia' | 'rumor' | 'inconsciencia' | 'salto_temporal';
+  tipo?:
+    | 'acontecimiento'
+    | 'hito'
+    | 'descubrimiento'
+    | 'secreto'
+    | 'descanso'
+    | 'noticia'
+    | 'rumor'
+    | 'inconsciencia'
+    | 'salto_temporal';
 }
 
 /**
@@ -442,7 +455,25 @@ export interface EntradaDeAgenda {
  */
 export function extraerMinutoDeTexto(texto?: string): number | null {
   if (!texto) return null;
-  const t = sinTildes(texto);
+  let t = sinTildes(texto);
+
+  /*
+   * Una duración no es una hora del día.
+   *
+   * «Tras dos horas de marcha» no significa que sean las 02:00, y «más tarde»
+   * no es media tarde. Estas expresiones se retiran ANTES de buscar nada,
+   * porque colarlas como si fueran un reloj es justo lo que descolocaba las
+   * entradas del diario: el suceso acababa apuntado de madrugada por haber
+   * mencionado de pasada cuánto duró el camino.
+   */
+  t = t
+    .replace(/\b(?:mas|demasiado|muy|algo|un poco|bastante)\s+tarde\b/g, ' ')
+    .replace(/\btarde o temprano\b/g, ' ')
+    .replace(
+      /\b(?:hace|tras|durante|pasad[oa]s?|otr[oa]s?|un[oa]s?|cada|en|por|despues de|al cabo de|al menos|casi|unos)\s+(?:\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|media|medio|varias?|varios?)\s*(?:h\b|horas?|min\b|minutos?|dias?|semanas?)/g,
+      ' '
+    )
+    .replace(/\b\d+\s*(?:horas?|minutos?|dias?|semanas?)\s+(?:de|mas|antes|despues|en)\b/g, ' ');
 
   // Formato digital directo: 14:30, 08:15, 9:00, 23:45
   const digitalMatch = t.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
@@ -452,8 +483,12 @@ export function extraerMinutoDeTexto(texto?: string): number | null {
     return h * 60 + m;
   }
 
-  // Formato hora con h: 14h, 8h30, 9h
-  const hMatch = t.match(/\b(\d{1,2})\s*h(?:oras?)?(?:\s*(\d{1,2}))?\b/i);
+  /*
+   * Formato con «h» pegada: 14h, 8h30, 14 h. Se exige que tras la hache no
+   * venga una letra, de modo que «3 horas» —una duración— no se lea como las
+   * tres de la madrugada.
+   */
+  const hMatch = t.match(/\b([01]?\d|2[0-3])\s?h(?![a-z])\s?([0-5]\d)?\b/);
   if (hMatch) {
     const h = parseInt(hMatch[1], 10) % 24;
     const m = hMatch[2] ? parseInt(hMatch[2], 10) % 60 : 0;
@@ -479,7 +514,9 @@ export function extraerMinutoDeTexto(texto?: string): number | null {
   if (/\b(alba|amanecer|despertar|aurora|primera luz|rayar el dia)\b/.test(t)) return 6 * 60 + 30; // 06:30
   if (/\b(desayuno|primera hora)\b/.test(t)) return 8 * 60; // 08:00
   if (/\b(manana|media manana)\b/.test(t)) return 10 * 60; // 10:00
-  if (/\b(mediodia|almuerzo|comida|doce)\b/.test(t)) return 12 * 60 + 30; // 12:30
+  // «comida» y «doce» quedan fuera a propósito: aparecen en demasiadas frases
+  // que no hablan de la hora («compramos comida», «doce guardias»).
+  if (/\b(mediodia|almuerzo|hora de comer)\b/.test(t)) return 12 * 60 + 30; // 12:30
   if (/\b(sobremesa|siesta)\b/.test(t)) return 14 * 60 + 30; // 14:30
   if (/\b(tarde|media tarde|merienda)\b/.test(t)) return 16 * 60 + 30; // 16:30
   if (/\b(crepusculo|ocaso|puesta de sol|atardecer|caida de la tarde)\b/.test(t)) return 18 * 60 + 45; // 18:45
@@ -517,6 +554,8 @@ export function leerAgenda(texto: string): EntradaDeAgenda[] {
       if (campo === 'lugar') entrada.lugar = valor;
       else if (campo === 'clima' || campo === 'tiempo') entrada.clima = valor;
       else if (campo === 'hito') entrada.hito = valor;
+      else if (campo === 'titulo' || campo === 'title' || campo === 'encabezado') entrada.titulo = valor;
+      else if (campo === 'mood' || campo === 'animo' || campo === 'icono') entrada.mood = valor;
       else if (campo === 'hora' || campo === 'momento' || campo === 'franja') {
         entrada.hora = valor;
         const min = extraerMinutoDeTexto(valor);
@@ -532,6 +571,10 @@ export function leerAgenda(texto: string): EntradaDeAgenda[] {
         else if (/rumor|murmullo|taberna/i.test(valNorm)) entrada.tipo = 'rumor';
         else if (/inconscien|coma|convalecen|letargo|herido/i.test(valNorm)) entrada.tipo = 'inconsciencia';
         else if (/salto|elipsis/i.test(valNorm)) entrada.tipo = 'salto_temporal';
+        else if (/descanso|acamp|pernoct|dormir|vivac/i.test(valNorm)) entrada.tipo = 'descanso';
+        else if (/hito|jalon/i.test(valNorm)) entrada.tipo = 'hito';
+        else if (/descubrimiento|hallazgo/i.test(valNorm)) entrada.tipo = 'descubrimiento';
+        else if (/secreto/i.test(valNorm)) entrada.tipo = 'secreto';
         else entrada.tipo = 'acontecimiento';
       }
     }
@@ -558,6 +601,8 @@ export function leerAgenda(texto: string): EntradaDeAgenda[] {
         entrada.tipo = 'inconsciencia';
       } else if (/salto temporal|pasaron los d[ií]as|semanas despu[eé]s/i.test(textoCompleto)) {
         entrada.tipo = 'salto_temporal';
+      } else if (/descanso (?:corto|largo)|acampam|montamos el campamento|pernoct|dormimos|vivaque/i.test(textoCompleto)) {
+        entrada.tipo = 'descanso';
       }
     }
 
