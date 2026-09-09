@@ -92,7 +92,6 @@ import {
   syncFullCampaignFromChats,
   fusionarTimeline,
   AVISO_TOKENS_POR_MINUTO,
-  TOPE_TOKENS_POR_MINUTO,
   generateClaudeProjectMemory,
   isNarrativeIncomplete,
   novelizeUserMessage
@@ -1242,26 +1241,16 @@ export default function App() {
             setChatTokenLoads(prev => ({ ...prev, [currentChatId]: totalTokens }));
           }
 
-          // Aviso proactivo si se acerca al tope de tokens por minuto
-          if (totalTokens >= AVISO_TOKENS_POR_MINUTO) {
-            setAlertConfig({
-              isOpen: true,
-              title: `⚡ Aviso: el turno se acerca a la cuota por minuto (${Math.round(TOPE_TOKENS_POR_MINUTO / 1000)}k)`,
-              message: `El volumen de este turno ha alcanzado ${totalTokens.toLocaleString('es-ES')} tokens (${usage.entrada ? `${usage.entrada.toLocaleString('es-ES')} de entrada / ` : ''}${usage.salida?.toLocaleString('es-ES') || 0} de salida).
-
-La capa gratuita de Google deja pasar ${TOPE_TOKENS_POR_MINUTO.toLocaleString('es-ES')} tokens de entrada por minuto. No es una cuota que se gaste: es el tamaño máximo de lo que puedes mandar en un minuto, así que cuando se rebasa falla cada turno, también con una clave nueva. Para que la historia continúe con fluidez y sin bloqueos (429), te recomendamos abrir un «Nuevo Capítulo» ahora.
-
-• El capítulo actual y todos tus mensajes quedan archivados íntegros en tu diario y Crónica.
-• Tu ficha de personaje, inventario, relaciones de PNJs y memoria se conservan al 100%.`,
-              actionButton: {
-                label: '✨ Crear Nuevo Capítulo',
-                onClick: () => {
-                  setAlertConfig(null);
-                  handleCreateChat();
-                }
-              }
-            });
-          }
+          /*
+           * El aviso de cuota ya NO interrumpe con una ventana.
+           *
+           * Saltaba al terminar el turno, tapaba la partida y había que
+           * cerrarla para seguir leyendo lo que el Narrador acababa de contar
+           * —y volvía a saltar al turno siguiente, y al otro, porque la
+           * condición se cumple a partir de ahí siempre—. La misma información
+           * la da la barra que hay sobre el campo de escribir, que se ve
+           * cuando toca mirarla y no reclama nada.
+           */
         },
         onSaveMessage: (updatedChat: Chat) => {
           setCurrentChats(prev => {
@@ -2479,7 +2468,7 @@ La capa gratuita de Google deja pasar ${TOPE_TOKENS_POR_MINUTO.toLocaleString('e
   const docsChars = currentFiles.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
   const estimatedCurrentTokens = Math.round((currentChatChars + docsChars) / 3.8);
   const effectiveChatTokens = currentChatTokenCount > 0 ? currentChatTokenCount : estimatedCurrentTokens;
-  const isCurrentChatNearTokenLimit = effectiveChatTokens >= 180000;
+  const isCurrentChatNearTokenLimit = effectiveChatTokens >= AVISO_TOKENS_POR_MINUTO;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg-color)] text-[var(--text-primary)] font-lora relative">

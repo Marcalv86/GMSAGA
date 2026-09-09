@@ -24,7 +24,7 @@ import {
   formatoConsulta
 } from '../utils/oracle';
 import { formatRollResult } from '../utils/rollRequests';
-import { isNarrativeIncomplete } from '../utils/geminiHelper';
+import { TOPE_TOKENS_POR_MINUTO, isNarrativeIncomplete } from '../utils/geminiHelper';
 
 import {
   BookOpen,
@@ -1469,29 +1469,59 @@ export const ChatView: React.FC<{
           </div>
         </div>
 
-        {/* Aviso preventivo de saturación de tokens */}
-        {isNearTokenLimit && !isLastMessageIncomplete && (
-          <div className="max-w-[900px] mx-auto mb-2 px-3.5 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-xs">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
-              <div className="leading-snug">
-                <span className="font-cinzel font-bold">Capítulo extenso (~{Math.round((chatTokensCount || 200000) / 1000)}k tokens): </span>
-                <span className="opacity-90">Te acercas al tope de cuota por minuto de Google (250k). Te recomendamos abrir un nuevo capítulo para continuar con fluidez.</span>
+        {/*
+          Aviso de saturación de tokens.
+          
+          Era un bloque de dos líneas con su párrafo explicativo, encima del
+          campo de escribir y en cada turno a partir del aviso. La explicación
+          se lee una vez y a partir de ahí solo estorba justo donde se juega:
+          lo que hace falta saber de un vistazo es cuánto queda, y eso lo dice
+          mejor una barra que un párrafo.
+        */}
+        {isNearTokenLimit && !isLastMessageIncomplete && (() => {
+          const usados = chatTokensCount || TOPE_TOKENS_POR_MINUTO;
+          const porcentaje = Math.min(100, (usados / TOPE_TOKENS_POR_MINUTO) * 100);
+          const pasado = usados >= TOPE_TOKENS_POR_MINUTO;
+          return (
+            <div className="max-w-[900px] mx-auto mb-2 flex items-center gap-2.5">
+              <Zap
+                className={`w-3.5 h-3.5 shrink-0 ${pasado ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline justify-between gap-2 mb-1">
+                  <span
+                    className={`font-cinzel text-[10px] font-bold truncate ${pasado ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}
+                  >
+                    {pasado ? 'Capítulo por encima del tope' : 'Capítulo cerca del tope'}
+                  </span>
+                  <span className="font-mono text-[10px] tabular-nums opacity-70 shrink-0">
+                    {Math.round(usados / 1000)}k / {Math.round(TOPE_TOKENS_POR_MINUTO / 1000)}k por minuto
+                  </span>
+                </div>
+                <div className="w-full h-1 rounded-full bg-[var(--glass-border)] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${pasado ? 'bg-red-600' : 'bg-amber-500'}`}
+                    style={{ width: `${Math.max(3, porcentaje)}%` }}
+                  />
+                </div>
               </div>
+              {onCreateNewChat && (
+                <button
+                  type="button"
+                  onClick={onCreateNewChat}
+                  className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-cinzel font-bold transition-colors cursor-pointer border ${
+                    pasado
+                      ? 'border-red-600/40 text-red-700 dark:text-red-300 hover:bg-red-600/10'
+                      : 'border-amber-600/40 text-amber-700 dark:text-amber-300 hover:bg-amber-600/10'
+                  }`}
+                  title="Cierra este capítulo y abre uno nuevo. La memoria, la ficha, el inventario y el diario se conservan enteros; lo único que se reinicia es el historial que viaja en cada turno."
+                >
+                  Cerrar capítulo
+                </button>
+              )}
             </div>
-            {onCreateNewChat && (
-              <button
-                type="button"
-                onClick={onCreateNewChat}
-                className="shrink-0 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-cinzel font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 ml-auto sm:ml-0"
-                title="Abrir nuevo capítulo manteniendo toda la memoria, ficha e inventario"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Nuevo Capítulo</span>
-              </button>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* Input Field & Attachments */}
         <div className="max-w-[900px] mx-auto relative">
