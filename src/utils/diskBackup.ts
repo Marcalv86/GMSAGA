@@ -9,8 +9,7 @@ import {
   getStoredThinkingLevel,
   getStoredTemperature,
   getStoredTopP,
-  getStoredAutoFailover,
-  getStoredMemorySyncGranularity
+  getStoredAutoFailover
 } from './geminiHelper';
 
 /**
@@ -208,8 +207,7 @@ export async function writeCampaignToDisk(
           thinkingLevel: getStoredThinkingLevel(),
           temperature: getStoredTemperature(),
           topP: getStoredTopP(),
-          autoFailover: getStoredAutoFailover(),
-          memorySyncGranularity: getStoredMemorySyncGranularity()
+          autoFailover: getStoredAutoFailover()
         },
         exportadaEl: new Date().toISOString()
       },

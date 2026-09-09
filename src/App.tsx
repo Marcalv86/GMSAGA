@@ -90,7 +90,6 @@ import {
   setStoredTopP,
   setStoredAutoFailover,
   setStoredKeyRotationMode,
-  setStoredMemorySyncGranularity,
   syncFullCampaignFromChats,
   fusionarTimeline,
   consolidarCronicaAlCerrarCapitulo,
@@ -2351,7 +2350,6 @@ export default function App() {
             if (typeof aiConfig.temperature === 'number') setStoredTemperature(aiConfig.temperature);
             if (typeof aiConfig.topP === 'number') setStoredTopP(aiConfig.topP);
             if (typeof aiConfig.autoFailover === 'boolean') setStoredAutoFailover(aiConfig.autoFailover);
-            if (aiConfig.memorySyncGranularity) setStoredMemorySyncGranularity(aiConfig.memorySyncGranularity);
           }
 
           // Soporte para copias completas de todas las campañas

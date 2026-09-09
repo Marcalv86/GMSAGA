@@ -19,14 +19,9 @@ import {
   setStoredBackgroundModel,
   getStoredApiKeys,
   setStoredApiKeys,
-  getStoredAutoSyncMemory,
-  setStoredAutoSyncMemory,
-  getStoredMemorySyncGranularity,
-  setStoredMemorySyncGranularity,
   getStoredKeyRotationMode,
   setStoredKeyRotationMode,
   KeyRotationMode,
-  MemorySyncGranularity,
   SafetyThreshold,
   ThinkingLevelSetting,
   describeApiError,
@@ -144,8 +139,6 @@ export const ApiKeyModal: React.FC<{
   const [topP, setTopP] = useState<number>(getStoredTopP());
   const [autoFailover, setAutoFailover] = useState<boolean>(getStoredAutoFailover());
   const [historyWindow, setHistoryWindow] = useState<HistoryWindowSetting>(getStoredHistoryWindow());
-  const [autoSyncMemory, setAutoSyncMemory] = useState<boolean>(getStoredAutoSyncMemory());
-  const [memorySyncGranularity, setMemorySyncGranularity] = useState<MemorySyncGranularity>(getStoredMemorySyncGranularity());
   const [keyRotationMode, setKeyRotationMode] = useState<KeyRotationMode>(getStoredKeyRotationMode());
   const [apiKeysList, setApiKeysList] = useState<string[]>(getStoredApiKeys());
   const [newKeyInput, setNewKeyInput] = useState('');
@@ -360,8 +353,6 @@ export const ApiKeyModal: React.FC<{
       setTopP(getStoredTopP());
       setAutoFailover(getStoredAutoFailover());
       setHistoryWindow(getStoredHistoryWindow());
-      setAutoSyncMemory(getStoredAutoSyncMemory());
-      setMemorySyncGranularity(getStoredMemorySyncGranularity());
       setUso(resumirUso());
     }
   }, [isOpen, currentKey, currentModel]);
@@ -386,8 +377,6 @@ export const ApiKeyModal: React.FC<{
     setStoredTopP(topP);
     setStoredAutoFailover(autoFailover);
     setStoredHistoryWindow(historyWindow);
-    setStoredAutoSyncMemory(autoSyncMemory);
-    setStoredMemorySyncGranularity(memorySyncGranularity);
     setSavedSuccess(true);
     setTimeout(() => {
       setSavedSuccess(false);
