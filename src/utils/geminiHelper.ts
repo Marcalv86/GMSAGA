@@ -1206,6 +1206,8 @@ export interface TurnPayload {
 export const CARACTERES_POR_TOKEN = 3.8;
 
 export interface CargaDelTurno {
+  /** Protocolos de interfaz y reglas del Director que la app añade siempre. */
+  andamiaje: number;
   /** Caracteres que viajan, desglosados para poder enseñar en qué se va. */
   directivas: number;
   memoria: number;
@@ -1215,6 +1217,8 @@ export interface CargaDelTurno {
   capituloActual: number;
   capitulosPrevios: number;
   fragmentosRescatados: number;
+  /** Lo que queda del prompt: ficha, calendario, salud, dados… */
+  otros: number;
   total: number;
   /** La misma cifra en tokens, estimada. */
   tokens: number;
@@ -1229,15 +1233,22 @@ export interface CargaDelTurno {
 /**
  * Cuánto pesa el turno que se va a enviar.
  *
- * Esto vivía duplicado: la barra de la barra lateral lo calculaba de una manera
- * y el aviso del chat de otra, con la consecuencia inevitable de que enseñaban
- * cifras distintas para lo mismo —una decía 165 mil y la otra 204 mil— sin que
- * hubiera forma de saber cuál creerse. Peor: la del chat solo sumaba el capítulo
- * y los documentos, olvidándose de las directivas y la memoria, que son treinta
- * y cinco mil tokens fijos en cada turno.
+ * SE MIDE EL ENVÍO DE VERDAD, no se suma a mano.
  *
- * Un solo cálculo para las dos, con el mismo criterio que aplica
- * `buildTurnPayload` al enviar de verdad.
+ * Primero esto vivía duplicado —la barra lateral lo calculaba de una manera y
+ * el aviso del chat de otra— y se unificó en una suma escrita a mano. Esa suma
+ * también estaba mal, y de las dos maneras a la vez: contaba la crónica, los
+ * PNJs, las tramas y los lugares, que NO viajan en el turno, y se dejaba fuera
+ * los protocolos de interfaz y las instrucciones del Director, que sí viajan y
+ * son treinta mil tokens. El error llegaba a veintisiete mil.
+ *
+ * El problema de fondo es que replicar a mano lo que arma `buildTurnPayload`
+ * está condenado a desviarse en cuanto uno de los dos cambie. Así que ya no se
+ * replica: se construye el envío real y se mide. Exacto por construcción, y no
+ * puede volver a separarse de la realidad.
+ *
+ * El desglose sigue siendo orientativo —sirve para ver en qué se va— y lo que
+ * no encaja en ninguna categoría se agrupa en «otros» en lugar de perderse.
  */
 export function estimarCargaDelTurno({
   project,
@@ -1250,27 +1261,31 @@ export function estimarCargaDelTurno({
   currentChatId?: string | null;
   files: ProjectFile[];
 }): CargaDelTurno {
+  /*
+   * Las directivas activas son las del proyecto, y si no las hay, las de la
+   * aplicación: `buildTurnPayload` hace exactamente esta sustitución, así que
+   * contar `project.instructions` a secas daba cero en una campaña que no las
+   * haya tocado, cuando en realidad viajan las de por defecto enteras.
+   */
+  const andamiaje = CORE_INTERFACE_PROTOCOLS.length;
   const directivas =
-    (project.instructions?.length || 0) + (project.system?.length || 0) + (project.style?.length || 0);
+    (project.instructions && project.instructions.trim().length > 10
+      ? project.instructions.length
+      : DEFAULT_DM_INSTRUCTIONS.length) +
+    (project.system && project.system.trim().length > 5 ? project.system.length : DEFAULT_SYSTEM.length) +
+    (project.style && project.style.trim().length > 5 ? project.style.length : DEFAULT_STYLE.length);
 
+  /*
+   * De la memoria solo viaja esto. La crónica, los PNJs, las tramas, los
+   * lugares y el estado actual NO se envían en el turno: alimentan la memoria
+   * general del proyecto y las pantallas, pero el Narrador no los recibe.
+   * Contarlos aquí era inflar la cifra con algo que nadie manda.
+   */
   const mem = project.memory;
   const memoria =
-    (mem?.story?.length || 0) +
-    (mem?.current_status?.length || 0) +
-    (mem?.manual_notes?.length || 0) +
     (mem?.raw_project_memory?.length || 0) +
-    (mem?.npcs || []).reduce(
-      (acc, n) => acc + (n.name?.length || 0) + (n.notes?.length || 0) + (n.description?.length || 0),
-      0
-    ) +
-    (mem?.quests || []).reduce(
-      (acc, q) => acc + (q.title?.length || 0) + (q.objective?.length || 0) + (q.progress?.length || 0),
-      0
-    ) +
-    (mem?.locations || []).reduce(
-      (acc, l) => acc + (l.name?.length || 0) + (l.desc?.length || 0) + (l.notes?.length || 0),
-      0
-    );
+    (mem?.manual_notes?.length || 0) +
+    (mem?.memory_edits || []).reduce((acc, e) => acc + (e.text?.length || 0), 0);
 
   // Un archivo de texto viaja entero salvo que sea una muestra de estilo (su
   // valor ya se destiló en las directivas) o esté marcado de consulta. Las
@@ -1310,9 +1325,38 @@ export function estimarCargaDelTurno({
   // pecar de prudente, no de optimista.
   const fragmentosRescatados = getStoredBusquedaLocal() && deConsulta.length ? 6000 : 0;
 
-  const total = directivas + memoria + archivos + capituloActual + capitulosPrevios + fragmentosRescatados;
+  const declarado =
+    andamiaje + directivas + memoria + archivos + capituloActual + capitulosPrevios + fragmentosRescatados;
+
+  /*
+   * La cifra buena: se arma el envío real y se mide. Si no se puede (una
+   * campaña sin capítulos todavía), se usa la suma declarada, que para ese caso
+   * se queda muy cerca.
+   */
+  let total = declarado;
+  try {
+    if (capitulo) {
+      const { sys, contents } = buildTurnPayload({
+        project,
+        currentChatId: capitulo.id,
+        chats,
+        files,
+        userText: '',
+        dicePool: { d20: [], d100: [], d6: [] }
+      });
+      const largoContenidos = contents.reduce(
+        (acc: number, c: any) =>
+          acc + (c.parts || []).reduce((a: number, part: any) => a + (part.text?.length || 0), 0),
+        0
+      );
+      total = sys.length + largoContenidos;
+    }
+  } catch {
+    // Un turno que no se puede armar no debe romper una barra de progreso.
+  }
 
   return {
+    andamiaje,
     directivas,
     memoria,
     archivos,
@@ -1320,6 +1364,7 @@ export function estimarCargaDelTurno({
     capituloActual,
     capitulosPrevios,
     fragmentosRescatados,
+    otros: Math.max(0, total - declarado),
     total,
     tokens: Math.round(total / CARACTERES_POR_TOKEN),
     ventanaHistorial,

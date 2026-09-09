@@ -75,6 +75,8 @@ export const ContextUsageWidget: React.FC<{
 
   const instructionsChars = carga.directivas;
   const memoryChars = carga.memoria;
+  // El total ya no es la suma de estas filas: sale de medir el envío real.
+
   const filesChars = carga.archivos;
   const deConsultaChars = carga.archivosDeConsulta;
   const mediaCount = carga.medios;
@@ -283,8 +285,25 @@ export const ContextUsageWidget: React.FC<{
 
                   <ul className="flex flex-col gap-2.5 m-0 p-0 list-none">
                     {[
-                      { label: 'Directivas', chars: instructionsChars, Icon: Scroll },
-                      { label: 'Memoria viva', chars: memoryChars, Icon: Brain },
+                      {
+                        label: 'Protocolos de la aplicación',
+                        chars: carga.andamiaje,
+                        Icon: Gauge,
+                        extra: 'Reglas de interfaz y etiquetas. Van en todos los turnos y no se pueden quitar.'
+                      },
+                      {
+                        label: 'Directivas del Narrador',
+                        chars: instructionsChars,
+                        Icon: Scroll,
+                        extra: 'Tus instrucciones de campaña, o las de por defecto si no las has tocado.'
+                      },
+                      {
+                        label: 'Memoria del proyecto',
+                        chars: memoryChars,
+                        Icon: Brain,
+                        extra:
+                          'Solo la memoria general, tus notas y tus directivas manuales. La crónica, los PNJs, las tramas y los lugares NO viajan en el turno.'
+                      },
                       {
                         label: 'Archivos que viajan enteros',
                         chars: filesChars,
@@ -305,6 +324,12 @@ export const ContextUsageWidget: React.FC<{
                         chars: rescateChars,
                         Icon: Search,
                         extra: rescateChars ? 'como mucho; lo normal es bastante menos' : undefined
+                      },
+                      {
+                        label: 'Ficha, calendario y resto del turno',
+                        chars: carga.otros,
+                        Icon: Landmark,
+                        extra: 'Ficha del protagonista, fecha y hora, salud, dados y demás bloques.'
                       }
                     ].map(({ label, chars, Icon, extra }) => {
                       const share = totalChars > 0 ? (chars / totalChars) * 100 : 0;
