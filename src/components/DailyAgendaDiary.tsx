@@ -25,7 +25,8 @@ import {
   horaLegible,
   iconoDeClima,
   iconoDeHito,
-  mesDelDia
+  mesDelDia,
+  esLaMismaEscena
 } from '../utils/campaignCalendar';
 import {
   Calendar,
@@ -156,10 +157,14 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
     });
 
     pcEvents.forEach((pce, idx) => {
+      // Mismo id, mismo texto exacto, o —lo habitual— la misma escena
+      // contada con otras palabras el mismo día.
       const alreadyInTimeline = unified.some(
-        t => t.id === pce.id ||
-             (t.summary && pce.description && t.summary.trim().toLowerCase() === pce.description.trim().toLowerCase()) ||
-             (t.title && pce.title && t.title.trim().toLowerCase() === pce.title.trim().toLowerCase())
+        t =>
+          t.id === pce.id ||
+          (t.summary && pce.description && t.summary.trim().toLowerCase() === pce.description.trim().toLowerCase()) ||
+          (t.title && pce.title && t.title.trim().toLowerCase() === pce.title.trim().toLowerCase()) ||
+          esLaMismaEscena({ title: t.title, summary: t.summary }, { title: pce.title, summary: pce.description })
       );
 
       if (!alreadyInTimeline) {

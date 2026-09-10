@@ -1497,3 +1497,49 @@ export function leerViaje(texto: string): ViajeLeido | null {
   }
   return ultimo;
 }
+
+
+/**
+ * ¿Este hito del protagonista es la misma escena que una entrada del diario?
+ *
+ * El repaso de memoria escribe DOS listas en la misma respuesta: los
+ * acontecimientos del día y los hitos del protagonista. Cuando cuenta la misma
+ * escena en las dos —con otras palabras, que es lo normal— el diario la enseña
+ * dos veces y a horas distintas: «El examen del violín druídico» a las 08:15 y
+ * «Inspección del violín druídico» a las 12:00.
+ *
+ * Comparar texto exacto no lo pilla, porque nunca es exacto. Se comparan las
+ * palabras con carga —las largas, sin tildes— y, tratándose del MISMO DÍA, con
+ * tres coincidencias basta: «violín», «trastienda», «Jarlaxle» juntas en dos
+ * entradas del mismo día no son dos escenas.
+ */
+/** Texto plano comparable: sin tildes, sin signos y en minúsculas. */
+function claveComparable(v?: string): string {
+  return (v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function esLaMismaEscena(
+  a: { title?: string; summary?: string },
+  b: { title?: string; summary?: string }
+): boolean {
+  const cargadas = (v?: string) =>
+    new Set(
+      claveComparable(`${v || ''}`)
+        .split(' ')
+        .filter(p => p.length > 4)
+    );
+  const pa = cargadas(`${a.title || ''} ${a.summary || ''}`);
+  const pb = cargadas(`${b.title || ''} ${b.summary || ''}`);
+  if (pa.size < 3 || pb.size < 3) return false;
+  let comunes = 0;
+  pa.forEach(p => {
+    if (pb.has(p)) comunes++;
+  });
+  return comunes >= 3;
+}

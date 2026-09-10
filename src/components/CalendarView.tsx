@@ -32,7 +32,8 @@ import {
   iconoDeClima,
   iconoDeHito,
   mesDelDia,
-  obtenerInfoRelacion
+  obtenerInfoRelacion,
+  esLaMismaEscena
 } from '../utils/campaignCalendar';
 
 import {
@@ -537,10 +538,14 @@ export const CalendarView: React.FC<{
 
     // 2. Integrar acontecimientos e hitos del protagonista si no están ya en el timeline
     pcEvents.forEach((pce, idx) => {
+      // Mismo id, mismo texto exacto, o —lo habitual— la misma escena
+      // contada con otras palabras el mismo día.
       const alreadyInTimeline = unified.some(
-        t => t.id === pce.id ||
-             (t.summary && pce.description && t.summary.trim().toLowerCase() === pce.description.trim().toLowerCase()) ||
-             (t.title && pce.title && t.title.trim().toLowerCase() === pce.title.trim().toLowerCase())
+        t =>
+          t.id === pce.id ||
+          (t.summary && pce.description && t.summary.trim().toLowerCase() === pce.description.trim().toLowerCase()) ||
+          (t.title && pce.title && t.title.trim().toLowerCase() === pce.title.trim().toLowerCase()) ||
+          esLaMismaEscena({ title: t.title, summary: t.summary }, { title: pce.title, summary: pce.description })
       );
 
       if (!alreadyInTimeline) {

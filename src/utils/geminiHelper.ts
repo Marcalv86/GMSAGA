@@ -3997,6 +3997,7 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
   "player_events": [
     { "title": "Hito clave del protagonista", "description": "Qué ocurrió y su significado", "dateOrTime": "Fecha o momento" }
   ],
+  "_nota_player_events": "⛔ NO es una segunda copia del diario. 'daily_events' lleva lo que PASÓ cada día; 'player_events' lleva solo los HITOS que cambian al protagonista y que se recordarán dentro de un año: un juramento, una pérdida, una cicatriz, subir de nivel, un pacto, una decisión que no tiene vuelta atrás, un vínculo que se rompe o se sella. Una escena cotidiana —una conversación, un registro, un trato, una inspección— va en 'daily_events' y NO se repite aquí. Si dudas, no lo pongas: repetir la misma escena en las dos listas la muestra DOS VECES en el diario de la jugadora, con dos títulos y dos horas distintas. Es preferible una lista de hitos corta y vacía que un diario duplicado.",
   "quests": [
     { "id": "id existente o nuevo", "title": "Título", "type": "Principal / Secundaria", "objective": "Objetivo", "progress": "Progreso", "status": "Activa / Completada" }
   ],
