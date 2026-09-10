@@ -180,6 +180,43 @@ export function suscribirseALlamadas(cb: (l: LlamadaRegistrada[]) => void): () =
   };
 }
 
+/**
+ * Caracteres a fichas, y qué parte del techo se lleva.
+ *
+ * El registro apuntaba «enviado: 698.390 caracteres», que contra un techo
+ * medido en fichas no dice absolutamente nada: hay que dividir a mano para
+ * enterarse de que eso era el 75% del envío máximo de un minuto. Un número que
+ * hay que traducir para entenderlo es un número que no se mira.
+ *
+ * En español salen unos 3,7 caracteres por ficha. Es una aproximación, y por
+ * eso se enseña con «≈» y solo cuando la API no ha dado la cuenta de verdad.
+ */
+export const CARACTERES_POR_FICHA = 3.7;
+export const TECHO_FICHAS_POR_MINUTO = 250000;
+
+export function fichasAproximadas(caracteres?: number): number | undefined {
+  if (caracteres === undefined || !Number.isFinite(caracteres)) return undefined;
+  return Math.round(caracteres / CARACTERES_POR_FICHA);
+}
+
+/** Qué parte del techo del minuto se lleva un envío, en porcentaje redondeado. */
+export function porcentajeDelTecho(fichas?: number): number | undefined {
+  if (fichas === undefined || !Number.isFinite(fichas)) return undefined;
+  return Math.round((fichas / TECHO_FICHAS_POR_MINUTO) * 100);
+}
+
+/**
+ * Las fichas de entrada que se pueden enseñar, vengan de donde vengan.
+ *
+ * Si la API contestó, manda su cuenta. Si la llamada se cortó antes —que es
+ * justo cuando más falta hace saber cuánto se estaba mandando— se cae en la
+ * estimación por caracteres.
+ */
+export function entradaMostrable(l: LlamadaRegistrada): { fichas?: number; estimada: boolean } {
+  if (l.fichasEntrada !== undefined) return { fichas: l.fichasEntrada, estimada: false };
+  return { fichas: fichasAproximadas(l.caracteresEnviados), estimada: true };
+}
+
 /** «1,2 s», «45 s», «2 min 10 s» — a ojo se lee mejor que 74213. */
 export function duracionLegible(ms?: number): string {
   if (ms === undefined || !Number.isFinite(ms)) return '—';
@@ -231,11 +268,16 @@ export function llamadasComoTexto(llamadas: LlamadaRegistrada[]): string {
       `[${l.horaLegible}] ${l.proposito} — ${l.estado.toUpperCase()}`,
       `  modelo: ${l.modelo}${l.claveN ? ` · clave ${l.claveN}${l.totalClaves ? `/${l.totalClaves}` : ''}` : ''}${l.intento ? ` · intento ${l.intento}` : ''}${l.esRespaldo ? ' · respaldo' : ''}`,
       `  duración: ${duracionLegible(l.duracionMs)}${l.primerTrozoMs !== undefined ? ` · primer trozo: ${duracionLegible(l.primerTrozoMs)}` : ''}`,
-      l.fichasEntrada !== undefined || l.fichasSalida !== undefined
-        ? `  fichas: entrada ${(l.fichasEntrada || 0).toLocaleString('es-ES')} · salida ${(l.fichasSalida || 0).toLocaleString('es-ES')}${l.fichasEnCache ? ` · caché ${l.fichasEnCache.toLocaleString('es-ES')}` : ''}`
-        : l.caracteresEnviados
-        ? `  enviado: ${l.caracteresEnviados.toLocaleString('es-ES')} caracteres`
-        : '',
+      (() => {
+        const e = entradaMostrable(l);
+        if (e.fichas === undefined) return '';
+        const pct = porcentajeDelTecho(e.fichas);
+        return `  entrada: ${e.estimada ? '≈' : ''}${e.fichas.toLocaleString('es-ES')} fichas${pct !== undefined ? ` (${pct}% del techo del minuto)` : ''}${
+          l.fichasSalida !== undefined ? ` · salida ${l.fichasSalida.toLocaleString('es-ES')}` : ''
+        }${l.fichasEnCache ? ` · caché ${l.fichasEnCache.toLocaleString('es-ES')}` : ''}${
+          e.estimada && l.caracteresEnviados ? ` [estimado sobre ${l.caracteresEnviados.toLocaleString('es-ES')} caracteres]` : ''
+        }`;
+      })(),
       l.motivoDeCierre ? `  cierre: ${l.motivoDeCierre}` : '',
       l.detalle ? `  detalle: ${l.detalle}` : '',
       l.capitulo ? `  capítulo: ${l.capitulo}` : ''

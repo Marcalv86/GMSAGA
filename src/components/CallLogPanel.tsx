@@ -3,7 +3,9 @@ import { Check, Copy, Loader, Radio, Trash2, TriangleAlert, XCircle } from 'luci
 import {
   LlamadaRegistrada,
   duracionLegible,
+  entradaMostrable,
   getLlamadas,
+  porcentajeDelTecho,
   limpiarLlamadas,
   llamadasComoTexto,
   resumenDeLlamadas,
@@ -181,11 +183,34 @@ export const CallLogPanel: React.FC = () => {
                       arranque {duracionLegible(l.primerTrozoMs)}
                     </span>
                   )}
-                  {l.fichasEntrada !== undefined && (
-                    <span className="text-[var(--text-secondary)]" title="Fichas de entrada, según la propia API">
-                      ↓{n(l.fichasEntrada)}
-                    </span>
-                  )}
+                  {/*
+                    La entrada, siempre en fichas y con su parte del techo.
+
+                    Antes, si la llamada se cortaba antes de contestar, solo
+                    quedaban los caracteres enviados —«698.390»—, que contra un
+                    techo medido en fichas no dicen nada. Y es justo el caso en
+                    que más falta hace saber cuánto se estaba mandando.
+                  */}
+                  {(() => {
+                    const e = entradaMostrable(l);
+                    if (e.fichas === undefined) return null;
+                    const pct = porcentajeDelTecho(e.fichas);
+                    const alto = (pct || 0) >= 70;
+                    return (
+                      <span
+                        className={alto ? 'text-amber-800 dark:text-amber-300 font-bold' : 'text-[var(--text-secondary)]'}
+                        title={
+                          (e.estimada
+                            ? `Estimado sobre ${n(l.caracteresEnviados)} caracteres enviados (la llamada no llegó a contestar).`
+                            : 'Fichas de entrada según la propia API.') +
+                          ' El techo de la capa gratuita son 250.000 fichas por minuto.'
+                        }
+                      >
+                        ↓{e.estimada ? '≈' : ''}{n(e.fichas)}
+                        {pct !== undefined ? ` (${pct}%)` : ''}
+                      </span>
+                    );
+                  })()}
                   {l.fichasSalida !== undefined && (
                     <span className="text-[var(--text-secondary)]" title="Fichas de salida">↑{n(l.fichasSalida)}</span>
                   )}
