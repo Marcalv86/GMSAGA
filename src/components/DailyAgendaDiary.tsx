@@ -760,9 +760,18 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                   setDiaSeleccionado(abs);
                   if (viewMode !== 'dia') setViewMode('dia');
                 }}
-                className={`relative flex flex-col items-center justify-between p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer min-h-[48px] sm:min-h-[58px] border text-left group ${
+                /*
+                  Las esquinas, medidas para una celda ESTRECHA.
+                  Con la semana de diez días cada casilla mide ~34px de ancho
+                  por 48 de alto, y ahí un `rounded-xl` con un círculo dentro
+                  deja de parecer un día del mes y pasa a ser una cápsula. Se
+                  usa el mismo redondeo discreto que el calendario grande, sin
+                  el `scale` que además hacía sobresalir el día elegido por
+                  encima de sus vecinos.
+                */
+                className={`relative flex flex-col items-center justify-between px-0.5 py-1 rounded-lg transition-colors cursor-pointer min-h-[44px] sm:min-h-[52px] border text-left group ${
                   isSelected
-                    ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-md ring-2 ring-[var(--accent)]/40 scale-[1.03] z-10'
+                    ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-sm z-10'
                     : isToday
                     ? 'bg-[var(--surface)] border-[var(--accent)] text-[var(--accent)] font-bold'
                     : hasEntries
@@ -772,15 +781,13 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
               >
                 {/* Top indicator & day number */}
                 <div className="w-full flex items-center justify-between gap-1">
-                  <span
-                    className={`inline-flex items-center justify-center font-cinzel text-xs sm:text-sm font-semibold rounded-full w-6 h-6 ${
-                      isSelected
-                        ? 'bg-[var(--on-accent)] text-[var(--accent)] font-bold'
-                        : isToday
-                        ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold'
-                        : ''
-                    }`}
-                  >
+                  {/*
+                    El número, sin su pastilla redonda: un círculo de 24px
+                    dentro de una casilla de 34 era una cápsula dentro de otra.
+                    El día elegido y el de hoy ya se distinguen por el fondo y
+                    el borde de la casilla, que es donde tiene que verse.
+                  */}
+                  <span className="font-cinzel text-xs sm:text-sm font-semibold leading-none">
                     {celda.etiqueta}
                   </span>
 

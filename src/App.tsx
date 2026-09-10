@@ -100,6 +100,7 @@ import {
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
   tramarLaCampana,
+  extraerIdentidadDeDocumentos,
   fusionarTrama,
   isNarrativeIncomplete,
   novelizeUserMessage,
@@ -2328,11 +2329,71 @@ export default function App() {
     await saveFilesToDB(currentPId, updated);
   };
 
+  /**
+   * Rellenar la ficha del protagonista leyendo su documento, sin pedirlo.
+   *
+   * Marcar un archivo como «ficha del OC» ya es decir quién es: no tiene
+   * sentido que además haya que pulsar un botón para que la aplicación lo lea.
+   * Sin esto, la ficha se quedaba con el nombre de reserva y el resultado se
+   * veía en la novela: «Protagonista abrió los ojos en la penumbra».
+   *
+   * ⛔ Solo rellena lo que está VACÍO. Lo que la jugadora haya escrito a mano
+   * no se toca nunca, ni aunque el documento diga otra cosa: para eso está el
+   * botón de leer la ficha, que sí avisa antes de sustituir.
+   */
+  const completarFichaDesdeDocumento = async (archivos: ProjectFile[]) => {
+    if (!currentProject) return;
+    const pc = currentProject.memory?.player_character;
+    const nombreDeReserva = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
+    const faltaNombre = !(pc?.name || '').trim() || nombreDeReserva.test((pc?.name || '').trim());
+    const faltaAlgo =
+      faltaNombre || !pc?.race || !pc?.class || !pc?.languages?.length || !pc?.appearance;
+    if (!faltaAlgo) return;
+
+    try {
+      const id = await extraerIdentidadDeDocumentos({ project: currentProject, files: archivos });
+      const puestos: string[] = [];
+      await handleUpdateMemory(mem => {
+        const actual = mem.player_character;
+        const nombreActual = (actual?.name || '').trim();
+        const sinNombre = !nombreActual || nombreDeReserva.test(nombreActual);
+        const nuevo = { ...(actual || { name: 'Protagonista' }) };
+        if (id.name && sinNombre) { nuevo.name = id.name; puestos.push(`nombre: ${id.name}`); }
+        if (id.race && !actual?.race) { nuevo.race = id.race; puestos.push(`raza: ${id.race}`); }
+        if (id.class && !actual?.class) { nuevo.class = id.class; puestos.push(`clase: ${id.class}`); }
+        if (id.languages?.length && !actual?.languages?.length) {
+          nuevo.languages = id.languages;
+          puestos.push(`idiomas: ${id.languages.join(', ')}`);
+        }
+        if (id.appearance && !actual?.appearance) { nuevo.appearance = id.appearance; puestos.push('rasgos físicos'); }
+        return { ...mem, player_character: nuevo };
+      });
+      if (puestos.length) {
+        logInfo('memory_sync', 'Ficha del protagonista completada desde su documento', puestos.join(' · '), {
+          projectName: currentProject.name
+        });
+        setTopProgress({
+          active: true,
+          label: `Ficha del protagonista completada desde el documento (${puestos.join(', ')})`,
+          type: 'sync'
+        });
+        setTimeout(() => setTopProgress(p => (p.type === 'sync' ? { active: false } : p)), 6000);
+      }
+    } catch (err) {
+      // Que no se pueda leer no puede romper el marcar un archivo.
+      logWarn('memory_sync', 'No se pudo leer la ficha del protagonista del documento', String(err), {
+        projectName: currentProject.name
+      });
+    }
+  };
+
   const handleUpdateFileCategory = async (fileId: string, category: FileCategory) => {
     if (!currentPId) return;
     const updated = currentFiles.map(f => (f.id === fileId ? { ...f, category } : f));
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
+    // Marcar un documento como ficha del OC es decir quién es: se lee solo.
+    if (category === 'sheet_pj') void completarFichaDesdeDocumento(updated);
   };
 
   const handleToggleOnDemand = async (fileId: string, onDemand: boolean) => {
