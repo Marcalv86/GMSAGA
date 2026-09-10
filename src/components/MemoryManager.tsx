@@ -1275,7 +1275,7 @@ export const MemoryManager: React.FC<{
           <div className="flex flex-wrap justify-between items-center bg-amber-50/80 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50 gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-amber-900 dark:text-amber-200 font-cinzel font-bold">
-                ⚠️ Cuaderno Oculto del Narrador (IA) — Planes Secretos & Spoilers:
+                ⚠️ Cuaderno oculto de dirección — contiene spoilers
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -1298,7 +1298,12 @@ export const MemoryManager: React.FC<{
           </div>
 
           <p className="text-xs text-[var(--text-secondary)] font-lora italic px-1">
-            Este espacio es el cuaderno de trabajo privado del Narrador (IA). Aquí la IA anota y actualiza de forma autónoma sus planes secretos, tramas en la sombra, giros argumentales ocultos y contingencias para mantener el mundo reactivo y coherente. Como jugadora, puedes inspeccionarlo si deseas ver el reverso de la trama, pero recuerda que contiene spoilers de lo que está por venir.
+            Tu cuaderno de dirección, en texto libre: planes en la sombra, tramas que aún no han asomado,
+            contingencias, notas de tono. Le llega al Narrador en cada turno marcado como secreto —lo usa para
+            mover el mundo y mantenerlo coherente, con prohibición de contarlo o insinuarlo— y no aparece en la
+            crónica ni en ningún resumen. Escríbelo tú: el Narrador lo lee, pero no escribe aquí. Para guardar un
+            giro concreto y poder seguirle la pista hasta que se descubra, usa los <strong>Giros de la campaña</strong>
+            de aquí arriba.
           </p>
 
           {showNarratorNotes ? (
@@ -1311,9 +1316,10 @@ export const MemoryManager: React.FC<{
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-center py-16 text-[var(--text-secondary)]">
                     <BookOpen className="w-10 h-10 mb-3 opacity-40 text-amber-700" />
-                    <p className="font-cinzel font-semibold text-sm mb-1">El Narrador (IA) aún no ha escrito notas secretas</p>
+                    <p className="font-cinzel font-semibold text-sm mb-1">El cuaderno está vacío</p>
                     <p className="text-xs max-w-sm text-[var(--text-secondary)]/80">
-                      A medida que avance la partida y ocurran tramas en la sombra, la IA actualizará este cuaderno privado de forma autónoma.
+                      Escribe aquí lo que quieras que el Narrador tenga en cuenta sin contárselo a nadie: hacia dónde va la
+                      trama, qué trama cada facción, qué quieres que pase más adelante.
                     </p>
                   </div>
                 )}

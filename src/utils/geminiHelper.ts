@@ -1542,7 +1542,10 @@ ${secretos
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
 ${dosierPnjs ? `${dosierPnjs}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
-${project.memory.manual_notes ? `NOTAS DIRECTAS DEL MAESTRO:\n${project.memory.manual_notes}\n` : ''}
+${project.memory.manual_notes ? `### 🔒 CUADERNO OCULTO DEL NARRADOR (SOLO TÚ — CONTIENE SPOILERS)
+Esto es tu cuaderno privado: planes en la sombra, tramas que aún no han asomado, contingencias y notas de dirección. En la aplicación está guardado tras un aviso de spoilers, o sea que la jugadora NO lo lee mientras juega. Trátalo con las mismas reglas que los 🔒: te sirve para mover el mundo y mantenerlo coherente, NUNCA para contarlo, insinuarlo ni dejar que un PNJ lo suelte sin un motivo ganado en escena, y jamás aparece en el HUD, la crónica, la agenda ni un resumen. Lo que de aquí ya haya salido a la luz jugando, sí puedes usarlo con normalidad.
+${project.memory.manual_notes}
+` : ''}
 ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHistory}` : ''}
   `.trim()
     : 'No hay memoria acumulada aún.';
@@ -4152,11 +4155,16 @@ QUÉ SÍ PUEDES HACER AQUÍ:
   \`[MEMORIA: el texto exacto a recordar, en una frase]\`
   Y dices en palabras qué has apuntado, para que se vea. Esas notas viajan contigo en todos los turnos de partida, así que escríbelas cortas, concretas y en un lenguaje que un Narrador pueda cumplir.
 - ⛔ No apuntes nada que no te hayan pedido. No es tu cuaderno: es el suyo. Ante la duda, pregunta antes de apuntar.
-- ⛔ No apuntes en [MEMORIA: ...] secretos de trama ni cosas que el personaje no sepa: eso no son instrucciones, son spoilers viajando en cada turno. Para eso está la línea de abajo.
-- PLANTAR UN GIRO PARA MÁS ADELANTE. Si la jugadora te cuenta una idea de trama que todavía NO ha pasado en la partida —«quiero que los dueños del barco resulten ser agentes Zhentarim», «el mercader es quien la vendió»—, guárdala como secreto de campaña con una línea:
+- PLANTAR UN GIRO PARA MÁS ADELANTE. Si lo que te cuenta es una idea de trama que todavía NO ha pasado —«quiero que los dueños del barco resulten ser agentes Zhentarim», «el mercader es quien la vendió», «ese PNJ en realidad trabaja para la otra facción»—, guárdala como secreto de campaña con una línea:
   \`[SECRETO: título corto | la verdad | se descubre: por dónde puede salir]\`
   Le vuelve al Narrador en cada turno con candado, para que ponga pistas y coherencia sin contarlo, y solo se abre cuando salga en escena. Dile en palabras qué has guardado.
-- ⛔ No conviertas en secreto algo que ya ha pasado en la partida ni algo que el personaje ya sabe: eso es memoria normal.
+
+⚖️ DÓNDE VA CADA COSA (las dos son buenas, no te cortes de usarlas):
+- \`[MEMORIA: ...]\` → lo importante que YA es cierto y sabido: reglas de mesa, preferencias de tono, datos del personaje, hechos de la partida, correcciones. Esto se ve en la pantalla de Memoria y viaja en cada turno. Es el sitio por defecto.
+- \`[SECRETO: ...]\` → lo que aún no ha pasado o el personaje aún no sabe: giros, identidades reales, quién está detrás de qué, tramas de enemigos, lo que se encontrará más adelante. Va al cuaderno oculto, tapado en la interfaz, y no se narra hasta que se descubra jugando.
+- La prueba: **¿esto le destriparía algo si lo leyera ahora mismo en su pantalla?** Sí → \`[SECRETO:]\`. No → \`[MEMORIA:]\`.
+- Ante la duda, \`[SECRETO:]\`: un giro guardado de más se puede contar mañana; uno destripado ya no se recupera.
+- Puedes usar las dos en el mismo mensaje: apuntar en memoria «Aryendell desconfía del capitán» y guardar aparte el giro de por qué tiene razón.
 
 QUÉ NO HACES AQUÍ:
 - ⛔ NO narras, NO haces avanzar la historia y NO decides acciones del personaje. Si te piden jugar algo, recuérdales que eso va en la pestaña de Jugar.
