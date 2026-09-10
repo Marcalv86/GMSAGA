@@ -214,6 +214,19 @@ export const CallLogPanel: React.FC = () => {
                   {l.fichasSalida !== undefined && (
                     <span className="text-[var(--text-secondary)]" title="Fichas de salida">↑{n(l.fichasSalida)}</span>
                   )}
+                  {/*
+                    Lo que gastó pensando. Es lo que contesta si el retraso del
+                    arranque fue el envío o el razonamiento: las dos cosas pasan
+                    en el mismo hueco y a ojo son iguales.
+                  */}
+                  {l.fichasDePensamiento ? (
+                    <span
+                      className="text-violet-700 dark:text-violet-300 font-bold"
+                      title="Fichas gastadas razonando antes de escribir. Ocurre ANTES del primer trozo, así que es parte del arranque."
+                    >
+                      pensando {n(l.fichasDePensamiento)}
+                    </span>
+                  ) : null}
                   {l.fichasEnCache ? (
                     <span className="text-emerald-700 dark:text-emerald-400" title="Fichas servidas de caché: esas no se cobran igual">
                       caché {n(l.fichasEnCache)}

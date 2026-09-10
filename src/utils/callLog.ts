@@ -37,6 +37,16 @@ export interface LlamadaRegistrada {
   fichasEntrada?: number;
   fichasSalida?: number;
   fichasEnCache?: number;
+  /**
+   * Lo que gastó pensando antes de escribir una sola palabra.
+   *
+   * La API lo devuelve y lo estábamos tirando. Es el dato que separa «tarda
+   * porque el envío es enorme» de «tarda porque se lo está pensando»: las dos
+   * cosas ocurren en el mismo hueco —antes del primer trozo— y a ojo son
+   * idénticas. Con la cifra delante, la pregunta se contesta en vez de
+   * discutirse.
+   */
+  fichasDePensamiento?: number;
   /** Lo que se midió al construir el envío, para cuando la API no lo diga. */
   caracteresEnviados?: number;
   /** STOP, MAX_TOKENS, SAFETY… Es lo que explica un relato cortado. */
@@ -137,6 +147,7 @@ export function cerrarLlamada(
     fichasEntrada?: number;
     fichasSalida?: number;
     fichasEnCache?: number;
+    fichasDePensamiento?: number;
     motivoDeCierre?: string;
     primerTrozoMs?: number;
     detalle?: string;
@@ -275,6 +286,8 @@ export function llamadasComoTexto(llamadas: LlamadaRegistrada[]): string {
         return `  entrada: ${e.estimada ? '≈' : ''}${e.fichas.toLocaleString('es-ES')} fichas${pct !== undefined ? ` (${pct}% del techo del minuto)` : ''}${
           l.fichasSalida !== undefined ? ` · salida ${l.fichasSalida.toLocaleString('es-ES')}` : ''
         }${l.fichasEnCache ? ` · caché ${l.fichasEnCache.toLocaleString('es-ES')}` : ''}${
+          l.fichasDePensamiento ? ` · pensando ${l.fichasDePensamiento.toLocaleString('es-ES')}` : ''
+        }${
           e.estimada && l.caracteresEnviados ? ` [estimado sobre ${l.caracteresEnviados.toLocaleString('es-ES')} caracteres]` : ''
         }`;
       })(),

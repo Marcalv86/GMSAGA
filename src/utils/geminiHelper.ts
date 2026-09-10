@@ -2725,6 +2725,7 @@ export async function generateStoryTurnStream({
             fichasEntrada: uso?.promptTokenCount,
             fichasSalida: uso?.candidatesTokenCount ?? uso?.responseTokenCount,
             fichasEnCache: uso?.cachedContentTokenCount,
+            fichasDePensamiento: uso?.thoughtsTokenCount,
             motivoDeCierre: motivoDeCierre || undefined,
             primerTrozoMs
           });
@@ -3253,6 +3254,7 @@ export async function generateContentWithFailover({
             fichasEntrada: res?.usageMetadata?.promptTokenCount,
             fichasSalida: res?.usageMetadata?.candidatesTokenCount ?? res?.usageMetadata?.responseTokenCount,
             fichasEnCache: res?.usageMetadata?.cachedContentTokenCount,
+            fichasDePensamiento: res?.usageMetadata?.thoughtsTokenCount,
             motivoDeCierre: res?.candidates?.[0]?.finishReason
           });
           return res;
