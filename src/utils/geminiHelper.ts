@@ -516,6 +516,16 @@ export function getThinkingBudgetConfig(thinkingSetting: ThinkingLevelSetting, m
  * caracteres por turno. A cambio, el Narrador se queda sin poder mirar en ese
  * material y solo sabe que existe.
  */
+/**
+ * Cuánto texto se rescata de los documentos de consulta en cada turno.
+ *
+ * Estaba escrito tres veces con dos valores distintos: el rescate real usaba
+ * 8.000 caracteres, el estimador de tokens contaba 6.000 y la interfaz decía
+ * «6 mil». O sea que la barra de gasto se quedaba corta y el rótulo mentía. Un
+ * número, un sitio.
+ */
+export const PRESUPUESTO_FRAGMENTOS_CONSULTA = 8000;
+
 export function getStoredBusquedaLocal(): boolean {
   return localStorage.getItem('gmstudio_busqueda_local') !== 'off';
 }
@@ -1308,7 +1318,7 @@ export function estimarCargaDelTurno({
   // Los fragmentos rescatados sí viajan. Cuánto exacto depende de la escena y no
   // se sabe hasta el turno: se pone el techo, que es lo honesto. La barra debe
   // pecar de prudente, no de optimista.
-  const fragmentosRescatados = getStoredBusquedaLocal() && deConsulta.length ? 6000 : 0;
+  const fragmentosRescatados = getStoredBusquedaLocal() && deConsulta.length ? PRESUPUESTO_FRAGMENTOS_CONSULTA : 0;
 
   const declarado =
     andamiaje + directivas + memoria + archivos + capituloActual + capitulosPrevios + fragmentosRescatados;
@@ -1642,7 +1652,7 @@ ${deConsulta.map(f => `- 📄 **${f.name}**${f.analysis ? `: ${f.analysis.slice(
         nombres: nombresVivos
       });
 
-      const rescatados = recuperar(deConsulta, consulta, 8000);
+      const rescatados = recuperar(deConsulta, consulta, PRESUPUESTO_FRAGMENTOS_CONSULTA);
       if (rescatados.length > 0) {
         fragmentosConsultaText = `### 📖 FRAGMENTOS RELEVANTES RESCATADOS DE ARCHIVOS DE CONSULTA:
 (El sistema ha recuperado estos extractos de tus documentos de consulta por su pertinencia directa con la escena presente):

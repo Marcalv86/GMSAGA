@@ -11,6 +11,7 @@ import {
   getStoredApiKeys,
   getStoredModel,
   setStoredBusquedaLocal,
+  PRESUPUESTO_FRAGMENTOS_CONSULTA,
   techoDeEnvio
 } from '../utils/geminiHelper';
 import { peticionesDeHoy } from '../utils/usageStats';
@@ -389,7 +390,8 @@ export const ContextUsageWidget: React.FC<{
                         />
                         <span>
                           <strong className="text-[var(--text-primary)]">Buscar en ellos cada turno.</strong>{' '}
-                          Rescata hasta 6 mil caracteres de lo que venga a cuento de la escena. La búsqueda
+                          Rescata hasta {(PRESUPUESTO_FRAGMENTOS_CONSULTA / 1000).toLocaleString('es-ES')} mil
+                          caracteres de lo que venga a cuento de la escena. La búsqueda
                           corre en tu navegador y no gasta ninguna petición, pero esos fragmentos sí suman
                           tokens. Con esto apagado el Narrador solo sabe que los archivos existen y tendrá que
                           pedirte los datos.
