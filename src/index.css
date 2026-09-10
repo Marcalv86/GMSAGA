@@ -88,14 +88,32 @@ html[data-theme='dark'] {
   background: var(--accent);
 }
 
+/*
+ * La aplicación no se desplaza NUNCA. Ni un píxel.
+ *
+ * En el móvil pasaba esto: se escribe en el chat, sube el teclado, el navegador
+ * empuja la página hacia arriba para dejar sitio, y al bajar el teclado la
+ * página se queda desplazada. Resultado: la barra de arriba se sale por encima
+ * y sobra hueco por abajo. `overflow: hidden` a secas no lo impide, porque lo
+ * que se mueve no es el contenido dentro del body sino el body dentro de la
+ * ventana visible.
+ *
+ * Se corrige por tres sitios a la vez, que es lo que hace falta para que
+ * aguante: `position: fixed` aquí, la cáscara de la aplicación clavada con
+ * `fixed inset-0`, e `interactive-widget=resizes-content` en el viewport para
+ * que el teclado REDIMENSIONE en vez de empujar.
+ */
 html,
 body {
   margin: 0;
   padding: 0;
+  position: fixed;
+  inset: 0;
   width: 100%;
   height: 100%;
   height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
