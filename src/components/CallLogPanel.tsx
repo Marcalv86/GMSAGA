@@ -6,6 +6,7 @@ import {
   entradaMostrable,
   getLlamadas,
   porcentajeDelTecho,
+  porcentajeEnCache,
   limpiarLlamadas,
   llamadasComoTexto,
   resumenDeLlamadas,
@@ -228,8 +229,11 @@ export const CallLogPanel: React.FC = () => {
                     </span>
                   ) : null}
                   {l.fichasEnCache ? (
-                    <span className="text-emerald-700 dark:text-emerald-400" title="Fichas servidas de caché: esas no se cobran igual">
-                      caché {n(l.fichasEnCache)}
+                    <span
+                      className="text-emerald-700 dark:text-emerald-400 font-bold"
+                      title="Fichas que Google sirvió de su caché en vez de volver a digerirlas. Es lo que explica que dos turnos del mismo tamaño tarden cosas muy distintas."
+                    >
+                      caché {(() => { const c = porcentajeEnCache(l); return c !== undefined ? `${c}%` : n(l.fichasEnCache); })()}
                     </span>
                   ) : null}
                   {l.motivoDeCierre && l.motivoDeCierre !== 'STOP' && (

@@ -228,6 +228,19 @@ export function entradaMostrable(l: LlamadaRegistrada): { fichas?: number; estim
   return { fichas: fichasAproximadas(l.caracteresEnviados), estimada: true };
 }
 
+/**
+ * Qué parte de la entrada vino de caché.
+ *
+ * Es el número que explica por qué dos turnos del mismo tamaño tardan cosas
+ * distintas: con el prefijo ya cacheado, el modelo no tiene que volver a
+ * digerir doscientas mil fichas. Como cifra suelta —«caché 192.460»— no se
+ * compara con nada; como porcentaje se entiende sola.
+ */
+export function porcentajeEnCache(l: LlamadaRegistrada): number | undefined {
+  if (!l.fichasEnCache || !l.fichasEntrada) return undefined;
+  return Math.round((l.fichasEnCache / l.fichasEntrada) * 100);
+}
+
 /** «1,2 s», «45 s», «2 min 10 s» — a ojo se lee mejor que 74213. */
 export function duracionLegible(ms?: number): string {
   if (ms === undefined || !Number.isFinite(ms)) return '—';
@@ -285,7 +298,7 @@ export function llamadasComoTexto(llamadas: LlamadaRegistrada[]): string {
         const pct = porcentajeDelTecho(e.fichas);
         return `  entrada: ${e.estimada ? '≈' : ''}${e.fichas.toLocaleString('es-ES')} fichas${pct !== undefined ? ` (${pct}% del techo del minuto)` : ''}${
           l.fichasSalida !== undefined ? ` · salida ${l.fichasSalida.toLocaleString('es-ES')}` : ''
-        }${l.fichasEnCache ? ` · caché ${l.fichasEnCache.toLocaleString('es-ES')}` : ''}${
+        }${l.fichasEnCache ? ` · caché ${l.fichasEnCache.toLocaleString('es-ES')}${(() => { const c = porcentajeEnCache(l); return c !== undefined ? ` (${c}% de la entrada)` : ''; })()}` : ''}${
           l.fichasDePensamiento ? ` · pensando ${l.fichasDePensamiento.toLocaleString('es-ES')}` : ''
         }${
           e.estimada && l.caracteresEnviados ? ` [estimado sobre ${l.caracteresEnviados.toLocaleString('es-ES')} caracteres]` : ''
