@@ -1778,12 +1778,21 @@ export const MemoryManager: React.FC<{
                     <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t border-[var(--user-border)] text-xs">
                       {tieneAfinidadActiva(n) ? (
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 text-[10px] font-mono font-bold"
-                            title={`Atracción: ${getAtrInfo(n.atr).label}`}
-                          >
-                            <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" /> ATR {n.atr ?? 0}/20
-                          </span>
+                          {/*
+                            La atracción solo se enseña si la hay.
+                            Un «ATR 0/20» en la tarjeta de la jefa de puerta o
+                            del centinela que la desprecia no informa de nada:
+                            sugiere que ahí hay un romance midiéndose. El
+                            vínculo y la confianza sí valen para todos.
+                          */}
+                          {(n.atr ?? 0) > 0 && (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 text-[10px] font-mono font-bold"
+                              title={`Atracción: ${getAtrInfo(n.atr).label}`}
+                            >
+                              <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" /> ATR {n.atr}/20
+                            </span>
+                          )}
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 text-[10px] font-mono font-bold"
                             title={`Vínculo: ${getVinInfo(n.vin).label}`}
