@@ -56,6 +56,7 @@ import {
 } from './campaignCalendar';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 import { logError, logWarn, logInfo } from './logger';
+import { abrirLlamada, cerrarLlamada } from './callLog';
 import { sanitizePlayerCharacter } from './sanitizers';
 import { recuperar, consultaDelTurno } from './localSearch';
 
@@ -2470,6 +2471,8 @@ export async function generateStoryTurnStream({
         let motivoDeCierre = '';
         // Fuera del try a propósito: hay que poder pararlo también cuando falla.
         let vigilante: ReturnType<typeof vigilanteDeSilencio> | null = null;
+        let idLlamada = '';
+        let primerTrozoMs: number | undefined;
         let bloqueoDePrompt = '';
         let currentContents: any[] = [];
         let currentConfig: any = null;
@@ -2526,6 +2529,27 @@ export async function generateStoryTurnStream({
           const centinela = new AbortController();
           config.abortSignal = señalCombinada(centinela, signal);
           vigilante = vigilanteDeSilencio(() => centinela.abort());
+
+          /*
+           * Cada tentativa se apunta, salga bien o mal.
+           *
+           * El registro de errores solo recoge lo que rompe, y por eso un turno
+           * lento, una clave que rota o una respuesta cortada por tope de
+           * salida no dejaban ni rastro: la pantalla decía «0 errores» con la
+           * partida atascada. Aquí queda todo.
+           */
+          idLlamada = abrirLlamada({
+            proposito: initialPrefix ? 'Turno narrado (continuar)' : 'Turno narrado',
+            modelo: currentModel,
+            claveN: nClave,
+            totalClaves: totalKeys,
+            intento,
+            esRespaldo: isFallback,
+            caracteresEnviados: (sys?.length || 0) + JSON.stringify(contents || '').length,
+            proyecto: project.name,
+            capitulo: currentChat.name
+          });
+          const arrancoEn = Date.now();
 
           let responseStream: any;
           try {
@@ -2591,6 +2615,9 @@ export async function generateStoryTurnStream({
             // Ha llegado algo: el reloj del silencio vuelve a empezar. Mientras
             // el Narrador escriba, puede tardar lo que le haga falta.
             vigilante?.latido();
+            // Cuánto tardó en arrancar. Es el número que separa «está pensando»
+            // de «se ha colgado», y a ojo son indistinguibles.
+            if (primerTrozoMs === undefined) primerTrozoMs = Date.now() - arrancoEn;
             if (signal?.aborted) break;
             let textPart = chunk.text ?? '';
             if (textPart) {
@@ -2693,11 +2720,25 @@ export async function generateStoryTurnStream({
           }
 
           vigilante?.parar();
+          cerrarLlamada(idLlamada, {
+            estado: 'ok',
+            fichasEntrada: uso?.promptTokenCount,
+            fichasSalida: uso?.candidatesTokenCount ?? uso?.responseTokenCount,
+            fichasEnCache: uso?.cachedContentTokenCount,
+            motivoDeCierre: motivoDeCierre || undefined,
+            primerTrozoMs
+          });
           await persistir(fullText.trim(), true);
           return;
         } catch (e: any) {
           vigilante?.parar();
           const fallo = classifyApiError(e);
+          cerrarLlamada(idLlamada, {
+            estado: signal?.aborted || fallo.isAborted ? 'cortada' : 'fallo',
+            primerTrozoMs,
+            motivoDeCierre: motivoDeCierre || undefined,
+            detalle: fallo.detail || String(e?.message || e).slice(0, 300)
+          });
 
           if (signal?.aborted || fallo.isAborted) {
             if (fullText.trim().length > 0) await persistir(fullText.trim(), true);
@@ -3069,7 +3110,8 @@ export async function generateContentWithFailover({
   primaryModel,
   preferredChain,
   signal,
-  timeoutMs
+  timeoutMs,
+  proposito = 'Tarea de fondo'
 }: {
   contents: any;
   config?: any;
@@ -3077,6 +3119,14 @@ export async function generateContentWithFailover({
   preferredChain?: string[];
   signal?: AbortSignal;
   timeoutMs?: number;
+  /**
+   * Para qué es esta llamada, en el registro.
+   *
+   * Todas las tareas de fondo salían por aquí sin nombre, así que en el
+   * registro eran una fila indistinguible de otra: imposible saber si el
+   * minuto que se fue era la memoria, la trama o la extracción de PNJs.
+   */
+  proposito?: string;
 }): Promise<any> {
   const { keys: rotadas } = getRotatedApiKeys();
   const todasLasClaves = rotadas.length > 0 ? rotadas : [''];
@@ -3153,6 +3203,22 @@ export async function generateContentWithFailover({
         const cancelarPorFuera = () => relojDeGuardia.abort();
         signal?.addEventListener('abort', cancelarPorFuera, { once: true });
 
+        const idLlamada = abrirLlamada({
+          proposito,
+          modelo: model,
+          claveN: todasLasClaves.indexOf(currentKey) + 1 || undefined,
+          totalClaves: todasLasClaves.length > 1 ? todasLasClaves.length : undefined,
+          intento,
+          esRespaldo: i > 0,
+          caracteresEnviados: (() => {
+            try {
+              return typeof contents === 'string' ? contents.length : JSON.stringify(contents ?? '').length;
+            } catch {
+              return undefined;
+            }
+          })()
+        });
+
         try {
           let res: any;
           try {
@@ -3182,10 +3248,23 @@ export async function generateContentWithFailover({
           // se le va sin que nadie la vea: si el cupo se cuenta solo al narrar,
           // la cuenta miente justo en la parte invisible.
           apuntarPeticion(model, currentKey || undefined);
+          cerrarLlamada(idLlamada, {
+            estado: 'ok',
+            fichasEntrada: res?.usageMetadata?.promptTokenCount,
+            fichasSalida: res?.usageMetadata?.candidatesTokenCount ?? res?.usageMetadata?.responseTokenCount,
+            fichasEnCache: res?.usageMetadata?.cachedContentTokenCount,
+            motivoDeCierre: res?.candidates?.[0]?.finishReason
+          });
           return res;
         } catch (err: any) {
           // Distinguir «lo hemos cortado nosotros por plazo» de «lo ha cortado la jugadora».
           const vencioElPlazo = relojDeGuardia.signal.aborted && !signal?.aborted;
+          cerrarLlamada(idLlamada, {
+            estado: vencioElPlazo || signal?.aborted ? 'cortada' : 'fallo',
+            detalle: vencioElPlazo
+              ? `Sin respuesta en ${Math.round(plazo / 1000)} s.`
+              : String(err?.message || err).slice(0, 300)
+          });
           if (signal?.aborted) throw new Error('Tarea cancelada.');
 
           const fallo = vencioElPlazo
@@ -3806,6 +3885,7 @@ ${historyToAnalyze}`;
   };
 
   const response = await generateContentWithFailover({
+    proposito: 'Sincronizar campaña y cronología',
     primaryModel: activeModel,
     contents: prompt,
     config: memConfig
@@ -4231,6 +4311,7 @@ ${relato}`;
 
   const modelo = getBackgroundTaskModel();
   const respuesta = await generateContentWithFailover({
+    proposito: 'Resumen al cerrar capítulo',
     primaryModel: modelo,
     contents: prompt,
     config: {
@@ -4524,6 +4605,7 @@ export async function preguntarAlDirectorOOC(
   let respuesta: any;
   try {
     respuesta = await generateContentWithFailover({
+      proposito: 'Chat con el GM',
       primaryModel: modelo,
       contents: armarContenido(true) as any,
       signal: consulta.signal,
@@ -4540,6 +4622,7 @@ export async function preguntarAlDirectorOOC(
       videos.length > 0 && /mediaResolution|media_resolution|INVALID_ARGUMENT|Unknown name/i.test(mensaje);
     if (!esPorLaResolucion) throw err;
     respuesta = await generateContentWithFailover({
+      proposito: 'Chat con el GM (reintento)',
       primaryModel: modelo,
       contents: armarContenido(false) as any,
       signal: consulta.signal,
@@ -4692,6 +4775,7 @@ Devuelve ÚNICAMENTE un JSON:
 ${revisando ? 'Devuelve la trama COMPLETA, no solo lo que cambies: lo que siga en pie con su mismo título y su misma verdad, y lo nuevo o arreglado donde toque.' : 'Entre 5 y 9 secretos, repartidos por capas y todos enganchados. Nada de relleno.'}`;
 
   const respuesta = await generateContentWithFailover({
+    proposito: 'Trazar la historia',
     primaryModel: modelo,
     contents: prompt,
     config: {
@@ -4905,6 +4989,7 @@ REGLAS DE SALIDA:
     const bgModel = getBackgroundTaskModel();
     const safetySetting = getStoredSafetyLevel();
     const response = await generateContentWithFailover({
+      proposito: 'Revisión de memoria',
       primaryModel: bgModel,
       contents: prompt,
       config: {
@@ -5903,6 +5988,7 @@ export async function extractNpcsFromDocument(
     const base64 = file.content.includes(',') ? file.content.split(',')[1] : file.content;
     onProgress?.(0, 1);
     const respuesta = await generateContentWithFailover({
+      proposito: 'Extraer PNJs de un documento',
       primaryModel: modelo,
       contents: [
         {
@@ -5929,6 +6015,7 @@ export async function extractNpcsFromDocument(
         : '';
     try {
       const respuesta = await generateContentWithFailover({
+        proposito: 'Extraer PNJs de un documento',
         primaryModel: modelo,
         contents: `${INSTRUCCIONES_PNJ}${contexto}\n\nDocumento:\n${trozos[i]}`,
         config
@@ -5958,6 +6045,7 @@ Sé estructurado y comienza indicando el tipo.`;
   const mimeType = file.mime || 'image/jpeg';
 
   const response = await generateContentWithFailover({
+    proposito: 'Analizar imagen subida',
     primaryModel: getBackgroundTaskModel(),
     contents: {
       parts: [{ text: prompt }, { inlineData: { data: cleanBase64, mimeType } }]
@@ -6029,6 +6117,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
   }
 
   const response = await generateContentWithFailover({
+    proposito: 'Extraer estilo visual',
     primaryModel: getBackgroundTaskModel(),
     contents: { parts },
     config: {
@@ -6280,6 +6369,7 @@ DOCUMENTO DE REFERENCIA:
 ${text.substring(0, 65000)}`;
 
   const response = await generateContentWithFailover({
+    proposito: 'Analizar estilo narrativo',
     primaryModel: getBackgroundTaskModel(),
     contents: prompt
   });
@@ -6297,6 +6387,7 @@ export async function extractStyleOrSystemFromFile(
   const prompt = `Analiza el siguiente texto y extrae las reglas, mecánicas, sistema de juego o lore principal. Devuelve un resumen conciso (máximo 3 párrafos) que sirva como instrucción de sistema/reglas para un Game Master.\n\nTEXTO:\n${(file.content || '').substring(0, 50000)}`;
 
   const response = await generateContentWithFailover({
+    proposito: 'Extraer estilo o sistema de un archivo',
     primaryModel: getBackgroundTaskModel(),
     contents: prompt
   });
@@ -6444,6 +6535,7 @@ ${primerRoleo || 'Todavía no se ha jugado nada.'}`;
 
   const modelo = getBackgroundTaskModel();
   const response = await generateContentWithFailover({
+    proposito: 'Deducir calendario',
     primaryModel: modelo,
     contents: prompt,
     config: {
@@ -6587,6 +6679,7 @@ ${texto.slice(0, 200000)}`;
 
   const modelo = getBackgroundTaskModel();
   const response = await generateContentWithFailover({
+    proposito: 'Destilar tabla de oráculo',
     primaryModel: modelo,
     contents: prompt,
     config: {
@@ -6818,6 +6911,7 @@ Devuelve un array JSON con objetos de la estructura:
 ]`;
 
   const response = await generateContentWithFailover({
+    proposito: 'Noticias del salto temporal',
     primaryModel: modelo,
     contents: prompt,
     config

@@ -6,8 +6,11 @@ import {
   exportLogsToTextFile,
   getLogsAsFormattedText
 } from '../utils/logger';
+import { CallLogPanel } from './CallLogPanel';
+import { getLlamadas } from '../utils/callLog';
 import {
   AlertTriangle,
+  Radio,
   Bug,
   Check,
   ChevronDown,
@@ -37,6 +40,20 @@ export const LoggerModal: React.FC<LoggerModalProps> = ({ isOpen, onClose }) => 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
+  /*
+   * Las llamadas primero, y a propósito.
+   *
+   * El registro de errores solo recoge lo que rompe: con la partida atascada
+   * enseñaba «0 errores registrados», que es la peor pantalla posible para
+   * empezar a buscar. Lo que hace falta ver primero es qué se pidió y cómo
+   * acabó, salga bien o mal.
+   */
+  const [pestaña, setPestaña] = useState<'llamadas' | 'errores'>('llamadas');
+  const [numLlamadas, setNumLlamadas] = useState(0);
+
+  useEffect(() => {
+    if (isOpen) setNumLlamadas(getLlamadas().length);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -121,7 +138,7 @@ export const LoggerModal: React.FC<LoggerModalProps> = ({ isOpen, onClose }) => 
             </div>
             <div className="min-w-0">
               <h3 className="font-cinzel text-base sm:text-lg font-bold text-[var(--accent)] m-0 truncate flex items-center gap-2">
-                <span>Registro de Errores y Depuración</span>
+                <span>Registro y Depuración</span>
                 {errorCount > 0 && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-sans font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
                     {errorCount} {errorCount === 1 ? 'error' : 'errores'}
@@ -129,7 +146,7 @@ export const LoggerModal: React.FC<LoggerModalProps> = ({ isOpen, onClose }) => 
                 )}
               </h3>
               <p className="text-xs text-[var(--text-secondary)] m-0 truncate">
-                Captura fallos en generación de hilos, streaming de narrativa y sincronización
+                Qué se le pide a Google en cada turno, cuánto tarda y cómo acaba
               </p>
             </div>
           </div>
@@ -144,6 +161,36 @@ export const LoggerModal: React.FC<LoggerModalProps> = ({ isOpen, onClose }) => 
           </button>
         </div>
 
+        {/* Las dos pestañas */}
+        <div className="px-3 pt-2.5 bg-[var(--glass)] border-b border-[var(--glass-border)] flex items-center gap-1.5 shrink-0">
+          {([
+            ['llamadas', 'Llamadas', <Radio key="r" className="w-3.5 h-3.5" />, numLlamadas],
+            ['errores', 'Errores', <Bug key="b" className="w-3.5 h-3.5" />, errorCount]
+          ] as const).map(([id, rot, icono, cuenta]) => (
+            <button
+              key={id}
+              onClick={() => setPestaña(id as 'llamadas' | 'errores')}
+              className={`min-h-[38px] px-3 rounded-t-lg text-xs font-cinzel font-bold flex items-center gap-1.5 border border-b-0 transition-colors cursor-pointer ${
+                pestaña === id
+                  ? 'bg-[var(--bg-color)] text-[var(--accent)] border-[var(--glass-border)]'
+                  : 'bg-transparent text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'
+              }`}
+            >
+              {icono}
+              {rot}
+              {cuenta > 0 && (
+                <span className={`font-mono text-[10px] font-normal ${id === 'errores' ? 'text-rose-600 dark:text-rose-400' : 'opacity-70'}`}>
+                  {cuenta}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {pestaña === 'llamadas' && <CallLogPanel />}
+
+        {pestaña === 'errores' && (
+        <>
         {/* Barra de Acciones y Estadísticas */}
         <div className="p-3 bg-[var(--glass)] border-b border-[var(--glass-border)] flex flex-wrap items-center justify-between gap-2.5 shrink-0">
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -446,14 +493,17 @@ export const LoggerModal: React.FC<LoggerModalProps> = ({ isOpen, onClose }) => 
           )}
         </div>
 
+        </>
+        )}
+
         {/* Pie */}
         <div className="p-3 border-t border-[var(--glass-border)] bg-[var(--sidebar-bg)] flex items-center justify-between text-xs text-[var(--text-secondary)] shrink-0">
           <span className="font-cinzel text-[11px]">
-            {filteredLogs.length} de {logs.length} eventos listados
+            {pestaña === 'errores' ? `${filteredLogs.length} de ${logs.length} eventos listados` : 'Se guardan las últimas 300 llamadas'}
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-[var(--surface-soft)] hover:bg-[var(--glass)] text-[var(--text-primary)] border border-[var(--user-border)] font-cinzel text-xs cursor-pointer transition-colors"
+            className="min-h-[38px] px-4 rounded-lg bg-[var(--surface-soft)] hover:bg-[var(--glass)] text-[var(--text-primary)] border border-[var(--user-border)] font-cinzel text-xs cursor-pointer transition-colors"
           >
             Cerrar
           </button>
