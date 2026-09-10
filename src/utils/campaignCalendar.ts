@@ -1232,6 +1232,51 @@ export function leerPresentes(texto: string): string[] {
   return out;
 }
 
+const SECRETO_RE = /\[\s*SECRETO\s*:\s*([^\]]+)\]/gi;
+
+export interface SecretoLeido {
+  titulo: string;
+  secreto: string;
+  comoSeDescubre?: string;
+}
+
+/**
+ * Lee `[SECRETO: Los dueños del barco | son agentes Zhentarim infiltrados | se descubre: registrando el camarote del capitán]`.
+ *
+ * Es la forma de que una idea de la jugadora quede GUARDADA como giro pendiente
+ * en vez de contarse de pasada en la prosa y perderse. Antes un secreto solo
+ * podía colgar de un PNJ o de un hilo con fecha: una verdad del mundo esperando
+ * a que la descubran no tenía dónde vivir.
+ */
+export function leerSecretos(texto: string): SecretoLeido[] {
+  if (!texto || !/SECRETO/i.test(texto)) return [];
+  SECRETO_RE.lastIndex = 0;
+  const out: SecretoLeido[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = SECRETO_RE.exec(texto)) !== null) {
+    const partes = m[1].split('|').map(p => p.trim());
+    const titulo = (partes.shift() || '').replace(/^[*_\s]+|[*_\s]+$/g, '');
+    if (titulo.length < 3) continue;
+    let secreto = '';
+    let comoSeDescubre: string | undefined;
+    for (const parte of partes) {
+      const corte = parte.indexOf(':');
+      const campo = corte > 0 ? sinTildes(parte.slice(0, corte)).trim().toLowerCase() : '';
+      if (campo === 'se descubre' || campo === 'descubre' || campo === 'como' || campo === 'pista') {
+        comoSeDescubre = parte.slice(corte + 1).trim() || undefined;
+      } else if (!secreto) {
+        // El primer trozo sin nombre de campo es el secreto en sí.
+        secreto = parte;
+      }
+    }
+    if (!secreto) continue;
+    if (!out.some(x => x.titulo.toLowerCase() === titulo.toLowerCase())) {
+      out.push({ titulo, secreto, comoSeDescubre });
+    }
+  }
+  return out;
+}
+
 const REVELADO_RE = /\[\s*REVELADO\s*:\s*([^\]]+)\]/gi;
 
 export interface RevelacionLeida {
@@ -1385,6 +1430,7 @@ export function limpiarEtiquetasDePnj(texto: string): string {
     // La revelación se registra en la ficha; en el relato sobra, que ahí ya se
     // ha contado con palabras.
     .replace(REVELADO_RE, '')
+    .replace(SECRETO_RE, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')

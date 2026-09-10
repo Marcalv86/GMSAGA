@@ -8,6 +8,7 @@ import {
   Film,
   ImagePlus,
   Loader,
+  Lock,
   MessageSquare,
   Send,
   Swords,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Chat, Project } from '../types';
 import { describeApiError, ImagenDeMesa, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
+import { SecretoLeido } from '../utils/campaignCalendar';
 import {
   conMiles,
   estimarCosteDeVideo,
@@ -49,6 +51,8 @@ export interface MensajeDeMesa {
   fichasDeEntrada?: number;
   /** Si el Director vio un vídeo en ese mensaje, y qué tramo. */
   videoVisto?: string;
+  /** Giros que guardó como secretos de campaña en ese mensaje. */
+  secretos?: string[];
 }
 
 /** Ancho máximo al que se reduce una imagen antes de guardarla y enviarla. */
@@ -136,7 +140,9 @@ export const MesaView: React.FC<{
   onAbrirNovela?: () => void;
   /** Apunta en la memoria de la campaña lo que el Director haya pedido recordar. */
   onAnotarEnMemoria?: (notas: string[]) => void;
-}> = ({ project, chats, currentChatId, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria }) => {
+  /** Guarda como secretos de campaña los giros que se planten aquí. */
+  onPlantarSecretos?: (secretos: SecretoLeido[]) => void;
+}> = ({ project, chats, currentChatId, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria, onPlantarSecretos }) => {
   const [mensajes, setMensajes] = useState<MensajeDeMesa[]>(() => leerMesa(project.id));
   const [texto, setTexto] = useState('');
   const [adjuntos, setAdjuntos] = useState<{ dataUrl: string; imagen: ImagenDeMesa }[]>([]);
@@ -230,6 +236,7 @@ export const MesaView: React.FC<{
           role: 'model',
           content: respuesta.texto,
           memorias: respuesta.memorias.length ? respuesta.memorias : undefined,
+          secretos: respuesta.secretos.length ? respuesta.secretos.map(x => x.titulo) : undefined,
           fichasDeEntrada: respuesta.fichasDeEntrada,
           timestamp: new Date().toISOString()
         }
@@ -239,6 +246,11 @@ export const MesaView: React.FC<{
       // Lo que haya pedido apuntar va a la memoria de la campaña, y se ve.
       if (respuesta.memorias.length && onAnotarEnMemoria) {
         onAnotarEnMemoria(respuesta.memorias);
+      }
+      // Los giros van a los secretos de campaña, no a la memoria: la memoria la
+      // lee la jugadora en cada turno, y un giro ahí es un giro destripado.
+      if (respuesta.secretos.length && onPlantarSecretos) {
+        onPlantarSecretos(respuesta.secretos);
       }
     } catch (err) {
       /*
@@ -444,6 +456,20 @@ export const MesaView: React.FC<{
                 >
                   <Film className="w-3 h-3 shrink-0" />
                   {conMiles(m.fichasDeEntrada)} fichas
+                </div>
+              ) : null}
+              {m.secretos?.length ? (
+                <div className="mt-2 pt-2 border-t border-[var(--glass-border)] flex flex-col gap-1">
+                  {m.secretos.map((t, k) => (
+                    <span
+                      key={k}
+                      className="flex items-start gap-1.5 text-[11px] text-rose-700 dark:text-rose-300 font-cinzel"
+                      title="Guardado como secreto de campaña. Le llega al Narrador con candado y no se cuenta hasta que salga jugando."
+                    >
+                      <Lock className="w-3.5 h-3.5 shrink-0 mt-px" />
+                      <span className="font-normal">Giro guardado: {t}</span>
+                    </span>
+                  ))}
                 </div>
               ) : null}
               {m.memorias?.length ? (

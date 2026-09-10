@@ -317,6 +317,34 @@ export interface ProjectMemoryEdit {
   source?: 'user' | 'ai';
 }
 
+/**
+ * Un secreto de la campaña que no cuelga de nadie.
+ *
+ * Los secretos vivían en dos sitios y ninguno servía para esto: `NPC.oculta`
+ * exige una persona, y `ScheduledThread` exige una fecha de vencimiento. Una
+ * idea como «los dueños del barco son agentes Zhentarim disfrazados» no es de
+ * nadie en concreto y no vence ningún día: es una verdad del mundo esperando a
+ * que alguien la descubra. Sin sitio donde vivir, se quedaba en la cabeza de la
+ * jugadora, se contaba de pasada en la prosa, o se perdía.
+ */
+export interface SecretoDeCampana {
+  id: string;
+  /** De qué va, en pocas palabras. Es lo único que se ve sin destapar. */
+  titulo: string;
+  /** La verdad. Va tapado en la interfaz y con candado para el Narrador. */
+  secreto: string;
+  /** Por dónde puede salir: registrar el camarote, emborrachar al contramaestre… */
+  comoSeDescubre?: string;
+  /** Quién lo plantó: la jugadora al preparar, o el Narrador durante la partida. */
+  origen?: 'jugadora' | 'narrador';
+  /** Cuándo y cómo salió a la luz EN JUEGO, si ya ha salido. */
+  revelado?: {
+    diaAbs?: number;
+    fecha?: string;
+    como?: string;
+  };
+}
+
 export interface Memory {
   story: string;
   quests: Quest[];
@@ -331,6 +359,14 @@ export interface Memory {
   memory_edits?: ProjectMemoryEdit[];
   player_character?: PlayerCharacter;
   visual_memory?: VisualMemoryItem[];
+  /**
+   * Los giros que aún no han pasado.
+   *
+   * Viajan al Narrador con candado y no aparecen en la crónica, el HUD ni los
+   * resúmenes. Es lo que separa «una campaña con sorpresas» de «una campaña
+   * cuyas sorpresas se cuentan solas».
+   */
+  gm_secrets?: SecretoDeCampana[];
 }
 
 export interface Quest {

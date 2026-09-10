@@ -906,7 +906,11 @@ export default function App() {
    */
   const conVinculos = (p: Project, diaActual: number): Project['memory'] => {
     const t = reporteActual.current;
-    if (!t || (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length)) return p.memory;
+    if (
+      !t ||
+      (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length && !t.secretos.length)
+    )
+      return p.memory;
 
     const mem = p.memory || {
       story: '',
@@ -1007,6 +1011,58 @@ export default function App() {
       return cambiado;
     });
 
+    /*
+     * Los giros de la campaña: los que se plantan y los que se destapan.
+     *
+     * Van aparte de los PNJs porque no son de nadie. Una idea de la jugadora
+     * —«los dueños del barco son Zhentarim»— antes no tenía dónde guardarse: o
+     * se contaba de pasada en la prosa, o se perdía. Ahora queda registrada con
+     * candado y solo se abre cuando sale en escena.
+     */
+    let secretosDeCampana = [...(mem.gm_secrets || [])];
+    const claveSecreto = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+    t.secretos.forEach(nuevo => {
+      const clave = claveSecreto(nuevo.titulo);
+      const ya = secretosDeCampana.find(x => claveSecreto(x.titulo) === clave);
+      if (ya) {
+        // Replantar uno que ya existe solo puede AMPLIARLO, nunca reescribir el
+        // giro original ni resucitar uno que ya se destapó.
+        secretosDeCampana = secretosDeCampana.map(x =>
+          x === ya
+            ? { ...x, comoSeDescubre: x.comoSeDescubre || nuevo.comoSeDescubre, secreto: x.secreto || nuevo.secreto }
+            : x
+        );
+        return;
+      }
+      secretosDeCampana.push({
+        id: `sec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        titulo: nuevo.titulo,
+        secreto: nuevo.secreto,
+        comoSeDescubre: nuevo.comoSeDescubre,
+        origen: 'narrador'
+      });
+    });
+
+    t.revelaciones.forEach(rev => {
+      const clave = claveSecreto(rev.nombre);
+      secretosDeCampana = secretosDeCampana.map(sec =>
+        claveSecreto(sec.titulo) === clave && !sec.revelado
+          ? {
+              ...sec,
+              revelado: {
+                diaAbs: calendarioValido(p.calendar) ? diaActual : undefined,
+                fecha:
+                  calendarioValido(p.calendar) && p.currentDate
+                    ? fechaLegible(p.calendar, p.currentDate)
+                    : undefined,
+                como: rev.como
+              }
+            }
+          : sec
+      );
+    });
+
     // Si hay un vínculo nuevo para un PNJ que aún no figuraba en la lista, registrarlo automáticamente
     const nuevosNpcs: NPC[] = [];
     t.vinculos.forEach(v => {
@@ -1045,7 +1101,7 @@ export default function App() {
     });
 
     const npcsDeduplicados = deduplicarListaNpcs([...npcs, ...nuevosNpcs]);
-    return { ...mem, npcs: npcsDeduplicados };
+    return { ...mem, npcs: npcsDeduplicados, gm_secrets: secretosDeCampana };
   };
 
   const handleUpdateProjectField = async (
@@ -1139,6 +1195,31 @@ export default function App() {
    * distinguir de un vistazo lo que apuntó el Director de lo que escribiste tú.
    */
   const TOPE_NOTAS_DE_MEMORIA = 50;
+
+  /*
+   * Un giro contado en el chat del GM se guarda como secreto, no como memoria.
+   *
+   * La memoria persistente viaja en cada turno y la lee la jugadora en su
+   * pantalla: un giro ahí es un giro destripado. Los secretos van con candado,
+   * solo al Narrador, y se abren cuando salgan jugando.
+   */
+  const plantarSecretosDesdeLaMesa = (nuevos: { titulo: string; secreto: string; comoSeDescubre?: string }[]) => {
+    if (!nuevos.length) return;
+    handleUpdateMemory(mem => {
+      const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+      const previos = mem.gm_secrets || [];
+      const añadir = nuevos
+        .filter(n => !previos.some(p => clave(p.titulo) === clave(n.titulo)))
+        .map(n => ({
+          id: `sec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          titulo: n.titulo,
+          secreto: n.secreto,
+          comoSeDescubre: n.comoSeDescubre,
+          origen: 'jugadora' as const
+        }));
+      return añadir.length ? { ...mem, gm_secrets: [...previos, ...añadir] } : mem;
+    });
+  };
 
   const anotarEnMemoriaDesdeLaMesa = (notas: string[]) => {
     if (!notas.length) return;
@@ -3319,6 +3400,7 @@ export default function App() {
               onVolverAJugar={() => setActiveTab('chat')}
               onAbrirNovela={() => setActiveTab('novel')}
               onAnotarEnMemoria={anotarEnMemoriaDesdeLaMesa}
+              onPlantarSecretos={plantarSecretosDesdeLaMesa}
             />
           )}
 

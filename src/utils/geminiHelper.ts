@@ -46,7 +46,9 @@ import {
   leerPresentes,
   leerVinculos,
   leerRevelaciones,
+  leerSecretos,
   RevelacionLeida,
+  SecretoLeido,
   VinculoLeido,
   HiloLeido
 } from './campaignCalendar';
@@ -1501,11 +1503,45 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
 
   const dosierPnjs = dosierDePersonajes(project.memory?.npcs || []);
 
+  /*
+   * Los giros que aún no han pasado.
+   *
+   * Van aparte del dosier de personajes porque no son de nadie: «el barco es
+   * una tapadera Zhentarim» no cuelga de un PNJ ni vence ningún día. Sin este
+   * bloque, una idea que la jugadora había plantado al preparar la campaña no
+   * llegaba al Narrador de ninguna forma, y acababa contándose de pasada en la
+   * prosa o perdiéndose del todo.
+   */
+  const secretos = project.memory?.gm_secrets || [];
+  const bloqueSecretos = secretos.length
+    ? `
+### 🔒 SECRETOS DE LA CAMPAÑA — SOLO TÚ (giros que AÚN NO han pasado)
+Esto es el guion que la jugadora ha preparado o que tú mismo dejaste plantado. Rigen las mismas reglas que los 🔒 del dosier: se usan para mover el mundo, nunca para contarlo, y no aparecen en el HUD, la crónica, la agenda ni ningún resumen.
+- Ponles pistas físicas y comportamiento coherente, y déjalos al alcance de quien investigue. Cuando uno salga de verdad a la luz, cierra con \`[REVELADO: título del secreto — cómo se ha sabido]\`.
+- ⛔ Y no los contradigas ni los sustituyas por otra explicación: son canon, solo falta que se descubran.
+
+${secretos
+  .map(sec => {
+    const cabecera = sec.revelado
+      ? `#### 🔓 ${sec.titulo} — YA SE SUPO${sec.revelado.fecha ? ` (${sec.revelado.fecha})` : ''}${sec.revelado.como ? `, ${sec.revelado.como.slice(0, 140)}` : ''}. El protagonista LO SABE.`
+      : `#### 🔒 ${sec.titulo} — todavía en pie, el protagonista NO lo sabe`;
+    return [
+      cabecera,
+      `- La verdad: ${sec.secreto.slice(0, 600)}`,
+      sec.comoSeDescubre ? `- Por dónde puede salir: ${sec.comoSeDescubre.slice(0, 300)}` : ''
+    ]
+      .filter(Boolean)
+      .join('\n');
+  })
+  .join('\n\n')}
+`.trim()
+    : '';
+
   const memoryContext = project.memory
     ? `
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
-${dosierPnjs ? `${dosierPnjs}\n` : ''}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
 ${project.memory.manual_notes ? `NOTAS DIRECTAS DEL MAESTRO:\n${project.memory.manual_notes}\n` : ''}
 ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHistory}` : ''}
   `.trim()
@@ -2613,6 +2649,14 @@ export interface TiempoReportado {
   /** Cómo han cambiado los vínculos de los personajes habituales. */
   vinculos: VinculoLeido[];
   /**
+   * Giros nuevos que quedan plantados para más adelante.
+   *
+   * Es la forma de que una idea que la jugadora suelta al preparar la escena
+   * —«en realidad los dueños del barco son Zhentarim»— quede guardada como
+   * secreto en vez de contarse de pasada en la prosa y perderse.
+   */
+  secretos: SecretoLeido[];
+  /**
    * Secretos que han salido a la luz EN ESCENA en este turno.
    *
    * Es el único camino por el que un secreto deja de serlo. Destapar la ficha
@@ -2664,6 +2708,7 @@ async function saveStreamedMessage(
   const presentes = leerPresentes(cleanedText);
   const vinculos = leerVinculos(cleanedText);
   const revelaciones = leerRevelaciones(cleanedText);
+  const secretos = leerSecretos(cleanedText);
   // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
   const hudDeEsteTurno = leerFechaDeHud(fullText);
   const avanceDeNivel = leerAvanceDeNivel(cleanedText) || undefined;
@@ -2685,6 +2730,7 @@ async function saveStreamedMessage(
       presentes.length ||
       vinculos.length ||
       revelaciones.length ||
+      secretos.length ||
       hudDeEsteTurno?.fechaTexto ||
       avanceDeNivel)
   ) {
@@ -2696,6 +2742,7 @@ async function saveStreamedMessage(
         presentes,
         vinculos,
         revelaciones,
+        secretos,
         fechaHud: hudDeEsteTurno?.fechaTexto,
         momentoHud: hudDeEsteTurno?.momento,
         avanceDeNivel
@@ -4105,7 +4152,11 @@ QUÉ SÍ PUEDES HACER AQUÍ:
   \`[MEMORIA: el texto exacto a recordar, en una frase]\`
   Y dices en palabras qué has apuntado, para que se vea. Esas notas viajan contigo en todos los turnos de partida, así que escríbelas cortas, concretas y en un lenguaje que un Narrador pueda cumplir.
 - ⛔ No apuntes nada que no te hayan pedido. No es tu cuaderno: es el suyo. Ante la duda, pregunta antes de apuntar.
-- ⛔ No apuntes secretos de trama ni cosas que el personaje no sepa: eso no son instrucciones, son spoilers viajando en cada turno.
+- ⛔ No apuntes en [MEMORIA: ...] secretos de trama ni cosas que el personaje no sepa: eso no son instrucciones, son spoilers viajando en cada turno. Para eso está la línea de abajo.
+- PLANTAR UN GIRO PARA MÁS ADELANTE. Si la jugadora te cuenta una idea de trama que todavía NO ha pasado en la partida —«quiero que los dueños del barco resulten ser agentes Zhentarim», «el mercader es quien la vendió»—, guárdala como secreto de campaña con una línea:
+  \`[SECRETO: título corto | la verdad | se descubre: por dónde puede salir]\`
+  Le vuelve al Narrador en cada turno con candado, para que ponga pistas y coherencia sin contarlo, y solo se abre cuando salga en escena. Dile en palabras qué has guardado.
+- ⛔ No conviertas en secreto algo que ya ha pasado en la partida ni algo que el personaje ya sabe: eso es memoria normal.
 
 QUÉ NO HACES AQUÍ:
 - ⛔ NO narras, NO haces avanzar la historia y NO decides acciones del personaje. Si te piden jugar algo, recuérdales que eso va en la pestaña de Jugar.
@@ -4143,6 +4194,14 @@ export interface RespuestaDeMesa {
   texto: string;
   /** Lo que ha pedido apuntar en la memoria de la campaña. */
   memorias: string[];
+  /**
+   * Giros que ha guardado como secretos de campaña.
+   *
+   * Es lo que faltaba para que una idea contada aquí —«que el barco sea una
+   * tapadera Zhentarim»— quedara guardada en algún sitio en lugar de vivir solo
+   * en esta conversación, que se recorta a los doscientos mensajes.
+   */
+  secretos: SecretoLeido[];
   /**
    * Lo que costó de verdad la pregunta, en fichas de entrada.
    *
@@ -4255,6 +4314,7 @@ export async function preguntarAlDirectorOOC(
   if (!bruto) throw new Error('El Director no ha contestado. Inténtalo de nuevo.');
 
   const memorias = leerMemoriasDeMesa(bruto);
+  const secretos = leerSecretos(bruto);
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
   const texto = stripStateTag(limpiarEtiquetasDeTiempo(bruto))
     .replace(MEMORIA_MESA_RE, '')
@@ -4262,7 +4322,7 @@ export async function preguntarAlDirectorOOC(
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  return { texto, memorias, fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount };
+  return { texto, memorias, secretos, fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount };
 }
 
 export async function generateClaudeProjectMemory({

@@ -297,6 +297,8 @@ export const MemoryManager: React.FC<{
    * interruptor que se queda encendido y te va destripando la campaña.
    */
   const [vinculosDestapados, setVinculosDestapados] = useState<Set<string>>(new Set());
+  /** Giros que la jugadora ha decidido leerse. No se guarda: se destapa y ya. */
+  const [secretosDestapados, setSecretosDestapados] = useState<Set<string>>(new Set());
 
   // Confirmation state
   const [confirmModal, setConfirmModal] = useState<{
@@ -1141,6 +1143,135 @@ export const MemoryManager: React.FC<{
       {/* Tab: Notes (Cuaderno Oculto del Narrador / IA) */}
       {activeTab === 'notes' && (
         <div className="flex flex-col gap-3">
+          {/*
+            Los giros pendientes, en una lista y no en un párrafo.
+
+            El cuaderno de abajo es texto libre: sirve para pensar, pero no
+            distingue lo que ya salió de lo que falta, y nada le dice al
+            Narrador que sea secreto. Estos sí: le llegan con candado, y pasan a
+            abiertos solos cuando se descubren jugando.
+          */}
+          {(() => {
+            const secretos = memory.gm_secrets || [];
+            const enPie = secretos.filter(x => !x.revelado);
+            const abiertos = secretos.filter(x => x.revelado);
+            return (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 sm:p-4 flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-cinzel text-xs font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 shrink-0" /> Giros de la campaña
+                    {secretos.length > 0 && (
+                      <span className="font-normal opacity-80">
+                        · {enPie.length} en pie{abiertos.length ? ` · ${abiertos.length} ya descubierto${abiertos.length === 1 ? '' : 's'}` : ''}
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      const titulo = (window.prompt('Título corto del giro (ej. «Los dueños del barco»)') || '').trim();
+                      if (!titulo) return;
+                      const secreto = (window.prompt('¿Cuál es la verdad? Esto NO se narrará hasta que se descubra jugando.') || '').trim();
+                      if (!secreto) return;
+                      const comoSeDescubre = (window.prompt('¿Por dónde puede salir? (opcional)') || '').trim();
+                      await onUpdateMemory(mem => ({
+                        ...mem,
+                        gm_secrets: [
+                          ...(mem.gm_secrets || []),
+                          { id: `sec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, titulo, secreto, comoSeDescubre: comoSeDescubre || undefined, origen: 'jugadora' as const }
+                        ]
+                      }));
+                    }}
+                    className="min-h-[36px] px-2.5 rounded-lg border border-rose-500/50 text-rose-700 dark:text-rose-300 hover:bg-rose-600 hover:text-white text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Plantar un giro
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed m-0">
+                  Ideas de trama que <strong>todavía no han pasado</strong>. Le llegan al Narrador con candado en cada
+                  turno: pone las pistas y hace que todo cuadre, pero tiene prohibido contarlo, insinuarlo o dejar que
+                  un PNJ lo suelte sin motivo. Cuando salga de verdad jugando, se marca solo. También puedes plantarlos
+                  hablando con el GM en su pestaña.
+                </p>
+
+                {secretos.length === 0 ? (
+                  <p className="text-[11px] text-[var(--text-secondary)] italic m-0">
+                    Ninguno todavía.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {secretos.map(sec => {
+                      const abierto = !!sec.revelado;
+                      const visible = abierto || secretosDestapados.has(sec.id);
+                      return (
+                        <div
+                          key={sec.id}
+                          className={`rounded-lg border p-2.5 ${abierto ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-[var(--user-border)] bg-[var(--surface)]'}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-cinzel text-xs font-bold text-[var(--text-primary)] min-w-0">
+                              {abierto ? '🔓' : '🔒'} {sec.titulo}
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {abierto ? (
+                                <span className="text-[10px] font-cinzel font-semibold text-emerald-700 dark:text-emerald-300">
+                                  Descubierto{sec.revelado?.fecha ? ` · ${sec.revelado.fecha}` : ''}
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() =>
+                                    setSecretosDestapados(prev => {
+                                      const n = new Set(prev);
+                                      n.has(sec.id) ? n.delete(sec.id) : n.add(sec.id);
+                                      return n;
+                                    })
+                                  }
+                                  className="min-h-[28px] px-2 rounded border border-[var(--user-border)] text-[10px] font-cinzel text-[var(--text-secondary)] hover:text-rose-600 hover:border-rose-500 cursor-pointer transition-colors"
+                                  title="Solo lo lees tú. No cambia nada de la partida."
+                                >
+                                  {visible ? 'Tapar' : 'Ver (te lo destripas)'}
+                                </button>
+                              )}
+                              <button
+                                onClick={async () => {
+                                  await onUpdateMemory(mem => ({
+                                    ...mem,
+                                    gm_secrets: (mem.gm_secrets || []).filter(x => x.id !== sec.id)
+                                  }));
+                                }}
+                                className="min-h-[28px] px-1.5 rounded border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-red-600 hover:border-red-500 cursor-pointer transition-colors"
+                                title="Quitar este giro"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                          {abierto && sec.revelado?.como && (
+                            <p className="text-[11px] text-emerald-800 dark:text-emerald-300 m-0 mt-1">Se supo: {sec.revelado.como}</p>
+                          )}
+                          {visible ? (
+                            <>
+                              <p className="text-xs text-[var(--text-primary)] italic m-0 mt-1.5 whitespace-pre-wrap">{sec.secreto}</p>
+                              {sec.comoSeDescubre && (
+                                <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-1">
+                                  Puede salir por: {sec.comoSeDescubre}
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-[11px] text-[var(--text-secondary)] italic m-0 mt-1">
+                              Aún en pie. El Narrador lo tiene y no puede contarlo.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="flex flex-wrap justify-between items-center bg-amber-50/80 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50 gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-amber-900 dark:text-amber-200 font-cinzel font-bold">
