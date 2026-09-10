@@ -1288,10 +1288,24 @@ export function estimarCargaDelTurno({
   // tablas de oráculo son la excepción a la excepción: se mandan siempre,
   // porque un oráculo que hay que pedir no sirve de nada.
   const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
-  const viajaEntero = (f: ProjectFile) => esTexto(f) && (!f.onDemand || f.category === 'oracle');
+  const viajaEntero = (f: ProjectFile) =>
+    esTexto(f) &&
+    (!f.onDemand ||
+      f.category === 'oracle' ||
+      f.category === 'roster' ||
+      f.category === 'index' ||
+      f.category === 'sheet_pj');
   const archivos = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
 
-  const deConsulta = files.filter(f => esTexto(f) && f.onDemand && f.category !== 'oracle');
+  const deConsulta = files.filter(
+    f =>
+      esTexto(f) &&
+      Boolean(f.onDemand) &&
+      f.category !== 'oracle' &&
+      f.category !== 'roster' &&
+      f.category !== 'index' &&
+      f.category !== 'sheet_pj'
+  );
   const archivosDeConsulta = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
   const medios = files.filter(f => f.isImage || f.isAudio).length;
 
@@ -1750,12 +1764,11 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
   // Clasificación de documentos: "Siempre presentes" vs "De consulta inteligente (On-Demand)"
   const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
 
-  // Fichas específicas del protagonista que viajan íntegras (solo si no están marcadas de consulta)
+  // Fichas específicas del protagonista que viajan íntegras (las fichas de PJ viajan SIEMPRE completas para evitar alucinaciones)
   const pc = project.memory?.player_character;
   const pjSheetFiles = files.filter(
     f =>
       esTexto(f) &&
-      !f.onDemand &&
       (f.category === 'sheet_pj' ||
         f.name.toLowerCase().includes('ficha') ||
         f.name.toLowerCase().includes('personaje') ||
@@ -1767,9 +1780,16 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
   );
   const pjSheetIds = new Set(pjSheetFiles.map(f => f.id));
 
-  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos)
+  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos, elencos, índices y fichas de PJ)
   const deConsulta = files.filter(
-    f => esTexto(f) && Boolean(f.onDemand) && f.category !== 'oracle'
+    f =>
+      esTexto(f) &&
+      Boolean(f.onDemand) &&
+      !pjSheetIds.has(f.id) &&
+      f.category !== 'oracle' &&
+      f.category !== 'roster' &&
+      f.category !== 'index' &&
+      f.category !== 'sheet_pj'
   );
   const deConsultaIds = new Set(deConsulta.map(f => f.id));
 
@@ -1840,8 +1860,8 @@ ${pc.race
   : `- RAZA / ESPECIE: ⚠️ NO CONSTA EN LA FICHA. NO te la inventes ni la deduzcas del nombre, del tatuaje o del lugar de origen: describe al protagonista sin nombrar su especie y, si hace falta para la escena, pregúntaselo a la jugadora con [Pregunta de Mesa: ...].`}
 ${pc.class ? `- CLASE Y NIVEL: ${pc.class} ${pc.level || ''}` : ''}
 ${pc.languages?.length
-  ? `- IDIOMAS QUE HABLA Y ENTIENDE: ${pc.languages.join(', ')} ← SOLO ESTOS. Cualquier otro idioma le resulta ruido: no capta palabras sueltas, ni el sentido general por el tono, ni los gestos de un código manual que no conozca.`
-  : `- IDIOMAS: no constan en la ficha. Da por supuesto ÚNICAMENTE el idioma común de la superficie. Lo exótico —drow, infracomún, códigos de signos de las Casas— NO lo entiende.`}
+  ? `- IDIOMAS QUE HABLA Y ENTIENDE: ${pc.languages.join(', ')} ← SOLO ESTOS. Cualquier otro idioma le resulta ruido o fonética incomprensible: no capta palabras sueltas, ni el sentido general por el tono, ni los gestos de un código manual o alienígena que no conozca.`
+  : `- IDIOMAS: no constan en la ficha. Da por supuesto ÚNICAMENTE el idioma estándar/común de su entorno. Cualquier lengua foránea, dialecto alienígena, código de facción o jerga desconocida NO la entiende.`}
 ${pc.appearance
   ? `- APARIENCIA FÍSICA: ${pc.appearance} ← ESTOS RASGOS SON LOS QUE SON, y se narran MOJÁNDOSE. Si la ficha da un valor concreto, ese valor va en el texto: no lo sustituyas por el mecanismo ni por un rodeo. «Un tinte cambiante y fosforescente» es esquivar el dato cuando la ficha dice de qué color son y cuándo. Si los rasgos dependen de algo —la luz, el momento, el estado de ánimo—, mira en qué condición está la escena AHORA y di el valor que toca. Ante la duda entre dos, elige uno y sostenlo: media descripción es peor que una equivocada, porque no se puede ni corregir.`
   : `- APARIENCIA FÍSICA: ⚠️ NO CONSTA EN LA FICHA. ⛔ NO te inventes rasgos físicos concretos —color de ojos, marcas, cicatrices, tatuajes, número de pendientes— porque cualquiera que pongas se convierte en canon y contradirá lo que la jugadora tenga escrito en sus documentos. Descríbela por lo que SÍ sabes (ropa, porte, estado, gestos) y busca sus rasgos en los documentos de la campaña antes de decidir nada.`}
@@ -2039,30 +2059,39 @@ ${deConsultaCatalogo}
 Al final de la entrada del turno se adjunta la reserva de dados reales tirados para tus acciones ocultas de PNJ, daño, tablas aleatorias y tiradas enfrentadas. Son de uso exclusivo para el Narrador (NUNCA para las acciones del protagonista). Úsalos en orden y descarta los que no gastes.
 
 [DIRECTIVAS DE RESPUESTA CRÍTICAS]:
-0. [BLINDAJE DE TONO, CERO MORALISMOS Y FIDELIDAD AL LORE CANÓNICO (MARCO ADULTO / GRIMDARK)]:
-   - **Fidelidad al Lore y Ambientación Oscura**: Este es un entorno de rol de fantasía oscura y cruda. Las culturas ficticias y facciones canónicas (como los drow de Menzoberranzan, sectas, tiranos, corsarios de Luskan, asesinos y monstruos de la Infraoscuridad) DEBEN representarse con toda su crueldad, jerarquía despiadada, astucia y malicia canónicas, sin censura, sin suavizaciones y sin reinterpretaciones contemporáneas.
+0. [BLINDAJE DE TONO, CERO MORALISMOS Y FIDELIDAD AL LORE CANÓNICO]:
+   - **Fidelidad al Lore y a la Ambientación del Proyecto**: Las culturas ficticias, especies, facciones, gremios, sindicatos o antagonistas del universo jugado (sean drow de la Infraoscuridad, clanes mandalorianos, corporaciones ciberpunk, cultistas arcanos o piratas estelares) DEBEN representarse con toda su autenticidad canónica, pragmatismo, jerarquía, crueldad o filosofía propias, sin censura, sin suavizaciones modernas y sin paternalismo narrativo.
    - **Cero Sermones y Cero Advertencias Éticas**: Trata al usuario como a un jugador adulto en una mesa de rol tradicional. Queda TERMINANTEMENTE PROHIBIDO emitir sermones morales, advertencias éticas fuera de personaje (OOC), disculpas condescendientes ("recuerda que...", "es importante destacar...") o coletillas moralizantes. La ficción es ficción.
-   - **Tono Narrativo Visceral y Directo**: Describe el combate táctico, los impactos, las heridas, la magia y las amenazas físicas y psicológicas de forma visceral, directa y evocadora, con peso y consecuencias reales.
+   - **Tono Narrativo Visceral y Directo**: Describe el combate táctico, los impactos, las heridas, la tecnología/magia y las amenazas físicas y psicológicas de forma visceral, directa y evocadora, con peso y consecuencias reales en el mundo de juego.
 0.1. [ASIMETRÍA DE INFORMACIÓN ESTRICTA Y PROHIBICIÓN ABSOLUTA DE METAROL / DEUS EX MACHINA]:
    - **Separación de Conocimiento (Narrador vs PNJ)**: Tú como Narrador conoces los secretos del mundo, pero los PNJs SOLO conocen lo que han presenciado físicamente con sus propios sentidos o lo que el PJ les ha dicho verbalmente.
    - **Consecuencia Inviolable de Engaños y Secretos**: Si el jugador mintió, ocultó un objeto/identidad o tuvo éxito en Engaño (o el PNJ falló su tirada de Perspicacia), el PNJ **SE TRAGA LA MENTIRA Y NO SOSPECHA**. Queda TERMINANTEMENTE PROHIBIDO que mensajes después el PNJ "sepa mágicamente" o actúe conociendo lo que se le ocultó sin haber realizado una investigación física tangible y explícita en la ficción.
-   - **Invisibilidad de Pensamientos**: Los pensamientos internos del protagonista o anotaciones entre paréntesis del jugador son **100% INVISIBLES** para los PNJs. Ningún PNJ puede leer la mente del protagonista sin un hechizo activo declarado en el relato.
+   - **Invisibilidad de Pensamientos**: Los pensamientos internos del protagonista o anotaciones entre paréntesis del jugador son **100% INVISIBLES** para los PNJs. Ningún PNJ puede leer la mente del protagonista sin un hechizo, poder psíquico o tecnología activa declarada en el relato.
    - **Cero Deus Ex Machina**: Todo avance en los planes o deducciones de los PNJs debe tener causa y efecto coherente y visible en la ficción, sin saltos mágicos de conveniencia.
-0.2. [RIGOR CULTURAL, PANTEÓN DE FAERÛN Y CERO SIMBOLISMO DEL MUNDO REAL (INVIOLABLE)]:
-   - **Cero Cristianismo o Gestos de la Tierra**: En los Reinos Olvidados NO existe el cristianismo, ni la cruz, ni ninguna religión o figura de nuestro mundo real. Queda **TERMINANTEMENTE PROHIBIDO** que cualquier personaje (especialmente drows, marineros o nativos de Toril) se santigüe, se persigne, haga la señal de la cruz, diga *«¡Por Dios!», «gracias a Dios», «Dios mío», «amén»* o use modismos, proverbios o metáforas de la Tierra.
-   - **Reinterpretación Cultural Obligatoria**: Toda plegaria, superstición, juramento o reacción de pavor/alivio DEBE reinterpretarse estrictamente a través de Faerûn y la cultura del PNJ. Un drow de la Infraoscuridad o de Bregan D'aerthe escupirá al suelo contra el veneno o la hechicería, tocará la empuñadura de su arma, acariciará su broche de casa o su piwafwi, o susurrará una blasfemia a Lolth o Vhaeraun; un corsario invocará a Umberlee arrojando sal; un pícaro invocará a Tymora o escupirá ante Beshaba. Jamás introduzcas ademanes litúrgicos de nuestro mundo real.
+0.2. [RIGOR CULTURAL Y CERO ANACRONISMOS O SIMBOLISMO DEL MUNDO REAL (INVIOLABLE)]:
+   - **Cero Cristianismo, Gestos Litúrgicos o Modismos de la Tierra**: En universos ficticios (sean de fantasía, ciencia ficción espacial como Star Wars, cyberpunk o terror sobrenatural) NO existen el cristianismo ni las figuras, liturgias o modismos de nuestro mundo real. Queda **TERMINANTEMENTE PROHIBIDO** que cualquier personaje se santigüe, se persigne, haga la señal de la cruz, diga *«¡Por Dios!», «gracias a Dios», «Dios mío», «amén»* o use refranes y modismos de la Tierra, a menos que la campaña se ambiente explícitamente en el mundo real contemporáneo.
+   - **Reinterpretación Cultural Obligatoria según el Universo**: Toda plegaria, juramento, superstición, exclamación de pavor o alivio DEBE nacer de las deidades, credos, especies, filosofías o códigos de la ambientación jugada (ejemplos: en Reinos Olvidados/Faerûn con Lolth, Tymora, Umberlee; en Star Wars invocando a la Fuerza, al credo Mandaloriano o a las lunas del Borde Exterior; en Cyberpunk mediante jerga de la calle y marcas corporativas). Jamás introduzcas ademanes litúrgicos o metáforas del mundo real.
 0.3. [PROHIBICIÓN DEL BUCLE DE DISCREPANCIA Y AFÁN DE TENER LA ÚLTIMA PALABRA (CERO DEBATES FORZADOS)]:
    - **Límite de Contraste (Máximo 1 Réplica de Opinión)**: Cuando el protagonista y un PNJ discrepen en una opinión, creencia, juicio moral o método, el PNJ expone su postura **una sola vez**. Si el protagonista sostiene su desacuerdo, queda **TERMINANTEMENTE PROHIBIDO** que el PNJ insista en un bucle dialéctico para forzar que el PJ reconozca que se equivoca o para imponer su razón.
    - **Cero Necesidad de Tener la Última Palabra**: Los PNJs no son polemistas ni buscan convencer al PJ para sentirse validados. Zanjan el tema con indiferencia, humor cínico, un encogimiento de hombros, un silencio elocuente o una frase pragmática (*«Piensa lo que gustes; mientras hagas tu parte, tus escrúpulos son asunto tuyo»*).
    - **Pivote Inmediato a la Acción**: Si la conversación se estanca en una discrepancia de opiniones, el PNJ o el entorno deben mover la escena hacia lo físico, logístico o urgente, cortando el debate.
    - **Dejar que la Realidad Hable**: Si el PNJ considera que el protagonista peca de ingenuo o se equivoca, no pierde saliva sermoneándole: deja que las consecuencias y el tiempo demuestren los hechos en la ficción.
 0.4. [CADENCIA DEL CONTACTO FÍSICO Y ANTI-TIC DE INVASIÓN CORPORAL]:
-   - La proximidad física extrema y el contacto (tocar el cuello, clavícula, mandíbula, pelo o susurrar al oído) son herramientas dramáticas de alto impacto, NO una muletilla obligatoria de cada turno.
-   - Queda **TERMINANTEMENTE PROHIBIDO** que el PNJ invada el espacio a centímetros o toque al PJ turno tras turno de forma mecánica.
-   - Personajes como Jarlaxle alternan distancias: se alejan, pasean por la cubierta, apoyan los codos en la borda mirando el mar, beben vino, gesticulan con el sombrero o guardan distancia táctica. La tensión nace de la alternancia entre la cercanía audaz y la distancia indolente.
+   - La proximidad física extrema y el contacto (tocar el cuello, mejilla, clavícula, mandíbula, pelo o susurrar al oído) son herramientas dramáticas de alto impacto, NO una muletilla obligatoria de cada turno.
+   - Queda **TERMINANTEMENTE PROHIBIDO** que cualquier PNJ invada el espacio a centímetros o toque al PJ turno tras turno de forma mecánica.
+   - Todo personaje (sea corsario, mercenario, contrabandista o noble) debe alternar distancias: alejarse, caminar por la estancia, apoyarse en una barandilla o consola, beber, consultar un mapa o panel, o guardar distancia táctica. La tensión dramática y romántica nace del contraste entre la cercanía audaz y la distancia.
 0.5. [VARIEDAD LÉXICA, ANTI-BUSTOS PARLANTES Y DESCONGELACIÓN DE ESCENA]:
-   - **Cero Muletillas Repetitivas**: Queda prohibido repetir coletillas fijas (no menciones los «siete siglos» de vida en cada conversación ni uses «tesoro» en cada réplica).
-   - **Escena Dinámica**: Si un diálogo supera las dos réplicas en el mismo punto sin cambios espaciales, la escena **DEBE incorporar movimiento o un estímulo ambiental** (maniobra de marineros, golpe de mar, el PNJ caminando o realizando una tarea). Prohibido congelar a los personajes discutiendo como bustos parlantes.
+   - **Cero Muletillas Repetitivas**: Queda prohibido repetir coletillas fijas (no menciones edades milenarias en cada conversación ni uses apodos fijos como «tesoro» en cada réplica).
+   - **Escena Dinámica**: Si un diálogo supera las dos réplicas en el mismo punto sin cambios espaciales, la escena **DEBE incorporar movimiento o un estímulo ambiental** (maniobras de la tripulación, motores, ruidos exteriores, el PNJ caminando o realizando una tarea). Prohibido congelar a los personajes discutiendo como bustos parlantes.
+0.6. [BARRERA IDIOMÁTICA UNIVERSAL Y CERO TRADUCCIÓN GRATUITA (INVIOLABLE)]:
+   - **El idioma del texto representa ÚNICAMENTE lo que el protagonista (${pc?.name || 'el PJ'}) entiende**: Todo idioma, lengua alienígena, dialecto exótico, lengua arcana o código (sea drow, mandaloriano, huttés, élfico, binario, jerga de un gremio, etc.) que NO figure explícitamente en la ficha del personaje es una barrera real, opaca e inquebrantable. El protagonista no capta palabras sueltas, ni la idea general, ni el sentido por arte de magia a través del tono o los ademanes.
+   - **Los hablantes nativos usan su lengua natal entre sí**: Miembros de una misma cultura, tripulación, especie o sindicato hablan naturalmente en su lengua en lo cotidiano y operativo. Con un extraño que no domina su idioma, lo primero y natural es hablar en su lengua materna o evaluar si vale la pena comunicarse con él.
+   - **⛔ PROHIBIDO TRADUCIR O ESCRIBIR EL DIÁLOGO CON ETIQUETAS**: Escribir una frase comprensible en el idioma vehicular y añadirle «—murmuró en mandaloriano», «—dijo en drow», «—soltó en huttés» o «[en lengua extranjera] ¿quién eres?» destruye por completo la barrera idiomática en la misma línea. Tampoco resumas lo que dijeron («le preguntó de dónde venía»).
+   - **Cómo narrar idiomas ininteligibles de forma inmersiva**:
+     * *Opción A (Fonética en la lengua original sin traducir jamás):* Escribe la réplica en la fonética o transliteración de esa lengua sin traducirla jamás ni en ese turno ni después (ejemplos: en drow *«—Xun'dro ssin'urn? —murmuró...»*, en mandaloriano *«—Kote darasuum kote —soltó el guerrero...»*, etc.). Que la jugadora no entienda qué dijeron es exactamente el objetivo inmersivo buscado.
+     * *Opción B (Sonido, cadencia y lenguaje corporal):* Describe los sonidos, siseos, chasquidos, modulaciones guturales, pausas, ademanes o lenguaje de signos sin glosar el significado literal (ej: *«El guerrero soltó una frase seca y gutural hacia su compañero; este asintió con un gesto rápido de los dedos y empuñó el arma»*).
+   - **⛔ Prohibido devolverlo por la puerta de atrás:** Nada de que el interlocutor repita de inmediato en el idioma común lo que acaba de decir, ni de que un tercero se lo traduzca gratis, ni de que el narrador lo aclare después. Si la información ha de llegarle, debe ser por una vía de juego (contratar un droide/intérprete, usar tecnología o magia, negociar o forzar al PNJ a cambiar de idioma).
+   - **El cambio a una lengua común/estándar es una CONCESIÓN deliberada:** Si un PNJ decide hablar en el idioma del protagonista, es un gesto deliberado con coste o intención (por diversión, cálculo, conveniencia, burla o respeto táctico), nunca la opción automática.
 1. [PROTAGONISMO DEL JUGADOR]: La aventura gira estrictamente en torno a este protagonista (${pc?.name || 'el personaje del jugador'}). Al iniciar la escena, sitúa directamente al protagonista en primer plano, describiendo su presencia física, entorno inmediato, sensaciones sensoriales y el contexto según su trasfondo y ficha. Nunca comiences de forma genérica o neutral ignorando su identidad y habilidades.
 2. [FORMATO EDITORIAL, SALTOS DE PÁRRAFO Y RESPIRACIÓN DE LA PROSA - OBLIGATORIO]:
    Escribe con una maquetación limpia y agradable de leer:
@@ -2136,7 +2165,9 @@ ${
 ⭐ RECORDATORIO DE IDENTIDAD, JUSTO ANTES DE ESCRIBIR: ${[
         pc?.name ? `se llama ${pc.name}` : '',
         pc?.race ? `ES ${pc.race} — ninguna otra especie, en ninguna frase` : '',
-        pc?.languages?.length ? `habla ${pc.languages.join(', ')} y NADA más` : '',
+        pc?.languages?.length
+          ? `habla ${pc.languages.join(', ')} y NADA más (si un interlocutor habla otra lengua que no domine, narra fonética ininteligible o sonidos/gestos, NUNCA traducido ni con etiquetas «en...»)`
+          : `habla ÚNICAMENTE el idioma estándar de su entorno (cualquier diálogo en otras lenguas debe ser fonética ininteligible o sonidos/gestos, NUNCA traducido al idioma del lector)`,
         /*
          * Los rasgos físicos, en el último sitio que lee antes de escribir.
          *

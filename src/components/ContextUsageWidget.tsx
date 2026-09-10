@@ -88,7 +88,15 @@ export const ContextUsageWidget: React.FC<{
   const mensajesRecortados = carga.mensajesRecortados;
   // La lista de verdad, que abajo se enumera por nombre.
   const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
-  const deConsulta = files.filter(f => esTexto(f) && f.onDemand && f.category !== 'oracle');
+  const deConsulta = files.filter(
+    f =>
+      esTexto(f) &&
+      f.onDemand &&
+      f.category !== 'oracle' &&
+      f.category !== 'roster' &&
+      f.category !== 'index' &&
+      f.category !== 'sheet_pj'
+  );
 
   // Un número como 127.694 no dice nada de un vistazo; 128 mil sí.
   const compact = (n: number) =>
