@@ -940,7 +940,7 @@ export default function App() {
     const t = reporteActual.current;
     if (
       !t ||
-      (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length && !t.secretos.length)
+      (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length && !t.secretos.length && !t.viaje)
     )
       return p.memory;
 
@@ -1172,7 +1172,36 @@ export default function App() {
     });
 
     const npcsDeduplicados = deduplicarListaNpcs([...npcs, ...nuevosNpcs]);
-    return { ...mem, npcs: npcsDeduplicados, gm_secrets: secretosDeCampana };
+    /*
+     * El trayecto largo en marcha.
+     *
+     * Zarpar lo declara el Narrador con [VIAJE: destino | jornadas: N] y llegar
+     * con [VIAJE: fin]. Entre medias, la aplicación cuenta los días y se lo
+     * recuerda en cada turno. Sin esta cuenta, «de las Moonshae a Luskan hay
+     * 8-12 días» era una frase en las directivas que la travesía entera se
+     * saltó en una sola noche.
+     */
+    let viajeEnCurso = mem.viaje;
+    if (t.viaje) {
+      if (t.viaje.fin) {
+        viajeEnCurso = undefined;
+      } else if (t.viaje.destino && t.viaje.jornadas) {
+        // Re-declarar el mismo destino no reinicia el contador: el día en que se
+        // zarpó es el que manda, y si no, cada recordatorio alargaría el viaje.
+        const mismoDestino =
+          mem.viaje?.destino?.toLowerCase().trim() === t.viaje.destino.toLowerCase().trim();
+        viajeEnCurso = mismoDestino
+          ? { ...mem.viaje!, jornadas: t.viaje.jornadas }
+          : { destino: t.viaje.destino, jornadas: t.viaje.jornadas, iniciadoAbs: diaActual };
+      }
+    }
+
+    return {
+      ...mem,
+      npcs: npcsDeduplicados,
+      gm_secrets: secretosDeCampana,
+      viaje: viajeEnCurso
+    };
   };
 
   const handleUpdateProjectField = async (

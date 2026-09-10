@@ -412,6 +412,19 @@ export interface Memory {
    * con nada). Cuando la jugadora dice «esto no es un PNJ», se apunta aquí y
    * ninguna vía automática lo vuelve a crear.
    */
+  /**
+   * El trayecto largo que está en marcha, si lo hay.
+   *
+   * Sin esto, «de las Moonshae a Luskan hay 8-12 días» era una frase en las
+   * directivas que nadie comprobaba: la travesía entera cabía en una noche.
+   */
+  viaje?: {
+    destino: string;
+    /** Jornadas que cuesta el trayecto entero. */
+    jornadas: number;
+    /** Día absoluto de la campaña en que se zarpó. */
+    iniciadoAbs: number;
+  };
   no_son_pnj?: string[];
   gm_secrets?: SecretoDeCampana[];
   /**

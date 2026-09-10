@@ -542,6 +542,7 @@ const AVANCE_RE = /\[\s*AVANCE\s*:\s*([^\]]+)\]/gi;
 const NIVEL_RE = /\[\s*NIVEL\s*:\s*([^\]]+)\]/gi;
 const AGENDA_RE = /\[\s*AGENDA\s*:\s*([^\]]+)\]/gi;
 const HILO_RE = /\[\s*HILO\s*:\s*([^\]]+)\]/gi;
+const VIAJE_RE = /\[\s*VIAJE\s*:\s*([^\]]+)\]/gi;
 
 /**
  * Lee `[TIEMPO: +2h]`, `[TIEMPO: +1d 6h]`, `[TIEMPO: +45m]` o `[TIEMPO: +3 días]`.
@@ -1431,6 +1432,7 @@ export function limpiarEtiquetasDePnj(texto: string): string {
     // ha contado con palabras.
     .replace(REVELADO_RE, '')
     .replace(SECRETO_RE, '')
+    .replace(VIAJE_RE, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -1439,3 +1441,59 @@ export function limpiarEtiquetasDePnj(texto: string): string {
 
 /** Cuántos días distintos hacen falta para dejar de ser figurante. */
 export const DIAS_PARA_SER_RECURRENTE = 3;
+
+
+/**
+ * Un trayecto largo en marcha: adónde se va y cuántas jornadas cuesta.
+ *
+ * Existe porque la regla sola no bastó. Las directivas dicen que del
+ * archipiélago Moonshae a Luskan hay entre 8 y 12 días de mar, y aun así una
+ * partida entera fue de despertar en la bodega a desembarcar en el puerto sin
+ * que pasara una sola jornada: el Narrador nunca adelantó el reloj porque nada
+ * llevaba la cuenta, y una prohibición que nadie comprueba es una sugerencia.
+ * Ahora el trayecto se declara, la aplicación cuenta los días de verdad y le
+ * recuerda en cada turno cuántos faltan.
+ */
+export interface ViajeLeido {
+  /** Adónde se va. Vacío en la etiqueta de cierre. */
+  destino: string;
+  /** Cuántas jornadas cuesta llegar. Ausente en la de cierre. */
+  jornadas?: number;
+  /** \`[VIAJE: fin]\`: se ha llegado, o el trayecto se cancela. */
+  fin: boolean;
+}
+
+/**
+ * Lee \`[VIAJE: Luskan | jornadas: 10]\` y \`[VIAJE: fin]\`.
+ *
+ * Se queda con la ÚLTIMA etiqueta del turno: si el Narrador abre y cierra un
+ * trayecto en el mismo mensaje, lo que vale es cómo acaba.
+ */
+export function leerViaje(texto: string): ViajeLeido | null {
+  if (!texto) return null;
+  VIAJE_RE.lastIndex = 0;
+  let ultimo: ViajeLeido | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = VIAJE_RE.exec(texto)) !== null) {
+    const campos = m[1].split('|').map(x => x.trim()).filter(Boolean);
+    if (!campos.length) continue;
+    const cabeza = campos[0];
+    if (/^(fin|final|llegada|llegamos|cancelar|cancelado)$/i.test(cabeza)) {
+      ultimo = { destino: '', fin: true };
+      continue;
+    }
+    const jornadas = campos
+      .slice(1)
+      .map(c => c.match(/(\d{1,3})/)?.[1])
+      .find(Boolean);
+    const n = jornadas ? parseInt(jornadas, 10) : NaN;
+    ultimo = {
+      destino: cabeza.slice(0, 80),
+      // Un trayecto de cero jornadas no es un trayecto, y uno de mil es un error
+      // de tecleo que dejaría la campaña anclada para siempre.
+      jornadas: Number.isFinite(n) ? Math.min(400, Math.max(1, n)) : undefined,
+      fin: false
+    };
+  }
+  return ultimo;
+}

@@ -35,6 +35,8 @@ import {
   hilosPendientes,
   hilosQueVencen,
   leerAgenda,
+  leerViaje,
+  type ViajeLeido,
   leerAvanceDeTiempo,
   leerFechaDeHud,
   leerAvanceDeNivel,
@@ -1713,6 +1715,47 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
     .map(c => ({ c, lista: secretos.filter(x => (x.capa || 1) === c) }))
     .filter(x => x.lista.length);
 
+  /*
+   * LA TRAVESÍA, CONTADA POR LA APLICACIÓN.
+   *
+   * La §7 ya prohibía el fast-travel y decía que de las Moonshae a Luskan hay
+   * de 8 a 12 días. No sirvió: una partida entera fue de despertar encadenada
+   * en la bodega a desembarcar en Whitesails sin que pasara una sola jornada.
+   * El motivo es que nadie llevaba la cuenta —el Narrador no tenía delante
+   * cuántos días le quedaban— y una prohibición sin cuenta atrás es un deseo.
+   * Ahora el número va delante en cada turno, con lo que falta y lo que ya
+   * lleva, que es lo único que un modelo no puede «olvidar».
+   */
+  const viaje = project.memory?.viaje;
+  const bloqueViaje = (() => {
+    if (!viaje?.destino || !viaje.jornadas) return '';
+    const cal = project.calendar;
+    const hoyAbs =
+      calendarioValido(cal) && project.currentDate ? aDiaAbsoluto(cal, project.currentDate) : undefined;
+    const hechas =
+      hoyAbs !== undefined && Number.isFinite(viaje.iniciadoAbs)
+        ? Math.max(0, hoyAbs - viaje.iniciadoAbs)
+        : 0;
+    const faltan = Math.max(0, viaje.jornadas - hechas);
+    return `
+### 🧭 TRAVESÍA EN CURSO — RUMBO A ${viaje.destino.toUpperCase()}
+**Jornada ${Math.min(hechas + 1, viaje.jornadas)} de ${viaje.jornadas}. ${
+      faltan > 0
+        ? `QUEDAN ${faltan} ${faltan === 1 ? 'JORNADA' : 'JORNADAS'} DE CAMINO.`
+        : 'EL TRAYECTO YA ESTÁ CUMPLIDO: se puede llegar en cuanto la escena lo permita.'
+    }**
+
+${
+  faltan > 0
+    ? `**⛔ NO SE LLEGA TODAVÍA.** Hasta que se consuman esas ${faltan} ${faltan === 1 ? 'jornada' : 'jornadas'} no hay puerto, ni muelle, ni tierra a la vista, ni «al cabo de unos días llegaron». Da igual lo que apetezca a la escena: el trayecto se paga día a día. Un descanso largo a bordo avanza **una** jornada, nunca el viaje entero.
+- **Y esas jornadas hay que VIVIRLAS, no saltarlas de golpe.** Cada una es una escena o media: quién hace guardia, qué se come, qué se oye por la noche, una conversación que solo pasa porque hay tiempo muerto. Un viaje largo es de las mejores cosas que le pueden pasar a una campaña —es donde la gente se conoce— y también el sitio natural de las escenas fuera de cámara (§3).
+- Para adelantar de verdad varias jornadas de una vez, hace falta un salto declarado con \`[TIEMPO: +Nd]\`, y entonces cuentas lo que pasó en esos días, no los borras.
+- Cuando por fin se llegue, cierra con \`[VIAJE: fin]\` en ese mismo turno.`
+    : `Ya se puede tocar puerto. Cuando se llegue, cierra con \`[VIAJE: fin]\`.`
+}
+`.trim();
+  })();
+
   const bloqueSecretos = secretos.length || plan
     ? `
 ### 🔒 LA HISTORIA, YA TRAZADA — SOLO TÚ
@@ -1756,7 +1799,7 @@ ${lista
     ? `
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
-${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
 ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHistory}` : ''}
   `.trim()
     : 'No hay memoria acumulada aún.';
@@ -3056,6 +3099,13 @@ export interface TiempoReportado {
    */
   revelaciones: RevelacionLeida[];
   /**
+   * Un trayecto largo que arranca, o el que se cierra al llegar.
+   *
+   * Lo que impide que la travesía entera de las Moonshae a Luskan quepa en una
+   * noche: en cuanto queda declarado, la aplicación cuenta las jornadas.
+   */
+  viaje?: ViajeLeido | null;
+  /**
    * La fecha que el Narrador ha escrito en la cabecera de HUD de este mensaje,
    * tal cual, sin resolver. Es la que ve la jugadora en el chat, así que es la
    * que debe mandar sobre el calendario.
@@ -3101,6 +3151,7 @@ async function saveStreamedMessage(
   const vinculos = leerVinculos(cleanedText);
   const revelaciones = leerRevelaciones(cleanedText);
   const secretos = leerSecretos(cleanedText);
+  const viaje = leerViaje(cleanedText);
   // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
   const hudDeEsteTurno = leerFechaDeHud(fullText);
   const avanceDeNivel = leerAvanceDeNivel(cleanedText) || undefined;
@@ -3123,6 +3174,7 @@ async function saveStreamedMessage(
       vinculos.length ||
       revelaciones.length ||
       secretos.length ||
+      viaje ||
       hudDeEsteTurno?.fechaTexto ||
       avanceDeNivel)
   ) {
@@ -3135,6 +3187,7 @@ async function saveStreamedMessage(
         vinculos,
         revelaciones,
         secretos,
+        viaje,
         fechaHud: hudDeEsteTurno?.fechaTexto,
         momentoHud: hudDeEsteTurno?.momento,
         avanceDeNivel
