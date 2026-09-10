@@ -359,6 +359,39 @@ export const MemoryManager: React.FC<{
    * un dato se le manda al Narrador como verdad, tiene que poder verse y
    * corregirse aquí.
    */
+  /**
+   * Quita de la lista a quien nunca ha pisado la partida.
+   *
+   * Extraer un compendio deja decenas de fichas de gente que no se ha conocido:
+   * ocupan sitio en cada turno y, peor, convierten en lista de la compra a
+   * personajes que deberían aparecer jugando. Esto borra solo a los que no han
+   * salido nunca, no tienen retrato y no tienen afinidad: o sea, a nadie con
+   * quien haya pasado nada.
+   */
+  const limpiarElencoNoConocido = async () => {
+    const todos = memory.npcs || [];
+    const conocido = (n: NPC) =>
+      (n.diasVistos?.length || 0) >= 1 ||
+      n.recurrente ||
+      Boolean(n.portrait) ||
+      typeof n.atr === 'number' ||
+      typeof n.vin === 'number' ||
+      typeof n.con === 'number';
+    const sobran = todos.filter(n => !conocido(n));
+    if (sobran.length === 0) {
+      window.alert('No hay ninguna ficha de gente sin conocer: todas las de la lista han salido en la partida o tienen algo tuyo.');
+      return;
+    }
+    const muestra = sobran.slice(0, 8).map(n => n.name).join(', ');
+    if (
+      !window.confirm(
+        `Se van a quitar ${sobran.length} fichas de personajes que NO han salido nunca en la partida, no tienen retrato y no tienen afinidad:\n\n${muestra}${sobran.length > 8 ? `, y ${sobran.length - 8} más` : ''}\n\nSeguirán existiendo en tus documentos, y se ficharán solos cuando aparezcan en escena. ¿Los quito?`
+      )
+    )
+      return;
+    await onUpdateMemory(mem => ({ ...mem, npcs: (mem.npcs || []).filter(conocido) }));
+  };
+
   const cambiarIdentidad = async (campo: 'race' | 'class' | 'languages' | 'appearance', valor: string) => {
     await onUpdateMemory(mem => ({
       ...mem,
@@ -1341,7 +1374,7 @@ export const MemoryManager: React.FC<{
                       onClick={() => setVerPremisa(v => !v)}
                       className="w-full text-left font-cinzel text-[11px] font-bold text-rose-700 dark:text-rose-300 flex items-center justify-between gap-2 cursor-pointer min-h-[28px]"
                     >
-                      <span>De qué va la historia de verdad</span>
+                      <span>{verPremisa ? 'De qué va la historia de verdad' : 'La historia está trazada'}</span>
                       <span className="text-[10px] font-normal shrink-0">{verPremisa ? 'Tapar' : 'Ver (te lo destripas)'}</span>
                     </button>
                     {verPremisa && (
@@ -1362,17 +1395,36 @@ export const MemoryManager: React.FC<{
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {secretos.map(sec => {
+                    {secretos.map((sec, iSec) => {
                       const abierto = !!sec.revelado;
                       const visible = abierto || secretosDestapados.has(sec.id);
+                      const indiceVisible = iSec + 1;
                       return (
                         <div
                           key={sec.id}
                           className={`rounded-lg border p-2.5 ${abierto ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-[var(--user-border)] bg-[var(--surface)]'}`}
                         >
                           <div className="flex items-start justify-between gap-2">
+                            {/*
+                              El título TAMBIÉN es el spoiler.
+
+                              Tapaba el contenido y dejaba los títulos a la
+                              vista: «El falso rescate», «La verdadera
+                              naturaleza de los grilletes». Con leer la lista ya
+                              sabes de qué va la campaña, que es exactamente lo
+                              que esto existía para evitar. Un giro en pie es un
+                              número y su capa; el nombre se ve al destaparlo.
+                            */}
                             <span className="font-cinzel text-xs font-bold text-[var(--text-primary)] min-w-0">
-                              {abierto ? '🔓' : '🔒'} {sec.titulo}
+                              {abierto || visible ? (
+                                <>
+                                  {abierto ? '🔓' : '🔒'} {sec.titulo}
+                                </>
+                              ) : (
+                                <span className="text-[var(--text-secondary)] font-normal italic">
+                                  🔒 Giro {indiceVisible} · sin destapar
+                                </span>
+                              )}
                               {sec.capa ? (
                                 <span
                                   className="ml-1.5 font-normal text-[10px] text-[var(--text-secondary)]"
@@ -1630,10 +1682,39 @@ export const MemoryManager: React.FC<{
                 Personajes No Jugadores Registrados ({memory.npcs?.length || 0})
               </span>
               <span className="text-[11px] text-[var(--text-secondary)] opacity-80">
-                Los retratos vinculados proporcionan descripciones visuales automáticas al Narrador.
+                Se fichan solos al aparecer en escena. Solo viajan al Narrador los que ya están en la partida:
+                el resto vive en tus documentos y se consulta desde ahí.
               </span>
             </div>
             <div className="flex gap-2 flex-wrap items-center">
+              {(() => {
+                /*
+                  Cuántos hay que no ha conocido.
+
+                  Se enseña la cifra en el propio botón porque si no, no hay
+                  forma de saber que la lista está llena de gente que llegó por
+                  una extracción y no por la partida.
+                */
+                const sinConocer = (memory.npcs || []).filter(
+                  n =>
+                    (n.diasVistos?.length || 0) === 0 &&
+                    !n.recurrente &&
+                    !n.portrait &&
+                    typeof n.atr !== 'number' &&
+                    typeof n.vin !== 'number' &&
+                    typeof n.con !== 'number'
+                ).length;
+                if (sinConocer === 0) return null;
+                return (
+                  <button
+                    onClick={limpiarElencoNoConocido}
+                    className="min-h-[32px] px-2.5 text-xs font-cinzel rounded border border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-200 hover:bg-amber-500/20 transition-all cursor-pointer font-semibold flex items-center gap-1.5 shadow-xs"
+                    title="Quita las fichas de quien no ha salido nunca en la partida. Siguen en tus documentos y se ficharán solos cuando aparezcan."
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Quitar {sinConocer} sin conocer
+                  </button>
+                );
+              })()}
               {memory.npcs && memory.npcs.length > 1 && (
                 <button
                   onClick={handleDeduplicateNpcs}

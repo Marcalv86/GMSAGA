@@ -1419,12 +1419,32 @@ function dosierDePersonajes(npcs: NPC[]): string {
    * escrito al lado.
    */
   const idsHabituales = new Set(habituales.map(n => n.id));
-  const elenco = conNombre.filter(n => !idsHabituales.has(n.id)).slice(-MAX_ELENCO_EN_PROMPT);
+  /*
+   * Solo la gente que HA SALIDO, o que a la jugadora le importa.
+   *
+   * Extraer un compendio dejaba cuarenta y dos personajes en la memoria, y
+   * todos viajaban en cada turno: novecientas fichas de gente que aún no se ha
+   * conocido, más una lista de nombres que se descubren leyendo la pantalla en
+   * vez de jugando. El Narrador ya tiene esos personajes en los documentos; lo
+   * que necesita del elenco es acordarse de quien YA está en la partida.
+   *
+   * Lo que cuenta como «está en la partida»: haber salido alguna vez, o que la
+   * jugadora le haya puesto retrato o afinidad, que es señal de que le importa.
+   */
+  const enLaPartida = (n: NPC) =>
+    (n.diasVistos?.length || 0) >= 1 ||
+    Boolean(n.portrait) ||
+    typeof n.atr === 'number' ||
+    typeof n.vin === 'number' ||
+    typeof n.con === 'number';
+  const elenco = conNombre
+    .filter(n => !idsHabituales.has(n.id) && enLaPartida(n))
+    .slice(-MAX_ELENCO_EN_PROMPT);
 
   const bloqueElenco = elenco.length
     ? `
-#### 🎭 EL RESTO DEL ELENCO QUE YA EXISTE (aún no han salido en escena, o casi)
-Gente de la campaña que ya está fichada. Todavía no tienes su dosier completo, pero EXISTEN y se llaman así.
+#### 🎭 EL RESTO DEL ELENCO QUE YA ESTÁ EN LA PARTIDA
+Gente que ya ha salido alguna vez, aunque todavía no tenga dosier completo. EXISTEN y se llaman así.
 - ⛔ NO te inventes un personaje nuevo para un papel que ya cubre alguien de esta lista. Si en la escena hace falta la mano derecha, el que lleva la barra o el mago de la banda, es el que figura aquí, con su nombre.
 - El detalle de cada uno está en los documentos de la campaña. Cuando alguno entre en escena de verdad, pásalo a tu dosier con \`[VÍNCULO: ...]\`.
 

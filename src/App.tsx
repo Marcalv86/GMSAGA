@@ -1065,8 +1065,44 @@ export default function App() {
       );
     });
 
-    // Si hay un vínculo nuevo para un PNJ que aún no figuraba en la lista, registrarlo automáticamente
     const nuevosNpcs: NPC[] = [];
+
+    /*
+     * Quien sale en escena queda fichado, aunque no pase nada entre ellos.
+     *
+     * Solo se creaba ficha con [VÍNCULO:], que el Narrador emite cuando la
+     * relación avanza de verdad. Así que un personaje podía aparecer cinco
+     * escenas seguidas —hablar, vender, vigilar— y no existir para la
+     * aplicación. La alternativa que había era extraer los PNJs de un documento
+     * a mano y por lotes, y eso deja cuarenta y dos fichas de gente que no se
+     * ha conocido: una lista de nombres que se descubren leyendo la pantalla en
+     * vez de jugando.
+     *
+     * Con esto el elenco se construye SOLO y en el orden correcto: entra quien
+     * pisa la escena, cuando la pisa. Lo demás sigue en los documentos, que es
+     * donde el Narrador puede consultarlo sin que nadie se destripe nada.
+     */
+    t.presentes.forEach(nombre => {
+      const limpio = (nombre || '').trim();
+      // Un nombre propio de verdad, no «el tabernero» ni «los guardias».
+      if (limpio.length < 3 || limpio.length > 60) return;
+      if (!/^[\p{Lu}]/u.test(limpio)) return;
+      if (npcs.some(n => coincidenNombresNpc(n.name, limpio, { alias: n.alias, trueIdentity: n.trueIdentity }))) return;
+      if (nuevosNpcs.some(n => coincidenNombresNpc(n.name, limpio))) return;
+      if (t.vinculos.some(v => coincidenNombresNpc(v.nombre, limpio))) return; // ese lo crea el vínculo, con más datos
+      if (coincidenNombresNpc(limpio, mem.player_character?.name || '')) return;
+
+      nuevosNpcs.push({
+        id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: limpio,
+        relation: 'Neutral',
+        status: 'Vivo',
+        notes: 'Apareció en escena.',
+        diasVistos: [marca]
+      });
+    });
+
+    // Si hay un vínculo nuevo para un PNJ que aún no figuraba en la lista, registrarlo automáticamente
     t.vinculos.forEach(v => {
       if (
         v.nombre &&
