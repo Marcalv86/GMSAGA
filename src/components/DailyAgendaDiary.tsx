@@ -698,8 +698,19 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
         </div>
 
         {/* Weekday Headers */}
+        {/*
+          La semana de este calendario no tiene por qué medir siete días: la de
+          Harptos son diez (la cabalgada). Con `grid-cols-7` fijo, los diez
+          nombres se partían en dos filas —PRI…SÉP y luego OCT NOV DÉC— y los
+          días se repartían de siete en siete, así que la columna bajo la que
+          caía cada día NO era su día de la semana. Se pinta con tantas columnas
+          como días tenga la semana de verdad.
+        */}
         {cal.weekdays && cal.weekdays.length > 0 && (
-          <div className="grid grid-cols-7 gap-1 text-center">
+          <div
+            className="grid gap-1 text-center"
+            style={{ gridTemplateColumns: `repeat(${diasSemana.length}, minmax(0, 1fr))` }}
+          >
             {diasSemana.map((d, i) => (
               <div
                 key={i}
@@ -712,14 +723,25 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
         )}
 
         {/* Month Days Grid (Clean style with circles & markers matching Screenshot 1) */}
-        <div className="grid grid-cols-7 gap-1 sm:gap-2">
+        <div
+          className="grid gap-1 sm:gap-2"
+          style={{ gridTemplateColumns: `repeat(${diasSemana.length}, minmax(0, 1fr))` }}
+        >
           {/* Empty offset padding cells */}
           {Array.from({ length: offsetInicioSemana }).map((_, i) => (
             <div key={`offset-${i}`} className="min-h-[44px] sm:min-h-[52px] opacity-20 pointer-events-none" />
           ))}
 
           {/* Actual Month Days */}
-          {diasMesActual.map(celda => {
+          {/*
+            Los festivales de Harptos no pertenecen a ningún mes y no llevan
+            número. Se colaban en la rejilla y, como el número se sacaba
+            quitándole las letras a la etiqueta, «Festín de la Cosecha» se
+            quedaba sin dígitos y caía al día del AÑO: por eso aparecía un 274
+            detrás del 30. Van en su propia tira, debajo, como en el calendario
+            grande.
+          */}
+          {diasMesActual.filter(c => !c.esFestival).map(celda => {
             const abs = (mesNavegacion.year - 1) * diasPorAno(cal) + (celda.dayOfYear - 1);
             const isSelected = abs === diaSeleccionado;
             const isToday = abs === hoyAbs;
@@ -759,7 +781,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                         : ''
                     }`}
                   >
-                    {celda.etiqueta.replace(/\D/g, '') || celda.dayOfYear}
+                    {celda.etiqueta}
                   </span>
 
                   {/* Sun / Star / Mood badge on top right like Screenshot 1 */}
