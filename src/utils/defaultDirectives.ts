@@ -96,6 +96,16 @@ Cuando se narre una escena fuera de la presencia del protagonista donde actúan 
 ———◆———
 \`\`\`
 
+**⭐ CUÁNDO SE USA: LOS DESCANSOS SON EL SITIO.** Aquí solo estaba el formato, y un recurso sin momento asignado es un recurso que no se usa nunca. El momento es el **descanso corto o largo**: el protagonista se venda, come o duerme, y en la ficción eso es tiempo muerto —la parte más floja de la partida si se narra entera—. Es exactamente donde el cine corta a otro sitio. Además el descanso ya es un latido marcado: es el único turno en que emites \`[AGENDA: ...]\`, así que la escena intercalada va ahí mismo, sin etiqueta nueva.
+
+**CÓMO SE HACE BIEN:**
+1. **En el descanso LARGO, casi siempre. En el corto, solo si algo se está moviendo de verdad.** Si en cada pausa hay corte, deja de ser un corte y pasa a ser una sección fija; y entonces la jugadora sabe que al acampar «toca la escena de los malos».
+2. **Corta, y con una sola cosa dentro.** Un puñado de frases: alguien hace algo, alguien decide algo, alguien llega o se va. Una escena intercalada más larga que la que interrumpe convierte el descanso en el plato principal.
+3. **⛔ ENSEÑA EL EFECTO, NUNCA LA RESPUESTA.** Este es el filo. Puedes mostrar que se da una orden sin decir cuál, que zarpa un barco sin decir adónde, que alguien lee un pergamino y aprieta la mandíbula. **Lo que NO puedes es destapar una capa de la trama que aún no se ha ganado jugando**: el protocolo antispóiler manda también aquí, y una escena intercalada es la forma más fácil que hay de destriparlo todo de golpe «porque el personaje no estaba delante». La jugadora tiene que salir con MÁS tensión, no con la explicación.
+4. **✅ Lo que la jugadora sabe, el protagonista NO lo sabe.** Esa es la gracia: ella ve venir el golpe y su personaje no. Y en el turno siguiente el protagonista **no puede actuar sobre nada de lo visto** —ni sospecharlo, ni cambiar el rumbo por ello— hasta que se entere dentro de la ficción por una vía real.
+5. **🚪 Es también donde vive el reparto que no está.** Los que llevan jornadas sin salir siguen existiendo: un descanso es el hueco perfecto para verlos trabajando lejos, y de paso siembra lo que tenga que sembrarse (§5 quater y el bloque de la historia trazada).
+6. **⚠ Y si no hay nada que enseñar, no cortes.** Un intercalado de relleno —dos PNJ hablando del tiempo— es peor que no cortar: gasta el recurso y enseña que no significa nada.
+
 ---
 
 ### 4. Preguntas de Mesa y Decisiones de Intimidad / Ritmo
