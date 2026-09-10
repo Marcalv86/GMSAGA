@@ -2537,6 +2537,45 @@ export default function App() {
         calendar: p.calendar || syncResult.calendar
       }));
 
+      /*
+       * «Sincronizar con IA» también traza la historia.
+       *
+       * No lo hacía: el trazado colgaba únicamente del final de un turno de
+       * narración, así que vaciar la memoria y pedir un repaso completo dejaba
+       * la pestaña de Giros exactamente igual de vacía que estaba. Y es justo
+       * lo que uno espera de un botón que dice sincronizar TODA la campaña:
+       * la estructura de la historia es memoria de la campaña como las demás.
+       */
+      let girosTrazados = 0;
+      try {
+        const proyectoAlDia = getLocalProjects().find(p => p.id === currentProject.id) || currentProject;
+        const sinTrama = !proyectoAlDia.memory?.plan_de_campana?.premisa;
+        const trama = await tramarLaCampana({
+          project: proyectoAlDia,
+          files: currentFiles,
+          chats: currentChats,
+          modo: sinTrama ? 'trazar' : 'revisar'
+        });
+        girosTrazados = trama.secretos.length;
+        if (currentPId) intentoDeTrazadoRef.current[currentPId] = Date.now();
+        await handleUpdateProjectField(p => ({
+          memory: {
+            ...(p.memory || {}),
+            gm_secrets: fusionarTrama(p.memory?.gm_secrets || [], trama),
+            plan_de_campana: {
+              premisa: trama.premisa || p.memory?.plan_de_campana?.premisa || '',
+              destino: trama.destino || p.memory?.plan_de_campana?.destino,
+              trazadoEl: new Date().toISOString()
+            }
+          }
+        }));
+      } catch (err) {
+        // El repaso de memoria vale igual aunque el trazado falle.
+        logError('threads', 'No se pudo trazar la historia durante la sincronización', err, {
+          projectName: currentProject.name
+        });
+      }
+
       setAlertConfig({
         isOpen: true,
         title: '¡Sincronización Total con IA Completada!',
@@ -2549,7 +2588,10 @@ export default function App() {
           `• ${syncResult.totalNpcs} PNJs con afinidad y notas.\n` +
           `• ${syncResult.totalQuests} tramas y misiones.\n` +
           `• ${syncResult.totalLocations} lugares registrados.\n` +
-          `• Evolución del protagonista y consecuencias programadas.\n\n` +
+          `• Evolución del protagonista y consecuencias programadas.\n` +
+          (girosTrazados > 0
+            ? `• ${girosTrazados} ${girosTrazados === 1 ? 'giro' : 'giros'} en la estructura de la historia (pestaña Giros).\n\n`
+            : `• La estructura de la historia no se ha podido trazar esta vez; mira el registro de errores.\n\n`) +
           `Lo que ya estaba escrito no se ha tocado` +
           (notasConservadas > 0
             ? `, incluidas tus ${notasConservadas} ${notasConservadas === 1 ? 'nota' : 'notas'}.`
