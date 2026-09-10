@@ -4820,6 +4820,7 @@ export interface TramaTrazada {
  * es una llamada al modelo de tareas de fondo, no un gasto por escena.
  */
 export interface IdentidadLeida {
+  name?: string;
   race?: string;
   class?: string;
   languages?: string[];
@@ -4870,6 +4871,7 @@ export async function extraerIdentidadDeDocumentos({
 
 Estos cuatro datos viajan al Narrador en cada turno como hechos fijos, así que la precisión importa más que la elegancia:
 
+- "name": CÓMO SE LLAMA, tal cual aparece en el documento. Es el dato que más falta hacía y el que faltaba: sin él la aplicación la llama «Protagonista», el Narrador recibe ese nombre como suyo, y los extractores automáticos le hacen ficha de PNJ porque no reconocen que es ella. Si el documento da nombre y apellido o casa, ponlos. Si de verdad no consta ningún nombre, déjalo vacío.
 - "race": su raza o especie, en pocas palabras y tal como la nombra el documento («Drow», «Elfa de la luna», «Humana»). Si el documento la matiza (mestiza, criada fuera, variante), respétalo.
 - "class": clase y arquetipo, corto («Druida», «Pícara / Arcana Trapacera»).
 - "languages": ARRAY con los idiomas que HABLA O ENTIENDE. Solo los que el documento le atribuya de verdad: no añadas el común «porque sí» si no consta, ni metas idiomas que solo se mencionan de pasada hablando de otros.
@@ -4881,7 +4883,7 @@ DOCUMENTOS:
 ${texto}
 
 Responde ÚNICAMENTE con el JSON, sin nada más:
-{ "race": "...", "class": "...", "languages": ["..."], "appearance": "..." }`;
+{ "name": "...", "race": "...", "class": "...", "languages": ["..."], "appearance": "..." }`;
 
   const modelo = getBackgroundTaskModel();
   const respuesta = await generateContentWithFailover({
@@ -4912,7 +4914,13 @@ Responde ÚNICAMENTE con el JSON, sin nada más:
     ? p.languages.map((x: any) => String(x).trim()).filter(Boolean).slice(0, 12)
     : undefined;
 
+  // Un nombre de relleno no es un nombre: si el documento no lo da, mejor
+  // dejarlo vacío que fijar «Protagonista» como si fuera el suyo.
+  const generico = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj|hero[íi]na?|h[ée]roe)$/i;
+  const nombre = txt(p?.name, 80);
+
   return {
+    name: nombre && !generico.test(nombre) ? nombre : undefined,
     race: txt(p?.race, 80),
     class: txt(p?.class, 80),
     languages: idiomas?.length ? idiomas : undefined,

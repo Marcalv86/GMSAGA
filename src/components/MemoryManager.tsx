@@ -716,16 +716,15 @@ export const MemoryManager: React.FC<{
                     )}
                   </div>
 
-                  {onTriggerAIUpdate && (
-                    <button
-                      onClick={handleSyncWithAI}
-                      disabled={isGenerating || isSyncingAI}
-                      className="px-3 py-1 text-xs font-cinzel bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-100 border border-amber-500/50 rounded-md transition-all flex items-center gap-1.5 font-bold shadow-xs cursor-pointer disabled:opacity-50"
-                    >
-                      <Sparkles className={`w-3.5 h-3.5 text-amber-600 dark:text-amber-400 ${isSyncingAI ? 'animate-spin' : ''}`} />
-                      <span>{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
-                    </button>
-                  )}
+                  {/*
+                    Aquí había un segundo «Sincronizar con IA» que llamaba
+                    EXACTAMENTE a la misma función que el de la barra de arriba.
+                    Puesto junto a la ficha del protagonista parecía que
+                    sincronizaba solo el personaje, y no: hacía lo mismo. Dos
+                    botones iguales con distinto aspecto y sitio no son una
+                    opción, son una duda. El que sí es del personaje —«Rellenar
+                    leyendo mi ficha subida»— está justo debajo.
+                  */}
                 </div>
 
                 {/*
@@ -755,6 +754,7 @@ export const MemoryManager: React.FC<{
                     try {
                       const id = await extraerIdentidadDeDocumentos({ project, files });
                       const encontrado = [
+                        id.name ? `Nombre: ${id.name}` : '',
                         id.race ? `Raza: ${id.race}` : '',
                         id.class ? `Clase: ${id.class}` : '',
                         id.languages?.length ? `Idiomas: ${id.languages.join(', ')}` : '',
@@ -762,7 +762,7 @@ export const MemoryManager: React.FC<{
                       ].filter(Boolean);
 
                       if (encontrado.length === 0) {
-                        window.alert('No he encontrado la raza, la clase, los idiomas ni la descripción física en tus documentos. Comprueba que la ficha del personaje esté subida en Archivos.');
+                        window.alert('No he encontrado el nombre, la raza, la clase, los idiomas ni la descripción física en tus documentos. Comprueba que la ficha del personaje esté subida en Archivos.');
                         return;
                       }
                       // Se enseña ANTES de escribir: son datos que el Narrador
@@ -774,6 +774,7 @@ export const MemoryManager: React.FC<{
                         ...mem,
                         player_character: {
                           ...(mem.player_character || { name: 'Protagonista' }),
+                          ...(id.name ? { name: id.name } : {}),
                           ...(id.race ? { race: id.race } : {}),
                           ...(id.class ? { class: id.class } : {}),
                           ...(id.languages ? { languages: id.languages } : {}),
@@ -788,7 +789,7 @@ export const MemoryManager: React.FC<{
                   }}
                   disabled={leyendoFicha}
                   className="mt-2.5 w-full min-h-[40px] px-3 rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] text-xs font-cinzel font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60"
-                  title="Lee la raza, la clase, los idiomas y los rasgos físicos de la ficha que tienes subida en Archivos, para no tener que copiarlos a mano."
+                  title="Lee el nombre, la raza, la clase, los idiomas y los rasgos físicos de la ficha que tienes subida en Archivos, para no tener que copiarlos a mano."
                 >
                   <Sparkles className={`w-3.5 h-3.5 ${leyendoFicha ? 'animate-spin' : ''}`} />
                   {leyendoFicha ? 'Leyendo tu ficha…' : 'Rellenar leyendo mi ficha subida'}

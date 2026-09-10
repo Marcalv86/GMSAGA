@@ -187,6 +187,9 @@ export default function App() {
   const [hayActualizacion, setHayActualizacion] = useState(false);
   // Apartar el aviso lo silencia media hora; antes lo apagaba hasta reabrir.
   const apartarAvisoRef = useRef<(() => void) | null>(null);
+  // Cuándo se intentó trazar la historia de cada campaña, para no reintentarlo
+  // en cada turno si algo falla.
+  const intentoDeTrazadoRef = useRef<Record<string, number>>({});
   useEffect(
     () =>
       vigilarVersion(
@@ -1752,10 +1755,28 @@ export default function App() {
             } catch (err) {
               console.warn('Auto-background memory synthesis skipped:', err);
             }
+          }, 1500);
+        }
 
-            // Sin material no hay nada que tramar: una historia trazada sobre la
-            // nada sería la IA inventándose una campaña que no es la tuya.
-            if (!hayConQueTramar) return;
+        /*
+         * EL TRAZADO DE LA HISTORIA TIENE SU PROPIO DISPARADOR.
+         *
+         * Estaba metido dentro del `if` de la memoria general, que solo salta
+         * la primera vez y luego una vez cada 24 horas. Así que en una campaña
+         * que ya tenía memoria sintetizada, el trazado NO SE EJECUTABA NUNCA
+         * —ni al empezar a jugar ni después— y la pestaña de Giros se quedaba
+         * en «Todavía nada» partida tras partida, que es justo lo contrario de
+         * lo que se prometía ahí. Ahora: si no hay historia trazada y hay
+         * material con el que trazarla, se traza; y una vez trazada, se repasa
+         * al ritmo de la memoria.
+         */
+        const sinTrazarTodavia = sinTrama && hayConQueTramar;
+        const desdeElUltimoIntento = Date.now() - (intentoDeTrazadoRef.current[currentProject.id] || 0);
+        const puedeReintentar = desdeElUltimoIntento > 20 * 60 * 1000;
+
+        if (hayConQueTramar && (sinTrazarTodavia || needsDailySync) && puedeReintentar) {
+          intentoDeTrazadoRef.current[currentProject.id] = Date.now();
+          setTimeout(async () => {
             try {
               const trama = await tramarLaCampana({
                 project: currentProject,
@@ -1781,8 +1802,15 @@ export default function App() {
                 { projectName: currentProject.name }
               );
             } catch (err) {
-              // Que falle el trazado no puede estropear el turno ni la memoria.
-              console.warn('Trazado de la trama omitido:', err);
+              // Que falle el trazado no puede estropear el turno ni la memoria,
+              // pero tampoco puede fallar en silencio: si no, la pestaña de
+              // Giros se queda vacía sin que nada explique por qué.
+              logError(
+                'threads',
+                'No se pudo trazar la historia de la campaña',
+                err,
+                { projectName: currentProject.name }
+              );
             }
           }, 1500);
         }
