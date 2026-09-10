@@ -2183,6 +2183,63 @@ export function isNarrativeIncomplete(text: string): boolean {
  * Autocompleta de forma fluida y transparente una narración que se cortó
  * por alcanzar el límite de tokens o por una desconexión en el tramo final.
  */
+/**
+ * Cuánto silencio se aguanta antes de dar una respuesta por colgada.
+ *
+ * Es entre trozo y trozo, no el total: mientras el Narrador escriba, puede
+ * tardar lo que quiera. El primer trozo tarda más porque el modelo aún está
+ * digiriendo el envío, así que ese tiene su propio margen, más largo.
+ */
+const SILENCIO_MAXIMO_MS = 75000;
+const SILENCIO_PRIMER_TROZO_MS = 150000;
+
+/**
+ * Un vigilante para las respuestas en streaming.
+ *
+ * Las tareas de fondo tenían plazo máximo; el turno narrado NO tenía ninguno.
+ * Si Google aceptaba la conexión y luego no mandaba nada, la aplicación se
+ * quedaba esperando para siempre con el rótulo puesto, sin pasar a la
+ * siguiente clave ni a otro modelo. No hay forma de distinguir eso de «está
+ * pensando», y la jugadora se queda mirando una pantalla que no va a cambiar.
+ *
+ * Cortar por silencio es lo correcto: deja que una narración larga tarde lo
+ * que necesite, y solo se rinde cuando de verdad no llega nada.
+ */
+function vigilanteDeSilencio(alColgarse: () => void) {
+  let temporizador: ReturnType<typeof setTimeout> | null = null;
+  let vivo = true;
+  const rearmar = (ms: number) => {
+    if (!vivo) return;
+    if (temporizador) clearTimeout(temporizador);
+    temporizador = setTimeout(() => {
+      if (vivo) alColgarse();
+    }, ms);
+  };
+  return {
+    empezar: () => rearmar(SILENCIO_PRIMER_TROZO_MS),
+    latido: () => rearmar(SILENCIO_MAXIMO_MS),
+    parar: () => {
+      vivo = false;
+      if (temporizador) clearTimeout(temporizador);
+      temporizador = null;
+    }
+  };
+}
+
+/**
+ * Junta la señal de la jugadora («Detener») con la del vigilante.
+ *
+ * Hacen falta las dos: una la manda ella y la otra el reloj, y el SDK solo
+ * admite una.
+ */
+function señalCombinada(propia: AbortController, externa?: AbortSignal): AbortSignal {
+  if (externa) {
+    if (externa.aborted) propia.abort();
+    else externa.addEventListener('abort', () => propia.abort(), { once: true });
+  }
+  return propia.signal;
+}
+
 async function intentarCompletarNarrativa({
   fullText,
   ai,
@@ -2220,17 +2277,30 @@ async function intentarCompletarNarrativa({
 
   setLoadingText('Completando el desenlace de la narración...');
 
+  /*
+   * Aquí también hace falta vigilante, y de hecho más que en el turno normal:
+   * esto se dispara SOLO, sin que la jugadora lo haya pedido, cuando el relato
+   * se corta a media palabra. Si se colgaba, se quedaba «completando el
+   * desenlace» sin fin, con el texto cortado en pantalla y el botón de detener
+   * como única salida. Al menos ahora se rinde y deja lo que hubiera.
+   */
+  const centinela = new AbortController();
+  const vigilante = vigilanteDeSilencio(() => centinela.abort());
+  const configCont = { ...config, abortSignal: señalCombinada(centinela, signal) };
+
   try {
+    vigilante.empezar();
     const contStream = await ai.models.generateContentStream({
       model,
       contents: continuationContents,
-      config
+      config: configCont
     });
 
     let lastSave = Date.now();
     let isFirstChunk = true;
 
     for await (const chunk of contStream) {
+      vigilante.latido();
       if (signal?.aborted) break;
       let textPart = chunk.text ?? '';
       if (textPart) {
@@ -2256,7 +2326,12 @@ async function intentarCompletarNarrativa({
       }
     }
   } catch (err) {
+    // Si la continuación se cuelga o falla, se devuelve lo que hubiera: un
+    // relato cortado a media palabra es peor que ninguno, pero una pantalla
+    // esperando para siempre es peor que las dos.
     console.warn('Fallo en intento de autocompletado en caliente:', err);
+  } finally {
+    vigilante.parar();
   }
 
   return fullText;
@@ -2393,6 +2468,8 @@ export async function generateStoryTurnStream({
         let fullText = initialPrefix || '';
         let recibioTexto = false;
         let motivoDeCierre = '';
+        // Fuera del try a propósito: hay que poder pararlo también cuando falla.
+        let vigilante: ReturnType<typeof vigilanteDeSilencio> | null = null;
         let bloqueoDePrompt = '';
         let currentContents: any[] = [];
         let currentConfig: any = null;
@@ -2441,8 +2518,18 @@ export async function generateStoryTurnStream({
           }
           currentConfig = config;
 
+          /*
+           * El vigilante: si Google acepta la conexión y luego no manda nada,
+           * esto la corta y deja que el fallo salte a la siguiente clave o
+           * modelo, en vez de esperar indefinidamente con el rótulo puesto.
+           */
+          const centinela = new AbortController();
+          config.abortSignal = señalCombinada(centinela, signal);
+          vigilante = vigilanteDeSilencio(() => centinela.abort());
+
           let responseStream: any;
           try {
+            vigilante?.empezar();
             responseStream = await ai.models.generateContentStream({
               model: currentModel,
               contents,
@@ -2501,6 +2588,9 @@ export async function generateStoryTurnStream({
           let isFirstChunk = true;
 
           for await (const chunk of responseStream) {
+            // Ha llegado algo: el reloj del silencio vuelve a empezar. Mientras
+            // el Narrador escriba, puede tardar lo que le haga falta.
+            vigilante?.latido();
             if (signal?.aborted) break;
             let textPart = chunk.text ?? '';
             if (textPart) {
@@ -2602,9 +2692,11 @@ export async function generateStoryTurnStream({
             }
           }
 
+          vigilante?.parar();
           await persistir(fullText.trim(), true);
           return;
         } catch (e: any) {
+          vigilante?.parar();
           const fallo = classifyApiError(e);
 
           if (signal?.aborted || fallo.isAborted) {
