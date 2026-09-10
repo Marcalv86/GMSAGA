@@ -12,7 +12,8 @@ import { parseMessageSegments, RollBadgeCard } from './RollBadge';
 import { parseSceneHUD, SceneHUDCard } from './SceneHUDCard';
 import {
   CALENDARIO_FANTASTICO,
-  aDiaAbsoluto
+  aDiaAbsoluto,
+  diasJugadosEnElCapitulo
 } from '../utils/campaignCalendar';
 import {
   PROBABILIDADES,
@@ -30,6 +31,7 @@ import {
   BookCheck,
   BookOpen,
   Dices,
+  CalendarDays,
   FastForward,
   Sparkles,
   Library,
@@ -768,6 +770,23 @@ export const ChatView: React.FC<{
     sceneText?: string;
   } | null>(null);
 
+  /*
+   * Cuántas jornadas lleva el capítulo.
+   *
+   * No es un dato de cuota —lo que llena el envío son los mensajes, no los
+   * días— sino de ritmo: un capítulo que abarca muchas jornadas es más difícil
+   * de reconstruir en el calendario, porque hay que repartir lo que pasó entre
+   * más días con las mismas pistas. Teniéndolo a la vista se decide cuándo
+   * cerrar, en vez de descubrirlo cuando el diario ya salió torcido.
+   *
+   * Se recalcula solo cuando cambia el número de mensajes: leer los HUD de un
+   * capítulo entero en cada tecla pulsada sería absurdo.
+   */
+  const jornadas = useMemo(
+    () => diasJugadosEnElCapitulo((chat?.messages || []).map(m => m.content)),
+    [chat?.messages?.length, chat?.id]
+  );
+
   // Modal de Salto de Tiempo / Cambio de Escena
   const [showTransitionModal, setShowTransitionModal] = useState(false);
   const handleOpenTransitionModal = useCallback(() => {
@@ -1336,7 +1355,41 @@ export const ChatView: React.FC<{
           usan a cada turno y un icono suelto no se reconoce sin probarlo.
         */}
         {chat?.messages && chat.messages.length > 0 && !isGenerating && (
-          <div className="max-w-[900px] mx-auto mb-2 flex justify-end items-center gap-2">
+          <div className="max-w-[900px] mx-auto mb-2 flex justify-between items-center gap-2">
+            {/*
+              Las jornadas del capítulo, donde se puede hacer algo al respecto.
+
+              Aquí y no en la cabecera: en el móvil el nombre del capítulo está
+              escondido y el encabezado ornamental queda arriba del todo, así
+              que habría que subir a buscarlo. Esta fila está pegada al campo de
+              escribir y tiene al lado las dos salidas —saltar el tiempo o
+              cerrar el capítulo—, que es justo lo que se decide al mirarlo.
+            */}
+            {jornadas.dias > 0 ? (
+              <span
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 min-h-[32px] text-[11px] font-cinzel transition-colors ${
+                  jornadas.dias >= 4
+                    ? 'border-amber-700/50 bg-amber-500/10 text-amber-950 dark:text-amber-100 font-bold'
+                    : 'border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)]'
+                }`}
+                title={
+                  `Jornadas jugadas en este capítulo: ${jornadas.dias}` +
+                  (jornadas.primera && jornadas.ultima && jornadas.dias > 1
+                    ? ` (de ${jornadas.primera} a ${jornadas.ultima})`
+                    : jornadas.primera
+                    ? ` (${jornadas.primera})`
+                    : '') +
+                  '. Cuenta días con escena, no tiempo transcurrido: un salto temporal suma uno, no los que salta. ' +
+                  'Cuantas menos jornadas por capítulo, mejor sale el calendario.'
+                }
+              >
+                <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+                {jornadas.dias} {jornadas.dias === 1 ? 'jornada' : 'jornadas'}
+              </span>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={handleOpenTransitionModal}
               className="shrink-0 min-h-[32px] text-xs font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
@@ -1357,6 +1410,7 @@ export const ChatView: React.FC<{
                 <span className="hidden sm:inline">Continuar Narración</span>
               </button>
             )}
+            </div>
           </div>
         )}
 

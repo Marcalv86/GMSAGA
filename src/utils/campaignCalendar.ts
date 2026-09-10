@@ -499,6 +499,42 @@ export function leerFechaDeHud(texto?: string): FechaDeHud | null {
   return null;
 }
 
+/**
+ * Cuántos días distintos se han jugado dentro de un capítulo.
+ *
+ * Cuenta jornadas con escena, no tiempo transcurrido: un salto temporal de dos
+ * semanas dentro del capítulo suma un día, no quince. Es a propósito. Lo que
+ * hace que un capítulo se vuelva pesado —de leer, de reconstruir en el
+ * calendario y de mandar en cada turno— son las jornadas jugadas; una elipsis
+ * cuesta dos líneas y no ensucia nada.
+ *
+ * Se lee de los HUD que el Narrador ya escribe, que es la fuente más fiable que
+ * hay: está escrito en el propio capítulo y no hay que deducirlo.
+ */
+export function diasJugadosEnElCapitulo(textos: (string | undefined)[]): {
+  dias: number;
+  primera?: string;
+  ultima?: string;
+} {
+  const vistas: string[] = [];
+  const claves = new Set<string>();
+  for (const t of textos) {
+    const hud = leerFechaDeHud(t);
+    if (!hud?.fechaTexto) continue;
+    // «14 de Ches» y «14 De Ches,» son el mismo día: sin normalizar saldrían dos.
+    const clave = hud.fechaTexto
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    if (!clave || claves.has(clave)) continue;
+    claves.add(clave);
+    vistas.push(hud.fechaTexto.trim());
+  }
+  return { dias: vistas.length, primera: vistas[0], ultima: vistas[vistas.length - 1] };
+}
+
 // ---------------------------------------------------------------- etiquetas del Narrador
 
 const TIEMPO_RE = /\[\s*TIEMPO\s*:\s*([^\]]+)\]/gi;
