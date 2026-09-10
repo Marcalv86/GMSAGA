@@ -119,6 +119,8 @@ Al final de tu respuesta (tras la narración pura), incluye las siguientes etiqu
 **REGLA DE ORO DE ACTUALIZACIÓN:** En cada turno se actualiza ÚNICAMENTE lo esencial (Vida/PG, enfermedad/condiciones/heridas, inventario/dinero, tiempo transcurrido y afinidad). Y SOLO si han ocurrido cambios reales en la narración; si no ha habido alteraciones, no modifiques valores ni emitas etiquetas innecesarias:
 
 1. \`[PRESENTES: nombre1, nombre2]\` — Quién ha estado presente en escena de forma reconocible.
+   - **⛔ EL PROTAGONISTA NO VA NUNCA EN ESTA LISTA.** Está en todas las escenas, así que ponerlo es una perogrullada; y como la aplicación abre ficha de PNJ a quien aparece aquí, el resultado es que la jugadora encuentra a su propio personaje en el elenco, con «Figurante (1/3 encuentros)» debajo. Esta etiqueta es para LOS DEMÁS: quien se cruza con ella, no ella.
+   - Tampoco van los bultos sin nombre («los guardias», «el tabernero») ni quien solo se menciona de pasada sin estar delante.
 2. \`[VÍNCULO: nombre | aparenta: ... | oculta: ... | grado: tipo — descripción | atr: 0-20 | vin: 0-20 | con: 0-20]\` — SOLO cuando la escena haya producido un cambio o avance real en la relación/química con un PNJ recurrente. Si nada ha cambiado, omite esta línea.
 3. \`[INVENTARIO: +X Objeto, -Y Objeto, +Z PO, -W PO, +A PP, -B PC]\` — Obligatorio SIEMPRE y ÚNICAMENTE cuando el protagonista gane, compre, gaste, pierda o consuma equipo o dinero (ej. \`[INVENTARIO: +1 Máscara de Disfraz (mágica), -15 PO]\`). Si no hubo cambios de objetos ni monedas, OMITE esta línea.
 4. \`[TIEMPO: +Xh]\` o \`[TIEMPO: +Yd]\` o \`[TIEMPO: +Zm]\` — Cuánto tiempo de campaña ha consumido la escena.

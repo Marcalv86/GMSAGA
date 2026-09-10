@@ -714,6 +714,24 @@ export const MemoryManager: React.FC<{
                         {cleanPc.title}
                       </p>
                     )}
+                    {/*
+                      Que la ficha se quede con el nombre de relleno no es un
+                      detalle cosmético: el Narrador recibe «Protagonista» como
+                      el nombre del personaje, y el filtro que impide que el OC
+                      acabe fichado como PNJ compara contra esa palabra en vez
+                      de contra su nombre. Callado no se arregla nunca.
+                    */}
+                    {!(memory.player_character?.name || '').trim() ||
+                    /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i.test(
+                      (memory.player_character?.name || '').trim()
+                    ) ? (
+                      <p className="mt-1 text-[11px] leading-snug text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/40 rounded-lg px-2 py-1.5 m-0">
+                        ⚠️ <strong>Tu personaje no tiene nombre en la ficha.</strong> El Narrador lo llama
+                        «Protagonista» en cada turno, y sin nombre la aplicación no puede reconocerlo, así que acaba
+                        creándole tarjeta de PNJ. Pulsa <strong>«Rellenar leyendo mi ficha subida»</strong> aquí abajo,
+                        o escríbelo a mano.
+                      </p>
+                    ) : null}
                   </div>
 
                   {/*
@@ -1848,9 +1866,9 @@ export const MemoryManager: React.FC<{
                       <button
                         onClick={() => setNoEsPnj(n)}
                         className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 font-cinzel cursor-pointer flex items-center gap-0.5 shrink-0"
-                        title="Quitarlo del elenco para siempre: no volverá a crearse solo"
+                        title="Bórralo del elenco y veta el nombre: no volverá a crearse solo. Es lo que hay que usar cuando se cuela tu propio personaje."
                       >
-                        <UserMinus className="w-3 h-3" /> No es un PNJ
+                        <UserMinus className="w-3 h-3" /> Quitar del elenco
                       </button>
                     </div>
                   </div>
