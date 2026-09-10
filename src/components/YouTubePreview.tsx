@@ -1,17 +1,20 @@
 import React from 'react';
+import { leerEnlacesDeYouTube } from '../utils/youtube';
 
 export const YouTubePreview: React.FC<{ content: string }> = ({ content }) => {
-  const urlRegex =
-    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/g;
-  const matches = Array.from(content.matchAll(urlRegex));
-  if (!matches || matches.length === 0) return null;
-
-  // Unique video IDs
-  const uniqueVideoIds = Array.from(new Set(matches.map(m => m[1])));
+  /*
+   * El mismo reconocedor que usa el envío al modelo.
+   *
+   * Tenía el suyo propio, ligeramente distinto, y eso significaba que un enlace
+   * podía pintarse aquí y no llegar al Director, o al revés. Un enlace, una
+   * verdad.
+   */
+  const videos = leerEnlacesDeYouTube(content);
+  if (videos.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-3 mt-3">
-      {uniqueVideoIds.map((videoId, i) => (
+      {videos.map(({ id: videoId }, i) => (
         <div
           key={i}
           className="w-full max-w-[560px] aspect-video rounded-xl overflow-hidden shadow-2xl border border-[var(--glass-border)] bg-black"

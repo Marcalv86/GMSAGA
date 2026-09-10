@@ -3,6 +3,9 @@ import ReactMarkdown from 'react-markdown';
 import {
   BookmarkPlus,
   BookOpen,
+  Eye,
+  EyeOff,
+  Film,
   ImagePlus,
   Loader,
   MessageSquare,
@@ -12,7 +15,14 @@ import {
   Users
 } from 'lucide-react';
 import { Chat, Project } from '../types';
-import { describeApiError, ImagenDeMesa, preguntarAlDirectorOOC } from '../utils/geminiHelper';
+import { describeApiError, ImagenDeMesa, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
+import {
+  conMiles,
+  estimarCosteDeVideo,
+  leerEnlacesDeYouTube,
+  TramoDeVideo,
+  TRAMOS_DE_VIDEO
+} from '../utils/youtube';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
 
@@ -29,6 +39,16 @@ export interface MensajeDeMesa {
    * una foto de móvil a tamaño completo se come el sitio de la campaña entera.
    */
   adjuntos?: string[];
+  /**
+   * Lo que costó el turno en fichas de entrada, cuando se sabe.
+   *
+   * Se guarda con el mensaje para que la cuenta siga ahí mañana: mandar un
+   * vídeo es la única cosa de esta pantalla que puede costar de verdad, y
+   * conviene poder mirar atrás y ver cuál fue el caro.
+   */
+  fichasDeEntrada?: number;
+  /** Si el Director vio un vídeo en ese mensaje, y qué tramo. */
+  videoVisto?: string;
 }
 
 /** Ancho máximo al que se reduce una imagen antes de guardarla y enviarla. */
@@ -124,6 +144,17 @@ export const MesaView: React.FC<{
   const [pensando, setPensando] = useState(false);
   const [error, setError] = useState('');
   const finRef = useRef<HTMLDivElement>(null);
+  /** Cuánto del vídeo mira el Director, y si lo mira siquiera. */
+  const [tramo, setTramo] = useState<TramoDeVideo>('corto');
+  const [mirarElVideo, setMirarElVideo] = useState(true);
+
+  /*
+   * Los vídeos se leen del texto que se está escribiendo, no de un adjunto
+   * aparte: pegar el enlace ya es la forma natural de mandar un vídeo, y
+   * obligar a pegarlo Y ADEMÁS pulsar un botón sería pedir lo mismo dos veces.
+   */
+  const videosEnElTexto = leerEnlacesDeYouTube(texto);
+  const costeEstimado = estimarCosteDeVideo(tramo);
 
   useEffect(() => {
     setMensajes(leerMesa(project.id));
@@ -138,7 +169,7 @@ export const MesaView: React.FC<{
     setError('');
     const soloImagenes = files.filter(f => f.type.startsWith('image/'));
     if (soloImagenes.length < files.length) {
-      setError('Solo se pueden adjuntar imágenes. Para vídeos, pega el enlace de YouTube en el mensaje.');
+      setError('Solo se pueden adjuntar imágenes. Para vídeo, pega el enlace de YouTube: el Director lo verá.');
     }
     try {
       const preparadas = await Promise.all(soloImagenes.slice(0, 4).map(prepararImagen));
@@ -152,12 +183,25 @@ export const MesaView: React.FC<{
     const pregunta = texto.trim();
     if ((!pregunta && adjuntos.length === 0) || pensando) return;
 
+    /*
+     * La capa gratuita admite un solo vídeo por petición. Si hay varios se
+     * manda el primero y se dice: mejor eso que un error críptico de la API o
+     * —peor— que se manden todos y se funda la cuota de golpe.
+     */
+    const aMirar = mirarElVideo ? leerEnlacesDeYouTube(pregunta).slice(0, 1) : [];
+    const segundos = TRAMOS_DE_VIDEO[tramo].segundos;
+    const videos: VideoDeMesa[] = aMirar.map(v => ({
+      url: v.url,
+      ...(segundos ? { hastaSegundo: segundos } : {})
+    }));
+
     const conLaPregunta: MensajeDeMesa[] = [
       ...mensajes,
       {
         role: 'user',
         content: pregunta,
         adjuntos: adjuntos.length ? adjuntos.map(a => a.dataUrl) : undefined,
+        videoVisto: videos.length ? TRAMOS_DE_VIDEO[tramo].etiqueta : undefined,
         timestamp: new Date().toISOString()
       }
     ];
@@ -174,8 +218,11 @@ export const MesaView: React.FC<{
         chats,
         currentChatId,
         historial: mensajes,
-        pregunta: pregunta || '(sin texto: mira la imagen adjunta)',
-        imagenes: adjuntos.map(a => a.imagen)
+        pregunta:
+          pregunta ||
+          (adjuntos.length ? '(sin texto: mira la imagen adjunta)' : '(sin texto: mira el vídeo)'),
+        imagenes: adjuntos.map(a => a.imagen),
+        videos
       });
       const completo: MensajeDeMesa[] = [
         ...conLaPregunta,
@@ -183,6 +230,7 @@ export const MesaView: React.FC<{
           role: 'model',
           content: respuesta.texto,
           memorias: respuesta.memorias.length ? respuesta.memorias : undefined,
+          fichasDeEntrada: respuesta.fichasDeEntrada,
           timestamp: new Date().toISOString()
         }
       ];
@@ -193,7 +241,17 @@ export const MesaView: React.FC<{
         onAnotarEnMemoria(respuesta.memorias);
       }
     } catch (err) {
-      setError(describeApiError(err));
+      /*
+       * Un fallo con vídeo delante casi nunca es «la API va mal»: o el vídeo es
+       * privado o restringido, o el tramo pedido es más largo de lo que cabe.
+       * Decirlo ahorra media hora de probar a ciegas con la cuota del día.
+       */
+      const base = describeApiError(err);
+      setError(
+        videos.length
+          ? `${base}\n\nAl mandar un vídeo suele fallar por una de tres: el vídeo es privado o no está disponible en tu región, el tramo pedido no cabe en un envío (prueba «Primeros 5 min»), o el modelo de tareas de fondo no admite vídeo. Puedes desmarcar «No lo mires» para mandar solo el enlace.`
+          : base
+      );
     } finally {
       setPensando(false);
     }
@@ -317,8 +375,9 @@ export const MesaView: React.FC<{
               </p>
               <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto leading-relaxed mt-3 mb-0">
                 Puedes adjuntar imágenes para que las mire —una referencia de un PNJ, un mapa, una
-                ficha— y pegar enlaces de YouTube o Spotify, que se ven aquí mismo. Si le pides recordar
-                algo, lo apunta en la memoria de la campaña y te lo enseña.
+                ficha— y pegar un enlace de YouTube: lo <strong>ve de verdad</strong>, con imagen y
+                sonido, así que sirve para pasarle lore, una canción o una escena de referencia. Si le
+                pides recordar algo, lo apunta en la memoria de la campaña y te lo enseña.
               </p>
             </div>
           )}
@@ -344,6 +403,11 @@ export const MesaView: React.FC<{
                   ))}
                 </div>
               ) : null}
+              {m.videoVisto ? (
+                <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-md bg-[var(--accent)]/15 border border-[var(--accent)]/30 px-1.5 py-0.5 text-[10px] font-cinzel text-[var(--accent)]">
+                  <Eye className="w-3 h-3 shrink-0" /> Lo vio · {m.videoVisto}
+                </div>
+              ) : null}
               {m.content
                 ? m.role === 'user'
                   ? m.content
@@ -365,6 +429,23 @@ export const MesaView: React.FC<{
                 campaña encima. Cada nota se enseña aquí y se puede quitar desde
                 Memoria: puede escribir, nunca a escondidas.
               */}
+              {/*
+                Lo que costó, cuando costó algo digno de mención.
+
+                Una pregunta de mesa normal ronda las dos mil fichas; un vídeo
+                puede irse a cien mil. Enseñar la cuenta REAL —la que devuelve
+                la API, no la estimada— es la diferencia entre decidir y
+                adivinar con una cuota que se agota.
+              */}
+              {m.role === 'model' && typeof m.fichasDeEntrada === 'number' && m.fichasDeEntrada > 20000 ? (
+                <div
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-[var(--glass-border)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]"
+                  title="Fichas de entrada que costó esta pregunta, según la propia API."
+                >
+                  <Film className="w-3 h-3 shrink-0" />
+                  {conMiles(m.fichasDeEntrada)} fichas
+                </div>
+              ) : null}
               {m.memorias?.length ? (
                 <div className="mt-2 pt-2 border-t border-[var(--glass-border)] flex flex-col gap-1">
                   {m.memorias.map((nota, k) => (
@@ -401,6 +482,74 @@ export const MesaView: React.FC<{
 
       <div className="px-3 sm:px-4 md:px-6 pt-2.5 pb-4 border-t border-dashed border-[var(--glass-border)] shrink-0">
         <div className="max-w-[900px] mx-auto">
+          {/*
+            El vídeo, en cuanto se pega el enlace.
+
+            Antes el enlace se pintaba bonito y viajaba al modelo como texto:
+            contestaba sobre el vídeo sin haberlo visto. Ahora lo ve de verdad,
+            y como eso se cobra por segundo, la decisión de cuánto mirar está
+            aquí delante y no escondida en unos ajustes.
+          */}
+          {videosEnElTexto.length > 0 && (
+            <div className="mb-2 rounded-xl border border-[var(--accent)]/35 bg-[var(--accent)]/8 px-2.5 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-cinzel text-[11px] font-bold text-[var(--accent)] leading-snug">
+                  <Film className="w-3.5 h-3.5 shrink-0 mt-px" />
+                  {mirarElVideo ? 'El Director verá este vídeo' : 'Solo se enseñará el enlace'}
+                </span>
+                <button
+                  onClick={() => setMirarElVideo(v => !v)}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[var(--user-border)] bg-[var(--surface)] px-2 min-h-[32px] text-[10px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors cursor-pointer"
+                  title={
+                    mirarElVideo
+                      ? 'Mandar solo el enlace, sin que lo mire. No gasta apenas cuota.'
+                      : 'Que lo mire de verdad. Cuesta cuota, pero responde sobre lo que hay dentro.'
+                  }
+                >
+                  {mirarElVideo ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  {mirarElVideo ? 'No lo mires' : 'Que lo mire'}
+                </button>
+              </div>
+
+              {mirarElVideo && (
+                <>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {(Object.keys(TRAMOS_DE_VIDEO) as TramoDeVideo[]).map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setTramo(t)}
+                        title={TRAMOS_DE_VIDEO[t].descripcion}
+                        className={`min-h-[38px] rounded-lg border px-2.5 text-[11px] font-cinzel transition-all cursor-pointer ${
+                          tramo === t
+                            ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--on-accent)] font-bold'
+                            : 'border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:border-[var(--accent)]/60'
+                        }`}
+                      >
+                        {TRAMOS_DE_VIDEO[t].etiqueta}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 mb-0 text-[10px] leading-snug text-[var(--text-secondary)]">
+                    {costeEstimado === null ? (
+                      <>
+                        Sin recorte: un vídeo de una hora ronda las 360.000 fichas y no cabe en un
+                        envío. Recórtalo si es largo.
+                      </>
+                    ) : (
+                      <>Coste aproximado: ~{conMiles(costeEstimado)} fichas. Se te dirá el real al contestar.</>
+                    )}
+                    {videosEnElTexto.length > 1 && (
+                      <>
+                        {' '}
+                        <strong>Hay {videosEnElTexto.length} enlaces: solo verá el primero.</strong>
+                      </>
+                    )}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           {adjuntos.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {adjuntos.map((a, k) => (
@@ -438,7 +587,7 @@ export const MesaView: React.FC<{
             onClick={() => inputArchivo.current?.click()}
             disabled={pensando || adjuntos.length >= 4}
             className="shrink-0 w-11 h-11 rounded-xl border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] flex items-center justify-center transition-all disabled:opacity-30 cursor-pointer"
-            title="Adjuntar una imagen (máximo 4). Para vídeo, pega el enlace de YouTube en el mensaje."
+            title="Adjuntar una imagen (máximo 4). Para vídeo, pega el enlace de YouTube: lo verá."
             aria-label="Adjuntar imagen"
           >
             <ImagePlus className="w-4 h-4" />

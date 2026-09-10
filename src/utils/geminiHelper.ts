@@ -3968,6 +3968,22 @@ export interface ImagenDeMesa {
   mimeType: string;
 }
 
+/**
+ * Un vídeo de YouTube que el Director va a ver de verdad.
+ *
+ * No es la URL suelta dentro del texto: eso el modelo lo lee como una cadena de
+ * caracteres y se inventa el contenido. Esto viaja como `fileData` y Gemini
+ * descarga y procesa el vídeo.
+ */
+export interface VideoDeMesa {
+  /** URL canónica del vídeo, que es lo que entiende la API. */
+  url: string;
+  /** Segundo por el que empieza a mirar. Omitido = desde el principio. */
+  desdeSegundo?: number;
+  /** Segundo por el que deja de mirar. Omitido = hasta el final. */
+  hastaSegundo?: number;
+}
+
 export interface ConsultaDeMesa {
   project: Project;
   chats: Chat[];
@@ -3977,6 +3993,13 @@ export interface ConsultaDeMesa {
   pregunta: string;
   /** Imágenes adjuntas al mensaje, que sí llegan al modelo. */
   imagenes?: ImagenDeMesa[];
+  /**
+   * Vídeos de YouTube que el Director debe mirar.
+   *
+   * La capa gratuita admite UN vídeo por petición, así que aquí llega como
+   * mucho uno; la interfaz se encarga de avisar si se pegan más.
+   */
+  videos?: VideoDeMesa[];
 }
 
 /**
@@ -3992,7 +4015,8 @@ export function construirPromptOOC({
   currentChatId,
   historial,
   pregunta,
-  imagenes
+  imagenes,
+  videos
 }: ConsultaDeMesa): string {
   const pc = project.memory?.player_character;
   const cal = project.calendar;
@@ -4044,6 +4068,11 @@ QUÉ NO HACES AQUÍ:
 - ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
 - Si no sabes algo porque no consta en lo que tienes delante, dilo. No lo inventes.
 ${imagenes?.length ? `\n📎 LA JUGADORA TE HA ADJUNTADO ${imagenes.length === 1 ? 'UNA IMAGEN' : `${imagenes.length} IMÁGENES`}. Míralas y responde a lo que te pregunte sobre ellas: pueden ser una referencia visual de un personaje o un lugar, un mapa, una ficha, una captura de la propia aplicación o cualquier otra cosa. Describe lo que ves cuando sirva para contestar.` : ''}
+${videos?.length ? `\n🎬 LA JUGADORA TE HA ADJUNTADO UN VÍDEO Y LO ESTÁS VIENDO DE VERDAD${videos[0].hastaSegundo ? ` (los primeros ${Math.round(videos[0].hastaSegundo / 60)} minutos)` : ''}. Míralo y escúchalo antes de contestar.
+- Responde a partir de lo que HAY en el vídeo, no de lo que sepas del tema por tu cuenta. Si el vídeo contradice lo que creías, manda el vídeo.
+- Si es lore, música, una escena o una referencia visual, di qué has visto en concreto —nombres, datos, tono, momentos— para que se note que lo has mirado.
+- Si te piden guardar lo que cuenta, resúmelo tú en notas [MEMORIA: ...] cortas y concretas. No apuntes el enlace: apunta lo que dice.
+- Si el vídeo se corta antes de lo que hacía falta, dilo y sugiere mandar el tramo que falta.` : ''}
 
 CAMPAÑA: ${project.name}
 ${cal && fecha ? `MOMENTO ACTUAL: ${fechaCompleta(cal, fecha)}` : ''}
@@ -4069,6 +4098,15 @@ export interface RespuestaDeMesa {
   texto: string;
   /** Lo que ha pedido apuntar en la memoria de la campaña. */
   memorias: string[];
+  /**
+   * Lo que costó de verdad la pregunta, en fichas de entrada.
+   *
+   * Se enseña porque mandar un vídeo puede costar cien veces más que una
+   * pregunta normal, y una estimación de la documentación no es una medida.
+   * Con la cuenta real delante se decide si compensa; sin ella, se juega a
+   * ciegas con una cuota que se acaba.
+   */
+  fichasDeEntrada?: number;
 }
 
 /**
@@ -4102,19 +4140,71 @@ export async function preguntarAlDirectorOOC(
    * vería: adjuntar sería un adorno.
    */
   const imagenes = consulta.imagenes || [];
-  const contenido = imagenes.length
-    ? { parts: [{ text: prompt }, ...imagenes.map(i => ({ inlineData: { data: i.data, mimeType: i.mimeType } }))] }
-    : prompt;
-
-  const respuesta = await generateContentWithFailover({
-    primaryModel: modelo,
-    contents: contenido as any,
-    signal: consulta.signal,
-    config: {
-      temperature: 0.6,
-      ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
-    } as any
+  /*
+   * El vídeo va como `fileData` con la URL de YouTube: así Gemini lo descarga y
+   * lo procesa. Antes el enlace viajaba dentro del texto y el modelo contestaba
+   * como si lo hubiera visto sin haberlo visto, que es peor que no tener la
+   * función.
+   *
+   * `videoMetadata` recorta el tramo y `mediaResolution` lo baja de calidad: un
+   * vídeo se cobra por segundo, y sin esas dos cosas un documental largo se
+   * lleva por delante la cuota del minuto entero.
+   */
+  const videos = (consulta.videos || []).slice(0, 1);
+  const parteDeVideo = (v: VideoDeMesa, conResolucion: boolean) => ({
+    fileData: { fileUri: v.url },
+    ...(v.desdeSegundo || v.hastaSegundo
+      ? {
+          videoMetadata: {
+            ...(v.desdeSegundo ? { startOffset: `${Math.round(v.desdeSegundo)}s` } : {}),
+            ...(v.hastaSegundo ? { endOffset: `${Math.round(v.hastaSegundo)}s` } : {})
+          }
+        }
+      : {}),
+    ...(conResolucion ? { mediaResolution: 'MEDIA_RESOLUTION_LOW' } : {})
   });
+
+  const armarContenido = (conResolucion: boolean) =>
+    imagenes.length || videos.length
+      ? {
+          parts: [
+            { text: prompt },
+            ...imagenes.map(i => ({ inlineData: { data: i.data, mimeType: i.mimeType } })),
+            ...videos.map(v => parteDeVideo(v, conResolucion))
+          ]
+        }
+      : prompt;
+
+  const config = {
+    temperature: 0.6,
+    ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+  } as any;
+
+  let respuesta: any;
+  try {
+    respuesta = await generateContentWithFailover({
+      primaryModel: modelo,
+      contents: armarContenido(true) as any,
+      signal: consulta.signal,
+      config
+    });
+  } catch (err: any) {
+    /*
+     * `mediaResolution` por parte es reciente y no todos los modelos lo
+     * aceptan. Si es eso lo que molesta, se reintenta sin ello: se paga más
+     * caro, pero el vídeo llega. Cualquier otro error se deja subir tal cual.
+     */
+    const mensaje = String(err?.message || err);
+    const esPorLaResolucion =
+      videos.length > 0 && /mediaResolution|media_resolution|INVALID_ARGUMENT|Unknown name/i.test(mensaje);
+    if (!esPorLaResolucion) throw err;
+    respuesta = await generateContentWithFailover({
+      primaryModel: modelo,
+      contents: armarContenido(false) as any,
+      signal: consulta.signal,
+      config
+    });
+  }
 
   const bruto = limpiarTextoGenerado((respuesta.text || '').trim());
   if (!bruto) throw new Error('El Director no ha contestado. Inténtalo de nuevo.');
@@ -4127,7 +4217,7 @@ export async function preguntarAlDirectorOOC(
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  return { texto, memorias };
+  return { texto, memorias, fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount };
 }
 
 export async function generateClaudeProjectMemory({
