@@ -1729,9 +1729,12 @@ export const CalendarView: React.FC<{
                                 }
 
                                 return (
-                                  <span className={`inline-flex items-center gap-1.5 text-xs font-cinzel font-semibold px-2.5 py-0.5 rounded-md border shadow-2xs ${styleClass}`}>
-                                    <span className="text-sm">{icono}</span>
-                                    <span>{entrada.hito}</span>
+                                  // El icono anclado arriba: con un hito largo el
+                                  // texto envuelve, y centrado se quedaba flotando
+                                  // a media altura del bloque.
+                                  <span className={`inline-flex items-start gap-1.5 text-xs font-cinzel font-semibold px-2 py-1 rounded-md border shadow-2xs leading-snug ${styleClass}`}>
+                                    <span className="text-sm shrink-0 leading-none mt-px">{icono}</span>
+                                    <span className="min-w-0">{entrada.hito}</span>
                                   </span>
                                 );
                               })()}

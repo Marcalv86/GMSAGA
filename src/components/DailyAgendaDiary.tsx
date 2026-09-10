@@ -1017,7 +1017,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 flex-wrap">
                         {/* Time badge e.g. 13:00 / Tarde */}
-                        <span className="px-2.5 py-0.5 rounded-full bg-[var(--surface-soft)] text-[var(--accent)] font-cinzel font-bold text-xs border border-[var(--glass-border)] flex items-center gap-1 shadow-2xs">
+                        <span className="px-2 py-0.5 rounded-lg bg-[var(--surface-soft)] text-[var(--accent)] font-cinzel font-bold text-xs border border-[var(--glass-border)] flex items-center gap-1 shadow-2xs">
                           <Clock className="w-3 h-3" />
                           <span>{franja}</span>
                           {franjaNombre && (
@@ -1114,29 +1114,43 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                       <ReactMarkdown>{entrada.summary}</ReactMarkdown>
                     </div>
 
-                    {/* Footer Tags & Context Badges (Audio, Lugar, Clima, Hito) */}
-                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--glass-border)] text-xs text-[var(--text-secondary)]">
+                    {/*
+                      Etiquetas de la entrada: lugar, clima, hito.
+
+                      Eran `rounded-full`, y el pill redondo está pensado para
+                      una palabra corta. Aquí el texto lo escribe el Narrador y
+                      puede ser «Sentina de proa · Navío mercante asaltado · Mar
+                      de las Espadas»: en el móvil eso envuelve a dos líneas y
+                      el borde de cápsula queda deformado alrededor de un
+                      bloque. Esquina redondeada normal, el icono anclado arriba
+                      para que no baile al envolver, y un poco más de aire
+                      vertical, que dos líneas dentro de `py-0.5` van apretadas.
+                    */}
+                    <div className="flex flex-wrap items-start gap-1.5 pt-2 border-t border-[var(--glass-border)] text-xs text-[var(--text-secondary)]">
                       {entrada.audioDuration && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 flex items-center gap-1 font-cinzel text-[11px] font-semibold">
-                          <Volume2 className="w-3 h-3" /> {entrada.audioDuration}
+                        <span className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 flex items-start gap-1.5 font-cinzel text-[11px] font-semibold leading-snug">
+                          <Volume2 className="w-3 h-3 shrink-0 mt-0.5" /> {entrada.audioDuration}
                         </span>
                       )}
 
                       {entrada.lugar && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-[var(--surface-soft)] border border-[var(--glass-border)] flex items-center gap-1 font-cinzel text-[11px]">
-                          📍 {entrada.lugar}
+                        <span className="px-2 py-1 rounded-lg bg-[var(--surface-soft)] border border-[var(--glass-border)] flex items-start gap-1.5 font-cinzel text-[11px] leading-snug">
+                          <span className="shrink-0">📍</span>
+                          <span className="min-w-0">{entrada.lugar}</span>
                         </span>
                       )}
 
                       {entrada.clima && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-[var(--surface-soft)] border border-[var(--glass-border)] flex items-center gap-1 font-cinzel text-[11px]">
-                          {iconoClima} {entrada.clima}
+                        <span className="px-2 py-1 rounded-lg bg-[var(--surface-soft)] border border-[var(--glass-border)] flex items-start gap-1.5 font-cinzel text-[11px] leading-snug">
+                          <span className="shrink-0">{iconoClima}</span>
+                          <span className="min-w-0">{entrada.clima}</span>
                         </span>
                       )}
 
                       {entrada.hito && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-900 dark:text-amber-200 border border-amber-500/30 flex items-center gap-1 font-cinzel text-[11px] font-semibold">
-                          {iconoHitoVal} {entrada.hito}
+                        <span className="px-2 py-1 rounded-lg bg-amber-500/10 text-amber-900 dark:text-amber-200 border border-amber-500/30 flex items-start gap-1.5 font-cinzel text-[11px] font-semibold leading-snug">
+                          <span className="shrink-0">{iconoHitoVal}</span>
+                          <span className="min-w-0">{entrada.hito}</span>
                         </span>
                       )}
 
@@ -1375,7 +1389,7 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                     <div className="flex flex-col gap-2">
                       <div className="flex items-start justify-between gap-2">
                         <span
-                          className={`text-xs font-cinzel font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${
+                          className={`text-xs font-cinzel font-bold px-2 py-0.5 rounded-lg border flex items-center gap-1 ${
                             esUrgente
                               ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950/60 dark:text-red-300'
                               : esInminente
