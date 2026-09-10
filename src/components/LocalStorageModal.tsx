@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   RefreshCw,
   FolderSync,
-  Upload,
   AlertTriangle,
   Save,
   Bug,
@@ -88,6 +87,15 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
   const [isSavingManual, setIsSavingManual] = useState(false);
   const [fileToConfirmDelete, setFileToConfirmDelete] = useState<string | null>(null);
   const [fileToConfirmRestore, setFileToConfirmRestore] = useState<DiskCampaignFile | null>(null);
+  /*
+   * Sobrescribir un archivo se hacía al primer toque, sin preguntar.
+   *
+   * Es la única acción de esta pantalla que destruye algo sin remedio —el
+   * archivo de la carpeta deja de existir tal como estaba— y era la más fácil
+   * de disparar sin querer: un botón de veintidós píxeles de alto, pegado a los
+   * otros dos, en un móvil. Cargar sí preguntaba, y borrar también. Esta no.
+   */
+  const [fileToConfirmOverwrite, setFileToConfirmOverwrite] = useState<DiskCampaignFile | null>(null);
   const [isDeletingFile, setIsDeletingFile] = useState(false);
   const [isOverwritingFile, setIsOverwritingFile] = useState<string | null>(null);
 
@@ -414,7 +422,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                           type="button"
                           onClick={handleChooseFolder}
                           disabled={isChoosingFolder}
-                          className="py-2.5 px-4 rounded-lg font-cinzel font-bold text-xs bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 transition-opacity inline-flex items-center gap-2 cursor-pointer shadow-xs"
+                          className="min-h-[44px] py-2.5 px-4 rounded-lg font-cinzel font-bold text-xs bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 transition-opacity inline-flex items-center gap-2 cursor-pointer shadow-xs"
                         >
                           <FolderOpen className="w-4 h-4" />
                           <span>Elegir Carpeta y Activar Auto-Guardado</span>
@@ -423,10 +431,11 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                           type="button"
                           onClick={() => handleManualSaveToDisk()}
                           disabled={isSavingManual || !currentProject}
-                          className="py-2.5 px-4 rounded-lg font-cinzel font-bold text-xs bg-[color-mix(in_srgb,var(--accent)_15%,var(--surface))] border border-[var(--accent)] text-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_25%,var(--surface))] transition-all inline-flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                          className="min-h-[44px] py-2.5 px-4 rounded-lg font-cinzel font-bold text-xs bg-[color-mix(in_srgb,var(--accent)_15%,var(--surface))] border border-[var(--accent)] text-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_25%,var(--surface))] transition-all inline-flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
                         >
-                          <Download className="w-4 h-4" />
-                          <span>{isSavingManual ? 'Guardando...' : 'Guardar Manualmente en Carpeta'}</span>
+                          {/* Es una subida: de la partida al disco. Llevaba el icono de descargar. */}
+                          <Save className="w-4 h-4" />
+                          <span>{isSavingManual ? 'Guardando…' : 'Guardar la partida en una carpeta'}</span>
                         </button>
                       </div>
                     </div>
@@ -449,11 +458,11 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                             type="button"
                             onClick={() => handleManualSaveToDisk()}
                             disabled={isSavingManual || !currentProject}
-                            className="py-1.5 px-3 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity shadow-xs disabled:opacity-50"
-                            title="Guardar de inmediato el estado actual de la campaña en esta carpeta"
+                            className="min-h-[40px] py-1.5 px-3 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity shadow-xs disabled:opacity-50 active:scale-95"
+                            title="Volcar la partida abierta a su archivo de esta carpeta"
                           >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>{isSavingManual ? 'Guardando...' : 'Guardar en Carpeta Ahora'}</span>
+                            <Save className="w-3.5 h-3.5" />
+                            <span>{isSavingManual ? 'Guardando…' : 'Guardar ahora'}</span>
                           </button>
                           <button
                             onClick={handleForgetFolder}
@@ -472,7 +481,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                           </span>
                           <button
                             onClick={handleGrantPermission}
-                            className="py-1 px-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-cinzel font-bold cursor-pointer shrink-0"
+                            className="min-h-[40px] py-1 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-cinzel font-bold cursor-pointer shrink-0"
                           >
                             Reactivar
                           </button>
@@ -511,7 +520,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                                 await handleGrantPermission();
                                 await fetchDiskFiles();
                               }}
-                              className="py-1 px-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[11px] font-cinzel font-bold cursor-pointer shrink-0"
+                              className="min-h-[40px] py-1 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-cinzel font-bold cursor-pointer shrink-0"
                             >
                               Autorizar
                             </button>
@@ -569,34 +578,48 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                                     </div>
                                   </div>
 
-                                  {/* Action Buttons for this file */}
-                                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                                  {/*
+                                    Las dos direcciones, dichas con todas las letras.
+
+                                    «Cargar» y «Sobrescribir» no decían qué
+                                    reemplaza a qué: quien las mira no sabe si
+                                    sobrescribir mete el archivo en la partida o
+                                    la partida en el archivo, y equivocarse
+                                    borra horas de juego. Ahora cada botón lleva
+                                    la dirección escrita —«← al archivo», «del
+                                    archivo →»— y su explicación debajo, que en
+                                    el móvil no hay tooltip que valga.
+
+                                    Y ocupan una fila entera con alto de dedo:
+                                    tres botones de diez píxeles apretados en una
+                                    esquina eran imposibles de acertar.
+                                  */}
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 shrink-0 w-full sm:w-auto">
                                     {onImportCampaignFile && (
                                       <button
                                         type="button"
                                         onClick={() => setFileToConfirmRestore(df)}
-                                        className="py-1 px-2 rounded bg-[color-mix(in_srgb,var(--accent)_12%,var(--surface))] hover:bg-[color-mix(in_srgb,var(--accent)_22%,var(--surface))] text-[var(--accent)] border border-[var(--accent)]/40 font-cinzel font-bold text-[10px] inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                        title={`Cargar y continuar jugando la partida de ${df.name}`}
+                                        className="min-h-[40px] py-1.5 px-3 rounded-lg bg-[color-mix(in_srgb,var(--accent)_12%,var(--surface))] hover:bg-[color-mix(in_srgb,var(--accent)_22%,var(--surface))] text-[var(--accent)] border border-[var(--accent)]/40 font-cinzel font-bold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                                        title={`Sustituir la campaña abierta por lo que hay guardado en ${df.name}`}
                                       >
-                                        <Upload className="w-3 h-3" />
-                                        <span>Cargar</span>
+                                        <Download className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Cargar del archivo</span>
                                       </button>
                                     )}
 
                                     {currentProject && (
                                       <button
                                         type="button"
-                                        onClick={() => {
-                                          setIsOverwritingFile(df.name);
-                                          void handleManualSaveToDisk(df.name);
-                                        }}
+                                        onClick={() => setFileToConfirmOverwrite(df)}
                                         disabled={isSavingManual && isOverwritingFile === df.name}
-                                        className="py-1 px-2 rounded bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] hover:bg-[var(--glass-border)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel font-semibold text-[10px] inline-flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
-                                        title={`Sobrescribir ${df.name} con el estado más reciente de la campaña activa (${currentProject.name})`}
+                                        className="min-h-[40px] py-1.5 px-3 rounded-lg bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] hover:bg-[var(--glass-border)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel font-semibold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 active:scale-95"
+                                        title={`Sustituir el contenido de ${df.name} por el estado actual de «${currentProject.name}»`}
                                       >
-                                        <Save className={`w-3 h-3 ${isSavingManual && isOverwritingFile === df.name ? 'animate-spin' : ''}`} />
+                                        <Save className={`w-3.5 h-3.5 shrink-0 ${isSavingManual && isOverwritingFile === df.name ? 'animate-spin' : ''}`} />
                                         <span>
-                                          {isSavingManual && isOverwritingFile === df.name ? 'Guardando...' : 'Sobrescribir'}
+                                          {isSavingManual && isOverwritingFile === df.name
+                                            ? 'Guardando…'
+                                            : 'Guardar en el archivo'}
                                         </span>
                                       </button>
                                     )}
@@ -604,10 +627,11 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => setFileToConfirmDelete(df.name)}
-                                      className="p-1.5 rounded text-red-600 dark:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors cursor-pointer"
+                                      className="min-h-[40px] px-3 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                       title={`Eliminar ${df.name} definitivamente de la carpeta`}
                                     >
-                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                      <span className="sm:hidden font-cinzel text-[11px] font-semibold">Eliminar</span>
                                     </button>
                                   </div>
                                 </div>
@@ -618,7 +642,11 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
 
                         <div className="pt-2 border-t border-[var(--glass-border)] text-[10px] text-[var(--text-secondary)] space-y-1">
                           <p className="m-0 leading-relaxed">
-                            💡 <strong>Gestión de Copias y Nombres:</strong> Las partidas se guardan automáticamente con el nombre de tu campaña (ej. <code>{currentProject ? getCampaignFileName(currentProject.name) : 'Mi-Campana.gmstudio.json'}</code>). Si has cambiado el nombre de una partida o tienes archivos antiguos como <code>Nueva-Campana.gmstudio.json</code>, puedes eliminarlos con el botón de la papelera o pulsar <strong>Sobrescribir</strong> para reemplazarlos con la versión más moderna.
+            💡 <strong>Las dos direcciones, para no confundirlas:</strong>{' '}
+                            <strong>«Cargar del archivo»</strong> trae lo guardado y sustituye la partida que tengas abierta.{' '}
+                            <strong>«Guardar en el archivo»</strong> hace lo contrario: vuelca la partida abierta encima de ese archivo. Las dos preguntan antes.
+                            <br />
+                            Cada campaña se guarda sola con su propio nombre (ej. <code>{currentProject ? getCampaignFileName(currentProject.name) : 'Mi-Campana.gmstudio.json'}</code>). Si le cambiaste el nombre a una campaña te quedará el archivo viejo suelto: bórralo con la papelera, o vuelca encima la versión buena.
                           </p>
                         </div>
                       </div>
@@ -638,7 +666,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                               type="button"
                               onClick={() => setFileToConfirmDelete(null)}
                               disabled={isDeletingFile}
-                              className="py-1 px-3 rounded bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel text-[11px] cursor-pointer hover:bg-[var(--glass-border)] transition-colors"
+                              className="min-h-[40px] py-1 px-3 rounded-lg bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel text-[11px] cursor-pointer hover:bg-[var(--glass-border)] transition-colors"
                             >
                               Cancelar
                             </button>
@@ -646,7 +674,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                               type="button"
                               onClick={() => handleDeleteDiskFile(fileToConfirmDelete)}
                               disabled={isDeletingFile}
-                              className="py-1 px-3 rounded bg-red-600 hover:bg-red-700 text-white font-cinzel font-bold text-[11px] cursor-pointer transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+                              className="min-h-[40px] py-1 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-cinzel font-bold text-[11px] cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
                             >
                               <Trash2 className="w-3 h-3" />
                               <span>{isDeletingFile ? 'Borrando...' : 'Sí, Eliminar Archivo'}</span>
@@ -659,27 +687,89 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
                       {fileToConfirmRestore && (
                         <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-lg space-y-2 text-xs text-sky-900 dark:text-sky-300 animate-[fadeIn_0.15s_ease]">
                           <div className="flex items-center gap-1.5 font-cinzel font-bold text-sky-700 dark:text-sky-400">
-                            <Upload className="w-4 h-4 shrink-0" />
-                            <span>¿Cargar y Restaurar Partida?</span>
+                            <Download className="w-4 h-4 shrink-0" />
+                            <span>¿Cargar la partida del archivo?</span>
                           </div>
+                          {/*
+                            Se dice en qué dirección va, con nombres propios a
+                            los dos lados. «Se importará la partida» no aclara
+                            qué le pasa a lo que tienes abierto ahora mismo, que
+                            es justo lo que preocupa al pulsar.
+                          */}
                           <p className="text-[11px] m-0 leading-relaxed text-[var(--text-secondary)]">
-                            Se importará y cargará la partida desde <strong>«{fileToConfirmRestore.name}»</strong> ({formatFileSize(fileToConfirmRestore.size)}).
+                            El archivo <strong>«{fileToConfirmRestore.name}»</strong> ({formatFileSize(fileToConfirmRestore.size)}) pasa a ser tu partida.
+                            {currentProject ? (
+                              <>
+                                {' '}Lo que tengas ahora en <strong>«{currentProject.name}»</strong> sin guardar en la carpeta se pierde.
+                              </>
+                            ) : null}
                           </p>
                           <div className="flex items-center justify-end gap-2 pt-1">
                             <button
                               type="button"
                               onClick={() => setFileToConfirmRestore(null)}
-                              className="py-1 px-3 rounded bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel text-[11px] cursor-pointer hover:bg-[var(--glass-border)] transition-colors"
+                              className="min-h-[40px] py-1 px-3 rounded-lg bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel text-[11px] cursor-pointer hover:bg-[var(--glass-border)] transition-colors"
                             >
                               Cancelar
                             </button>
                             <button
                               type="button"
                               onClick={() => handleRestoreDiskFile(fileToConfirmRestore)}
-                              className="py-1 px-3 rounded bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold text-[11px] cursor-pointer hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
+                              className="min-h-[40px] py-1 px-3 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold text-[11px] cursor-pointer hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-1.5"
                             >
                               <CheckCircle2 className="w-3 h-3" />
-                              <span>Cargar Partida</span>
+                              <span>Sí, cargar del archivo</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/*
+                        La confirmación que faltaba.
+
+                        Guardar en un archivo destruye lo que hubiera dentro, y
+                        era la única de las tres acciones que se ejecutaba al
+                        primer toque. Ahora dice, con nombres propios, qué
+                        sustituye a qué y qué se pierde.
+                      */}
+                      {fileToConfirmOverwrite && (
+                        <div className="p-3 bg-amber-500/15 border border-amber-700/40 rounded-lg space-y-2 text-xs text-amber-950 dark:text-amber-100 animate-[fadeIn_0.15s_ease]">
+                          <div className="flex items-center gap-1.5 font-cinzel font-bold">
+                            <Save className="w-4 h-4 shrink-0" />
+                            <span>¿Guardar la partida en el archivo?</span>
+                          </div>
+                          <p className="text-[11px] m-0 leading-relaxed">
+                            Tu partida <strong>«{currentProject?.name}»</strong>, tal como está ahora, pasa a ocupar el
+                            archivo <strong>«{fileToConfirmOverwrite.name}»</strong>. Lo que ese archivo guardaba
+                            {' '}({formatFileSize(fileToConfirmOverwrite.size)}, del{' '}
+                            {new Date(fileToConfirmOverwrite.lastModified).toLocaleDateString('es-ES', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                            ) se pierde y no se puede recuperar.
+                          </p>
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setFileToConfirmOverwrite(null)}
+                              className="min-h-[36px] py-1 px-3 rounded-lg bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] font-cinzel text-[11px] cursor-pointer hover:bg-[var(--glass-border)] transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const destino = fileToConfirmOverwrite.name;
+                                setFileToConfirmOverwrite(null);
+                                setIsOverwritingFile(destino);
+                                void handleManualSaveToDisk(destino);
+                              }}
+                              className="min-h-[36px] py-1 px-3 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] font-cinzel font-bold text-[11px] cursor-pointer hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
+                            >
+                              <Save className="w-3 h-3" />
+                              <span>Sí, guardar encima</span>
                             </button>
                           </div>
                         </div>
@@ -873,7 +963,7 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
         <div className="p-3 border-t border-[var(--glass-border)] bg-[var(--glass)] flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded font-cinzel font-bold text-xs bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 transition-opacity cursor-pointer"
+            className="min-h-[40px] px-4 py-1.5 rounded-lg font-cinzel font-bold text-xs bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 transition-opacity cursor-pointer active:scale-95"
           >
             Cerrar
           </button>
