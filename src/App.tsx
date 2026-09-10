@@ -2895,7 +2895,7 @@ export default function App() {
   const isCurrentChatNearTokenLimit = effectiveChatTokens >= AVISO_TOKENS_POR_MINUTO;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg-color)] text-[var(--text-primary)] font-lora relative">
+    <div className="flex h-[100dvh] w-screen overflow-hidden bg-[var(--bg-color)] text-[var(--text-primary)] font-lora relative">
       {/* Sutil viñeteado para efecto de inmersión / iluminación central */}
       <div className="pointer-events-none fixed inset-0 z-50 shadow-[inset_0_0_120px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_0_150px_rgba(0,0,0,0.2)] mix-blend-multiply opacity-50" />
       {/*

@@ -45,6 +45,20 @@ export async function hayVersionNueva(): Promise<boolean> {
 }
 
 /**
+ * Desde qué versión se pidió la última actualización.
+ *
+ * GitHub Pages sirve desde varios nodos y no todos se enteran a la vez de un
+ * despliegue: se puede preguntar a uno que ya tiene la versión nueva, recargar,
+ * y que otro te devuelva la vieja. Entonces el aviso vuelve a saltar, se
+ * actualiza otra vez, y a girar. Guardando desde qué versión se salió, al
+ * volver se sabe si el viaje sirvió de algo.
+ *
+ * Vive en `sessionStorage` a propósito: es un dato de este intento, no de la
+ * campaña, y debe desaparecer al cerrar del todo.
+ */
+const CLAVE_INTENTO = 'gmstudio_version_al_actualizar';
+
+/**
  * Recarga de verdad, no la recarga de mentira.
  *
  * `location.reload()` puede volver a servir el mismo HTML cacheado y dejar todo
@@ -55,6 +69,13 @@ export async function hayVersionNueva(): Promise<boolean> {
  * No se toca `localStorage`: ahí viven las campañas.
  */
 export async function recargarConLaVersionNueva(): Promise<void> {
+  try {
+    // Desde dónde salimos, para reconocer una recarga que no cambió nada.
+    const actual = guionActual();
+    if (actual) sessionStorage.setItem(CLAVE_INTENTO, actual);
+  } catch {
+    /* sin sessionStorage se sigue igual, solo que sin la red de seguridad */
+  }
   try {
     if ('caches' in window) {
       const nombres = await caches.keys();
@@ -86,8 +107,32 @@ export function vigilarVersion(alHaberNueva: () => void): () => void {
   let parado = false;
   let avisado = false;
 
+  /*
+   * ¿Venimos de actualizar y seguimos en la misma versión?
+   *
+   * Entonces el despliegue aún no ha llegado al nodo que nos sirve, y volver a
+   * avisar solo consigue que se actualice otra vez para nada. Se calla hasta la
+   * siguiente comprobación del reloj, que da tiempo de sobra a que propague.
+   */
+  let enGracia = false;
+  try {
+    const desde = sessionStorage.getItem(CLAVE_INTENTO);
+    if (desde) {
+      sessionStorage.removeItem(CLAVE_INTENTO);
+      enGracia = desde === guionActual();
+    }
+  } catch {
+    /* sin sessionStorage, se comporta como antes */
+  }
+
   const mirar = async () => {
     if (parado || avisado) return;
+    // La primera comprobación tras una actualización que no cambió nada se
+    // salta; a partir de la siguiente se mira con normalidad.
+    if (enGracia) {
+      enGracia = false;
+      return;
+    }
     if (await hayVersionNueva()) {
       avisado = true;
       alHaberNueva();
