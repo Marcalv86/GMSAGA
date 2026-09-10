@@ -8,7 +8,10 @@ import {
   Compass,
   Calendar,
   Sparkles,
-  Clock
+  Clock,
+  Minus,
+  Plus,
+  Newspaper
 } from 'lucide-react';
 
 export interface SceneTransitionPreset {
@@ -18,7 +21,30 @@ export interface SceneTransitionPreset {
   icon: React.ComponentType<{ className?: string }>;
   description: string;
   defaultPrompt: string;
+  /**
+   * En qué unidad se mide este salto.
+   *
+   * Los saltos de horas se resuelven solos; los de días no: «varios días» lo
+   * decidía el Narrador de su cosecha, y por eso el calendario y el HUD acababan
+   * discrepando. Los de escala «dias» piden el número exacto.
+   */
+  escala: 'horas' | 'dias';
+  /** Días que se proponen por defecto, para no empezar en blanco. */
+  diasPorDefecto?: number;
 }
+
+/** Lo que se decide en el modal además del texto de la instrucción. */
+export interface OpcionesDeTransicion {
+  /** Días exactos que pasan. 0 = el salto no se mide en días. */
+  dias: number;
+  /** Si hay que pedir noticias concretas del mundo para esos días. */
+  noticias: boolean;
+  /** Qué estuvo haciendo el personaje: convaleciente, de viaje, de compras… */
+  motivo: string;
+}
+
+/** Tope de días de un salto en un solo paso. */
+export const MAX_DIAS_DE_SALTO = 60;
 
 export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
   {
@@ -29,7 +55,8 @@ export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
     description:
       'Pasa la noche. El grupo recupera PG, dados de golpe y ranuras. El mundo no se detiene: los PNJs vigilan o traman, facciones avanzan en bambalinas y amanece con un nuevo estímulo o acontecimiento.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Descanso Largo · 8 horas]: La escena anterior concluye y el grupo completa un descanso largo de 8 horas sin sobresaltos mayores. Se recuperan todos los puntos de golpe, dados de golpe y recursos de clase.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Actualiza el encabezado de HUD (📍 nuevo momento/lugar, fecha Harptos y hora matutina, 🌤 clima y visibilidad, 👥 presentes). El paso de la noche afecta a los PNJs y al entorno: narra qué han estado haciendo los acompañantes durante las guardias o el reposo, cómo amanece la situación (ánimos, preparativos) y qué movimientos han ocurrido en bambalinas con las facciones o enemigos cercanos. Abre la jornada con un estímulo activo o novedad inmediata que rompa la quietud.'
+      '⏳ [Transición de Escena / Descanso Largo · 8 horas]: La escena anterior concluye y el grupo completa un descanso largo de 8 horas sin sobresaltos mayores. Se recuperan todos los puntos de golpe, dados de golpe y recursos de clase.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Actualiza el encabezado de HUD (📍 nuevo momento/lugar, fecha Harptos y hora matutina, 🌤 clima y visibilidad, 👥 presentes). El paso de la noche afecta a los PNJs y al entorno: narra qué han estado haciendo los acompañantes durante las guardias o el reposo, cómo amanece la situación (ánimos, preparativos) y qué movimientos han ocurrido en bambalinas con las facciones o enemigos cercanos. Abre la jornada con un estímulo activo o novedad inmediata que rompa la quietud.',
+    escala: 'horas'
   },
   {
     id: 'short_rest',
@@ -39,7 +66,8 @@ export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
     description:
       'Pausa para vendar heridas, gastar dados de golpe y charlar. El entorno circundante sigue en marcha: cambios de guardia, ruidos y ajustes de tensión.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Descanso Corto · 1-2 horas]: Transcurre un receso de una a dos horas de calma. El grupo toma aliento, venda heridas, gasta dados de golpe y recupera recursos breves.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: El entorno no se detiene; describe cómo reaccionan los PNJs presentes tras la pausa, qué cambios se perciben en el entorno tras este intervalo (patrullas, rumores, ruidos que se aproximan o cambios de viento) y presenta el estímulo activo que encara el grupo al levantarse.'
+      '⏳ [Transición de Escena / Descanso Corto · 1-2 horas]: Transcurre un receso de una a dos horas de calma. El grupo toma aliento, venda heridas, gasta dados de golpe y recupera recursos breves.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: El entorno no se detiene; describe cómo reaccionan los PNJs presentes tras la pausa, qué cambios se perciben en el entorno tras este intervalo (patrullas, rumores, ruidos que se aproximan o cambios de viento) y presenta el estímulo activo que encara el grupo al levantarse.',
+    escala: 'horas'
   },
   {
     id: 'time_skip_hours',
@@ -49,7 +77,8 @@ export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
     description:
       'Pasan varias horas del día. Cae el sol, se encienden antorchas, rotan turnos y las facciones o criaturas nocturnas mueven ficha.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Salto Temporal de Varias Horas]: Transcurren varias horas de espera o camino. La luz solar se extingue y cae la noche: actualiza el encabezado de HUD con la nueva hora vespertina/nocturna y visibilidad reducida.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Durante estas horas, los PNJs presentes y lejanos han seguido sus rutinas o planes en bambalinas. Narra la atmósfera nocturna, los cambios de guardia y ánimos, y el acontecimiento o rumor que surge con la llegada de la oscuridad.'
+      '⏳ [Transición de Escena / Salto Temporal de Varias Horas]: Transcurren varias horas de espera o camino. La luz solar se extingue y cae la noche: actualiza el encabezado de HUD con la nueva hora vespertina/nocturna y visibilidad reducida.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Durante estas horas, los PNJs presentes y lejanos han seguido sus rutinas o planes en bambalinas. Narra la atmósfera nocturna, los cambios de guardia y ánimos, y el acontecimiento o rumor que surge con la llegada de la oscuridad.',
+    escala: 'horas'
   },
   {
     id: 'location_change',
@@ -59,7 +88,9 @@ export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
     description:
       'Elipsis de desplazamiento hacia un nuevo destino. Se narran los hitos de la ruta y se sitúa al grupo a su llegada con nuevo HUD y una situación viva.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Viaje y Desplazamiento]: Se cierra la escena previa y el grupo emprende el viaje hacia el siguiente destino relevante.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Narra de forma concisa el trayecto y la dinámica entre los viajeros durante el camino. Sitúa al grupo a su llegada con un nuevo encabezado de HUD (📍 nuevo lugar exacto, 🌤 clima y 👥 presentes) y un acontecimiento, encuentro o complicación que recibe al grupo en el nuevo escenario.'
+      '⏳ [Transición de Escena / Viaje y Desplazamiento]: Se cierra la escena previa y el grupo emprende el viaje hacia el siguiente destino relevante.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Narra de forma concisa el trayecto y la dinámica entre los viajeros durante el camino. Sitúa al grupo a su llegada con un nuevo encabezado de HUD (📍 nuevo lugar exacto, 🌤 clima y 👥 presentes) y un acontecimiento, encuentro o complicación que recibe al grupo en el nuevo escenario.',
+    escala: 'dias',
+    diasPorDefecto: 3
   },
   {
     id: 'downtime_days',
@@ -69,14 +100,16 @@ export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
     description:
       'Varios días de actividad cotidiana, compras, forja o convalecencia. Noticias que llegan de la Costa de la Espada o Luskan y un suceso que rompe la monotonía.',
     defaultPrompt:
-      '⏳ [Transición de Escena / Tiempo Muerto · Varios Días]: Transcurren varios días de calma relativa y vida cotidiana en la zona.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Durante este tiempo, el mundo de Faerûn ha seguido girando: actualiza la fecha en el HUD. Detalla qué han estado haciendo los personajes, qué noticias, rumores o intrigas han cruzado los caminos (desde Luskan, Aguasprofundas o la región), y cuál es el acontecimiento, visita o ruptura de la calma que arranca el nuevo conflicto.'
+      '⏳ [Transición de Escena / Tiempo Muerto · Varios Días]: Transcurren varios días de calma relativa y vida cotidiana en la zona.\n\n🌍 [Afectación al Mundo, Eventos y PNJs]: Durante este tiempo, el mundo de Faerûn ha seguido girando: actualiza la fecha en el HUD. Detalla qué han estado haciendo los personajes, qué noticias, rumores o intrigas han cruzado los caminos (desde Luskan, Aguasprofundas o la región), y cuál es el acontecimiento, visita o ruptura de la calma que arranca el nuevo conflicto.',
+    escala: 'dias',
+    diasPorDefecto: 7
   }
 ];
 
 interface SceneTransitionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onExecuteTransition: (promptText: string) => void;
+  onExecuteTransition: (promptText: string, opciones: OpcionesDeTransicion) => void;
   isGenerating?: boolean;
 }
 
@@ -90,17 +123,35 @@ export const SceneTransitionModal: React.FC<SceneTransitionModalProps> = ({
   const [customPrompt, setCustomPrompt] = useState<string>(
     SCENE_TRANSITION_PRESETS[0].defaultPrompt
   );
+  const [dias, setDias] = useState<number>(0);
+  const [noticias, setNoticias] = useState<boolean>(true);
+  const [motivo, setMotivo] = useState<string>('');
 
   if (!isOpen) return null;
 
-  const handleSelectPreset = (preset: SceneTransitionPreset) => {
-    setSelectedPresetId(preset.id);
-    setCustomPrompt(preset.defaultPrompt);
+  const preset =
+    SCENE_TRANSITION_PRESETS.find(pr => pr.id === selectedPresetId) || SCENE_TRANSITION_PRESETS[0];
+  const enDias = preset.escala === 'dias';
+
+  const handleSelectPreset = (p: SceneTransitionPreset) => {
+    setSelectedPresetId(p.id);
+    setCustomPrompt(p.defaultPrompt);
+    setDias(p.escala === 'dias' ? p.diasPorDefecto || 1 : 0);
+    setMotivo('');
   };
+
+  const ajustarDias = (delta: number) =>
+    setDias(d => Math.max(1, Math.min(MAX_DIAS_DE_SALTO, d + delta)));
 
   const handleExecute = () => {
     if (!customPrompt.trim() || isGenerating) return;
-    onExecuteTransition(customPrompt.trim());
+    onExecuteTransition(customPrompt.trim(), {
+      dias: enDias ? dias : 0,
+      // Pedir noticias de un solo día es gastar una llamada para nada: en un día
+      // el mundo no se mueve lo bastante como para que llegue una gaceta.
+      noticias: enDias && noticias && dias >= 2,
+      motivo: motivo.trim()
+    });
     onClose();
   };
 
@@ -187,6 +238,96 @@ export const SceneTransitionModal: React.FC<SceneTransitionModalProps> = ({
               })}
             </div>
           </div>
+
+          {/*
+            Cuántos días, exactamente.
+
+            «Varios días» lo decidía el Narrador de su cosecha, y de ahí salían
+            calendarios y HUD que no cuadraban. Aquí se dice el número y viaja
+            en la instrucción, así que solo hay una versión de cuánto ha pasado.
+          */}
+          {enDias && (
+            <div className="rounded-lg border border-[var(--user-border)] bg-[var(--surface)] p-3 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="font-cinzel text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[var(--accent)]" /> ¿Cuántos días pasan?
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => ajustarDias(-1)}
+                    disabled={dias <= 1}
+                    className="w-10 h-10 shrink-0 rounded-lg border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30"
+                    aria-label="Un día menos"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={MAX_DIAS_DE_SALTO}
+                    value={dias}
+                    onChange={e => {
+                      const n = parseInt(e.target.value, 10);
+                      setDias(Number.isFinite(n) ? Math.max(1, Math.min(MAX_DIAS_DE_SALTO, n)) : 1);
+                    }}
+                    className="w-16 h-10 rounded-lg border border-[var(--user-border)] bg-[var(--bg-color)] text-center font-cinzel text-sm font-bold text-[var(--text-primary)] outline-hidden focus:border-[var(--accent)]"
+                    aria-label="Días que pasan"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => ajustarDias(1)}
+                    disabled={dias >= MAX_DIAS_DE_SALTO}
+                    className="w-10 h-10 shrink-0 rounded-lg border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30"
+                    aria-label="Un día más"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <input
+                type="text"
+                value={motivo}
+                onChange={e => setMotivo(e.target.value)}
+                placeholder="¿Haciendo qué? Convaleciente, forjando, de viaje a Luskan…"
+                className="w-full h-10 px-3 rounded-lg border border-[var(--user-border)] bg-[var(--bg-color)] text-xs font-lora text-[var(--text-primary)] outline-hidden focus:border-[var(--accent)]"
+              />
+
+              {/*
+                Las noticias del mundo.
+
+                Se piden aparte, al modelo de tareas de fondo, para que salgan
+                concretas y fechadas —«el día 3 Thay atacó Puerta de Baldur»— en
+                vez de un «llegaron rumores» de relleno. Van al Narrador para
+                que las use y las registre en el calendario con su día exacto.
+              */}
+              <label
+                className={`flex items-start gap-2.5 rounded-lg border p-2.5 transition-colors ${
+                  dias >= 2 ? 'cursor-pointer border-[var(--user-border)] hover:border-[var(--accent)]/50' : 'border-[var(--user-border)] opacity-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={noticias && dias >= 2}
+                  disabled={dias < 2}
+                  onChange={e => setNoticias(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 shrink-0 accent-[var(--accent)] cursor-pointer disabled:cursor-not-allowed"
+                />
+                <span className="min-w-0">
+                  <span className="font-cinzel text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                    <Newspaper className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" /> Noticias del mundo
+                  </span>
+                  <span className="block text-[11px] leading-relaxed text-[var(--text-secondary)] mt-0.5">
+                    {dias < 2
+                      ? 'A partir de dos días. En uno solo no da tiempo a que llegue nada.'
+                      : `Genera qué pasó en Faerûn durante esos ${dias} días —guerras, bandos, robos, intrigas— con su día exacto, y se apunta en el calendario. No gasta de tus turnos de partida: sale del modelo de tareas de fondo.`}
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
 
           {/* Prompt customization */}
           <div>

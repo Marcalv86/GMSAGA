@@ -43,6 +43,7 @@ import { FilesView } from './components/FilesView';
 import { InstructionsView } from './components/InstructionsView';
 import { NovelReaderView } from './components/NovelReaderView';
 import { MesaView } from './components/MesaView';
+import { OpcionesDeTransicion } from './components/SceneTransitionModal';
 import { recargarConLaVersionNueva, vigilarVersion } from './utils/versionCheck';
 import { MapViewer } from './components/MapViewer';
 import { InstallAppModal } from './components/InstallAppModal';
@@ -99,7 +100,8 @@ import {
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
   isNarrativeIncomplete,
-  novelizeUserMessage
+  novelizeUserMessage,
+  generarNoticiasSaltoTemporal
 } from './utils/geminiHelper';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
@@ -1697,9 +1699,74 @@ export default function App() {
     await triggerAIGeneration(continuePrompt, baseMessages, options);
   };
 
-  const handleSceneTransition = async (transitionPrompt: string) => {
+  const handleSceneTransition = async (
+    transitionPrompt: string,
+    opciones?: OpcionesDeTransicion
+  ) => {
     if (!transitionPrompt.trim() || !currentPId || !currentChatId || isGenerating || !currentChat) return;
-    const text = transitionPrompt.trim();
+    let text = transitionPrompt.trim();
+
+    /*
+     * El número de días, dicho una sola vez.
+     *
+     * «Varios días» lo interpretaba el Narrador a ojo y el calendario y el HUD
+     * acababan discrepando. Si la jugadora ha dicho cuántos, esa es la cifra y
+     * viaja pegada a la instrucción para que el HUD la escriba tal cual.
+     */
+    const dias = opciones?.dias || 0;
+    if (dias > 0) {
+      text += `\n\n📅 [DURACIÓN EXACTA DEL SALTO]: Pasan EXACTAMENTE ${dias} ${dias === 1 ? 'día' : 'días'}${opciones?.motivo ? `, con el protagonista ${opciones.motivo}` : ''}. Adelanta la fecha del HUD justo esos ${dias} ${dias === 1 ? 'día' : 'días'}, ni uno más ni uno menos, y escríbela completa. No digas «varios días»: di la fecha.`;
+    }
+
+    /*
+     * Las noticias del mundo, concretas y fechadas.
+     *
+     * Se piden aparte al modelo de tareas de fondo (que tiene su propia cuota,
+     * así que no cuesta turnos de partida) y se le entregan al Narrador ya
+     * hechas. La alternativa era que se las inventara mientras narra, y salían
+     * «llegaron rumores de la costa» sin nada dentro y sin fecha.
+     *
+     * Van al calendario por la vía de siempre —las etiquetas [AGENDA:] que el
+     * Narrador escribe en el chat— y no escribiendo en la cronología por un
+     * lado: así la siguiente sincronización las reconoce en vez de barrerlas.
+     */
+    if (opciones?.noticias && dias >= 2 && currentProject) {
+      /*
+       * El indicador se enciende ya: generar las noticias tarda unos segundos y
+       * sin esto la pantalla se quedaba muerta después de pulsar, que es
+       * exactamente cuando se vuelve a pulsar pensando que no ha ido.
+       */
+      setIsGenerating(true);
+      setLoadingText('El mundo sigue girando: buscando qué ha pasado mientras tanto…');
+      try {
+        const noticias = await generarNoticiasSaltoTemporal({
+          project: currentProject,
+          dias,
+          motivo: opciones.motivo || undefined,
+          // Dónde se está: lo último que se apuntó en la cronología, que es lo
+          // más fresco que hay sin volver a leerse el capítulo entero.
+          lugar: [...(currentProject.timeline || [])].reverse().find(e => e.lugar)?.lugar
+        });
+        if (noticias.length > 0) {
+          const lista = noticias
+            .map(n => {
+              const dia = Math.max(1, Math.min(dias, n.diaOffset || 1));
+              const donde = n.lugar ? ` · ${n.lugar}` : '';
+              const fuente = n.fuenteOClima ? ` · se sabe por: ${n.fuenteOClima}` : '';
+              return `- Día +${dia}${donde}${fuente} — **${n.titulo}**: ${n.resumen}`;
+            })
+            .join('\n');
+          text += `\n\n📰 [LO QUE HA PASADO EN EL MUNDO DURANTE ESTOS ${dias} DÍAS]:\n${lista}\n\nÚSALAS: no te inventes otras noticias distintas ni las sustituyas por «llegaron rumores». Cuenta cómo se entera el protagonista de las que le lleguen (pregoneros, tablón, taberna, un PNJ que las trae), y REGISTRA CADA UNA en su día con su etiqueta, en este formato exacto:\n\`[AGENDA: el resumen | dia: +N | tipo: noticia | lugar: donde pasó | titulo: el título]\`\nUna etiqueta por noticia, con el mismo «día +N» que tiene arriba. Las que el protagonista no llegue a oír se registran igual: el mundo pasa aunque nadie lo cuente.`;
+        }
+      } catch (err) {
+        // Sin noticias se sigue jugando: el salto es lo importante, esto es el adorno.
+        logWarn('threads', 'No se pudieron generar las noticias del salto temporal', String(err), {
+          projectName: currentProject.name,
+          details: { dias, motivo: opciones.motivo }
+        });
+      }
+    }
+
     const updatedMessages: Message[] = [...currentChat.messages, { role: 'user' as const, content: text }];
     const updatedChat = { ...currentChat, messages: updatedMessages };
     const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));

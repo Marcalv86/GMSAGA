@@ -4,7 +4,7 @@ import { Chat, PlayerCharacter, Project, ProjectFile } from '../types';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
 import { CreativeStudioModal } from './CreativeStudioModal';
-import { SceneTransitionModal } from './SceneTransitionModal';
+import { OpcionesDeTransicion, SceneTransitionModal } from './SceneTransitionModal';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
@@ -648,7 +648,10 @@ export const ChatView: React.FC<{
   onEditMessage: (index: number, newContent: string) => Promise<void> | void;
   onRegenerateMessage: (index: number, updatedUserPrompt?: string) => Promise<void> | void;
   onContinueNarrative: (fromIndex?: number) => Promise<void> | void;
-  onSceneTransition?: (transitionPrompt: string) => Promise<void> | void;
+  onSceneTransition?: (
+    transitionPrompt: string,
+    opciones?: OpcionesDeTransicion
+  ) => Promise<void> | void;
   onDeleteMessage: (index: number, deleteSubsequent: boolean) => Promise<void> | void;
   onUpdatePlayerCharacter?: (pc: PlayerCharacter) => void;
   onOpenNovelReader?: () => void;
@@ -1958,9 +1961,9 @@ export const ChatView: React.FC<{
       <SceneTransitionModal
         isOpen={showTransitionModal}
         onClose={handleCloseTransitionModal}
-        onExecuteTransition={(promptText) => {
+        onExecuteTransition={(promptText, opciones) => {
           if (onSceneTransition) {
-            onSceneTransition(promptText);
+            onSceneTransition(promptText, opciones);
           } else {
             setInputText(promptText);
             handleSend();
