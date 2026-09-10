@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import {
   BookmarkPlus,
   BookOpen,
+  ImagePlus,
   Loader,
   MessageSquare,
   Send,
@@ -11,7 +12,9 @@ import {
   Users
 } from 'lucide-react';
 import { Chat, Project } from '../types';
-import { describeApiError, preguntarAlDirectorOOC } from '../utils/geminiHelper';
+import { describeApiError, ImagenDeMesa, preguntarAlDirectorOOC } from '../utils/geminiHelper';
+import { YouTubePreview } from './YouTubePreview';
+import { SpotifyPreview } from './SpotifyPreview';
 
 export interface MensajeDeMesa {
   role: 'user' | 'model';
@@ -19,6 +22,48 @@ export interface MensajeDeMesa {
   timestamp?: string;
   /** Lo que el Director apuntó en la memoria en ese mensaje, para poder verlo. */
   memorias?: string[];
+  /**
+   * Miniaturas de lo que se adjuntó, en `data:` para poder repintarlas.
+   *
+   * Se guardan reducidas a propósito: la conversación vive en localStorage y
+   * una foto de móvil a tamaño completo se come el sitio de la campaña entera.
+   */
+  adjuntos?: string[];
+}
+
+/** Ancho máximo al que se reduce una imagen antes de guardarla y enviarla. */
+const ANCHO_MAX_ADJUNTO = 1024;
+
+/**
+ * Reduce y recomprime una imagen antes de mandarla.
+ *
+ * Una foto de móvil son varios megas y varios miles de tokens; a mil px de
+ * ancho y calidad 0,8 se ve perfectamente para lo que hace falta aquí —mirar
+ * una referencia, leer un mapa— y cuesta una fracción.
+ */
+async function prepararImagen(file: File): Promise<{ dataUrl: string; imagen: ImagenDeMesa }> {
+  const dataUrlOriginal: string = await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result));
+    fr.onerror = () => rej(new Error('No se pudo leer la imagen.'));
+    fr.readAsDataURL(file);
+  });
+
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const el = new Image();
+    el.onload = () => res(el);
+    el.onerror = () => rej(new Error('No se pudo abrir la imagen.'));
+    el.src = dataUrlOriginal;
+  });
+
+  const escala = Math.min(1, ANCHO_MAX_ADJUNTO / (img.naturalWidth || ANCHO_MAX_ADJUNTO));
+  const lienzo = document.createElement('canvas');
+  lienzo.width = Math.max(1, Math.round((img.naturalWidth || ANCHO_MAX_ADJUNTO) * escala));
+  lienzo.height = Math.max(1, Math.round((img.naturalHeight || ANCHO_MAX_ADJUNTO) * escala));
+  lienzo.getContext('2d')?.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+
+  const dataUrl = lienzo.toDataURL('image/jpeg', 0.8);
+  return { dataUrl, imagen: { data: dataUrl.split(',')[1], mimeType: 'image/jpeg' } };
 }
 
 const CLAVE_MESA = 'gmstudio_mesa_';
@@ -74,6 +119,8 @@ export const MesaView: React.FC<{
 }> = ({ project, chats, currentChatId, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria }) => {
   const [mensajes, setMensajes] = useState<MensajeDeMesa[]>(() => leerMesa(project.id));
   const [texto, setTexto] = useState('');
+  const [adjuntos, setAdjuntos] = useState<{ dataUrl: string; imagen: ImagenDeMesa }[]>([]);
+  const inputArchivo = useRef<HTMLInputElement>(null);
   const [pensando, setPensando] = useState(false);
   const [error, setError] = useState('');
   const finRef = useRef<HTMLDivElement>(null);
@@ -87,17 +134,37 @@ export const MesaView: React.FC<{
     finRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mensajes.length, pensando]);
 
+  const anadirImagenes = async (files: File[]) => {
+    setError('');
+    const soloImagenes = files.filter(f => f.type.startsWith('image/'));
+    if (soloImagenes.length < files.length) {
+      setError('Solo se pueden adjuntar imágenes. Para vídeos, pega el enlace de YouTube en el mensaje.');
+    }
+    try {
+      const preparadas = await Promise.all(soloImagenes.slice(0, 4).map(prepararImagen));
+      setAdjuntos(prev => [...prev, ...preparadas].slice(0, 4));
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo preparar la imagen.');
+    }
+  };
+
   const enviar = async () => {
     const pregunta = texto.trim();
-    if (!pregunta || pensando) return;
+    if ((!pregunta && adjuntos.length === 0) || pensando) return;
 
     const conLaPregunta: MensajeDeMesa[] = [
       ...mensajes,
-      { role: 'user', content: pregunta, timestamp: new Date().toISOString() }
+      {
+        role: 'user',
+        content: pregunta,
+        adjuntos: adjuntos.length ? adjuntos.map(a => a.dataUrl) : undefined,
+        timestamp: new Date().toISOString()
+      }
     ];
     setMensajes(conLaPregunta);
     guardarMesa(project.id, conLaPregunta);
     setTexto('');
+    setAdjuntos([]);
     setPensando(true);
     setError('');
 
@@ -107,7 +174,8 @@ export const MesaView: React.FC<{
         chats,
         currentChatId,
         historial: mensajes,
-        pregunta
+        pregunta: pregunta || '(sin texto: mira la imagen adjunta)',
+        imagenes: adjuntos.map(a => a.imagen)
       });
       const completo: MensajeDeMesa[] = [
         ...conLaPregunta,
@@ -250,6 +318,11 @@ export const MesaView: React.FC<{
                 de mesa. Aquí no se narra ni pasa el tiempo: nada de lo que se hable entra en la crónica
                 ni toca la ficha.
               </p>
+              <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto leading-relaxed mt-3 mb-0">
+                Puedes adjuntar imágenes para que las mire —una referencia de un PNJ, un mapa, una
+                ficha— y pegar enlaces de YouTube o Spotify, que se ven aquí mismo. Si le pides recordar
+                algo, lo apunta en la memoria de la campaña y te lo enseña.
+              </p>
             </div>
           )}
 
@@ -262,7 +335,31 @@ export const MesaView: React.FC<{
                   : 'self-start bg-[var(--surface-soft)] border border-[var(--glass-border)] markdown-body'
               }`}
             >
-              {m.role === 'user' ? m.content : <ReactMarkdown>{m.content}</ReactMarkdown>}
+              {m.adjuntos?.length ? (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {m.adjuntos.map((src, k) => (
+                    <img
+                      key={k}
+                      src={src}
+                      alt="Adjunto"
+                      className="max-h-40 rounded-lg border border-[var(--glass-border)]"
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {m.content
+                ? m.role === 'user'
+                  ? m.content
+                  : <ReactMarkdown>{m.content}</ReactMarkdown>
+                : null}
+              {/*
+                Los enlaces se ven, como en el chat de juego. Aquí es donde se
+                comparte una referencia visual o una pieza de música para una
+                escena, y tener que salir de la app para verla rompe la
+                conversación.
+              */}
+              <YouTubePreview content={m.content} />
+              <SpotifyPreview content={m.content} />
               {/*
                 Lo apuntado, siempre a la vista.
 
@@ -306,7 +403,49 @@ export const MesaView: React.FC<{
       </div>
 
       <div className="px-3 sm:px-4 md:px-6 pt-2.5 pb-4 border-t border-dashed border-[var(--glass-border)] shrink-0">
+        <div className="max-w-[900px] mx-auto">
+          {adjuntos.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {adjuntos.map((a, k) => (
+                <div key={k} className="relative">
+                  <img
+                    src={a.dataUrl}
+                    alt="Adjunto"
+                    className="h-16 w-16 object-cover rounded-lg border border-[var(--user-border)]"
+                  />
+                  <button
+                    onClick={() => setAdjuntos(prev => prev.filter((_, i) => i !== k))}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-xs flex items-center justify-center cursor-pointer shadow-md"
+                    aria-label="Quitar imagen"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="max-w-[900px] mx-auto flex items-end gap-2">
+          <input
+            ref={inputArchivo}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={e => {
+              if (e.target.files?.length) anadirImagenes(Array.from(e.target.files));
+              e.target.value = '';
+            }}
+          />
+          <button
+            onClick={() => inputArchivo.current?.click()}
+            disabled={pensando || adjuntos.length >= 4}
+            className="shrink-0 w-11 h-11 rounded-xl border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] flex items-center justify-center transition-all disabled:opacity-30 cursor-pointer"
+            title="Adjuntar una imagen (máximo 4). Para vídeo, pega el enlace de YouTube en el mensaje."
+            aria-label="Adjuntar imagen"
+          >
+            <ImagePlus className="w-4 h-4" />
+          </button>
           <textarea
             value={texto}
             onChange={e => setTexto(e.target.value)}
@@ -317,13 +456,16 @@ export const MesaView: React.FC<{
               }
             }}
             rows={1}
+            // El texto largo se partía en dos líneas y la segunda quedaba cortada
+            // por el campo de una sola fila. La pista de YouTube vive ahora en la
+            // pantalla de bienvenida, donde hay sitio para explicarla.
             placeholder="Pregúntale al Director…"
             disabled={pensando}
             className="flex-1 resize-none rounded-xl border border-[var(--user-border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm font-lora text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60 min-h-[44px] max-h-40"
           />
           <button
             onClick={enviar}
-            disabled={pensando || !texto.trim()}
+            disabled={pensando || (!texto.trim() && adjuntos.length === 0)}
             className="shrink-0 bg-[var(--accent)] text-[var(--on-accent)] w-11 h-11 rounded-xl flex items-center justify-center hover:bg-[var(--accent-hover)] active:scale-95 transition-all disabled:opacity-30 cursor-pointer"
             aria-label="Enviar al Director"
           >

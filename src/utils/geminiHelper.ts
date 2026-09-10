@@ -3890,6 +3890,12 @@ function limpiarTextoGenerado(texto: string): string {
  * gastar de los veinte turnos diarios que la capa gratuita da para narrar: sale
  * del cupo de quinientos, que no se agota.
  */
+export interface ImagenDeMesa {
+  /** Base64 sin el prefijo `data:`, tal como lo quiere la API. */
+  data: string;
+  mimeType: string;
+}
+
 export interface ConsultaDeMesa {
   project: Project;
   chats: Chat[];
@@ -3897,6 +3903,8 @@ export interface ConsultaDeMesa {
   /** La conversación de mesa que ya se lleva, para que tenga hilo. */
   historial: { role: 'user' | 'model'; content: string }[];
   pregunta: string;
+  /** Imágenes adjuntas al mensaje, que sí llegan al modelo. */
+  imagenes?: ImagenDeMesa[];
 }
 
 /**
@@ -3911,7 +3919,8 @@ export function construirPromptOOC({
   chats,
   currentChatId,
   historial,
-  pregunta
+  pregunta,
+  imagenes
 }: ConsultaDeMesa): string {
   const pc = project.memory?.player_character;
   const cal = project.calendar;
@@ -3962,6 +3971,7 @@ QUÉ NO HACES AQUÍ:
 - ⛔ NO emites etiquetas técnicas de partida ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:]…): aquí no pasa el tiempo, no se registra la crónica y la ficha no cambia. La ÚNICA etiqueta que puedes usar es [MEMORIA: ...].
 - ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
 - Si no sabes algo porque no consta en lo que tienes delante, dilo. No lo inventes.
+${imagenes?.length ? `\n📎 LA JUGADORA TE HA ADJUNTADO ${imagenes.length === 1 ? 'UNA IMAGEN' : `${imagenes.length} IMÁGENES`}. Míralas y responde a lo que te pregunte sobre ellas: pueden ser una referencia visual de un personaje o un lugar, un mapa, una ficha, una captura de la propia aplicación o cualquier otra cosa. Describe lo que ves cuando sirva para contestar.` : ''}
 
 CAMPAÑA: ${project.name}
 ${cal && fecha ? `MOMENTO ACTUAL: ${fechaCompleta(cal, fecha)}` : ''}
@@ -4013,9 +4023,20 @@ export async function preguntarAlDirectorOOC(
 ): Promise<RespuestaDeMesa> {
   const prompt = construirPromptOOC(consulta);
   const modelo = getBackgroundTaskModel();
+
+  /*
+   * Las imágenes van como `inlineData` junto al texto, que es como las recibe
+   * el modelo. Sin esto se podrían enseñar en pantalla pero el Director no las
+   * vería: adjuntar sería un adorno.
+   */
+  const imagenes = consulta.imagenes || [];
+  const contenido = imagenes.length
+    ? { parts: [{ text: prompt }, ...imagenes.map(i => ({ inlineData: { data: i.data, mimeType: i.mimeType } }))] }
+    : prompt;
+
   const respuesta = await generateContentWithFailover({
     primaryModel: modelo,
-    contents: prompt,
+    contents: contenido as any,
     signal: consulta.signal,
     config: {
       temperature: 0.6,
