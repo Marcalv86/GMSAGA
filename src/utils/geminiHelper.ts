@@ -1555,6 +1555,7 @@ Esta es tu ficha interna de la gente recurrente de la campaña. Úsala: son sus 
 - 🔒 ES TUYO, NO DEL PROTAGONISTA. No se narra, no se insinúa gratis, ningún PNJ lo suelta sin un motivo ganado en escena y NUNCA aparece en el HUD, en la crónica ni en un resumen. Que tú lo sepas no es que ella lo sepa: si lo sueltas, has destripado el giro y ya no hay vuelta atrás.
 - 🔒 SE DESTAPA JUGÁNDOLO: investigando, ganándose la confianza, una indiscreción de un tercero, un descuido, una prueba física. Cuando de verdad salga a la luz en la escena, y SOLO entonces, cierra el mensaje con \`[REVELADO: Nombre — cómo se ha sabido]\`. A partir de ahí pasa a ser algo con lo que el protagonista puede contar.
 - 🔓 YA SE SUPO: eso ya no es un secreto. Puede mencionarse, tener consecuencias y salir en boca de quien corresponda. No hagas como si el protagonista no lo supiera.
+- 📈 ESTOS SON LOS DE HOY. Lo que sepas de estas personas por novelas o material publicado es su pasado; lo que diga este dosier y los documentos de campaña es su presente, y manda aunque contradiga lo que recuerdes. Si un documento trae un apartado de evolución, de «ahora» o de errores a evitar, ESO es el canon de esta mesa.
 - 💤 ROTA EL REPARTO SUMANDO, NUNCA QUITANDO. Quien vive o trabaja donde pasa la escena tiene que estar ahí, y verlo a diario es lo correcto: el jefe de la banda en el cuartel de la banda sale todos los días, y lo que cambia es qué hace y de qué humor está, no si aparece. Rotar es preguntarse quién MÁS entra por esa puerta. Y para eso, mira DOS cosas en este orden: primero, si alguno de los portadores de la trama (🚪) tiene ya su disparador cumplido —ese entra con algo que contar y la escena se justifica sola—; y si no hay ninguno, quién lleva más tiempo sin salir de los de aquí arriba y de los documentos, y si esa escena le da un motivo para asomar. Tirar siempre de los dos o tres que ya están delante convierte una banda entera en un dúo, y deja sin usar a gente con secciones propias en el material.
 - ⛔ Pero no es un sorteo: quien vuelve necesita un MOTIVO en la ficción para estar ahí —le mandaron, le conviene, pasaba por su territorio, quiere algo de alguien—. Un cameo sin motivo es peor que la repetición.
 - Lo marcado como 🎒 es lo que ESE personaje puede usar en escena. Si tiene medios para resolver algo a su manera, los usa (ver el protocolo de disfraces e ilusión).
@@ -1899,6 +1900,7 @@ ${
 Calendario en uso: ${cal.name} (${diasPorAno(cal)} días por año).
 AHORA MISMO SON: ${fechaCompleta(cal, fecha)}.
 Ten presente la hora al describir la luz, quién está despierto, qué está abierto y qué no.
+📈 Y ten presente el AÑO: esta fecha no es solo el reloj, es el punto del mundo en que estamos. Todo lo que sepas de estos personajes y de este mundo por novelas o material publicado ANTERIOR a esta fecha es su pasado —explica por qué son como son, no dice cómo son ahora—. Quien tenga décadas de libros detrás ha cambiado en ellas: escríbelo como está HOY, no como en su primera aparición.
 
 ${
   vencen.length
