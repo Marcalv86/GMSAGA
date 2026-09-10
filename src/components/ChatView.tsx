@@ -46,6 +46,7 @@ import {
   Smile,
   Square,
   Swords,
+  Users,
   Trash2,
   X,
   Mic,
@@ -659,6 +660,7 @@ export const ChatView: React.FC<{
   isNearTokenLimit?: boolean;
   chatTokensCount?: number;
   onCreateNewChat?: () => void;
+  onOpenMesa?: () => void;
   /** Si este capítulo ya está cerrado, es decir, si hay otro después. */
   estaCerrado?: boolean;
 }> = ({
@@ -691,6 +693,7 @@ export const ChatView: React.FC<{
   isNearTokenLimit,
   chatTokensCount,
   onCreateNewChat,
+  onOpenMesa,
   estaCerrado
 }) => {
   const [inputText, setInputText] = useState('');
@@ -1095,6 +1098,21 @@ export const ChatView: React.FC<{
                 aria-label="Modo novela"
               >
                 <BookOpen className="w-3.5 h-3.5" /> <span>Novela</span>
+              </button>
+            )}
+            {/*
+              La mesa va aquí, con Jugar y Novela, porque es la tercera forma de
+              estar en la misma partida: jugarla, leerla, o hablarla. En el móvil
+              se queda el icono solo, como el resto de esta fila.
+            */}
+            {onOpenMesa && (
+              <button
+                onClick={onOpenMesa}
+                className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
+                title="Hablar con el Director fuera de personaje: dudas de reglas, aclaraciones, ritmo. No narra ni hace pasar el tiempo."
+                aria-label="Mesa, fuera de personaje"
+              >
+                <Users className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Mesa</span>
               </button>
             )}
           </div>

@@ -3875,6 +3875,125 @@ function limpiarTextoGenerado(texto: string): string {
     .trim();
 }
 
+/**
+ * La conversación de mesa: hablar con el Director FUERA de personaje.
+ *
+ * Es una consulta deliberadamente BARATA, y esa es la mitad de la gracia. Un
+ * turno de partida arrastra unos treinta y cinco mil tokens: protocolos de
+ * interfaz, las instrucciones narrativas enteras, los documentos y el capítulo
+ * completo. Para preguntar «¿cuántos PG me quedan?» o «¿esto cuenta como
+ * hito?» no hace falta nada de eso: sobra con quién es el personaje, en qué
+ * punto está la campaña y las últimas líneas de la escena para saber a qué se
+ * refiere «esto».
+ *
+ * Y va al modelo de tareas de fondo a propósito. Preguntar de mesa no debería
+ * gastar de los veinte turnos diarios que la capa gratuita da para narrar: sale
+ * del cupo de quinientos, que no se agota.
+ */
+export interface ConsultaDeMesa {
+  project: Project;
+  chats: Chat[];
+  currentChatId?: string | null;
+  /** La conversación de mesa que ya se lleva, para que tenga hilo. */
+  historial: { role: 'user' | 'model'; content: string }[];
+  pregunta: string;
+}
+
+/**
+ * Arma el prompt de la consulta de mesa.
+ *
+ * Se exporta aparte para poder MEDIRLO: la razón de ser de esta pantalla es que
+ * cuesta una fracción de un turno de partida, y una afirmación así hay que
+ * poder comprobarla, no repetirla.
+ */
+export function construirPromptOOC({
+  project,
+  chats,
+  currentChatId,
+  historial,
+  pregunta
+}: ConsultaDeMesa): string {
+  const pc = project.memory?.player_character;
+  const cal = project.calendar;
+  const fecha = project.currentDate;
+
+  // Solo la cola de la escena, para que sepa a qué se refiere «esto».
+  const capitulo = chats.find(c => c.id === currentChatId) || chats[chats.length - 1];
+  const ultimasLineas = (capitulo?.messages || [])
+    .filter(m => m.content && m.content !== 'Pensando...' && m.content !== 'Tirando dados...')
+    .slice(-4)
+    .map(m => `${m.role === 'user' ? 'Jugadora' : 'Narrador'}: ${stripStateTag(limpiarEtiquetasDeTiempo(m.content)).slice(0, 1200)}`)
+    .join('\n');
+
+  const ficha = pc
+    ? [
+        `- Protagonista: ${pc.name}${pc.title ? ` — ${pc.title}` : ''}`,
+        pc.race || pc.class ? `- ${[pc.race, pc.class, pc.level].filter(Boolean).join(' · ')}` : '',
+        typeof pc.hp === 'number' ? `- PG: ${pc.hp}/${pc.maxHp ?? '?'}${pc.ac ? ` · CA ${pc.ac}` : ''}` : '',
+        pc.conditions?.length ? `- Condiciones: ${pc.conditions.join(', ')}` : '',
+        typeof pc.hitosActuales === 'number' && pc.hitosParaSubir
+          ? `- Hitos hacia el siguiente nivel: ${pc.hitosActuales}/${pc.hitosParaSubir}`
+          : ''
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : '(sin ficha registrada)';
+
+  const conversacion = historial
+    .slice(-16)
+    .map(m => `${m.role === 'user' ? 'Jugadora' : 'Director'}: ${m.content}`)
+    .join('\n');
+
+  const prompt = `Estás hablando con la jugadora FUERA DE PERSONAJE, en la mesa, como el Director de esta partida quitándose el sombrero de Narrador un momento.
+
+QUÉ ERES AQUÍ:
+- El Director de juego respondiendo de tú a tú: dudas de reglas, aclaraciones de lo que ha pasado, ajustes de tono o de ritmo, decisiones de mesa, problemas técnicos de la partida.
+- Hablas normal, en primera persona y sin prosa literaria. Nada de narrar, nada de describir el viento ni los olores. Esto es una conversación, no una escena.
+
+QUÉ NO HACES AQUÍ:
+- ⛔ NO narras, NO haces avanzar la historia y NO decides acciones del personaje. Si te piden jugar algo, recuérdales que eso va en la pestaña de Jugar.
+- ⛔ NO emites etiquetas técnicas ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:]…): aquí no se registra nada, no pasa el tiempo y la ficha no cambia.
+- ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
+- Si no sabes algo porque no consta en lo que tienes delante, dilo. No lo inventes.
+
+CAMPAÑA: ${project.name}
+${cal && fecha ? `MOMENTO ACTUAL: ${fechaCompleta(cal, fecha)}` : ''}
+
+FICHA:
+${ficha}
+
+DÓNDE ESTAMOS (memoria de la campaña):
+${(project.memory?.raw_project_memory || project.memory?.story || 'Todavía no hay memoria registrada.').slice(0, 4000)}
+
+${ultimasLineas ? `ÚLTIMAS LÍNEAS DE LA ESCENA EN CURSO (para que sepas a qué se refiere):\n${ultimasLineas}\n` : ''}
+${conversacion ? `CONVERSACIÓN DE MESA HASTA AHORA:\n${conversacion}\n` : ''}
+Jugadora: ${pregunta}
+Director:`;
+
+  return prompt;
+}
+
+export async function preguntarAlDirectorOOC(
+  consulta: ConsultaDeMesa & { signal?: AbortSignal }
+): Promise<string> {
+  const prompt = construirPromptOOC(consulta);
+  const modelo = getBackgroundTaskModel();
+  const respuesta = await generateContentWithFailover({
+    primaryModel: modelo,
+    contents: prompt,
+    signal: consulta.signal,
+    config: {
+      temperature: 0.6,
+      ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    } as any
+  });
+
+  const texto = limpiarTextoGenerado((respuesta.text || '').trim());
+  if (!texto) throw new Error('El Director no ha contestado. Inténtalo de nuevo.');
+  // Por si acaso se le escapa alguna etiqueta: aquí no registran nada.
+  return stripStateTag(limpiarEtiquetasDeTiempo(texto)).trim();
+}
+
 export async function generateClaudeProjectMemory({
   project,
   chats,

@@ -42,6 +42,7 @@ import { SimpleMemoryView } from './components/SimpleMemoryView';
 import { FilesView } from './components/FilesView';
 import { InstructionsView } from './components/InstructionsView';
 import { NovelReaderView } from './components/NovelReaderView';
+import { MesaView } from './components/MesaView';
 import { MapViewer } from './components/MapViewer';
 import { InstallAppModal } from './components/InstallAppModal';
 import { LocalStorageModal } from './components/LocalStorageModal';
@@ -168,7 +169,7 @@ export default function App() {
   }, [currentFiles]);
 
   const [activeTab, setActiveTab] = useState<
-    'chat' | 'files' | 'memory' | 'instructions' | 'novel'
+    'chat' | 'files' | 'memory' | 'instructions' | 'novel' | 'mesa'
   >('chat');
   const [isGenerating, setIsGenerating] = useState(false);
   // Controlador de la generación en curso, para poder detenerla desde la interfaz.
@@ -3040,7 +3041,8 @@ export default function App() {
             ].map(tab => {
               const TabIcon = tab.icon;
               const isCurrentActive =
-                activeTab === tab.id || (tab.id === 'chat' && activeTab === 'novel');
+                activeTab === tab.id ||
+                (tab.id === 'chat' && (activeTab === 'novel' || activeTab === 'mesa'));
               return (
                 <button
                   key={tab.id}
@@ -3113,10 +3115,21 @@ export default function App() {
               isNearTokenLimit={isCurrentChatNearTokenLimit}
               chatTokensCount={effectiveChatTokens}
               onCreateNewChat={handleCreateChat}
+              onOpenMesa={() => setActiveTab('mesa')}
               estaCerrado={
                 currentChats.length > 1 &&
                 currentChats.findIndex(c => c.id === currentChatId) < currentChats.length - 1
               }
+            />
+          )}
+
+          {activeTab === 'mesa' && currentProject && (
+            <MesaView
+              project={currentProject}
+              chats={currentChats}
+              currentChatId={currentChatId}
+              onVolverAJugar={() => setActiveTab('chat')}
+              onAbrirNovela={() => setActiveTab('novel')}
             />
           )}
 
