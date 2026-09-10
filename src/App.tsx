@@ -43,6 +43,7 @@ import { FilesView } from './components/FilesView';
 import { InstructionsView } from './components/InstructionsView';
 import { NovelReaderView } from './components/NovelReaderView';
 import { MesaView } from './components/MesaView';
+import { recargarConLaVersionNueva, vigilarVersion } from './utils/versionCheck';
 import { MapViewer } from './components/MapViewer';
 import { InstallAppModal } from './components/InstallAppModal';
 import { LocalStorageModal } from './components/LocalStorageModal';
@@ -171,6 +172,17 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<
     'chat' | 'files' | 'memory' | 'instructions' | 'novel' | 'mesa'
   >('chat');
+  /*
+   * Aviso de versión nueva.
+   *
+   * Los archivos llevan hash, así que lo único que se queda viejo es el
+   * `index.html`; y una aplicación instalada guarda su propia copia del
+   * arranque. El resultado era abrir la app y seguir viendo la de ayer sin que
+   * nada lo dijera. Ahora se comprueba y se ofrece recargar de verdad.
+   */
+  const [hayActualizacion, setHayActualizacion] = useState(false);
+  useEffect(() => vigilarVersion(() => setHayActualizacion(true)), []);
+
   const [isGenerating, setIsGenerating] = useState(false);
   // Controlador de la generación en curso, para poder detenerla desde la interfaz.
   const generationAbortRef = useRef<AbortController | null>(null);
@@ -2635,6 +2647,28 @@ export default function App() {
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg-color)] text-[var(--text-primary)] font-lora relative">
       {/* Sutil viñeteado para efecto de inmersión / iluminación central */}
       <div className="pointer-events-none fixed inset-0 z-50 shadow-[inset_0_0_120px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_0_150px_rgba(0,0,0,0.2)] mix-blend-multiply opacity-50" />
+      {/*
+        Barra de actualización.
+
+        Va arriba del todo y ocupa una línea: es un aviso, no una interrupción.
+        No se puede posponer con un «más tarde» porque seguir en la versión
+        vieja es justamente el problema que resuelve, pero tampoco tapa nada ni
+        bloquea la partida: se puede seguir jugando y actualizar al terminar.
+      */}
+      {hayActualizacion && (
+        <div className="fixed top-0 left-0 right-0 z-[130] bg-[var(--accent)] text-[var(--on-accent)] px-3 py-1.5 flex items-center justify-center gap-3 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
+          <span className="font-cinzel text-[11px] sm:text-xs font-bold truncate">
+            Hay una versión nueva de GM Studio
+          </span>
+          <button
+            onClick={() => void recargarConLaVersionNueva()}
+            className="shrink-0 rounded-lg bg-[var(--on-accent)] text-[var(--accent)] px-2.5 py-1 font-cinzel text-[11px] font-bold hover:brightness-95 active:scale-95 transition-all cursor-pointer"
+          >
+            Actualizar
+          </button>
+        </div>
+      )}
+
       {/* Top Subtle Progress Bar during file uploads, analysis & background tasks */}
       {topProgress.active && (
         <div className="fixed top-0 left-0 right-0 z-[110] pointer-events-none transition-opacity duration-300">

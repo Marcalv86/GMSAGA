@@ -1102,8 +1102,12 @@ export const ChatView: React.FC<{
             )}
             {/*
               La mesa va aquí, con Jugar y Novela, porque es la tercera forma de
-              estar en la misma partida: jugarla, leerla, o hablarla. En el móvil
-              se queda el icono solo, como el resto de esta fila.
+              estar en la misma partida: jugarla, leerla, o hablarla.
+
+              Y lleva su rótulo SIEMPRE, como sus dos compañeras. Escondérselo en
+              el móvil la dejaba como el único icono suelto de la fila: quien la
+              estrenaba no sabía que eso era una pestaña nueva, y la buscaba sin
+              encontrarla teniéndola delante.
             */}
             {onOpenMesa && (
               <button
@@ -1112,7 +1116,7 @@ export const ChatView: React.FC<{
                 title="Hablar con el Director fuera de personaje: dudas de reglas, aclaraciones, ritmo. No narra ni hace pasar el tiempo."
                 aria-label="Mesa, fuera de personaje"
               >
-                <Users className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Mesa</span>
+                <Users className="w-3.5 h-3.5" /> <span>Mesa</span>
               </button>
             )}
           </div>
