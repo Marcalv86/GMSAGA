@@ -1526,8 +1526,8 @@ ${bloqueElenco}
         ausencia === 0
           ? `- 🎬 Está en escena AHORA MISMO.`
           : ausencia <= 2
-          ? `- 🎬 Salió hace muy poco (${ausencia}).`
-          : `- 💤 LLEVA ${ausencia} SIN SALIR. Es candidato a volver si la escena le da un motivo.`
+          ? `- 🎬 Sale a menudo. Si vive o trabaja aquí, eso es lo correcto: no lo apartes por dar variedad.`
+          : `- 💤 LLEVA ${ausencia} SIN SALIR. Podría entrar ADEMÁS de los de siempre, si la escena le da un motivo.`
       );
     }
     if (typeof n.atr === 'number' || typeof n.vin === 'number' || typeof n.con === 'number') {
@@ -1555,7 +1555,7 @@ Esta es tu ficha interna de la gente recurrente de la campaña. Úsala: son sus 
 - 🔒 ES TUYO, NO DEL PROTAGONISTA. No se narra, no se insinúa gratis, ningún PNJ lo suelta sin un motivo ganado en escena y NUNCA aparece en el HUD, en la crónica ni en un resumen. Que tú lo sepas no es que ella lo sepa: si lo sueltas, has destripado el giro y ya no hay vuelta atrás.
 - 🔒 SE DESTAPA JUGÁNDOLO: investigando, ganándose la confianza, una indiscreción de un tercero, un descuido, una prueba física. Cuando de verdad salga a la luz en la escena, y SOLO entonces, cierra el mensaje con \`[REVELADO: Nombre — cómo se ha sabido]\`. A partir de ahí pasa a ser algo con lo que el protagonista puede contar.
 - 🔓 YA SE SUPO: eso ya no es un secreto. Puede mencionarse, tener consecuencias y salir en boca de quien corresponda. No hagas como si el protagonista no lo supiera.
-- 💤 ROTA EL REPARTO, PERO CON MOTIVO. Antes de decidir quién aparece, mira DOS cosas en este orden: primero, si alguno de los portadores de la trama (🚪) tiene ya su disparador cumplido —ese entra con algo que contar y la escena se justifica sola—; y si no hay ninguno, quién lleva más tiempo sin salir de los de aquí arriba y de los documentos, y si esa escena es suya. Tirar siempre de los dos o tres que ya están delante convierte una banda entera en un dúo, y deja sin usar a gente con secciones propias en el material.
+- 💤 ROTA EL REPARTO SUMANDO, NUNCA QUITANDO. Quien vive o trabaja donde pasa la escena tiene que estar ahí, y verlo a diario es lo correcto: el jefe de la banda en el cuartel de la banda sale todos los días, y lo que cambia es qué hace y de qué humor está, no si aparece. Rotar es preguntarse quién MÁS entra por esa puerta. Y para eso, mira DOS cosas en este orden: primero, si alguno de los portadores de la trama (🚪) tiene ya su disparador cumplido —ese entra con algo que contar y la escena se justifica sola—; y si no hay ninguno, quién lleva más tiempo sin salir de los de aquí arriba y de los documentos, y si esa escena le da un motivo para asomar. Tirar siempre de los dos o tres que ya están delante convierte una banda entera en un dúo, y deja sin usar a gente con secciones propias en el material.
 - ⛔ Pero no es un sorteo: quien vuelve necesita un MOTIVO en la ficción para estar ahí —le mandaron, le conviene, pasaba por su territorio, quiere algo de alguien—. Un cameo sin motivo es peor que la repetición.
 - Lo marcado como 🎒 es lo que ESE personaje puede usar en escena. Si tiene medios para resolver algo a su manera, los usa (ver el protocolo de disfraces e ilusión).
 

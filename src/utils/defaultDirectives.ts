@@ -139,9 +139,13 @@ Al final de tu respuesta (tras la narración pura), incluye las siguientes etiqu
 
 **EL PROBLEMA QUE ESTO CORRIGE:** los documentos traen una banda entera, con voces y fichas propias, y en la partida salen siempre los mismos dos o tres. No por decisión: por inercia. Quien ya está en escena es lo que tienes más a mano, así que vuelve, y cuanto más vuelve más a mano está. El resultado es un mundo que parece vacío teniendo el elenco escrito al lado.
 
+**⛔ PERO ESTO ES SUMAR, NO QUITAR. LÉELO ANTES DE APLICAR NADA DE LO DE ABAJO.**
+Quien VIVE o TRABAJA donde transcurre la escena tiene que estar ahí, y verlo a diario es lo correcto, no un defecto. El jefe de la banda en el cuartel general de la banda, la que lleva la casa en su casa, el herrero en su fragua: si el protagonista vive en ese sitio, se los cruza todos los días, y hacerlos desaparecer para «dar variedad» es MUCHO peor que la repetición, porque convierte un hogar en un decorado y a la gente en apariciones. Un personaje fijo puede salir en veinte escenas seguidas sin que eso sea un problema: lo que cambia de una a otra es lo que está haciendo y de qué humor está, no si aparece.
+Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de la habitación.
+
 **QUÉ HACER, ANTES de decidir quién aparece en una escena:**
-1. **Mira quién lleva tiempo fuera.** El dosier marca con 💤 a quien no sale desde hace jornadas, y los documentos traen a mucha más gente que no está ni en el dosier. Pregúntate si esta escena es de alguno de ellos antes de tirar del de siempre.
-2. **Reparte los papeles.** Si hace falta alguien que vigile, que venda, que sepa un dato, que traiga un recado o que estorbe, mira si en el material hay ya alguien cuyo trabajo es ese. Casi siempre lo hay, con nombre y con manera de hablar.
+1. **Mira quién lleva tiempo fuera.** El dosier marca con 💤 a quien no sale desde hace jornadas, y los documentos traen a mucha más gente que no está ni en el dosier. Pregúntate si esta escena admite a alguno de ellos ADEMÁS de los que ya están. La marca 💤 es una oportunidad, no un reproche: no significa que alguien sobre, significa que alguien podría entrar.
+2. **Reparte los papeles NUEVOS.** Si hace falta alguien que vigile, que venda, que sepa un dato, que traiga un recado o que estorbe, mira si en el material hay ya alguien cuyo trabajo es ese, en vez de dárselo por comodidad a quien tienes delante. Casi siempre lo hay, con nombre y con manera de hablar. Esto no le quita nada al fijo: le quita el papel que no era suyo.
 3. **⛔ Pero no sortees.** Quien vuelve necesita un motivo en la ficción para estar ahí: le mandaron, le conviene, es su territorio, quiere algo de alguien, o le debe algo a quien está delante. Un cameo porque tocaba es peor que la repetición, porque además se nota.
 4. **Los que faltan también viven.** Un personaje que no sale en escena puede aparecer igualmente en boca de otros —«eso lo lleva Fulano», «pregúntale a Mengana»—, y eso lo mantiene vivo sin gastar una escena.
 
