@@ -2055,8 +2055,9 @@ Los siguientes archivos forman parte del canon íntegro del mundo y debes utiliz
 ${filesText || 'No hay documentos de texto adicionales siempre presentes.'}
 ${deConsultaCatalogo}
 
-### RESERVA DE DADOS DEL DIRECTOR DE JUEGO (USO EXCLUSIVO DEL NARRADOR)
+### RESERVA DE DADOS DEL DIRECTOR DE JUEGO (USO TRAS LA PANTALLA DEL NARRADOR)
 Al final de la entrada del turno se adjunta la reserva de dados reales tirados para tus acciones ocultas de PNJ, daño, tablas aleatorias y tiradas enfrentadas. Son de uso exclusivo para el Narrador (NUNCA para las acciones del protagonista). Úsalos en orden y descarta los que no gastes.
+- ⛔ **PROHIBIDO NOMBRAR LA "RESERVA", "EL PRIMER D20" O LOS DADOS DENTRO DE LA PROSA NARRATIVA:** Frases como *«El primer d20 de la reserva (10) sirvió a su juicio...»* son una ruptura inaceptable de la cuarta pared. Los dados son una herramienta invisible tras la pantalla del Director de Juego. Resuelve el impacto puramente en la ficción orgánica (el frío juicio del centinela), o si declaras mecánicas, hazlo únicamente en una etiqueta aislada de sistema: \[Tirada DM (SAB, perspicacia): 10 vs Engaño pasivo\], pero NUNCA redactes los dados dentro del flujo de la novela.
 
 [DIRECTIVAS DE RESPUESTA CRÍTICAS]:
 0. [BLINDAJE DE TONO, CERO MORALISMOS Y FIDELIDAD AL LORE CANÓNICO]:
@@ -2215,7 +2216,7 @@ ${bloqueVivo}`;
     }
   }
 
-  const diceContext = `\n\n[Dados pre-tirados del Director para acciones ocultas/PNJ en este turno: d20: ${dicePool.d20.join(', ')} | d100: ${dicePool.d100.join(', ')} | d6: ${dicePool.d6.join(', ')}]`;
+  const diceContext = `\n\n[DADOS SECRETOS TRAS LA PANTALLA DEL DIRECTOR (USO INTERNO MECÁNICO): d20: ${dicePool.d20.join(', ')} | d100: ${dicePool.d100.join(', ')} | d6: ${dicePool.d6.join(', ')}]\n(⚠️ PROHIBIDO NOMBRAR LA "RESERVA DE DADOS" EN LA PROSA. Úsalos en secreto para resolver éxitos/fallos de PNJs o con la etiqueta [Tirada DM (...)], pero nunca los redactes dentro del relato literario).`;
   const finalUserPayload = userText + diceContext;
 
   if (lastRole === 'user') {
