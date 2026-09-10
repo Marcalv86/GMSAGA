@@ -335,8 +335,31 @@ export interface SecretoDeCampana {
   secreto: string;
   /** Por dónde puede salir: registrar el camarote, emborrachar al contramaestre… */
   comoSeDescubre?: string;
-  /** Quién lo plantó: la jugadora al preparar, o el Narrador durante la partida. */
-  origen?: 'jugadora' | 'narrador';
+  /**
+   * A qué capa de la cebolla pertenece.
+   *
+   * 1 = lo que PARECE que pasa · 2 = lo que pasa de verdad · 3 = quién está
+   * detrás y por qué · 4 = el fondo del asunto. Es lo que separa una trama de
+   * una lista de sorpresas: sin capas no hay orden de revelación, y el Narrador
+   * o lo suelta todo de golpe o no lo saca nunca.
+   */
+  capa?: number;
+  /**
+   * Títulos de otros secretos con los que engancha.
+   *
+   * Una capa que no engancha con otra no es una capa: es un giro suelto. Aquí
+   * se guarda de qué tira cada hilo cuando alguien lo estira.
+   */
+  conecta?: string[];
+  /**
+   * Qué se puede ir sembrando AHORA, mucho antes de que se descubra.
+   *
+   * Es la mitad del oficio: un giro sin siembra previa se lee como un truco;
+   * con ella, como algo que estaba delante todo el rato.
+   */
+  sembrar?: string;
+  /** Quién lo plantó: la jugadora al preparar, el Narrador, o el trazado inicial. */
+  origen?: 'jugadora' | 'narrador' | 'trama';
   /** Cuándo y cómo salió a la luz EN JUEGO, si ya ha salido. */
   revelado?: {
     diaAbs?: number;
@@ -367,6 +390,22 @@ export interface Memory {
    * cuyas sorpresas se cuentan solas».
    */
   gm_secrets?: SecretoDeCampana[];
+  /**
+   * La forma de la historia, decidida de antemano.
+   *
+   * No es un secreto más: es el mapa de cómo encajan todos. La premisa, hacia
+   * dónde va, y qué hay que ir sembrando. El Narrador lo lleva encima para
+   * dirigir hacia allí en vez de improvisar cada escena y descubrir tarde que
+   * lo de hace tres capítulos no lleva a ninguna parte.
+   */
+  plan_de_campana?: {
+    /** De qué va la historia, en dos o tres frases. Con candado. */
+    premisa: string;
+    /** Dónde acaba esto si nadie lo tuerce. */
+    destino?: string;
+    /** Cuándo se trazó, para saber si se ha quedado viejo. */
+    trazadoEl?: string;
+  };
 }
 
 export interface Quest {

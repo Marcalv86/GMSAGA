@@ -1513,26 +1513,50 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
    * prosa o perdiéndose del todo.
    */
   const secretos = project.memory?.gm_secrets || [];
-  const bloqueSecretos = secretos.length
-    ? `
-### 🔒 SECRETOS DE LA CAMPAÑA — SOLO TÚ (giros que AÚN NO han pasado)
-Esto es el guion que la jugadora ha preparado o que tú mismo dejaste plantado. Rigen las mismas reglas que los 🔒 del dosier: se usan para mover el mundo, nunca para contarlo, y no aparecen en el HUD, la crónica, la agenda ni ningún resumen.
-- Ponles pistas físicas y comportamiento coherente, y déjalos al alcance de quien investigue. Cuando uno salga de verdad a la luz, cierra con \`[REVELADO: título del secreto — cómo se ha sabido]\`.
-- ⛔ Y no los contradigas ni los sustituyas por otra explicación: son canon, solo falta que se descubran.
+  const plan = project.memory?.plan_de_campana;
+  const NOMBRE_DE_CAPA: Record<number, string> = {
+    1: 'CAPA 1 — lo que PARECE que pasa',
+    2: 'CAPA 2 — lo que pasa DE VERDAD',
+    3: 'CAPA 3 — quién está detrás y qué gana',
+    4: 'CAPA 4 — el fondo del asunto'
+  };
+  const porCapa = [1, 2, 3, 4]
+    .map(c => ({ c, lista: secretos.filter(x => (x.capa || 1) === c) }))
+    .filter(x => x.lista.length);
 
-${secretos
-  .map(sec => {
-    const cabecera = sec.revelado
-      ? `#### 🔓 ${sec.titulo} — YA SE SUPO${sec.revelado.fecha ? ` (${sec.revelado.fecha})` : ''}${sec.revelado.como ? `, ${sec.revelado.como.slice(0, 140)}` : ''}. El protagonista LO SABE.`
-      : `#### 🔒 ${sec.titulo} — todavía en pie, el protagonista NO lo sabe`;
-    return [
-      cabecera,
+  const bloqueSecretos = secretos.length || plan
+    ? `
+### 🔒 LA HISTORIA, YA TRAZADA — SOLO TÚ
+${plan?.premisa ? `**DE QUÉ VA ESTO DE VERDAD:** ${plan.premisa}\n` : ''}${plan?.destino ? `**HACIA DÓNDE VA:** ${plan.destino}\n` : ''}
+Esto no es una lista de sorpresas sueltas: es la estructura de la historia, decidida de antemano y por capas, donde cada una reinterpreta la anterior sin desmentirla. Tú la sabes ENTERA desde el principio. Ese es justo el motivo de que puedas dirigir en vez de improvisar.
+
+**QUÉ HACES CON ESTO EN CADA ESCENA:**
+- **SIEMBRA.** Lo de «se puede ir sembrando» va en escena AHORA, mucho antes de que nadie lo descubra, como detalle físico sin subrayar: se menciona y se sigue adelante. Un giro sin siembra previa se lee como un truco; con ella, como algo que estaba delante todo el rato. Si una escena te da ocasión de plantar una semilla, plántala.
+- **APUNTA HACIA ALLÍ.** Cuando decidas qué complicación aparece, quién entra por la puerta o qué encuentran, elige lo que empuje hacia esta estructura. Ese es el trabajo: que las escenas lleven a algún sitio.
+- **RESPETA EL ORDEN DE LAS CAPAS.** No destapes una capa profunda antes que la de encima. Si el protagonista se acerca a la capa 3 sin haber entendido la 2, lo que encuentra no tiene sentido todavía: dale la pieza que le falta, no la respuesta final.
+- **⛔ NUNCA LO CUENTAS.** Ni lo insinúas con guiños, ni lo resume el narrador, ni lo suelta un PNJ sin un motivo ganado en escena. No aparece en el HUD, la crónica, la agenda ni ningún resumen. Saberlo es para dirigir, no para contar.
+- **⛔ NO LO CONTRADIGAS NI LO SUSTITUYAS** por otra explicación que se te ocurra sobre la marcha: esto es canon, solo falta que se descubra.
+- **Cuando uno salga de verdad a la luz**, cierra con \`[REVELADO: título del secreto — cómo se ha sabido]\`. Y si al jugar aparece una capa nueva que encaja, plántala con \`[SECRETO: ...]\`.
+
+${porCapa
+  .map(
+    ({ c, lista }) => `#### ${NOMBRE_DE_CAPA[c] || `CAPA ${c}`}
+${lista
+  .map(sec =>
+    [
+      sec.revelado
+        ? `**🔓 ${sec.titulo}** — YA SE SUPO${sec.revelado.fecha ? ` (${sec.revelado.fecha})` : ''}${sec.revelado.como ? `, ${sec.revelado.como.slice(0, 140)}` : ''}. El protagonista LO SABE y puedes usarlo con normalidad.`
+        : `**🔒 ${sec.titulo}** — en pie, el protagonista NO lo sabe`,
       `- La verdad: ${sec.secreto.slice(0, 600)}`,
-      sec.comoSeDescubre ? `- Por dónde puede salir: ${sec.comoSeDescubre.slice(0, 300)}` : ''
+      sec.conecta?.length ? `- Engancha con: ${sec.conecta.slice(0, 5).join(' · ')}` : '',
+      !sec.revelado && sec.sembrar ? `- 🌱 SIEMBRA ESTO YA: ${sec.sembrar.slice(0, 300)}` : '',
+      !sec.revelado && sec.comoSeDescubre ? `- Por dónde puede salir: ${sec.comoSeDescubre.slice(0, 300)}` : ''
     ]
       .filter(Boolean)
-      .join('\n');
-  })
+      .join('\n')
+  )
+  .join('\n\n')}`
+  )
   .join('\n\n')}
 `.trim()
     : '';
@@ -4331,6 +4355,150 @@ export async function preguntarAlDirectorOOC(
     .trim();
 
   return { texto, memorias, secretos, fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount };
+}
+
+export interface TramaTrazada {
+  premisa: string;
+  destino: string;
+  secretos: {
+    titulo: string;
+    secreto: string;
+    capa: number;
+    conecta: string[];
+    comoSeDescubre?: string;
+    sembrar?: string;
+  }[];
+}
+
+/**
+ * Trama la campaña entera antes de jugarla.
+ *
+ * Esto es lo que separa una historia de una sucesión de escenas. Un Narrador
+ * que improvisa turno a turno no puede sembrar, porque no sabe qué va a
+ * cosechar; a los tres capítulos tiene un montón de hilos que no llevan a
+ * ninguna parte y resuelve con lo primero que se le ocurre. Aquí decide ANTES
+ * cuántas capas tiene el asunto, qué hay debajo de cada una y cómo enganchan,
+ * y a partir de ese momento cada escena puede apuntar a algo.
+ *
+ * Se ejecuta a mano y una vez (o cuando se quiera rehacer), no en cada turno:
+ * es una llamada al modelo de tareas de fondo, no un gasto por escena.
+ */
+export async function tramarLaCampana({
+  project,
+  files = [],
+  chats = [],
+  ideas
+}: {
+  project: Project;
+  files?: ProjectFile[];
+  chats?: Chat[];
+  /** Lo que la jugadora quiera aportar. Son semillas, no el guion. */
+  ideas?: string;
+}): Promise<TramaTrazada> {
+  const modelo = getBackgroundTaskModel();
+  const pc = project.memory?.player_character;
+
+  const documentos = files
+    .filter(f => !f.isImage && !f.isAudio && (f.content || '').trim())
+    .slice(0, 12)
+    .map(f => `=== ${f.name} ===\n${(f.content || '').slice(0, 12000)}`)
+    .join('\n\n')
+    .slice(0, 90000);
+
+  const yaJugado = chats
+    .flatMap(c => c.messages || [])
+    .filter(m => m.content && m.content.length > 40)
+    .slice(-14)
+    .map(m => `${m.role === 'user' ? 'Jugadora' : 'Narrador'}: ${stripStateTag(limpiarEtiquetasDeTiempo(m.content)).slice(0, 600)}`)
+    .join('\n')
+    .slice(0, 12000);
+
+  const yaPlantados = (project.memory?.gm_secrets || [])
+    .map(x => `- ${x.titulo}: ${x.secreto}${x.revelado ? ' [YA DESCUBIERTO EN JUEGO]' : ''}`)
+    .join('\n');
+
+  const prompt = `Eres el autor de esta campaña de rol, no su locutor. Antes de narrar una sola escena más, tu trabajo ahora es DECIDIR LA HISTORIA: qué está pasando de verdad, cuántas capas tiene y cómo encajan unas con otras.
+
+Esto es lo que separa una buena historia de una sucesión de escenas. Quien improvisa turno a turno no puede sembrar nada, porque no sabe qué va a cosechar; a los tres capítulos tiene diez hilos que no llevan a ninguna parte y los resuelve con lo primero que se le ocurra. Tú vas a saberlo todo de antemano.
+
+CÓMO SE TRAMA UNA CEBOLLA:
+- **Capa 1 — lo que PARECE que pasa.** La lectura obvia de la situación. Tiene que ser creíble y suficiente por sí sola: si huele a tapadera desde el minuto uno, no engaña a nadie.
+- **Capa 2 — lo que pasa DE VERDAD.** Reinterpreta la capa 1 sin contradecirla: los mismos hechos, otro sentido. Aquí es donde el jugador dice «ah, entonces aquello de…».
+- **Capa 3 — quién está detrás y qué gana.** Un interés concreto de alguien concreto. No «el mal»: un nombre, un motivo y algo que ganar o perder.
+- **Capa 4 — el fondo del asunto.** Lo que hace que todo esto importara desde el principio, y que suele tocar al protagonista más de lo que parecía. Opcional: solo si la campaña lo aguanta.
+
+REGLAS DURAS:
+1. **Cada capa reinterpreta la anterior, no la desmiente.** Si al destapar la capa 2 la capa 1 se vuelve mentira, has hecho un truco barato. Los mismos hechos tienen que seguir en pie, leídos de otra forma.
+2. **Todo engancha con algo.** Cada secreto declara con qué otros conecta, por su título exacto. Un giro que no engancha con nada es un giro suelto y sobra.
+3. **Todo se puede sembrar hoy.** De cada secreto dices qué detalle concreto y físico se puede ir poniendo en escena YA, meses antes de que se descubra: un objeto fuera de sitio, una cicatriz, una ausencia, una moneda de la ceca equivocada, alguien que no come cerdo. Sin siembra, un giro es un truco; con siembra, algo que estaba delante todo el rato.
+4. **Todo se puede descubrir jugando.** De cada secreto dices por dónde puede salir con acciones que un jugador de verdad haría. Un secreto que solo se destapa si el Narrador lo regala no es un secreto: es un anuncio.
+5. **Usa el material que ya existe.** Los personajes, las facciones y los lugares de los documentos, y lo que ya se haya jugado. No inventes un elenco paralelo.
+6. **Respeta lo ya plantado y lo ya descubierto.** Lo que aparece abajo como plantado es canon: incorpóralo a la estructura en la capa que le toque, sin cambiarlo. Lo marcado como YA DESCUBIERTO no puede volver a ser un secreto: constrúyele encima.
+7. **Nada de metatrama vacía.** Ni profecías, ni elegidos, ni «el destino lo quiso», salvo que el material lo pida. Conflictos de gente con intereses.
+
+CAMPAÑA: ${project.name}
+${pc ? `PROTAGONISTA: ${pc.name}${pc.race ? `, ${pc.race}` : ''}${pc.class ? `, ${pc.class}` : ''}${pc.backstory ? `\nTrasfondo: ${pc.backstory.slice(0, 1200)}` : ''}${pc.personality ? `\nCarácter: ${pc.personality.slice(0, 600)}` : ''}` : ''}
+
+${ideas ? `⭐ LO QUE QUIERE LA JUGADORA (son semillas suyas: respétalas y hazlas encajar en la estructura, no las descartes):\n${ideas.slice(0, 6000)}\n` : ''}
+${yaPlantados ? `GIROS YA PLANTADOS (canon, incorpóralos):\n${yaPlantados}\n` : ''}
+${yaJugado ? `LO QUE YA SE HA JUGADO (la trama tiene que salir de aquí, no contradecirlo):\n${yaJugado}\n` : ''}
+${documentos ? `MATERIAL DE LA CAMPAÑA:\n${documentos}` : ''}
+
+Devuelve ÚNICAMENTE un JSON:
+{
+  "premisa": "De qué va esta historia de verdad, en 2-3 frases. Sin rodeos.",
+  "destino": "Dónde acaba esto si nadie lo tuerce, en 1-2 frases.",
+  "secretos": [
+    {
+      "titulo": "Título corto y distintivo",
+      "secreto": "La verdad, concreta y con nombres",
+      "capa": 1,
+      "conecta": ["Título exacto de otro secreto"],
+      "comoSeDescubre": "Acciones concretas que un jugador haría",
+      "sembrar": "El detalle físico que se puede poner en escena hoy"
+    }
+  ]
+}
+
+Entre 5 y 9 secretos, repartidos por capas y todos enganchados. Nada de relleno.`;
+
+  const respuesta = await generateContentWithFailover({
+    primaryModel: modelo,
+    contents: prompt,
+    config: {
+      temperature: 0.85,
+      responseMimeType: 'application/json',
+      ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    } as any
+  });
+
+  const limpio = (respuesta.text || '{}').replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+  let parsed: any = {};
+  try {
+    parsed = JSON.parse(limpio);
+  } catch (e) {
+    throw new Error('El trazado ha vuelto ilegible. Vuelve a intentarlo.');
+  }
+
+  const brutos: any[] = Array.isArray(parsed.secretos) ? parsed.secretos : [];
+  const secretos = brutos
+    .map(x => ({
+      titulo: String(x?.titulo || '').trim(),
+      secreto: String(x?.secreto || '').trim(),
+      capa: Number.isFinite(Number(x?.capa)) ? Math.max(1, Math.min(4, Math.round(Number(x.capa)))) : 1,
+      conecta: Array.isArray(x?.conecta) ? x.conecta.map((c: any) => String(c).trim()).filter(Boolean) : [],
+      comoSeDescubre: x?.comoSeDescubre ? String(x.comoSeDescubre).trim() : undefined,
+      sembrar: x?.sembrar ? String(x.sembrar).trim() : undefined
+    }))
+    .filter(x => x.titulo.length > 2 && x.secreto.length > 10);
+
+  if (secretos.length === 0) throw new Error('El trazado ha vuelto vacío. Vuelve a intentarlo.');
+
+  return {
+    premisa: String(parsed.premisa || '').trim(),
+    destino: String(parsed.destino || '').trim(),
+    secretos
+  };
 }
 
 export async function generateClaudeProjectMemory({

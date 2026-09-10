@@ -11,6 +11,7 @@ import {
   fechaInicial,
   fechaLegible
 } from '../utils/campaignCalendar';
+import { tramarLaCampana } from '../utils/geminiHelper';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
@@ -299,6 +300,8 @@ export const MemoryManager: React.FC<{
   const [vinculosDestapados, setVinculosDestapados] = useState<Set<string>>(new Set());
   /** Giros que la jugadora ha decidido leerse. No se guarda: se destapa y ya. */
   const [secretosDestapados, setSecretosDestapados] = useState<Set<string>>(new Set());
+  const [tramando, setTramando] = useState(false);
+  const [verPremisa, setVerPremisa] = useState(false);
 
   // Confirmation state
   const [confirmModal, setConfirmModal] = useState<{
@@ -1166,6 +1169,59 @@ export const MemoryManager: React.FC<{
                       </span>
                     )}
                   </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    onClick={async () => {
+                      if (tramando) return;
+                      const ideas = (window.prompt(
+                        secretos.length
+                          ? '¿Alguna idea que quieras que la IA incorpore al trazar la historia? (opcional)\n\nLo ya plantado se respeta y se coloca en la capa que le toque.'
+                          : '¿Alguna idea de por dónde quieres que vaya la historia? (opcional)\n\nLa IA trazará las capas: lo que parece que pasa, lo que pasa de verdad, quién está detrás y por qué.'
+                      ) ?? null);
+                      if (ideas === null) return;
+                      setTramando(true);
+                      try {
+                        const trama = await tramarLaCampana({ project, files, chats: project.chats || [], ideas: ideas.trim() || undefined });
+                        await onUpdateMemory(mem => {
+                          const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+                          const previos = mem.gm_secrets || [];
+                          // Lo ya descubierto y lo ya plantado a mano no se pisa:
+                          // el trazado se suma a lo que hay, no lo reemplaza.
+                          const nuevos = trama.secretos
+                            .filter(t => !previos.some(p => clave(p.titulo) === clave(t.titulo)))
+                            .map(t => ({
+                              id: `sec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                              titulo: t.titulo,
+                              secreto: t.secreto,
+                              comoSeDescubre: t.comoSeDescubre,
+                              capa: t.capa,
+                              conecta: t.conecta,
+                              sembrar: t.sembrar,
+                              origen: 'trama' as const
+                            }));
+                          return {
+                            ...mem,
+                            gm_secrets: [...previos, ...nuevos],
+                            plan_de_campana: {
+                              premisa: trama.premisa,
+                              destino: trama.destino,
+                              trazadoEl: new Date().toISOString()
+                            }
+                          };
+                        });
+                      } catch (err: any) {
+                        window.alert(err?.message || 'No se pudo trazar la historia. Inténtalo de nuevo.');
+                      } finally {
+                        setTramando(false);
+                      }
+                    }}
+                    disabled={tramando}
+                    className="min-h-[36px] px-2.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 shadow-xs"
+                    title="La IA decide la historia entera de antemano: las capas, qué hay debajo de cada una y cómo enganchan. Una sola llamada, del modelo de tareas de fondo."
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${tramando ? 'animate-spin' : ''}`} />
+                    {tramando ? 'Tramando…' : secretos.length ? 'Retramar' : 'Que la IA trame la historia'}
+                  </button>
                   <button
                     onClick={async () => {
                       const titulo = (window.prompt('Título corto del giro (ej. «Los dueños del barco»)') || '').trim();
@@ -1185,6 +1241,7 @@ export const MemoryManager: React.FC<{
                   >
                     <Plus className="w-3.5 h-3.5" /> Plantar un giro
                   </button>
+                  </div>
                 </div>
 
                 <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed m-0">
@@ -1194,9 +1251,31 @@ export const MemoryManager: React.FC<{
                   hablando con el GM en su pestaña.
                 </p>
 
+                {memory.plan_de_campana?.premisa && (
+                  <div className="rounded-lg border border-rose-500/30 bg-[var(--surface)] p-2.5">
+                    <button
+                      onClick={() => setVerPremisa(v => !v)}
+                      className="w-full text-left font-cinzel text-[11px] font-bold text-rose-700 dark:text-rose-300 flex items-center justify-between gap-2 cursor-pointer min-h-[28px]"
+                    >
+                      <span>De qué va la historia de verdad</span>
+                      <span className="text-[10px] font-normal shrink-0">{verPremisa ? 'Tapar' : 'Ver (te lo destripas)'}</span>
+                    </button>
+                    {verPremisa && (
+                      <>
+                        <p className="text-xs text-[var(--text-primary)] italic m-0 mt-1.5 whitespace-pre-wrap">{memory.plan_de_campana.premisa}</p>
+                        {memory.plan_de_campana.destino && (
+                          <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-1">Hacia dónde va: {memory.plan_de_campana.destino}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {secretos.length === 0 ? (
                   <p className="text-[11px] text-[var(--text-secondary)] italic m-0">
-                    Ninguno todavía.
+                    Ninguno todavía. Pulsa <strong>Que la IA trame la historia</strong>: leerá tus documentos y lo ya
+                    jugado, y decidirá las capas —lo que parece que pasa, lo que pasa de verdad, quién está detrás— con
+                    lo que hay que ir sembrando desde ya.
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
@@ -1211,6 +1290,14 @@ export const MemoryManager: React.FC<{
                           <div className="flex items-start justify-between gap-2">
                             <span className="font-cinzel text-xs font-bold text-[var(--text-primary)] min-w-0">
                               {abierto ? '🔓' : '🔒'} {sec.titulo}
+                              {sec.capa ? (
+                                <span
+                                  className="ml-1.5 font-normal text-[10px] text-[var(--text-secondary)]"
+                                  title="A qué capa de la cebolla pertenece. Las de abajo no se destapan antes que las de arriba."
+                                >
+                                  capa {sec.capa}
+                                </span>
+                              ) : null}
                             </span>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {abierto ? (
@@ -1252,6 +1339,16 @@ export const MemoryManager: React.FC<{
                           {visible ? (
                             <>
                               <p className="text-xs text-[var(--text-primary)] italic m-0 mt-1.5 whitespace-pre-wrap">{sec.secreto}</p>
+                              {sec.sembrar && (
+                                <p className="text-[11px] text-emerald-700 dark:text-emerald-400 m-0 mt-1">
+                                  🌱 Se va sembrando con: {sec.sembrar}
+                                </p>
+                              )}
+                              {sec.conecta?.length ? (
+                                <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-1">
+                                  Engancha con: {sec.conecta.join(' · ')}
+                                </p>
+                              ) : null}
                               {sec.comoSeDescubre && (
                                 <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-1">
                                   Puede salir por: {sec.comoSeDescubre}
