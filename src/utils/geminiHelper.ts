@@ -1355,6 +1355,75 @@ export function estimarCargaDelTurno({
   };
 }
 
+/** Cuántos personajes habituales se le describen al Narrador en cada turno. */
+const MAX_PNJS_EN_PROMPT = 12;
+
+/**
+ * El dosier de los personajes que el Narrador debería conocer.
+ *
+ * Esto no llegaba. De todos los PNJs, `buildTurnPayload` usaba únicamente los
+ * NOMBRES, y solo para armar la consulta de búsqueda local: ni lo que aparentan,
+ * ni lo que ocultan, ni sus disfraces, ni su equipo. El Narrador dirigía a
+ * ciegas a gente de la que la aplicación tenía ficha completa.
+ *
+ * Las consecuencias se notan jugando. Un PNJ con un sombrero de disfraz en el
+ * inventario nunca lo usa, porque el Narrador no sabe que lo tiene. Un
+ * corsario que finge una cosa y trama otra no puede sostener la diferencia,
+ * porque no le consta cuál es. Y las directivas piden emitir vínculos «solo
+ * para los personajes que la aplicación ya te ha listado arriba como
+ * habituales» — una lista que nunca se enviaba.
+ *
+ * Viajan solo los recurrentes, y recortados: es el precio de que el Narrador
+ * sepa a quién está dirigiendo.
+ */
+function dosierDePersonajes(npcs: NPC[]): string {
+  const habituales = npcs
+    .filter(n => n.name && (n.recurrente || (n.diasVistos?.length || 0) >= 2))
+    .slice(-MAX_PNJS_EN_PROMPT);
+  if (habituales.length === 0) return '';
+
+  const corta = (v: string | undefined, max: number) =>
+    v && v.trim() ? v.trim().slice(0, max) : '';
+
+  const fichas = habituales.map(n => {
+    const lineas: string[] = [];
+    const nombre = n.trueIdentity && n.trueIdentity !== n.name ? `${n.name} (en realidad ${n.trueIdentity})` : n.name;
+    lineas.push(`### ${nombre}${n.relation ? ` — ${n.relation}` : ''}${n.status ? ` · ${n.status}` : ''}`);
+    if (n.alias) lineas.push(`- Se le conoce como: ${corta(n.alias, 120)}`);
+    if (n.disguise) lineas.push(`- ⚠️ DISFRAZ ACTIVO / apariencia falsa: ${corta(n.disguise, 300)}`);
+    if (n.appearance) lineas.push(`- Aspecto: ${corta(n.appearance, 300)}`);
+    if (n.aparenta) lineas.push(`- Lo que DEJA VER al protagonista: ${corta(n.aparenta, 300)}`);
+    if (n.oculta) lineas.push(`- 🔒 LO QUE CALLA (el protagonista NO lo sabe): ${corta(n.oculta, 300)}`);
+    if (n.vinculo) lineas.push(`- Vínculo: ${corta(n.vinculo, 120)}`);
+    if (typeof n.atr === 'number' || typeof n.vin === 'number' || typeof n.con === 'number') {
+      lineas.push(`- Afinidad: atracción ${n.atr ?? 0}/20 · vínculo ${n.vin ?? 0}/20 · confianza ${n.con ?? 0}/20`);
+    }
+    if (n.notes) lineas.push(`- Notas: ${corta(n.notes, 400)}`);
+
+    /*
+     * El equipo es lo que hace que un personaje ACTÚE como quien es. Sin esta
+     * línea, el sombrero de disfraz, la varita o el piwafwi son adorno en una
+     * ficha que nadie lee.
+     */
+    const equipo = (n.characterSheet?.inventory || [])
+      .filter(i => i.name)
+      .slice(0, 12)
+      .map(i => `${i.name}${i.attuned ? ' (sintonizado)' : ''}${i.description ? ` — ${i.description.slice(0, 90)}` : ''}`);
+    if (equipo.length) lineas.push(`- 🎒 Recursos y objetos de los que dispone: ${equipo.join('; ')}`);
+
+    return lineas.join('\n');
+  });
+
+  return `
+### 👥 PERSONAJES HABITUALES QUE YA CONOCES (dosier del Director)
+Esta es tu ficha interna de la gente recurrente de la campaña. Úsala: son sus datos, no sugerencias.
+- Lo marcado como 🔒 es TUYO, no del protagonista: no se narra, no se insinúa gratis y ningún PNJ lo suelta sin motivo.
+- Lo marcado como 🎒 es lo que ESE personaje puede usar en escena. Si tiene medios para resolver algo a su manera, los usa (ver el protocolo de disfraces e ilusión).
+
+${fichas.join('\n\n')}
+`.trim();
+}
+
 export function buildTurnPayload({
   project,
   currentChatId,
@@ -1412,10 +1481,13 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
 `;
   }
 
+  const dosierPnjs = dosierDePersonajes(project.memory?.npcs || []);
+
   const memoryContext = project.memory
     ? `
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}
 ${project.memory.manual_notes ? `NOTAS DIRECTAS DEL MAESTRO:\n${project.memory.manual_notes}\n` : ''}
 ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHistory}` : ''}
   `.trim()
