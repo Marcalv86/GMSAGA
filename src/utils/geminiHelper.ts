@@ -5067,97 +5067,317 @@ export function looksLikeNpcSheet(file: ProjectFile): boolean {
 /**
  * Extrae de forma estructurada un familiar o compañero desde un documento.
  */
-export async function extractNpcFromDocument(file: ProjectFile): Promise<NPC> {
+/**
+ * Cuánto texto se le manda al modelo de una vez al buscar PNJs.
+ *
+ * Antes había un `.slice(0, 40000)` sin explicación: de un compendio de 200.000
+ * caracteres el modelo veía el 19% y nadie se enteraba. Ahora el documento se
+ * parte en trozos y se leen todos, así que este número solo decide cuántas
+ * llamadas hacen falta, no cuánto se pierde. 60.000 caracteres son unas 16.000
+ * fichas: cabe de sobra en un envío y deja sitio para la respuesta.
+ */
+const MAX_CARACTERES_POR_TROZO = 60000;
+
+/**
+ * Parte un documento largo por sus encabezados.
+ *
+ * Cortar a ciegas cada N caracteres partía la ficha de alguien por la mitad y
+ * salían dos medios personajes o ninguno. Aquí se agrupan secciones enteras
+ * hasta llenar el trozo, de modo que nadie queda a caballo entre dos llamadas
+ * salvo que su sección sola ya sea más larga que el tope.
+ */
+export function partirDocumentoPorSecciones(
+  texto: string,
+  tope = MAX_CARACTERES_POR_TROZO
+): string[] {
+  if (!texto) return [];
+  if (texto.length <= tope) return [texto];
+
+  const lineas = texto.split('\n');
+  const secciones: string[] = [];
+  let actual: string[] = [];
+  for (const linea of lineas) {
+    // Un encabezado abre sección nueva, salvo que la actual esté vacía.
+    if (/^#{1,6}\s/.test(linea) && actual.length > 0) {
+      secciones.push(actual.join('\n'));
+      actual = [linea];
+    } else {
+      actual.push(linea);
+    }
+  }
+  if (actual.length) secciones.push(actual.join('\n'));
+
+  const trozos: string[] = [];
+  let buffer = '';
+  const empujar = () => {
+    if (buffer.trim()) trozos.push(buffer);
+    buffer = '';
+  };
+  for (const sec of secciones) {
+    if (sec.length > tope) {
+      // Una sección sola más larga que el tope: se corta a lo bruto, que es
+      // mejor que dejarla fuera. Pasa con tablas y transcripciones largas.
+      empujar();
+      for (let i = 0; i < sec.length; i += tope) trozos.push(sec.slice(i, i + tope));
+      continue;
+    }
+    if (buffer.length + sec.length + 1 > tope) empujar();
+    buffer += (buffer ? '\n' : '') + sec;
+  }
+  empujar();
+  return trozos;
+}
+
+/** Dos formas de escribir el mismo nombre son la misma persona. */
+function claveDeNombre(nombre: string): string {
+  return (nombre || '')
+    // «Jarlaxle Baenre — CR 15» o «Azleah (corrección de canon)» son la persona
+    // y una coletilla del documento. La coletilla sobra para identificarla.
+    .split(/[—–(\[]/)[0]
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/**
+ * ¿Son el mismo personaje escrito de dos maneras?
+ *
+ * Un compendio no llama a nadie igual dos veces seguidas: en un capítulo es
+ * «Jarlaxle», en el apéndice de fichas «Jarlaxle Baenre». Sin esto salían dos
+ * entradas, una con la voz y otra con los puntos de golpe.
+ *
+ * La regla es el nombre corto siendo PREFIJO del largo, por palabras enteras:
+ * así «Jarlaxle» entra en «Jarlaxle Baenre», pero «Gromph Baenre» y «Beniago
+ * Baenre» —que comparten apellido pero no principio— siguen siendo dos.
+ */
+function mismoPersonaje(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [corto, largo] = a.length <= b.length ? [a, b] : [b, a];
+  // Un nombre de pila muy corto («Jax», «Dab») coincide con demasiadas cosas
+  // por accidente; ahí se exige que sea idéntico.
+  if (corto.length < 4) return false;
+  return largo.startsWith(corto + ' ');
+}
+
+const INSTRUCCIONES_PNJ = `Analiza este documento y extrae TODOS los Personajes No Jugadores (PNJ), villanos, monstruos y criaturas que aparezcan con nombre propio y con información suficiente para ficharlos.
+
+MUY IMPORTANTE:
+- Devuelve un ARRAY con TODOS los que encuentres, no solo uno. Un compendio puede traer quince personajes: quiero los quince.
+- Solo personajes: NO extraigas lugares, tabernas, ciudades, barcos, organizaciones, facciones, dioses ni conceptos. «Bregan D'aerthe» es una organización, no un PNJ; «Jarlaxle» sí lo es.
+- Si el documento da la ficha mecánica de alguien (PG, CA, atributos, ataques, objetos mágicos), inclúyela en "sheet".
+- Si un personaje aparece con alias o disfraz, rellena "alias" y "disguise", y pon en "trueIdentity" quién es de verdad.
+- Si de alguien solo hay una mención de pasada sin nada que fichar, omítelo.
+- No inventes: lo que no diga el documento, se deja vacío.
+
+Para cada personaje:
+- "name": nombre propio, tal como lo escribe el documento
+- "relation": "Aliado", "Enemigo", "Neutral", "Contacto" o "Peligro"
+- "status": "Vivo", "Activo" o el estado que se indique
+- "description": rol público, quién es de cara a la galería
+- "appearance": descripción física (rostro, ojos, ropa, estatura, rasgos)
+- "notes": trasfondo, motivos, cómo se le interpreta, errores a evitar
+- "aparenta": lo que deja ver, cómo trata a los demás
+- "oculta": secretos, debilidades o intenciones que calla
+- "alias": apodo o nombre falso, si lo tiene
+- "trueIdentity": identidad real, si el documento la revela
+- "disguise": el disfraz o apariencia falsa, si la usa
+- "sheet": ficha opcional con hp, maxHp, ac, speed, attributes, traits
+
+Responde ÚNICAMENTE con un JSON de esta forma:
+{
+  "personajes": [
+    {
+      "name": "...",
+      "relation": "Neutral",
+      "status": "Vivo",
+      "description": "...",
+      "appearance": "...",
+      "notes": "...",
+      "aparenta": "...",
+      "oculta": "...",
+      "alias": "...",
+      "trueIdentity": "...",
+      "disguise": "...",
+      "sheet": {
+        "hp": 15, "maxHp": 15, "ac": 13, "speed": "30 pies",
+        "attributes": { "str": 12, "dex": 14, "con": 12, "int": 10, "wis": 11, "cha": 10 },
+        "traits": []
+      }
+    }
+  ]
+}`;
+
+/** Convierte un objeto suelto del JSON en un PNJ, sin inventarse nada. */
+function pnjDesdeJson(bruto: any, respaldo: string): NPC {
+  const texto = (v: any) => {
+    const t = typeof v === 'string' ? v.trim() : '';
+    // El modelo rellena con «...» o «N/A» cuando no sabe: eso no es un dato.
+    return !t || /^(\.{3}|n\/?a|desconocido|no consta|ninguno?)$/i.test(t) ? undefined : t;
+  };
+  const nombre = texto(bruto?.name) || respaldo;
+  const sheet = bruto?.sheet;
+  const tieneFicha =
+    sheet && (sheet.hp || sheet.maxHp || sheet.ac || sheet.speed || sheet.attributes || sheet.traits?.length);
+  return {
+    id: 'npc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+    name: nombre,
+    relation: texto(bruto?.relation) || 'Neutral',
+    status: texto(bruto?.status) || 'Vivo',
+    description: texto(bruto?.description) || '',
+    appearance: texto(bruto?.appearance),
+    notes: texto(bruto?.notes) || '',
+    aparenta: texto(bruto?.aparenta),
+    oculta: texto(bruto?.oculta),
+    alias: texto(bruto?.alias),
+    trueIdentity: texto(bruto?.trueIdentity),
+    disguise: texto(bruto?.disguise),
+    characterSheet: tieneFicha
+      ? {
+          name: nombre,
+          characterType: 'npc',
+          hp: sheet.hp,
+          maxHp: sheet.maxHp,
+          ac: sheet.ac,
+          speed: sheet.speed,
+          attributes: sheet.attributes,
+          traits: sheet.traits || []
+        }
+      : undefined
+  } as NPC;
+}
+
+/**
+ * Junta lo que dos trozos distintos dijeron del mismo personaje.
+ *
+ * Un compendio habla de alguien en varios sitios: su voz en un capítulo, su
+ * ficha mecánica en el apéndice. Sin esto saldrían dos entradas con el mismo
+ * nombre y cada una con la mitad. Se queda con el texto más largo de cada
+ * campo, que es la forma barata de decir «el que trae más información».
+ */
+export function fusionarPnjs(lista: NPC[]): NPC[] {
+  const grupos: { clave: string; npc: NPC }[] = [];
+  for (const npc of lista) {
+    const clave = claveDeNombre(npc.name);
+    if (!clave) continue;
+    const grupo = grupos.find(g => mismoPersonaje(g.clave, clave));
+    if (!grupo) {
+      grupos.push({ clave, npc });
+      continue;
+    }
+    const previo = grupo.npc;
+    // La clave del grupo pasa a ser la más completa de las dos, para que un
+    // tercer trozo que traiga el nombre largo también reconozca al grupo.
+    if (clave.length > grupo.clave.length) grupo.clave = clave;
+    const masLargo = (a?: string, b?: string) => ((b || '').length > (a || '').length ? b : a);
+    grupo.npc = {
+      ...previo,
+      name: previo.name.length >= npc.name.length ? previo.name : npc.name,
+      relation: previo.relation === 'Neutral' && npc.relation !== 'Neutral' ? npc.relation : previo.relation,
+      status: previo.status === 'Vivo' && npc.status !== 'Vivo' ? npc.status : previo.status,
+      description: masLargo(previo.description, npc.description) || '',
+      notes: masLargo(previo.notes, npc.notes) || '',
+      appearance: masLargo(previo.appearance, npc.appearance),
+      aparenta: masLargo(previo.aparenta, npc.aparenta),
+      oculta: masLargo(previo.oculta, npc.oculta),
+      alias: masLargo(previo.alias, npc.alias),
+      trueIdentity: masLargo(previo.trueIdentity, npc.trueIdentity),
+      disguise: masLargo(previo.disguise, npc.disguise),
+      // La ficha mecánica suele estar en un apéndice, lejos del retrato: gana
+      // la que exista, no la que llegó primero.
+      characterSheet: previo.characterSheet || npc.characterSheet
+    };
+  }
+  return grupos.map(g => g.npc);
+}
+
+/**
+ * Saca TODOS los PNJs de un documento, por largo que sea.
+ *
+ * Antes esto devolvía uno solo y además leía únicamente los primeros 40.000
+ * caracteres. Con un compendio de doscientos mil el resultado era un personaje
+ * de quince, sin ningún aviso de que faltaban catorce: parecía que el documento
+ * no traía más.
+ */
+export async function extractNpcsFromDocument(
+  file: ProjectFile,
+  onProgress?: (hechos: number, total: number) => void
+): Promise<NPC[]> {
   if (!file.isImage && !(file.content || '').trim()) {
     throw new Error(`"${file.name}" no contiene texto legible.`);
   }
 
-  const instructions = `Analiza este documento y extrae los datos del Personaje No Jugador (PNJ), Villano, Monstruo o Criatura de forma fiel.
-Extrae:
-- "name": Nombre del PNJ o monstruo
-- "relation": Relación estimada ("Aliado", "Enemigo", "Neutral", "Contacto", "Peligro")
-- "status": "Vivo", "Activo" o estado
-- "description": Lo que aparenta físicamente o su rol público
-- "notes": Trasfondo, motivos o notas
-- "aparenta": Lo que aparenta
-- "oculta": Secretos, debilidades o intenciones ocultas si se mencionan
-- "sheet": Ficha opcional con hp, maxHp, ac, speed, attributes, traits
+  const respaldo = file.name.replace(/\.[^/.]+$/, '');
+  const modelo = getBackgroundTaskModel();
+  const config = { responseMimeType: 'application/json', temperature: 0.1 } as any;
 
-Responde ÚNICAMENTE con un JSON:
-{
-  "name": "...",
-  "relation": "Neutral",
-  "status": "Vivo",
-  "description": "...",
-  "notes": "...",
-  "aparenta": "...",
-  "oculta": "...",
-  "sheet": {
-    "hp": 15,
-    "maxHp": 15,
-    "ac": 13,
-    "speed": "30 pies",
-    "attributes": { "str": 12, "dex": 14, "con": 12, "int": 10, "wis": 11, "cha": 10 },
-    "traits": []
-  }
-}`;
+  const leerRespuesta = (respuesta: any): NPC[] => {
+    const limpio = (respuesta?.text || '{}').replace(/```json/gi, '').replace(/```/g, '').trim();
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(limpio);
+    } catch (e) {
+      console.warn('No se pudo leer el JSON de PNJs:', e);
+      return [];
+    }
+    // Se acepta tanto {personajes:[...]} como un array pelado o un objeto suelto.
+    const brutos: any[] = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed.personajes)
+      ? parsed.personajes
+      : parsed.name
+      ? [parsed]
+      : [];
+    return brutos.map(b => pnjDesdeJson(b, respaldo)).filter(n => n.name && n.name.trim().length > 1);
+  };
 
-  let contents: any;
   if (file.isImage && file.content) {
     const base64 = file.content.includes(',') ? file.content.split(',')[1] : file.content;
-    contents = [
-      {
-        role: 'user',
-        parts: [
-          { inlineData: { mimeType: file.mime || 'image/jpeg', data: base64 } },
-          { text: `${instructions}\n\nLee la imagen adjunta y extrae el PNJ/Monstruo.` }
-        ]
-      }
-    ];
-  } else {
-    contents = `${instructions}\n\nDocumento:\n${(file.content || '').slice(0, 40000)}`;
+    onProgress?.(0, 1);
+    const respuesta = await generateContentWithFailover({
+      primaryModel: modelo,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType: file.mime || 'image/jpeg', data: base64 } },
+            { text: `${INSTRUCCIONES_PNJ}\n\nLee la imagen adjunta y extrae los PNJ/monstruos que aparezcan.` }
+          ]
+        }
+      ],
+      config
+    });
+    onProgress?.(1, 1);
+    return fusionarPnjs(leerRespuesta(respuesta));
   }
 
-  const response = await generateContentWithFailover({
-    primaryModel: getBackgroundTaskModel(),
-    contents,
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.1
+  const trozos = partirDocumentoPorSecciones(file.content || '');
+  const encontrados: NPC[] = [];
+  for (let i = 0; i < trozos.length; i++) {
+    onProgress?.(i, trozos.length);
+    const contexto =
+      trozos.length > 1
+        ? `\n\n(Esta es la parte ${i + 1} de ${trozos.length} del documento «${file.name}». Extrae solo los personajes que aparezcan en ESTA parte; de las demás se encargan otras lecturas.)`
+        : '';
+    try {
+      const respuesta = await generateContentWithFailover({
+        primaryModel: modelo,
+        contents: `${INSTRUCCIONES_PNJ}${contexto}\n\nDocumento:\n${trozos[i]}`,
+        config
+      });
+      encontrados.push(...leerRespuesta(respuesta));
+    } catch (err) {
+      // Un trozo que falle no puede tirar la lectura entera: se sigue con el
+      // resto y al menos se registra lo que sí se pudo leer.
+      console.warn(`Falló la parte ${i + 1} de ${trozos.length} al extraer PNJs:`, err);
     }
-  });
-
-  const cleanJson = (response.text || '{}').replace(/```json/gi, '').replace(/```/g, '').trim();
-  let parsed: any = {};
-  try {
-    parsed = JSON.parse(cleanJson);
-  } catch (e) {
-    console.error('Error parsing NPC JSON:', e);
   }
-
-  const npcId = 'npc_' + Date.now() + '_' + Math.random().toString(36).substring(7);
-
-  return {
-    id: npcId,
-    name: parsed.name || file.name.replace(/\.[^/.]+$/, ''),
-    relation: parsed.relation || 'Neutral',
-    status: parsed.status || 'Vivo',
-    description: parsed.description || '',
-    notes: parsed.notes || '',
-    aparenta: parsed.aparenta,
-    oculta: parsed.oculta,
-    characterSheet: parsed.sheet ? {
-      name: parsed.name || file.name,
-      characterType: 'npc',
-      hp: parsed.sheet.hp,
-      maxHp: parsed.sheet.maxHp,
-      ac: parsed.sheet.ac,
-      speed: parsed.sheet.speed,
-      attributes: parsed.sheet.attributes,
-      traits: parsed.sheet.traits || []
-    } : undefined
-  };
+  onProgress?.(trozos.length, trozos.length);
+  return fusionarPnjs(encontrados);
 }
+
 
 export async function analyzeUploadedImage(file: ProjectFile, base64: string): Promise<string> {
   const prompt = `Analiza esta imagen para la Memoria y Base de Conocimiento de una campaña de rol/fantasía.

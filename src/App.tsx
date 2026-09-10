@@ -74,7 +74,7 @@ import {
   refrescarCatalogoEnSegundoPlano,
   TiempoReportado,
   analyzeUploadedImage,
-  extractNpcFromDocument,
+  extractNpcsFromDocument,
   describeApiError,
   classifyApiError,
   destilarTablaOraculo,
@@ -2366,43 +2366,69 @@ export default function App() {
       type: 'sync'
     });
     try {
-      const npc = await extractNpcFromDocument(file);
-
-      const refreshedFiles = await loadFilesFromDB(currentPId);
-      const matchingPortrait = refreshedFiles.find(f => {
-        if (!f.isImage || !f.content) return false;
-        const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
-        const cleanNpcName = npc.name.toLowerCase().trim();
-        return (
-          f.category === 'portrait_npc' ||
-          (cleanNpcName.length > 2 && (cleanName.includes(cleanNpcName) || cleanNpcName.includes(cleanName)))
-        );
+      /*
+       * Un documento puede traer quince personajes, no uno.
+       *
+       * Esto devolvía un solo PNJ y encima leía únicamente los primeros 40.000
+       * caracteres: de un compendio de doscientos mil salía UNA ficha y ningún
+       * aviso de que faltaban catorce. Ahora se lee entero, por partes, y se
+       * registran todos los que aparezcan.
+       */
+      const npcs = await extractNpcsFromDocument(file, (hechos, total) => {
+        if (total > 1) {
+          setTopProgress({
+            active: true,
+            percent: Math.round((hechos / total) * 100),
+            label: `Leyendo "${file.name}" en busca de PNJs — parte ${Math.min(hechos + 1, total)} de ${total}...`,
+            type: 'sync'
+          });
+        }
       });
 
-      if (matchingPortrait && !npc.portrait) {
-        npc.portrait = matchingPortrait.content;
+      if (npcs.length === 0) {
+        setTopProgress({
+          active: true,
+          label: `No se encontró ningún PNJ con ficha en "${file.name}"`,
+          type: 'sync'
+        });
+        setTimeout(() => {
+          setTopProgress(p => (p.label?.includes('ningún PNJ') ? { active: false } : p));
+        }, 5000);
+        return;
+      }
+
+      // Cada uno con su retrato, si hay una imagen que se llame como él.
+      const refreshedFiles = await loadFilesFromDB(currentPId);
+      for (const npc of npcs) {
+        const matchingPortrait = refreshedFiles.find(f => {
+          if (!f.isImage || !f.content) return false;
+          const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
+          const cleanNpcName = npc.name.toLowerCase().trim();
+          return cleanNpcName.length > 2 && (cleanName.includes(cleanNpcName) || cleanNpcName.includes(cleanName));
+        });
+        if (matchingPortrait && !npc.portrait) npc.portrait = matchingPortrait.content;
       }
 
       await handleUpdateFileCategory(file.id, 'sheet_npc');
 
       await handleUpdateMemory(mem => {
         const existing = mem.npcs || [];
-        const filtered = existing.filter(n => n.name.toLowerCase() !== npc.name.toLowerCase());
+        const nuevosPorNombre = new Set(npcs.map(n => n.name.toLowerCase().trim()));
+        const filtered = existing.filter(n => !nuevosPorNombre.has(n.name.toLowerCase().trim()));
         return {
           ...mem,
-          npcs: [...filtered, npc]
+          npcs: [...filtered, ...npcs]
         };
       });
 
-      setTopProgress({
-        active: true,
-        percent: 100,
-        label: `PNJ "${npc.name}" registrado con éxito`,
-        type: 'sync'
-      });
+      const resumen =
+        npcs.length === 1
+          ? `PNJ "${npcs[0].name}" registrado con éxito`
+          : `${npcs.length} PNJs registrados: ${npcs.slice(0, 4).map(n => n.name).join(', ')}${npcs.length > 4 ? ` y ${npcs.length - 4} más` : ''}`;
+      setTopProgress({ active: true, percent: 100, label: resumen, type: 'sync' });
       setTimeout(() => {
-        setTopProgress(p => (p.label?.includes(npc.name) ? { active: false } : p));
-      }, 4000);
+        setTopProgress(p => (p.label === resumen ? { active: false } : p));
+      }, 6000);
     } catch (error) {
       console.error('Error extracting NPC:', error);
       setTopProgress({
