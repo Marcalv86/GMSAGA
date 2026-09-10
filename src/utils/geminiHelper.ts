@@ -1783,7 +1783,9 @@ ${pc.class ? `- CLASE Y NIVEL: ${pc.class} ${pc.level || ''}` : ''}
 ${pc.languages?.length
   ? `- IDIOMAS QUE HABLA Y ENTIENDE: ${pc.languages.join(', ')} ← SOLO ESTOS. Cualquier otro idioma le resulta ruido: no capta palabras sueltas, ni el sentido general por el tono, ni los gestos de un código manual que no conozca.`
   : `- IDIOMAS: no constan en la ficha. Da por supuesto ÚNICAMENTE el idioma común de la superficie. Lo exótico —drow, infracomún, códigos de signos de las Casas— NO lo entiende.`}
-${pc.appearance ? `- APARIENCIA FÍSICA: ${pc.appearance}` : ''}
+${pc.appearance
+  ? `- APARIENCIA FÍSICA: ${pc.appearance} ← ESTOS RASGOS SON LOS QUE SON. Cuando alguien la mire, ve ESTO, con estas palabras y no con una aproximación tuya. Si aquí dice que sus ojos son de alejandrita, no son «iridiscentes», ni «cambiantes», ni «de un tinte extraño»: son de alejandrita.`
+  : `- APARIENCIA FÍSICA: ⚠️ NO CONSTA EN LA FICHA. ⛔ NO te inventes rasgos físicos concretos —color de ojos, marcas, cicatrices, tatuajes, número de pendientes— porque cualquiera que pongas se convierte en canon y contradirá lo que la jugadora tenga escrito en sus documentos. Descríbela por lo que SÍ sabes (ropa, porte, estado, gestos) y busca sus rasgos en los documentos de la campaña antes de decidir nada.`}
 ${pc.personality ? `- PERSONALIDAD Y COMPORTAMIENTO: ${pc.personality}` : ''}
 ${pc.backstory ? `- TRASFONDO E HISTORIA: ${pc.backstory}` : ''}
 ${pc.notes ? `- HABILIDADES / NOTAS: ${pc.notes}` : ''}
@@ -2074,7 +2076,16 @@ ${
 ⭐ RECORDATORIO DE IDENTIDAD, JUSTO ANTES DE ESCRIBIR: ${[
         pc?.name ? `se llama ${pc.name}` : '',
         pc?.race ? `ES ${pc.race} — ninguna otra especie, en ninguna frase` : '',
-        pc?.languages?.length ? `habla ${pc.languages.join(', ')} y NADA más` : ''
+        pc?.languages?.length ? `habla ${pc.languages.join(', ')} y NADA más` : '',
+        /*
+         * Los rasgos físicos, en el último sitio que lee antes de escribir.
+         *
+         * Estaban solo arriba, en la ficha, a doscientas mil fichas de
+         * distancia de la escena. Y son justo lo que un PNJ mira al mirarla,
+         * así que si no los tiene fresco se los inventa: «un tinte
+         * fosforescente y cambiante» donde ponía «ojos de alejandrita».
+         */
+        pc?.appearance ? `SE LA VE ASÍ, con estas palabras: ${pc.appearance.slice(0, 400)}` : ''
       ]
         .filter(Boolean)
         .join(' · ')}.`

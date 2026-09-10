@@ -358,7 +358,7 @@ export const MemoryManager: React.FC<{
    * un dato se le manda al Narrador como verdad, tiene que poder verse y
    * corregirse aquí.
    */
-  const cambiarIdentidad = async (campo: 'race' | 'class' | 'languages', valor: string) => {
+  const cambiarIdentidad = async (campo: 'race' | 'class' | 'languages' | 'appearance', valor: string) => {
     await onUpdateMemory(mem => ({
       ...mem,
       player_character: {
@@ -707,6 +707,41 @@ export const MemoryManager: React.FC<{
                   orden de preguntar en vez de deducirla— pero peor que la
                   correcta, así que conviene verla.
                 */}
+                {/*
+                  Los rasgos físicos, que no se podían escribir en ningún sitio.
+
+                  Sin este campo, la línea de apariencia desaparecía del envío y
+                  el Narrador rellenaba el hueco: donde ponía «ojos de
+                  alejandrita» salía «un tinte fosforescente y cambiante». Y el
+                  detalle podía estar en un documento, sí, pero enterrado entre
+                  doscientas mil fichas; esto viaja pegado a la escena.
+                */}
+                <label className="mt-2.5 flex flex-col gap-1">
+                  <span className="font-cinzel text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1">
+                    Rasgos físicos — lo que ve quien la mira
+                    {!cleanPc.appearance && (
+                      <span className="text-amber-600 dark:text-amber-400" title="Sin rellenar. El Narrador tiene orden de no inventarse rasgos, pero tampoco podrá describirlos.">
+                        ⚠
+                      </span>
+                    )}
+                  </span>
+                  <textarea
+                    defaultValue={cleanPc.appearance || ''}
+                    key={`${cleanPc.name}-appearance-${(cleanPc.appearance || '').length}`}
+                    onBlur={e => {
+                      if (e.target.value.trim() !== (cleanPc.appearance || '').trim()) {
+                        cambiarIdentidad('appearance', e.target.value);
+                      }
+                    }}
+                    rows={3}
+                    placeholder="Ojos de alejandrita que cambian del verde al rojo según la luz; melena plateada; media luna de tinta clara en la frente…"
+                    className={`w-full rounded-lg border bg-[var(--surface)] px-2.5 py-2 text-xs font-lora leading-relaxed text-[var(--text-primary)] outline-hidden focus:border-[var(--accent)] resize-y ${
+                      cleanPc.appearance ? 'border-[var(--user-border)]' : 'border-amber-500/50'
+                    }`}
+                    title="Estos rasgos viajan al Narrador en cada turno y van pegados a la escena, así que los usa tal cual en vez de aproximarlos."
+                  />
+                </label>
+
                 <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {([
                     { campo: 'race' as const, rotulo: 'Raza / especie', valor: cleanPc.race || '', ph: 'Drow, humana, tiefling…' },
