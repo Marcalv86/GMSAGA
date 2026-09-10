@@ -45,6 +45,8 @@ import {
   limpiarEtiquetasDePnj,
   leerPresentes,
   leerVinculos,
+  leerRevelaciones,
+  RevelacionLeida,
   VinculoLeido,
   HiloLeido
 } from './campaignCalendar';
@@ -1393,7 +1395,21 @@ function dosierDePersonajes(npcs: NPC[]): string {
     if (n.disguise) lineas.push(`- ⚠️ DISFRAZ ACTIVO / apariencia falsa: ${corta(n.disguise, 300)}`);
     if (n.appearance) lineas.push(`- Aspecto: ${corta(n.appearance, 300)}`);
     if (n.aparenta) lineas.push(`- Lo que DEJA VER al protagonista: ${corta(n.aparenta, 300)}`);
-    if (n.oculta) lineas.push(`- 🔒 LO QUE CALLA (el protagonista NO lo sabe): ${corta(n.oculta, 300)}`);
+    /*
+     * Un secreto y un dato sabido no se narran igual, y hasta ahora eran la
+     * misma línea. Lo que ya salió en escena deja de estar prohibido: seguir
+     * tratándolo como secreto hace que el Narrador finja que el protagonista
+     * no sabe algo que sabe, y ahí se pierden las dos cosas —la sorpresa antes
+     * y la consecuencia después.
+     */
+    if (n.oculta) {
+      const rev = n.secretoRevelado;
+      lineas.push(
+        rev
+          ? `- 🔓 YA SE SUPO${rev.fecha ? ` (${rev.fecha})` : ''}${rev.como ? `, ${corta(rev.como, 140)}` : ''} — el protagonista LO SABE: ${corta(n.oculta, 300)}`
+          : `- 🔒 LO QUE CALLA (el protagonista NO lo sabe todavía): ${corta(n.oculta, 300)}`
+      );
+    }
     if (n.vinculo) lineas.push(`- Vínculo: ${corta(n.vinculo, 120)}`);
     if (typeof n.atr === 'number' || typeof n.vin === 'number' || typeof n.con === 'number') {
       lineas.push(`- Afinidad: atracción ${n.atr ?? 0}/20 · vínculo ${n.vin ?? 0}/20 · confianza ${n.con ?? 0}/20`);
@@ -1417,7 +1433,9 @@ function dosierDePersonajes(npcs: NPC[]): string {
   return `
 ### 👥 PERSONAJES HABITUALES QUE YA CONOCES (dosier del Director)
 Esta es tu ficha interna de la gente recurrente de la campaña. Úsala: son sus datos, no sugerencias.
-- Lo marcado como 🔒 es TUYO, no del protagonista: no se narra, no se insinúa gratis y ningún PNJ lo suelta sin motivo.
+- 🔒 ES TUYO, NO DEL PROTAGONISTA. No se narra, no se insinúa gratis, ningún PNJ lo suelta sin un motivo ganado en escena y NUNCA aparece en el HUD, en la crónica ni en un resumen. Que tú lo sepas no es que ella lo sepa: si lo sueltas, has destripado el giro y ya no hay vuelta atrás.
+- 🔒 SE DESTAPA JUGÁNDOLO: investigando, ganándose la confianza, una indiscreción de un tercero, un descuido, una prueba física. Cuando de verdad salga a la luz en la escena, y SOLO entonces, cierra el mensaje con \`[REVELADO: Nombre — cómo se ha sabido]\`. A partir de ahí pasa a ser algo con lo que el protagonista puede contar.
+- 🔓 YA SE SUPO: eso ya no es un secreto. Puede mencionarse, tener consecuencias y salir en boca de quien corresponda. No hagas como si el protagonista no lo supiera.
 - Lo marcado como 🎒 es lo que ESE personaje puede usar en escena. Si tiene medios para resolver algo a su manera, los usa (ver el protocolo de disfraces e ilusión).
 
 ${fichas.join('\n\n')}
@@ -2578,6 +2596,13 @@ export interface TiempoReportado {
   /** Cómo han cambiado los vínculos de los personajes habituales. */
   vinculos: VinculoLeido[];
   /**
+   * Secretos que han salido a la luz EN ESCENA en este turno.
+   *
+   * Es el único camino por el que un secreto deja de serlo. Destapar la ficha
+   * en Memoria para leerla no cuenta: eso es mirar el guion, no averiguar nada.
+   */
+  revelaciones: RevelacionLeida[];
+  /**
    * La fecha que el Narrador ha escrito en la cabecera de HUD de este mensaje,
    * tal cual, sin resolver. Es la que ve la jugadora en el chat, así que es la
    * que debe mandar sobre el calendario.
@@ -2621,6 +2646,7 @@ async function saveStreamedMessage(
   const hilos = leerHilos(cleanedText);
   const presentes = leerPresentes(cleanedText);
   const vinculos = leerVinculos(cleanedText);
+  const revelaciones = leerRevelaciones(cleanedText);
   // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
   const hudDeEsteTurno = leerFechaDeHud(fullText);
   const avanceDeNivel = leerAvanceDeNivel(cleanedText) || undefined;
@@ -2641,6 +2667,7 @@ async function saveStreamedMessage(
       hilos.length ||
       presentes.length ||
       vinculos.length ||
+      revelaciones.length ||
       hudDeEsteTurno?.fechaTexto ||
       avanceDeNivel)
   ) {
@@ -2651,6 +2678,7 @@ async function saveStreamedMessage(
         hilos,
         presentes,
         vinculos,
+        revelaciones,
         fechaHud: hudDeEsteTurno?.fechaTexto,
         momentoHud: hudDeEsteTurno?.momento,
         avanceDeNivel

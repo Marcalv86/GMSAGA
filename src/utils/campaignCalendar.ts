@@ -1232,6 +1232,41 @@ export function leerPresentes(texto: string): string[] {
   return out;
 }
 
+const REVELADO_RE = /\[\s*REVELADO\s*:\s*([^\]]+)\]/gi;
+
+export interface RevelacionLeida {
+  /** De quién se ha destapado el secreto. */
+  nombre: string;
+  /** Cómo salió a la luz, con las palabras del Narrador. */
+  como?: string;
+}
+
+/**
+ * Lee `[REVELADO: Serena — lo contó ella misma al tercer vaso]`.
+ *
+ * Es la etiqueta que convierte un secreto en un dato sabido. Hasta que el
+ * Narrador la emite, lo que un PNJ calla está prohibido en escena; después,
+ * deja de estarlo. Sin esto la aplicación no tenía forma de distinguir «esto
+ * es un giro que aún no ha pasado» de «esto ya salió y el personaje lo sabe»,
+ * y el Narrador acababa tratando los giros como información de dominio común.
+ */
+export function leerRevelaciones(texto: string): RevelacionLeida[] {
+  if (!texto || !/REVELADO/i.test(texto)) return [];
+  REVELADO_RE.lastIndex = 0;
+  const out: RevelacionLeida[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = REVELADO_RE.exec(texto)) !== null) {
+    // «Serena — lo contó ella» y «Serena | lo contó ella» valen igual: el
+    // Narrador escribe con guion largo la mitad de las veces.
+    const partes = m[1].split(/—|–|\||:/);
+    const nombre = (partes.shift() || '').trim().replace(/^[*_\s]+|[*_\s]+$/g, '');
+    if (nombre.length < 2) continue;
+    const como = partes.join(' — ').trim() || undefined;
+    if (!out.some(r => r.nombre.toLowerCase() === nombre.toLowerCase())) out.push({ nombre, como });
+  }
+  return out;
+}
+
 export interface VinculoLeido {
   nombre: string;
   aparenta?: string;
@@ -1347,6 +1382,9 @@ export function limpiarEtiquetasDePnj(texto: string): string {
     .replace(VINCULO_RE, '')
     .replace(AFINIDAD_TAG_RE, '')
     .replace(AFINIDAD_INLINE_RE, '')
+    // La revelación se registra en la ficha; en el relato sobra, que ahí ya se
+    // ha contado con palabras.
+    .replace(REVELADO_RE, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')

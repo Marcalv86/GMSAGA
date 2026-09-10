@@ -1385,11 +1385,18 @@ export const MemoryManager: React.FC<{
                           >
                             <Shield className="w-2.5 h-2.5 text-amber-500" /> CON {n.con ?? 0}/20
                           </span>
-                          {n.oculta && !vinculosDestapados.has(n.id) && (
-                            <span className="text-[10px] text-rose-600 dark:text-rose-400 font-cinzel flex items-center gap-0.5" title="Tiene secretos ocultos que descubrir">
+                          {n.oculta && n.secretoRevelado ? (
+                            <span
+                              className="text-[10px] text-emerald-600 dark:text-emerald-400 font-cinzel flex items-center gap-0.5"
+                              title={`Su secreto salió a la luz jugando${n.secretoRevelado.fecha ? ` el ${n.secretoRevelado.fecha}` : ''}. El Narrador ya cuenta con ello.`}
+                            >
+                              <Lock className="w-2.5 h-2.5" /> Descubierto
+                            </span>
+                          ) : n.oculta && !vinculosDestapados.has(n.id) ? (
+                            <span className="text-[10px] text-rose-600 dark:text-rose-400 font-cinzel flex items-center gap-0.5" title="Guarda algo que tu personaje aún no sabe. Sale jugando.">
                               <Lock className="w-2.5 h-2.5" /> Secreto
                             </span>
-                          )}
+                          ) : null}
                         </div>
                       ) : (
                         <div className="text-[10px] text-[var(--text-secondary)] font-cinzel flex items-center gap-1">

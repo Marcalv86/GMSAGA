@@ -371,6 +371,23 @@ export interface NPC {
   aparenta?: string;
   /** Lo que calla. Va tapado: leerlo es destriparse la traición. */
   oculta?: string;
+  /**
+   * Cuándo y cómo se supo lo que callaba, si ya se ha sabido EN JUEGO.
+   *
+   * Es la diferencia entre un secreto y un dato. Mientras esto no exista, el
+   * Narrador tiene prohibido narrarlo, insinuarlo o dejar que otro PNJ lo
+   * suelte; en cuanto existe, es algo que el protagonista sabe y con lo que se
+   * puede contar. Destapar la ficha para leerla no lo rellena: eso es la
+   * jugadora mirando el guion, no el personaje averiguando nada.
+   */
+  secretoRevelado?: {
+    /** Día absoluto de campaña en que salió. */
+    diaAbs?: number;
+    /** La fecha escrita, para enseñarla sin recalcular. */
+    fecha?: string;
+    /** Cómo se supo: «lo contó Dab'nay», «lo dedujo por el anillo». */
+    como?: string;
+  };
   /** En qué punto está la relación, en dos o tres palabras. */
   vinculo?: string;
   /** Eje de Atracción / Química romántica y tensión (escala 0 - 20) */

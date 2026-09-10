@@ -906,7 +906,7 @@ export default function App() {
    */
   const conVinculos = (p: Project, diaActual: number): Project['memory'] => {
     const t = reporteActual.current;
-    if (!t || (!t.presentes.length && !t.vinculos.length)) return p.memory;
+    if (!t || (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length)) return p.memory;
 
     const mem = p.memory || {
       story: '',
@@ -973,6 +973,34 @@ export default function App() {
           // Que el Narrador se moleste en escribir un vínculo ya dice que este
           // personaje cuenta, aunque la cuenta de días aún no haya llegado.
           recurrente: true
+        };
+      }
+
+      /*
+       * El secreto que ha salido a la luz en esta escena.
+       *
+       * A partir de aquí deja de ir con candado en el dosier del Narrador: es
+       * algo que el protagonista sabe, con lo que se puede contar y que puede
+       * tener consecuencias. Solo se marca una vez —la primera— para que
+       * quede la fecha en que se supo y no la del último turno que lo mencione.
+       */
+      const rev = t.revelaciones.find(x =>
+        coincidenNombresNpc(x.nombre, cambiado.name, undefined, {
+          alias: cambiado.alias,
+          trueIdentity: cambiado.trueIdentity
+        })
+      );
+      if (rev && cambiado.oculta && !cambiado.secretoRevelado) {
+        cambiado = {
+          ...cambiado,
+          secretoRevelado: {
+            diaAbs: calendarioValido(p.calendar) ? diaActual : undefined,
+            fecha:
+              calendarioValido(p.calendar) && p.currentDate
+                ? fechaLegible(p.calendar, p.currentDate)
+                : undefined,
+            como: rev.como
+          }
         };
       }
 

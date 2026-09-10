@@ -74,7 +74,18 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
     return { label: 'Confianza absoluta / Guarda tus secretos más oscuros', escudos: 5, gradient: 'from-rose-600 to-amber-500' };
   };
 
-  const isSecretRevealed = vinculosDestapados.has(npc.id);
+  /*
+   * Dos cosas distintas que antes eran la misma.
+   *
+   * `sabidoEnJuego` es que el secreto SALIÓ en una escena: el personaje lo
+   * averiguó y ya cuenta como conocido, también para el Narrador. `destapado`
+   * es la jugadora abriendo el sobre para leerlo: no cambia nada de la partida
+   * y es, literalmente, destriparse el giro. Mezclarlas hacía que leer una
+   * ficha por curiosidad pareciera haber descubierto algo.
+   */
+  const sabidoEnJuego = !!npc.secretoRevelado;
+  const destapado = vinculosDestapados.has(npc.id);
+  const isSecretRevealed = sabidoEnJuego || destapado;
   const sheet = npc.characterSheet;
 
   // Physical appearance resolution
@@ -428,14 +439,29 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                     <div className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-xl space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="font-cinzel text-xs font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
-                          <Lock className="w-3.5 h-3.5" /> Lo que oculta (Secreto de Trama):
+                          <Lock className="w-3.5 h-3.5" />
+                          {sabidoEnJuego ? 'Lo que ocultaba (ya lo sabes):' : 'Lo que oculta (aún no lo sabes):'}
                         </span>
-                        {isSecretRevealed && (
-                          <span className="text-[10px] bg-rose-500/20 text-rose-800 dark:text-rose-300 px-2 py-0.5 rounded font-cinzel font-semibold">
+                        {sabidoEnJuego ? (
+                          <span
+                            className="text-[10px] bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded font-cinzel font-semibold shrink-0"
+                            title="Salió a la luz jugando. El Narrador ya puede contar con ello."
+                          >
+                            Descubierto en juego
+                          </span>
+                        ) : destapado ? (
+                          <span className="text-[10px] bg-rose-500/20 text-rose-800 dark:text-rose-300 px-2 py-0.5 rounded font-cinzel font-semibold shrink-0">
                             Sello Roto
                           </span>
-                        )}
+                        ) : null}
                       </div>
+
+                      {sabidoEnJuego && (
+                        <p className="text-[11px] text-emerald-800 dark:text-emerald-300 m-0 leading-snug">
+                          Se supo {npc.secretoRevelado?.fecha ? `el ${npc.secretoRevelado.fecha}` : 'jugando'}
+                          {npc.secretoRevelado?.como ? `: ${npc.secretoRevelado.como}` : '.'}
+                        </p>
+                      )}
 
                       {isSecretRevealed ? (
                         <p className="text-sm text-[var(--text-primary)] leading-relaxed italic m-0 whitespace-pre-wrap border-l-2 border-rose-500 pl-3">
@@ -444,13 +470,16 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                       ) : (
                         <div className="space-y-2">
                           <p className="text-xs text-[var(--text-secondary)] italic m-0">
-                            Este personaje oculta intenciones o secretos que podrían alterar el curso de la campaña.
+                            Este personaje guarda algo que tu personaje <strong>todavía no sabe</strong>. El Narrador lo
+                            tiene y no puede contarlo: sale jugando —preguntando, ganándote su confianza, atando cabos—
+                            y entonces se marca solo.
                           </p>
                           <button
                             onClick={() => onToggleDestaparVinculo(npc.id)}
-                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-cinzel text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                            className="min-h-[40px] px-3 border border-rose-500/50 text-rose-700 dark:text-rose-300 hover:bg-rose-600 hover:text-white rounded-lg font-cinzel text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                            title="Solo lo lees tú. No cambia nada de la partida y te quedas sin la sorpresa."
                           >
-                            <Lock className="w-3.5 h-3.5" /> Romper Sello y Revelar Secreto
+                            <Lock className="w-3.5 h-3.5" /> Leerlo igualmente (te lo destripas)
                           </button>
                         </div>
                       )}
