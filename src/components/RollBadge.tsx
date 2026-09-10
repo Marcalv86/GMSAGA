@@ -13,109 +13,78 @@ interface RollInfo {
   d100Pair?: [number, number];
   isDouble?: boolean;
   dmContext?: string;
+  /**
+   * Contra qué se tira cuando no es una CD numérica: «Engaño pasivo», «SAB
+   * pasiva del PJ». El formato que las instrucciones del DM piden en §4 es
+   * justo ese, así que sin esto la tirada no se reconocía y salía en crudo.
+   */
+  contra?: string;
   total?: number;
   modifier?: number;
   rawText: string;
 }
 
+/**
+ * Las cinco formas de tirada, en un solo sitio.
+ *
+ * Estaban duplicadas en las dos funciones de lectura y se les fue la mano a
+ * cada una por su lado. Como son \`/g\`, guardan estado entre usos: por eso se
+ * guardan como texto y se instancia una nueva cada vez.
+ */
+const PATRONES = {
+  habilidad: String.raw`\[\s*Tirada\s+de\s+([^:]+?)\s*:\s*d(\d+)\s+natural\s*=\s*(\d+)(?:\s*[|,]\s*(?:CD|DC)\s*[:=]?\s*(\d+))?\s*\]`,
+  simple: String.raw`\[\s*Tirada\s+d(\d+)\s*:\s*(\d+)\s*\]`,
+  oraculoPregunta: String.raw`\[\s*Or[aá]culo\s*—\s*[«"']?([^»"'\n|]+?)[»"']?\s*\|\s*probabilidad\s*:\s*([^|\n]+?)\s*\|\s*d100\s*=\s*(\d+)(?:\s*\|\s*D[ÍI]GITOS\s+REPETIDOS)?\s*\]`,
+  oraculoSignificado: String.raw`\[\s*Or[aá]culo\s*—\s*descubrir\s+significado\s*\|\s*d100\s*=\s*(\d+)\s+y\s+(\d+)\s*\]`,
+  /**
+   * Tirada del DM o de un PNJ. Admite las tres formas que se ven en mesa:
+   *   [Tirada DM (DES, goblin acercándose): 14 vs SAB pasiva del PJ]   ← la de §4
+   *   [Tirada DM (SAB, perspicacia de Jarlaxle): 14 + 3 = 17 vs Engaño pasivo]
+   *   [Tirada PNJ (SAB de Dab'nay): d20 = 14 + 3 = 17 vs CD 12]
+   * El «d20 =» y el «vs …» son opcionales, y el «contra» puede ser una CD
+   * numérica o el nombre de una pasiva.
+   */
+  dm: String.raw`\[\s*Tirada\s+(?:DM|PNJ)\s*\(([^)]+?)\)\s*:\s*(?:d(\d+)\s*=\s*)?(\d+)\s*([+-]\s*\d+)?\s*(?:=\s*(\d+))?\s*(?:(?:vs|contra)\s+(?:(?:CD|DC)\s*[:=]?\s*(\d+)|([^\]]+?)))?\s*\]`
+} as const;
+
+const nuevaRegex = (patron: string) => new RegExp(patron, 'gi');
+
+/** Lee una coincidencia de tirada de DM / PNJ y la convierte en datos. */
+function leerTiradaDeDM(match: RegExpExecArray): RollInfo {
+  const modificador = match[4] ? parseInt(match[4].replace(/\s+/g, ''), 10) : 0;
+  const natural = parseInt(match[3], 10);
+  const contra = match[7]?.trim();
+  return {
+    type: 'dm',
+    dmContext: match[1].trim(),
+    sides: match[2] ? parseInt(match[2], 10) : 20,
+    natural,
+    modifier: modificador,
+    total: match[5] ? parseInt(match[5], 10) : natural + modificador,
+    dc: match[6] ? parseInt(match[6], 10) : undefined,
+    contra: contra || undefined,
+    rawText: match[0]
+  };
+}
+
+/**
+ * Todas las tiradas de un mensaje, y la prosa ya sin las etiquetas.
+ *
+ * Se apoya en parseMessageSegments para no tener dos lectores distintos: eran
+ * dos copias de las mismas cinco expresiones, y en cuanto una cambió dejaron
+ * de reconocer lo mismo.
+ */
 export function parseMessageRolls(text: string): { narrativeText: string; rolls: RollInfo[] } {
   if (!text) return { narrativeText: '', rolls: [] };
-
-  const rolls: RollInfo[] = [];
-  let narrativeText = text;
-
-  // 1. Tirada de Habilidad: [Tirada de Percepción: d20 natural = 18 | CD 15]
-  const skillRollRegex = /\[\s*Tirada\s+de\s+([^:]+?)\s*:\s*d(\d+)\s+natural\s*=\s*(\d+)(?:\s*[|,]\s*(?:CD|DC)\s*[:=]?\s*(\d+))?\s*\]/gi;
-  let match;
-  while ((match = skillRollRegex.exec(text)) !== null) {
-    const rawText = match[0];
-    const skillName = match[1].trim();
-    const sides = parseInt(match[2], 10) || 20;
-    const natural = parseInt(match[3], 10);
-    const dc = match[4] ? parseInt(match[4], 10) : undefined;
-    rolls.push({
-      type: 'skill',
-      skillName,
-      sides,
-      natural,
-      dc,
-      rawText
-    });
-  }
-
-  // 2. Tirada simple: [Tirada d20: 17] o [Tirada d6: 4]
-  const simpleRollRegex = /\[\s*Tirada\s+d(\d+)\s*:\s*(\d+)\s*\]/gi;
-  while ((match = simpleRollRegex.exec(text)) !== null) {
-    const rawText = match[0];
-    const sides = parseInt(match[1], 10);
-    const natural = parseInt(match[2], 10);
-    rolls.push({
-      type: 'simple',
-      sides,
-      natural,
-      rawText
-    });
-  }
-
-  // 3. Oráculo con pregunta: [Oráculo — «¿pregunta?» | probabilidad: Probable | d100 = 42 | DÍGITOS REPETIDOS]
-  const oracleQueryRegex = /\[\s*Or[aá]culo\s*—\s*[«"']?([^»"'\n|]+?)[»"']?\s*\|\s*probabilidad\s*:\s*([^|\n]+?)\s*\|\s*d100\s*=\s*(\d+)(?:\s*\|\s*D[ÍI]GITOS\s+REPETIDOS)?\s*\]/gi;
-  while ((match = oracleQueryRegex.exec(text)) !== null) {
-    const rawText = match[0];
-    const question = match[1].trim();
-    const probability = match[2].trim();
-    const d100Result = parseInt(match[3], 10);
-    const isDouble = rawText.toUpperCase().includes('DÍGITOS REPETIDOS') || rawText.toUpperCase().includes('DIGITOS REPETIDOS');
-    rolls.push({
-      type: 'oracle_query',
-      question,
-      probability,
-      d100Result,
-      isDouble,
-      rawText
-    });
-  }
-
-  // 4. Oráculo significado: [Oráculo — descubrir significado | d100 = 12 y 78]
-  const oracleMeaningRegex = /\[\s*Or[aá]culo\s*—\s*descubrir\s+significado\s*\|\s*d100\s*=\s*(\d+)\s+y\s+(\d+)\s*\]/gi;
-  while ((match = oracleMeaningRegex.exec(text)) !== null) {
-    const rawText = match[0];
-    const a = parseInt(match[1], 10);
-    const b = parseInt(match[2], 10);
-    rolls.push({
-      type: 'oracle_meaning',
-      d100Pair: [a, b],
-      rawText
-    });
-  }
-
-  // 5. Tirada DM / PNJ: [Tirada DM (SAB de Dab'nay calibrando intenciones): d20 = 14 + 3 = 17 vs CD 12]
-  const dmRollRegex = /\[\s*Tirada\s+(?:DM|PNJ)\s*\(([^)]+?)\)\s*:\s*d(\d+)\s*=\s*(\d+)(?:\s*\+\s*(\d+))?(?:\s*=\s*(\d+))?(?:\s*(?:vs|contra)\s*(?:CD|DC)\s*(\d+))?\s*\]/gi;
-  while ((match = dmRollRegex.exec(text)) !== null) {
-    const rawText = match[0];
-    const dmContext = match[1].trim();
-    const sides = parseInt(match[2], 10) || 20;
-    const baseRoll = parseInt(match[3], 10);
-    const modifier = match[4] ? parseInt(match[4], 10) : 0;
-    const total = match[5] ? parseInt(match[5], 10) : (baseRoll + modifier);
-    const dc = match[6] ? parseInt(match[6], 10) : undefined;
-    rolls.push({
-      type: 'dm',
-      dmContext,
-      sides,
-      natural: baseRoll,
-      modifier,
-      total,
-      dc,
-      rawText
-    });
-  }
-
-  // Eliminar los tags del texto narrativo para que se dibujen como tarjetas ricas
-  for (const r of rolls) {
-    narrativeText = narrativeText.replace(r.rawText, '').trim();
-  }
-
-  return { narrativeText, rolls };
+  const segmentos = parseMessageSegments(text);
+  return {
+    narrativeText: segmentos
+      .filter((s): s is TextSegment => s.type === 'text')
+      .map(s => s.content)
+      .join('\n\n')
+      .trim(),
+    rolls: segmentos.filter((s): s is RollSegment => s.type === 'roll').map(s => s.roll)
+  };
 }
 
 export interface TextSegment {
@@ -137,7 +106,7 @@ export function parseMessageSegments(text: string): MessageSegment[] {
   let match;
 
   // 1. Tirada de Habilidad
-  const skillRollRegex = /\[\s*Tirada\s+de\s+([^:]+?)\s*:\s*d(\d+)\s+natural\s*=\s*(\d+)(?:\s*[|,]\s*(?:CD|DC)\s*[:=]?\s*(\d+))?\s*\]/gi;
+  const skillRollRegex = nuevaRegex(PATRONES.habilidad);
   while ((match = skillRollRegex.exec(text)) !== null) {
     const rawText = match[0];
     const skillName = match[1].trim();
@@ -152,7 +121,7 @@ export function parseMessageSegments(text: string): MessageSegment[] {
   }
 
   // 2. Tirada simple
-  const simpleRollRegex = /\[\s*Tirada\s+d(\d+)\s*:\s*(\d+)\s*\]/gi;
+  const simpleRollRegex = nuevaRegex(PATRONES.simple);
   while ((match = simpleRollRegex.exec(text)) !== null) {
     const rawText = match[0];
     const sides = parseInt(match[1], 10);
@@ -165,7 +134,7 @@ export function parseMessageSegments(text: string): MessageSegment[] {
   }
 
   // 3. Oráculo con pregunta
-  const oracleQueryRegex = /\[\s*Or[aá]culo\s*—\s*[«"']?([^»"'\n|]+?)[»"']?\s*\|\s*probabilidad\s*:\s*([^|\n]+?)\s*\|\s*d100\s*=\s*(\d+)(?:\s*\|\s*D[ÍI]GITOS\s+REPETIDOS)?\s*\]/gi;
+  const oracleQueryRegex = nuevaRegex(PATRONES.oraculoPregunta);
   while ((match = oracleQueryRegex.exec(text)) !== null) {
     const rawText = match[0];
     const question = match[1].trim();
@@ -180,7 +149,7 @@ export function parseMessageSegments(text: string): MessageSegment[] {
   }
 
   // 4. Oráculo significado
-  const oracleMeaningRegex = /\[\s*Or[aá]culo\s*—\s*descubrir\s+significado\s*\|\s*d100\s*=\s*(\d+)\s+y\s+(\d+)\s*\]/gi;
+  const oracleMeaningRegex = nuevaRegex(PATRONES.oraculoSignificado);
   while ((match = oracleMeaningRegex.exec(text)) !== null) {
     const rawText = match[0];
     const a = parseInt(match[1], 10);
@@ -193,19 +162,12 @@ export function parseMessageSegments(text: string): MessageSegment[] {
   }
 
   // 5. Tirada DM / PNJ
-  const dmRollRegex = /\[\s*Tirada\s+(?:DM|PNJ)\s*\(([^)]+?)\)\s*:\s*d(\d+)\s*=\s*(\d+)(?:\s*\+\s*(\d+))?(?:\s*=\s*(\d+))?(?:\s*(?:vs|contra)\s*(?:CD|DC)\s*(\d+))?\s*\]/gi;
+  const dmRollRegex = nuevaRegex(PATRONES.dm);
   while ((match = dmRollRegex.exec(text)) !== null) {
-    const rawText = match[0];
-    const dmContext = match[1].trim();
-    const sides = parseInt(match[2], 10) || 20;
-    const baseRoll = parseInt(match[3], 10);
-    const modifier = match[4] ? parseInt(match[4], 10) : 0;
-    const total = match[5] ? parseInt(match[5], 10) : (baseRoll + modifier);
-    const dc = match[6] ? parseInt(match[6], 10) : undefined;
     items.push({
       index: match.index,
-      endIndex: match.index + rawText.length,
-      roll: { type: 'dm', dmContext, sides, natural: baseRoll, modifier, total, dc, rawText }
+      endIndex: match.index + match[0].length,
+      roll: leerTiradaDeDM(match)
     });
   }
 
@@ -249,11 +211,15 @@ export const RollBadgeCard: React.FC<{ roll: RollInfo }> = ({ roll }) => {
               <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--accent)]">
                 Tirada de DM / PNJ
               </span>
-              {roll.dc !== undefined && (
+              {roll.dc !== undefined ? (
                 <span className="text-[10px] font-cinzel font-semibold px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--user-border)] text-[var(--text-secondary)]">
                   CD {roll.dc}
                 </span>
-              )}
+              ) : roll.contra ? (
+                <span className="text-[10px] font-cinzel font-semibold px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--user-border)] text-[var(--text-secondary)]">
+                  vs {roll.contra}
+                </span>
+              ) : null}
             </div>
             <div className="text-[11px] text-[var(--text-secondary)] font-lora italic truncate max-w-xs sm:max-w-md">
               {roll.dmContext}
