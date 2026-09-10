@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import {
   Project,
   Chat,
+  Location,
   ProjectFile,
   SecretoDeCampana,
   Memory,
@@ -1391,11 +1392,63 @@ const MAX_PNJS_EN_PROMPT = 12;
  * Viajan solo los recurrentes, y recortados: es el precio de que el Narrador
  * sepa a quién está dirigiendo.
  */
+/**
+ * Cuántos nombres del elenco caben en la lista corta.
+ *
+ * Son una línea cada uno: aquí lo que se paga es no tener que inventarse a
+ * nadie, y eso sale barato.
+ */
+const MAX_ELENCO_EN_PROMPT = 24;
+
 function dosierDePersonajes(npcs: NPC[]): string {
-  const habituales = npcs
-    .filter(n => n.name && (n.recurrente || (n.diasVistos?.length || 0) >= 2))
+  const conNombre = (npcs || []).filter(n => n.name && n.name.trim().length > 1);
+  const habituales = conNombre
+    .filter(n => n.recurrente || (n.diasVistos?.length || 0) >= 2)
     .slice(-MAX_PNJS_EN_PROMPT);
-  if (habituales.length === 0) return '';
+
+  /*
+   * El resto del elenco, en una línea por cabeza.
+   *
+   * El dosier completo solo incluye a los habituales, y eso dejaba fuera a todo
+   * el que viniera de un documento sin haber salido aún en escena: Serena,
+   * Braelin o Kimmuriel existían en la memoria y el Narrador no se enteraba.
+   * Y era un círculo cerrado, porque para volverse habitual hay que aparecer
+   * dos veces, y no puedes aparecer si quien narra no sabe que existes. El
+   * resultado era una taberna llena de gente inventada teniendo el elenco
+   * escrito al lado.
+   */
+  const idsHabituales = new Set(habituales.map(n => n.id));
+  const elenco = conNombre.filter(n => !idsHabituales.has(n.id)).slice(-MAX_ELENCO_EN_PROMPT);
+
+  const bloqueElenco = elenco.length
+    ? `
+#### 🎭 EL RESTO DEL ELENCO QUE YA EXISTE (aún no han salido en escena, o casi)
+Gente de la campaña que ya está fichada. Todavía no tienes su dosier completo, pero EXISTEN y se llaman así.
+- ⛔ NO te inventes un personaje nuevo para un papel que ya cubre alguien de esta lista. Si en la escena hace falta la mano derecha, el que lleva la barra o el mago de la banda, es el que figura aquí, con su nombre.
+- El detalle de cada uno está en los documentos de la campaña. Cuando alguno entre en escena de verdad, pásalo a tu dosier con \`[VÍNCULO: ...]\`.
+
+${elenco
+  .map(n => {
+    const quien = [n.relation, n.description || n.aparenta || n.notes]
+      .filter(Boolean)
+      .map(v => String(v).trim().slice(0, 130))
+      .join(' · ');
+    return `- **${n.name.trim()}**${quien ? ` — ${quien}` : ''}`;
+  })
+  .join('\n')}
+`.trim()
+    : '';
+
+  if (habituales.length === 0) {
+    // Sin habituales todavía, el elenco es lo único que hay, y hace falta.
+    return bloqueElenco
+      ? `
+### 👥 PERSONAJES DE LA CAMPAÑA (dosier del Director)
+
+${bloqueElenco}
+`.trim()
+      : '';
+  }
 
   const corta = (v: string | undefined, max: number) =>
     v && v.trim() ? v.trim().slice(0, max) : '';
@@ -1452,6 +1505,54 @@ Esta es tu ficha interna de la gente recurrente de la campaña. Úsala: son sus 
 - Lo marcado como 🎒 es lo que ESE personaje puede usar en escena. Si tiene medios para resolver algo a su manera, los usa (ver el protocolo de disfraces e ilusión).
 
 ${fichas.join('\n\n')}
+${bloqueElenco ? `\n${bloqueElenco}` : ''}
+`.trim();
+}
+
+/**
+ * Cuántos lugares caben en el dosier de cada turno.
+ *
+ * Una campaña acumula tabernas, calles y salas; mandarlas todas sería pagar
+ * cada turno por sitios donde no se ha vuelto en meses. Doce cubre de sobra el
+ * mundo que se está usando.
+ */
+const MAX_LUGARES_EN_PROMPT = 12;
+
+/**
+ * Los sitios de la campaña, con sus nombres, en cada turno.
+ *
+ * `memory.locations` existía, la sincronización lo rellenaba... y no llegaba al
+ * Narrador por ninguna vía. Con el compendio marcado «de consulta», que un
+ * lugar apareciera dependía de que la búsqueda por palabras acertara ese turno:
+ * bastaba con que no acertara para que la taberna del cuartel general se
+ * llamara de repente «El Gato Verde». Un nombre propio no puede depender de una
+ * lotería.
+ *
+ * Es barato justamente porque son nombres y una línea de qué es cada sitio: lo
+ * que hace falta para NO inventárselo. El detalle sigue viniendo de los
+ * documentos.
+ */
+function dosierDeLugares(locations: Location[]): string {
+  const utiles = (locations || [])
+    .filter(l => l.name && l.name.trim().length > 1)
+    .slice(-MAX_LUGARES_EN_PROMPT);
+  if (utiles.length === 0) return '';
+
+  const fichas = utiles.map(l => {
+    const desc = (l.desc || '').trim().slice(0, 260);
+    const notas = (l.notes || '').trim().slice(0, 200);
+    return `- **${l.name.trim()}**${desc ? ` — ${desc}` : ''}${notas ? ` · ${notas}` : ''}`;
+  });
+
+  return `
+### 🗺️ LUGARES DE LA CAMPAÑA (nombres canónicos)
+Estos sitios YA EXISTEN y ya tienen nombre. Es tu lista de nombres propios, no una sugerencia.
+- ⛔ NO renombres ninguno, ni lo traduzcas, ni le pongas un nombre «parecido» porque suene mejor. Si en la escena aparece uno de estos sitios, se llama EXACTAMENTE como está escrito aquí.
+- ⛔ NO inventes un local nuevo para una función que ya cubre uno de estos. Si el grupo va a la taberna de la banda, es la que figura aquí.
+- ✅ Puedes crear lugares nuevos cuando la escena lo pida de verdad; entonces el nombre lo pones tú y pasa a ser canon.
+- El detalle de cada sitio está en los documentos de la campaña; esto es solo para que los llames por su nombre.
+
+${fichas.join('\n')}
 `.trim();
 }
 
@@ -1513,6 +1614,7 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
   }
 
   const dosierPnjs = dosierDePersonajes(project.memory?.npcs || []);
+  const dosierLugares = dosierDeLugares(project.memory?.locations || []);
 
   /*
    * Los giros que aún no han pasado.
@@ -1576,7 +1678,7 @@ ${lista
     ? `
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
-${dosierPnjs ? `${dosierPnjs}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
 ${project.memory.manual_notes ? `### 🔒 CUADERNO OCULTO DEL NARRADOR (SOLO TÚ — CONTIENE SPOILERS)
 Esto es tu cuaderno privado: planes en la sombra, tramas que aún no han asomado, contingencias y notas de dirección. En la aplicación está guardado tras un aviso de spoilers, o sea que la jugadora NO lo lee mientras juega. Trátalo con las mismas reglas que los 🔒: te sirve para mover el mundo y mantenerlo coherente, NUNCA para contarlo, insinuarlo ni dejar que un PNJ lo suelte sin un motivo ganado en escena, y jamás aparece en el HUD, la crónica, la agenda ni un resumen. Lo que de aquí ya haya salido a la luz jugando, sí puedes usarlo con normalidad.
 ${project.memory.manual_notes}
