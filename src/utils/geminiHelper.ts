@@ -2217,7 +2217,22 @@ ${bloqueVivo}`;
   }
 
   const diceContext = `\n\n[DADOS SECRETOS TRAS LA PANTALLA DEL DIRECTOR (USO INTERNO MECÁNICO): d20: ${dicePool.d20.join(', ')} | d100: ${dicePool.d100.join(', ')} | d6: ${dicePool.d6.join(', ')}]\n(⚠️ PROHIBIDO NOMBRAR LA "RESERVA DE DADOS" EN LA PROSA. Úsalos en secreto para resolver éxitos/fallos de PNJs o con la etiqueta [Tirada DM (...)], pero nunca los redactes dentro del relato literario).`;
-  const finalUserPayload = userText + diceContext;
+  /**
+   * El recordatorio va AQUÍ, pegado al turno de la jugadora, y no solo en las
+   * directivas de arriba.
+   *
+   * El protocolo §6 ante lo explica largo, pero el texto de ella es lo último
+   * que el modelo lee antes de escribir, y ahí un párrafo en tercera persona
+   * se parece demasiado a prosa que continuar. Recordarle en ese punto exacto
+   * de qué es lo que acaba de leer cuesta unas pocas fichas y evita las dos
+   * cosas que más se cuelan: devolvérselo ampliado, y que un PNJ conteste a
+   * algo que ella solo pensó. No se añade si no hay texto suyo que proteger.
+   */
+  const recordatorioDeTurno = userText.trim()
+    ? `\n\n[⛔ CÓMO SE LEE LO QUE ACABA DE ESCRIBIR LA JUGADORA (aplícalo, no lo narres): eso NO es prosa tuya que continuar, es lo que ella DECLARA, esté en primera o en tercera persona y lleve corchetes o no. 1) No se lo devuelvas ampliado: ni gestos, ni posturas, ni miradas, ni MOTIVOS que ella no haya escrito. Arranca por el mundo. 2) De todo lo que haya ahí, para el mundo solo EXISTE lo que un testigo con ojos y oídos habría captado desde donde está. Los juicios, opiniones, comparaciones, recuerdos y motivos NO han salido de su boca: ningún PNJ los responde, los alude ni los adivina. Callar sí se ve, y un PNJ puede interpretarlo mal —eso es bueno—; acertar con el porqué porque tú lo has leído, no.]`
+    : '';
+
+  const finalUserPayload = userText + diceContext + recordatorioDeTurno;
 
   if (lastRole === 'user') {
     contents[contents.length - 1].parts.push({ text: '\n\n' + finalUserPayload });
