@@ -14,6 +14,8 @@
  * se cerró.
  */
 
+import { versionEnUso } from './versionCheck';
+
 export type EstadoLlamada = 'en curso' | 'ok' | 'fallo' | 'cortada';
 
 export interface LlamadaRegistrada {
@@ -280,7 +282,7 @@ export function llamadasComoTexto(llamadas: LlamadaRegistrada[]): string {
   const r = resumenDeLlamadas(llamadas);
   const cab = [
     '=== REGISTRO DE LLAMADAS — GM Studio ===',
-    `Generado: ${new Date().toLocaleString('es-ES')}`,
+    `Generado: ${new Date().toLocaleString('es-ES')} · versión ${versionEnUso()}`,
     `Total: ${r.total} · correctas: ${r.ok} · fallidas: ${r.fallidas} · en curso: ${r.enCurso}`,
     `Fichas de entrada: ${r.fichasEntrada.toLocaleString('es-ES')} · de salida: ${r.fichasSalida.toLocaleString('es-ES')}`,
     `Duración media: ${duracionLegible(r.duracionMedia)}`,

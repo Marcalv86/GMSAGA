@@ -185,7 +185,18 @@ export default function App() {
    * nada lo dijera. Ahora se comprueba y se ofrece recargar de verdad.
    */
   const [hayActualizacion, setHayActualizacion] = useState(false);
-  useEffect(() => vigilarVersion(() => setHayActualizacion(true)), []);
+  // Apartar el aviso lo silencia media hora; antes lo apagaba hasta reabrir.
+  const apartarAvisoRef = useRef<(() => void) | null>(null);
+  useEffect(
+    () =>
+      vigilarVersion(
+        () => setHayActualizacion(true),
+        apartar => {
+          apartarAvisoRef.current = apartar;
+        }
+      ),
+    []
+  );
 
   const [isGenerating, setIsGenerating] = useState(false);
   // Controlador de la generación en curso, para poder detenerla desde la interfaz.
@@ -1121,6 +1132,10 @@ export default function App() {
     t.vinculos.forEach(v => {
       if (
         v.nombre &&
+        // El protagonista no es un PNJ. Esta guarda estaba en el camino de
+        // [PRESENTES:] pero faltaba aquí, así que un [VÍNCULO:] con su nombre
+        // le abría ficha propia.
+        !coincidenNombresNpc(v.nombre, mem.player_character?.name || '') &&
         !npcs.some(n => coincidenNombresNpc(n.name, v.nombre, { alias: n.alias, trueIdentity: n.trueIdentity })) &&
         !nuevosNpcs.some(n => coincidenNombresNpc(n.name, v.nombre))
       ) {
@@ -2972,9 +2987,12 @@ export default function App() {
             Actualizar
           </button>
           <button
-            onClick={() => setHayActualizacion(false)}
+            onClick={() => {
+              setHayActualizacion(false);
+              apartarAvisoRef.current?.();
+            }}
             className="shrink-0 min-h-[30px] rounded-lg border border-[var(--on-accent)]/50 px-2 font-cinzel text-[11px] hover:bg-[var(--on-accent)]/15 active:scale-95 transition-all cursor-pointer"
-            title="Sigue jugando. La versión nueva te espera y no se vuelve a avisar hasta que abras la aplicación otra vez."
+            title="Sigue jugando. La versión nueva te espera y se vuelve a avisar dentro de un rato."
           >
             Ahora no
           </button>

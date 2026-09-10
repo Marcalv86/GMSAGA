@@ -39,6 +39,7 @@ import {
   Shield,
   Sparkles,
   Trash2,
+  UserMinus,
   User,
   Users
 } from 'lucide-react';
@@ -299,6 +300,7 @@ export const MemoryManager: React.FC<{
   const [secretosDestapados, setSecretosDestapados] = useState<Set<string>>(new Set());
   const [tramando, setTramando] = useState(false);
   const [leyendoFicha, setLeyendoFicha] = useState(false);
+  const [noEsPnj, setNoEsPnj] = useState<NPC | null>(null);
   const [verPremisa, setVerPremisa] = useState(false);
 
   // Confirmation state
@@ -1834,6 +1836,21 @@ export const MemoryManager: React.FC<{
                           <Camera className="w-3 h-3" /> {portraitSrc ? 'Retrato' : '+ Retrato'}
                         </button>
                       </div>
+
+                      {/*
+                        La salida de emergencia cuando algo se cuela como PNJ y
+                        no debería —el caso típico es el propio protagonista,
+                        que sale nombrado en todos los documentos—. Borrarlo a
+                        secas no bastaba: la siguiente sincronización lo volvía a
+                        crear. Esto lo borra y lo veta para siempre.
+                      */}
+                      <button
+                        onClick={() => setNoEsPnj(n)}
+                        className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 font-cinzel cursor-pointer flex items-center gap-0.5 shrink-0"
+                        title="Quitarlo del elenco para siempre: no volverá a crearse solo"
+                      >
+                        <UserMinus className="w-3 h-3" /> No es un PNJ
+                      </button>
                     </div>
                   </div>
                 );
@@ -1965,6 +1982,49 @@ export const MemoryManager: React.FC<{
                 No hay lugares registrados en la memoria. Las ciudades, asentamientos y ruinas se irán registrando conforme los descubras.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmación de «esto no es un PNJ» */}
+      {noEsPnj && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[160] p-4">
+          <div className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-xl shadow-2xl w-[400px] max-w-full font-lora overflow-hidden">
+            <div className="p-4 border-b border-[var(--glass-border)] bg-[var(--sidebar-bg)]">
+              <h4 className="font-cinzel text-base text-[var(--accent)] font-bold m-0">Quitar «{noEsPnj.name}» del elenco</h4>
+            </div>
+            <div className="p-4">
+              <p className="text-sm mb-4 leading-relaxed text-[var(--text-primary)]">
+                Se borra su ficha y su nombre queda vetado: <strong>ninguna extracción ni sincronización volverá a
+                crearlo solo</strong>. Es lo que hay que usar cuando se cuela tu propio personaje, que sale nombrado en
+                todos los documentos de la campaña.
+              </p>
+              <p className="text-xs mb-5 leading-relaxed text-[var(--text-secondary)] m-0">
+                Si algún día lo quieres de vuelta, tendrás que añadirlo a mano.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setNoEsPnj(null)}
+                  className="px-3.5 py-1.5 text-xs font-cinzel border border-[var(--user-border)] rounded hover:border-[var(--accent)] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    const fuera = noEsPnj;
+                    setNoEsPnj(null);
+                    await onUpdateMemory(mem => ({
+                      ...mem,
+                      npcs: (mem.npcs || []).filter(x => x.id !== fuera.id),
+                      no_son_pnj: [...new Set([...(mem.no_son_pnj || []), fuera.name])]
+                    }));
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-cinzel bg-red-600 hover:bg-red-700 text-white rounded font-bold cursor-pointer"
+                >
+                  Quitar para siempre
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

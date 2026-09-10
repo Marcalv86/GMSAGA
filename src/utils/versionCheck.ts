@@ -103,9 +103,26 @@ const CADA = 15 * 60 * 1000;
  * cuando de verdad importa: se deja la app abierta en el móvil durante días y
  * es al retomarla cuando conviene enterarse.
  */
-export function vigilarVersion(alHaberNueva: () => void): () => void {
+/**
+ * Cuánto se calla el aviso cuando se aparta con «Ahora no».
+ *
+ * Antes no se callaba: se apagaba. `avisado` se ponía a true con el primer
+ * aviso y no se bajaba nunca, así que tras un solo «Ahora no» la aplicación
+ * dejaba de comprobar durante el resto de la sesión —horas, y todos los
+ * despliegues que hubiera— sin volver a decir nada. En una app que se deja
+ * abierta días en el móvil, eso es quedarse con una versión vieja para
+ * siempre sin enterarte. Ahora aparta, no apaga.
+ */
+const SILENCIO_TRAS_APARTAR = 30 * 60 * 1000;
+
+export function vigilarVersion(
+  alHaberNueva: () => void,
+  /** Se le entrega una función para apartar el aviso sin apagarlo. */
+  alPoderApartar?: (apartar: () => void) => void
+): () => void {
   let parado = false;
   let avisado = false;
+  let calladoHasta = 0;
 
   /*
    * ¿Venimos de actualizar y seguimos en la misma versión?
@@ -126,7 +143,7 @@ export function vigilarVersion(alHaberNueva: () => void): () => void {
   }
 
   const mirar = async () => {
-    if (parado || avisado) return;
+    if (parado || avisado || Date.now() < calladoHasta) return;
     // La primera comprobación tras una actualización que no cambió nada se
     // salta; a partir de la siguiente se mira con normalidad.
     if (enGracia) {
@@ -143,6 +160,13 @@ export function vigilarVersion(alHaberNueva: () => void): () => void {
     if (document.visibilityState === 'visible') void mirar();
   };
 
+  // Apartar el aviso lo silencia un rato y luego vuelve a mirar, en lugar de
+  // dejar de comprobar hasta que se reabra la aplicación.
+  alPoderApartar?.(() => {
+    avisado = false;
+    calladoHasta = Date.now() + SILENCIO_TRAS_APARTAR;
+  });
+
   // Un respiro al arrancar: el primer segundo es para pintar la aplicación.
   const arranque = setTimeout(mirar, 4000);
   const reloj = setInterval(mirar, CADA);
@@ -154,4 +178,18 @@ export function vigilarVersion(alHaberNueva: () => void): () => void {
     clearInterval(reloj);
     document.removeEventListener('visibilitychange', alVolver);
   };
+}
+
+/**
+ * Qué build está corriendo ahora mismo, en corto.
+ *
+ * El nombre del archivo principal lleva el hash del build, así que sirve de
+ * número de versión sin tener que generar ninguno. Se enseña en el registro de
+ * llamadas: sin esto no hay forma de saber —ni desde dentro ni contándolo— si
+ * lo que se está ejecutando ya trae un arreglo o es de hace tres despliegues.
+ */
+export function versionEnUso(): string {
+  const g = guionActual();
+  if (!g) return 'desarrollo';
+  return g.match(/assets\/index-([A-Za-z0-9_-]+)\.js/)?.[1] || 'desconocida';
 }

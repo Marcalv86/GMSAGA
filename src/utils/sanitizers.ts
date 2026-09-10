@@ -152,24 +152,59 @@ export function sanitizeProjectMemory(mem?: Memory): Memory {
   }
 
   const cleanPc = sanitizePlayerCharacter(mem.player_character);
-  const pcClean = (cleanPc.name || '').trim().toLowerCase();
-  const generic = new Set(['protagonista', 'jugador', 'el jugador', 'personaje jugador', 'oc', 'pj', 'hero', 'héroe']);
+
+  /*
+   * EL PROTAGONISTA NO ES UN PNJ, Y AQUÍ SE LE CERRABA MAL LA PUERTA.
+   *
+   * Se comparaba contra `cleanPc.name`, que YA VIENE CON EL NOMBRE DE RESERVA
+   * puesto: si la ficha no tenía nombre, la comparación se hacía contra
+   * «Protagonista» y cualquier ficha del OC —«Aryendell»— pasaba limpiamente.
+   * Y como el compendio de la campaña habla del OC en cada página, el extractor
+   * de PNJs le hacía su tarjeta como a uno más.
+   *
+   * Ahora se compara contra el nombre DE VERDAD, sin el relleno, y plegando
+   * tildes: «Aryéndell» y «Aryendell» eran dos personas distintas para un
+   * `toLowerCase()` a secas.
+   */
+  const plegar = (v?: string) =>
+    (v || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  const generic = new Set(['protagonista', 'jugador', 'el jugador', 'personaje jugador', 'oc', 'pj', 'hero', 'heroe']);
+  const nombreReal = plegar(mem.player_character?.name);
+  const pcClean = generic.has(nombreReal) ? '' : nombreReal;
+  // «Aryendell Sylvaris» y «Aryendell» son la misma: el nombre de pila cuenta.
+  const pcPila = pcClean.split(/\s+/)[0] || '';
+
+  const esElProtagonista = (nombre?: string) => {
+    const nl = plegar(nombre);
+    if (!nl) return false;
+    if (generic.has(nl)) return true;
+    if (!pcClean) return false;
+    if (nl === pcClean) return true;
+    if (nl.length > 3 && (nl.includes(pcClean) || pcClean.includes(nl))) return true;
+    // Nombre de pila suelto contra ficha con apellido, y al revés.
+    if (pcPila.length > 3 && plegar(nombre).split(/\s+/)[0] === pcPila) return true;
+    return false;
+  };
+
+  // Y los que la jugadora haya marcado a mano como «esto no es un PNJ».
+  const vetados = new Set((mem.no_son_pnj || []).map(plegar).filter(Boolean));
 
   // Filtrar PNJs que sean en realidad el protagonista
-  const cleanNpcs = (mem.npcs || []).filter(n => {
-    const nl = (n.name || '').trim().toLowerCase();
-    if (!nl || generic.has(nl)) return false;
-    if (pcClean && (nl === pcClean || (nl.length > 3 && (nl.includes(pcClean) || pcClean.includes(nl))))) {
-      return false;
-    }
-    return true;
-  });
+  const cleanNpcs = (mem.npcs || []).filter(
+    n => (n.name || '').trim() && !esElProtagonista(n.name) && !vetados.has(plegar(n.name))
+  );
 
   return {
     ...mem,
     story: mem.story || '',
     quests: Array.isArray(mem.quests) ? mem.quests : [],
     npcs: cleanNpcs,
+    no_son_pnj: Array.isArray(mem.no_son_pnj) ? mem.no_son_pnj : undefined,
     companions: Array.isArray(mem.companions) ? mem.companions : [],
     locations: Array.isArray(mem.locations) ? mem.locations : [],
     current_status: mem.current_status || '',

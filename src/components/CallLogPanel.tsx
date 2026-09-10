@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Copy, Loader, Radio, Trash2, TriangleAlert, XCircle } from 'lucide-react';
+import { versionEnUso } from '../utils/versionCheck';
 import {
   LlamadaRegistrada,
   duracionLegible,
@@ -82,6 +83,14 @@ export const CallLogPanel: React.FC = () => {
     <div className="flex flex-col min-h-0 flex-1">
       {/* Resumen: lo que contesta «¿cuánto llevo?» de un vistazo */}
       <div className="p-3 bg-[var(--glass)] border-b border-[var(--glass-border)] shrink-0 space-y-2.5">
+        {/*
+          Qué versión se está ejecutando. Sin esto no hay forma de saber si lo
+          que corre en el móvil ya trae un arreglo o es de tres despliegues
+          atrás, que es justo lo que despista cuando algo "sigue fallando".
+        */}
+        <div className="font-mono text-[10px] text-[var(--text-secondary)] text-center">
+          versión {versionEnUso()}
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center">
           {[
             { r: 'Llamadas', v: n(r.total) },

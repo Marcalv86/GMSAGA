@@ -403,6 +403,16 @@ export interface Memory {
    * resúmenes. Es lo que separa «una campaña con sorpresas» de «una campaña
    * cuyas sorpresas se cuentan solas».
    */
+  /**
+   * Nombres que NUNCA vuelven a la lista de PNJs.
+   *
+   * El protagonista sale nombrado en todos los documentos de la campaña, así
+   * que los extractores automáticos le hacen ficha como a uno más y el filtro
+   * por nombre no siempre acierta (una ficha sin nombre no se puede comparar
+   * con nada). Cuando la jugadora dice «esto no es un PNJ», se apunta aquí y
+   * ninguna vía automática lo vuelve a crear.
+   */
+  no_son_pnj?: string[];
   gm_secrets?: SecretoDeCampana[];
   /**
    * La forma de la historia, decidida de antemano.
