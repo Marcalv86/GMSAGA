@@ -761,8 +761,27 @@ export default function App() {
         ];
       }
 
+      /*
+       * Al re-tirar un turno, el Narrador vuelve a emitir sus [AGENDA:] y antes
+       * se apuntaban OTRA VEZ encima de las de la versión anterior: la misma
+       * escena, dos veces en el diario. Las entradas en vivo van clavadas a su
+       * mensaje del chat, así que las de ese mensaje se reemplazan en bloque en
+       * lugar de acumularse. Lo escrito a mano por la jugadora nunca se toca.
+       */
+      const anclaDeEsteMensaje = msgInfo?.msgIndex;
+      const timelinePrevioSinEsteMensaje =
+        anclaDeEsteMensaje === undefined
+          ? p.timeline || []
+          : (p.timeline || []).filter(
+              e =>
+                e.autoria === 'jugadora' ||
+                e.tipo === 'diario' ||
+                !!e.images?.length ||
+                !(e.chatId === (currentChatId || undefined) && e.msgIndex === anclaDeEsteMensaje)
+            );
+
       const timelineCompleto = [
-        ...(p.timeline || []),
+        ...timelinePrevioSinEsteMensaje,
         ...t.agenda.map((entrada, i) => {
           const entryAbsDay =
             entrada.diaOffset !== undefined

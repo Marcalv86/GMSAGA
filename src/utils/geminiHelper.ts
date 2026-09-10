@@ -3858,7 +3858,13 @@ export async function syncFullCampaignFromChats(
   )
     .sort((a, b) => a[0] - b[0])
     .slice(-60)
-    .map(([off, textos]) => `- diaOffset ${off} (${fechaLegible(cal, desdeDiaAbsoluto(cal, baseAbs + off))}): ${textos.slice(0, 3).map(t => t.slice(0, 70)).join(' / ')}`)
+    .map(
+      ([off, textos]) =>
+        `- diaOffset ${off} (${fechaLegible(cal, desdeDiaAbsoluto(cal, baseAbs + off))}):\n${textos
+          .slice(0, 12)
+          .map(t => `    · ${t.slice(0, 160)}`)
+          .join('\n')}`
+    )
     .join('\n');
 
   // Entidades previas registradas
@@ -3907,7 +3913,7 @@ CÓMO SE USAN (es la regla más importante de todo este encargo):
 ${historialRecortado
   ? `- ⚠️ EL HISTORIAL DE ABAJO ESTÁ RECORTADO: arranca a mitad de campaña, así que su primer mensaje NO es el diaOffset 0. Lo único seguro es que el ÚLTIMO mensaje corresponde al diaOffset ${diasTranscurridos} (hoy): fecha hacia atrás desde ahí y apóyate en las jornadas ya registradas para situarte.`
   : `- El primer mensaje del historial corresponde a diaOffset 0. El último, a diaOffset ${diasTranscurridos}.`}
-${diasRegistrados ? `\nJORNADAS YA REGISTRADAS EN EL DIARIO (reutiliza estos mismos diaOffset para esos días; añade solo lo que falte y NO reescribas lo ya anotado):\n${diasRegistrados}\n` : ''}
+${diasRegistrados ? `\n⛔ ESCENAS QUE YA ESTÁN EN EL DIARIO — NO LAS VUELVAS A ESCRIBIR:\n${diasRegistrados}\n\nEstas entradas SE CONSERVAN tal cual: no hace falta que las repitas, y repetirlas con otras palabras crea un duplicado que la jugadora ve en su diario. Antes de anotar una escena, comprueba si ya está ahí arriba aunque esté contada de otra manera («Captura y despertar en la sentina» y «Despertar entre cadenas y sombras» son LA MISMA escena). En \`daily_events\` devuelve ÚNICAMENTE las jornadas o escenas que falten. Si no falta ninguna, devuelve la lista vacía: eso es una respuesta correcta y no borra nada. Reutiliza los mismos diaOffset para los días que ya aparecen.\n` : ''}
 ${existingState}
 
 REGLA ANTI-DUPLICADOS (CRÍTICA):
@@ -4193,21 +4199,42 @@ ${historyToAnalyze}`;
     });
   });
 
-  // Preservar entradas manuales de la usuaria o que contengan imágenes adjuntas
+  /*
+   * QUÉ SE CONSERVA DEL DIARIO QUE YA HABÍA.
+   *
+   * Aquí estaba el origen de las escenas duplicadas. Antes se conservaba solo
+   * lo de la jugadora, y TODO lo que el Narrador había anotado en vivo con sus
+   * etiquetas [AGENDA:] se tiraba para sustituirlo por esta reconstrucción.
+   * Pero al modelo se le pide justo lo contrario —«añade solo lo que falte y NO
+   * reescribas lo ya anotado»—, así que las dos mitades se contradecían: si
+   * obedecía, el diario se vaciaba; si no obedecía, la misma escena acababa
+   * escrita dos veces con distintas palabras. Que es lo que se veía: «Captura y
+   * despertar en la sentina» y «Despertar entre cadenas y sombras».
+   *
+   * Ahora manda lo anotado en vivo. Se escribió mientras la escena ocurría y va
+   * clavado a su mensaje del chat, así que es el registro bueno; la
+   * reconstrucción solo rellena lo que falte. Y como el modelo sí sabe
+   * reconocer que dos textos cuentan lo mismo —cosa que comparar palabras no
+   * hace—, se le manda la lista completa de lo ya registrado y se le pide que
+   * devuelva únicamente lo nuevo.
+   */
   const existingTimeline = project.timeline || [];
-  const manualUserEntries = existingTimeline.filter(
+  const entradasQueSeQuedan = existingTimeline.filter(
     e =>
       (e.images && e.images.length > 0) ||
       e.tipo === 'diario' ||
       e.autoria === 'jugadora' ||
-      e.id?.startsWith('manual_')
+      e.id?.startsWith('manual_') ||
+      // Lo que el Narrador anotó en vivo, clavado a su mensaje.
+      !!e.msgId ||
+      e.id?.startsWith('dia_')
   );
 
   // Fusionar, deduplicar y ordenar cronológicamente
-  const rawCombined = [...newTimelineEntries];
-  manualUserEntries.forEach(manual => {
-    if (!rawCombined.some(c => c.id === manual.id)) {
-      rawCombined.push(manual);
+  const rawCombined = [...entradasQueSeQuedan];
+  newTimelineEntries.forEach(nueva => {
+    if (!rawCombined.some(c => c.id === nueva.id)) {
+      rawCombined.push(nueva);
     }
   });
 
