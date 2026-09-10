@@ -1083,6 +1083,39 @@ export default function App() {
     }
   };
 
+  /**
+   * Guarda lo que el Director haya apuntado desde la mesa.
+   *
+   * Van a `memory_edits`, que es donde viven las instrucciones de «recuerda
+   * esto» y viajan en TODOS los turnos de partida marcadas como de
+   * cumplimiento obligatorio. Por eso hay tope: cincuenta notas es de sobra
+   * para llevar las manías de una campaña, y más que eso deja de ser memoria
+   * para convertirse en un impuesto sobre cada petición. Al pasarse se sueltan
+   * las más antiguas, que es el orden en que dejan de importar.
+   *
+   * Se marcan con `source: 'ai'` —un campo que ya existía sin usar— para poder
+   * distinguir de un vistazo lo que apuntó el Director de lo que escribiste tú.
+   */
+  const TOPE_NOTAS_DE_MEMORIA = 50;
+
+  const anotarEnMemoriaDesdeLaMesa = (notas: string[]) => {
+    if (!notas.length) return;
+    handleUpdateMemory(mem => {
+      const previas = mem.memory_edits || [];
+      const yaEstan = new Set(previas.map(e => e.text.trim().toLowerCase()));
+      const nuevas = notas
+        .filter(n => !yaEstan.has(n.trim().toLowerCase()))
+        .map((text, i) => ({
+          id: `mesa_${Date.now()}_${i}`,
+          text,
+          createdAt: Date.now(),
+          source: 'ai' as const
+        }));
+      if (!nuevas.length) return mem;
+      return { ...mem, memory_edits: [...previas, ...nuevas].slice(-TOPE_NOTAS_DE_MEMORIA) };
+    });
+  };
+
   // Chapter / Chat Management
   const handleCreateChat = () => {
     if (!currentPId || !currentProject) return;
@@ -3130,6 +3163,7 @@ export default function App() {
               currentChatId={currentChatId}
               onVolverAJugar={() => setActiveTab('chat')}
               onAbrirNovela={() => setActiveTab('novel')}
+              onAnotarEnMemoria={anotarEnMemoriaDesdeLaMesa}
             />
           )}
 

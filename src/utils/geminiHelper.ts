@@ -3950,9 +3950,16 @@ QUÉ ERES AQUÍ:
 - El Director de juego respondiendo de tú a tú: dudas de reglas, aclaraciones de lo que ha pasado, ajustes de tono o de ritmo, decisiones de mesa, problemas técnicos de la partida.
 - Hablas normal, en primera persona y sin prosa literaria. Nada de narrar, nada de describir el viento ni los olores. Esto es una conversación, no una escena.
 
+QUÉ SÍ PUEDES HACER AQUÍ:
+- APUNTAR EN LA MEMORIA DE LA CAMPAÑA. Si la jugadora te pide recordar algo, corregir un dato que estaba mal, o establecer una regla de mesa («a partir de ahora no describas comida», «mi personaje tiene fobia a las alturas», «Kieron es zurdo»), emites al final de tu respuesta una línea por cada cosa a recordar:
+  \`[MEMORIA: el texto exacto a recordar, en una frase]\`
+  Y dices en palabras qué has apuntado, para que se vea. Esas notas viajan contigo en todos los turnos de partida, así que escríbelas cortas, concretas y en un lenguaje que un Narrador pueda cumplir.
+- ⛔ No apuntes nada que no te hayan pedido. No es tu cuaderno: es el suyo. Ante la duda, pregunta antes de apuntar.
+- ⛔ No apuntes secretos de trama ni cosas que el personaje no sepa: eso no son instrucciones, son spoilers viajando en cada turno.
+
 QUÉ NO HACES AQUÍ:
 - ⛔ NO narras, NO haces avanzar la historia y NO decides acciones del personaje. Si te piden jugar algo, recuérdales que eso va en la pestaña de Jugar.
-- ⛔ NO emites etiquetas técnicas ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:]…): aquí no se registra nada, no pasa el tiempo y la ficha no cambia.
+- ⛔ NO emites etiquetas técnicas de partida ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:]…): aquí no pasa el tiempo, no se registra la crónica y la ficha no cambia. La ÚNICA etiqueta que puedes usar es [MEMORIA: ...].
 - ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
 - Si no sabes algo porque no consta en lo que tienes delante, dilo. No lo inventes.
 
@@ -3973,9 +3980,37 @@ Director:`;
   return prompt;
 }
 
+const MEMORIA_MESA_RE = /\[\s*MEMORIA\s*:\s*([^\]]+)\]/gi;
+
+export interface RespuestaDeMesa {
+  /** Lo que el Director contesta, ya sin etiquetas. */
+  texto: string;
+  /** Lo que ha pedido apuntar en la memoria de la campaña. */
+  memorias: string[];
+}
+
+/**
+ * Saca las anotaciones de memoria que el Director quiera dejar.
+ *
+ * Se exporta para poder probarlo: esto escribe en algo que viaja en TODOS los
+ * turnos de partida, así que conviene saber con certeza qué entra y qué no.
+ */
+export function leerMemoriasDeMesa(texto: string): string[] {
+  if (!texto || !texto.includes('[')) return [];
+  MEMORIA_MESA_RE.lastIndex = 0;
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = MEMORIA_MESA_RE.exec(texto)) !== null) {
+    const nota = m[1].trim().replace(/\s+/g, ' ');
+    // Una nota vacía o de dos letras no es una instrucción, es ruido.
+    if (nota.length > 3 && nota.length <= 400 && !out.includes(nota)) out.push(nota);
+  }
+  return out;
+}
+
 export async function preguntarAlDirectorOOC(
   consulta: ConsultaDeMesa & { signal?: AbortSignal }
-): Promise<string> {
+): Promise<RespuestaDeMesa> {
   const prompt = construirPromptOOC(consulta);
   const modelo = getBackgroundTaskModel();
   const respuesta = await generateContentWithFailover({
@@ -3988,10 +4023,18 @@ export async function preguntarAlDirectorOOC(
     } as any
   });
 
-  const texto = limpiarTextoGenerado((respuesta.text || '').trim());
-  if (!texto) throw new Error('El Director no ha contestado. Inténtalo de nuevo.');
-  // Por si acaso se le escapa alguna etiqueta: aquí no registran nada.
-  return stripStateTag(limpiarEtiquetasDeTiempo(texto)).trim();
+  const bruto = limpiarTextoGenerado((respuesta.text || '').trim());
+  if (!bruto) throw new Error('El Director no ha contestado. Inténtalo de nuevo.');
+
+  const memorias = leerMemoriasDeMesa(bruto);
+  // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
+  const texto = stripStateTag(limpiarEtiquetasDeTiempo(bruto))
+    .replace(MEMORIA_MESA_RE, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return { texto, memorias };
 }
 
 export async function generateClaudeProjectMemory({

@@ -1,6 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { BookOpen, Loader, MessageSquare, Send, Swords, Trash2, Users } from 'lucide-react';
+import {
+  BookmarkPlus,
+  BookOpen,
+  Loader,
+  MessageSquare,
+  Send,
+  Swords,
+  Trash2,
+  Users
+} from 'lucide-react';
 import { Chat, Project } from '../types';
 import { describeApiError, preguntarAlDirectorOOC } from '../utils/geminiHelper';
 
@@ -8,6 +17,8 @@ export interface MensajeDeMesa {
   role: 'user' | 'model';
   content: string;
   timestamp?: string;
+  /** Lo que el Director apuntó en la memoria en ese mensaje, para poder verlo. */
+  memorias?: string[];
 }
 
 const CLAVE_MESA = 'gmstudio_mesa_';
@@ -58,7 +69,9 @@ export const MesaView: React.FC<{
   currentChatId?: string | null;
   onVolverAJugar?: () => void;
   onAbrirNovela?: () => void;
-}> = ({ project, chats, currentChatId, onVolverAJugar, onAbrirNovela }) => {
+  /** Apunta en la memoria de la campaña lo que el Director haya pedido recordar. */
+  onAnotarEnMemoria?: (notas: string[]) => void;
+}> = ({ project, chats, currentChatId, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria }) => {
   const [mensajes, setMensajes] = useState<MensajeDeMesa[]>(() => leerMesa(project.id));
   const [texto, setTexto] = useState('');
   const [pensando, setPensando] = useState(false);
@@ -98,10 +111,19 @@ export const MesaView: React.FC<{
       });
       const completo: MensajeDeMesa[] = [
         ...conLaPregunta,
-        { role: 'model', content: respuesta, timestamp: new Date().toISOString() }
+        {
+          role: 'model',
+          content: respuesta.texto,
+          memorias: respuesta.memorias.length ? respuesta.memorias : undefined,
+          timestamp: new Date().toISOString()
+        }
       ];
       setMensajes(completo);
       guardarMesa(project.id, completo);
+      // Lo que haya pedido apuntar va a la memoria de la campaña, y se ve.
+      if (respuesta.memorias.length && onAnotarEnMemoria) {
+        onAnotarEnMemoria(respuesta.memorias);
+      }
     } catch (err) {
       setError(describeApiError(err));
     } finally {
@@ -152,6 +174,19 @@ export const MesaView: React.FC<{
             fuera de personaje
           </span>
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {mensajes.length > 0 && (
+            <span
+              className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                mensajes.length >= TOPE_MENSAJES * 0.9
+                  ? 'bg-amber-500/20 text-amber-950 dark:text-amber-100 border-amber-700/50'
+                  : 'text-[var(--text-secondary)] border-[var(--glass-border)]'
+              }`}
+              title={`Esta conversación guarda como mucho ${TOPE_MENSAJES} mensajes. Al pasarse, los más antiguos se van.`}
+            >
+              {mensajes.length}/{TOPE_MENSAJES}
+            </span>
+          )}
         {mensajes.length > 0 && (
           <button
             onClick={limpiar}
@@ -162,7 +197,43 @@ export const MesaView: React.FC<{
             <span className="hidden sm:inline">Vaciar</span>
           </button>
         )}
+        </div>
       </div>
+
+      {/*
+        El aviso del tope.
+
+        La conversación se recortaba sola al llegar a los doscientos mensajes y
+        no se decía: se perdía el principio de la charla sin que nadie lo
+        notara. Ahora se avisa antes de llegar, con la cuenta a la vista, para
+        poder vaciarla a conciencia en vez de que se caiga por un lado.
+      */}
+      {mensajes.length >= TOPE_MENSAJES * 0.9 && (
+        <div className="px-3 sm:px-4 md:px-6 pt-2 shrink-0">
+          <div className="max-w-[900px] mx-auto rounded-lg border border-amber-700/50 bg-amber-500/15 px-2.5 py-2 text-[11px] leading-snug text-amber-950 dark:text-amber-100 flex items-center justify-between gap-2">
+            <span>
+              {mensajes.length >= TOPE_MENSAJES ? (
+                <>
+                  <strong>Conversación llena.</strong> A partir de aquí se van perdiendo los mensajes más
+                  antiguos.
+                </>
+              ) : (
+                <>
+                  <strong>Casi llena</strong> ({mensajes.length} de {TOPE_MENSAJES}). Al pasarse, los más
+                  antiguos se irán cayendo.
+                </>
+              )}{' '}
+              Lo que se anotó en la memoria no se pierde: eso vive en Memoria.
+            </span>
+            <button
+              onClick={limpiar}
+              className="shrink-0 rounded-lg border border-amber-700/50 px-2.5 py-1 font-cinzel text-[10px] font-bold hover:bg-amber-600/10 cursor-pointer"
+            >
+              Vaciar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-6 py-4">
         <div className="max-w-[900px] mx-auto flex flex-col gap-3">
@@ -192,6 +263,28 @@ export const MesaView: React.FC<{
               }`}
             >
               {m.role === 'user' ? m.content : <ReactMarkdown>{m.content}</ReactMarkdown>}
+              {/*
+                Lo apuntado, siempre a la vista.
+
+                Dejar que el Director escriba en la memoria es útil, pero si lo
+                hace en silencio deja de saberse qué instrucciones lleva la
+                campaña encima. Cada nota se enseña aquí y se puede quitar desde
+                Memoria: puede escribir, nunca a escondidas.
+              */}
+              {m.memorias?.length ? (
+                <div className="mt-2 pt-2 border-t border-[var(--glass-border)] flex flex-col gap-1">
+                  {m.memorias.map((nota, k) => (
+                    <span
+                      key={k}
+                      className="flex items-start gap-1.5 text-[11px] text-[var(--accent)] font-cinzel"
+                      title="Anotado en la memoria de la campaña. Puedes quitarlo desde Memoria."
+                    >
+                      <BookmarkPlus className="w-3.5 h-3.5 shrink-0 mt-px" />
+                      <span className="font-normal">{nota}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
 
