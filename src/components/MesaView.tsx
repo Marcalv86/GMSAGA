@@ -209,33 +209,20 @@ export const MesaView: React.FC<{
     <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-color)]">
       {/* Cabecera, con el mismo alto que las otras vistas */}
       <div className="bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] border-b border-[var(--glass-border)] px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 flex justify-between items-center gap-2 shrink-0">
-        {/*
-          El mismo selector que en Jugar y en Novela, para poder volver.
-          Sin él se entra en la mesa y no hay salida evidente: la partida se
-          queda al otro lado de una pestaña que ya no se ve.
-        */}
+        {/* El mismo par que en Jugar, en el mismo sitio y con el mismo aspecto. */}
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-0.5 text-xs font-cinzel shadow-2xs shrink-0">
             {onVolverAJugar && (
               <button
                 onClick={onVolverAJugar}
                 className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
-                title="Volver a jugar"
+                title="Volver a jugar con el Narrador"
               >
-                <Swords className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Jugar</span>
-              </button>
-            )}
-            {onAbrirNovela && (
-              <button
-                onClick={onAbrirNovela}
-                className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
-                title="Leer la crónica en formato novela"
-              >
-                <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
+                <Swords className="w-3.5 h-3.5" /> <span>Jugar</span>
               </button>
             )}
             <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs">
-              <Users className="w-3.5 h-3.5" /> <span>Mesa</span>
+              <Users className="w-3.5 h-3.5" /> <span>GM</span>
             </span>
           </div>
           <span className="hidden md:inline font-cinzel text-xs text-[var(--text-secondary)] truncate">
@@ -243,6 +230,16 @@ export const MesaView: React.FC<{
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {onAbrirNovela && (
+            <button
+              onClick={onAbrirNovela}
+              className="text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[var(--glass)] px-2 sm:px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+              title="Leer la crónica en formato novela maquetada"
+              aria-label="Modo novela"
+            >
+              <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
+            </button>
+          )}
           {mensajes.length > 0 && (
             <span
               className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${
@@ -311,7 +308,7 @@ export const MesaView: React.FC<{
                 <MessageSquare className="w-6 h-6" />
               </div>
               <h3 className="font-cinzel text-base font-bold text-[var(--accent)] m-0 mb-2">
-                Habla con el Director
+                Habla con el GM
               </h3>
               <p className="text-sm text-[var(--text-secondary)] max-w-md mx-auto leading-relaxed m-0">
                 Dudas de reglas, aclaraciones de lo que ha pasado, ajustes de tono o de ritmo, decisiones

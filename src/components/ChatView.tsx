@@ -1079,44 +1079,34 @@ export const ChatView: React.FC<{
       {/* Top Header Bar: misma altura, posición y diseño que la barra de la Novela */}
       <div className="bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] border-b border-[var(--glass-border)] px-3 sm:px-4 md:px-6 py-1 sm:py-2.5 flex justify-between items-center gap-2 md:gap-3 shadow-2xs shrink-0 z-10">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-          {/* Selector de modo de lectura integrado: idéntico en Crónica y Novela */}
+          {/*
+            Con quién hablas: el Narrador o el Director.
+
+            Antes esto era «Jugar | Novela | Mesa», tres cosas juntas que no son
+            la misma clase de cosa: dos son conversaciones y la tercera es una
+            forma de leer lo ya escrito. Puestas en fila parecían tres pestañas
+            equivalentes y no se entendía cuál hacía qué.
+
+            Aquí quedan solo las dos conversaciones, que sí son alternativas
+            reales: se habla con uno o con el otro. Leer en novela se ha ido con
+            la lupa y la exportación, que es su sitio: herramientas para mirar el
+            capítulo, no para jugarlo.
+          */}
           <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-0.5 text-xs font-cinzel shadow-2xs shrink-0">
-            {/*
-              Este par cambia cómo se lee el capítulo, no de sección. Llamarlo
-              «Crónica» lo hacía chocar con la pestaña «Crónica» de la barra de
-              arriba: el mismo nombre en dos sitios para dos cosas distintas.
-              «Jugar» y «Leer» dicen lo que hace cada uno.
-            */}
-            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs" title="Modo de juego: escribes y el Narrador responde">
+            <span
+              className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs"
+              title="Modo de juego: escribes y el Narrador responde"
+            >
               <Swords className="w-3.5 h-3.5" /> <span>Jugar</span>
             </span>
-            {onOpenNovelReader && (
-              <button
-                onClick={onOpenNovelReader}
-                className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
-                title="Leer la crónica en formato novela maquetada"
-                aria-label="Modo novela"
-              >
-                <BookOpen className="w-3.5 h-3.5" /> <span>Novela</span>
-              </button>
-            )}
-            {/*
-              La mesa va aquí, con Jugar y Novela, porque es la tercera forma de
-              estar en la misma partida: jugarla, leerla, o hablarla.
-
-              Y lleva su rótulo SIEMPRE, como sus dos compañeras. Escondérselo en
-              el móvil la dejaba como el único icono suelto de la fila: quien la
-              estrenaba no sabía que eso era una pestaña nueva, y la buscaba sin
-              encontrarla teniéndola delante.
-            */}
             {onOpenMesa && (
               <button
                 onClick={onOpenMesa}
                 className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
                 title="Hablar con el Director fuera de personaje: dudas de reglas, aclaraciones, ritmo. No narra ni hace pasar el tiempo."
-                aria-label="Mesa, fuera de personaje"
+                aria-label="Hablar con el Director fuera de personaje"
               >
-                <Users className="w-3.5 h-3.5" /> <span>Mesa</span>
+                <Users className="w-3.5 h-3.5" /> <span>GM</span>
               </button>
             )}
           </div>
@@ -1191,6 +1181,18 @@ export const ChatView: React.FC<{
               aria-label="Buscar"
             >
               <Search className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Buscar</span>
+            </button>
+          )}
+
+          {/* Leer en novela vive con las demás herramientas de mirar el capítulo. */}
+          {onOpenNovelReader && (
+            <button
+              onClick={onOpenNovelReader}
+              className="text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[var(--glass)] px-2 sm:px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+              title="Leer la crónica en formato novela maquetada"
+              aria-label="Modo novela"
+            >
+              <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
             </button>
           )}
 
