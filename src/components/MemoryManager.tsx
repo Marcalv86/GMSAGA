@@ -11,7 +11,7 @@ import {
   fechaInicial,
   fechaLegible
 } from '../utils/campaignCalendar';
-import { tramarLaCampana } from '../utils/geminiHelper';
+import { fusionarTrama, tramarLaCampana } from '../utils/geminiHelper';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
@@ -1181,34 +1181,24 @@ export const MemoryManager: React.FC<{
                       if (ideas === null) return;
                       setTramando(true);
                       try {
-                        const trama = await tramarLaCampana({ project, files, chats: project.chats || [], ideas: ideas.trim() || undefined });
-                        await onUpdateMemory(mem => {
-                          const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-                          const previos = mem.gm_secrets || [];
-                          // Lo ya descubierto y lo ya plantado a mano no se pisa:
-                          // el trazado se suma a lo que hay, no lo reemplaza.
-                          const nuevos = trama.secretos
-                            .filter(t => !previos.some(p => clave(p.titulo) === clave(t.titulo)))
-                            .map(t => ({
-                              id: `sec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-                              titulo: t.titulo,
-                              secreto: t.secreto,
-                              comoSeDescubre: t.comoSeDescubre,
-                              capa: t.capa,
-                              conecta: t.conecta,
-                              sembrar: t.sembrar,
-                              origen: 'trama' as const
-                            }));
-                          return {
-                            ...mem,
-                            gm_secrets: [...previos, ...nuevos],
-                            plan_de_campana: {
-                              premisa: trama.premisa,
-                              destino: trama.destino,
-                              trazadoEl: new Date().toISOString()
-                            }
-                          };
+                        const trama = await tramarLaCampana({
+                          project,
+                          files,
+                          chats: project.chats || [],
+                          ideas: ideas.trim() || undefined,
+                          modo: memory.plan_de_campana?.premisa ? 'revisar' : 'trazar'
                         });
+                        await onUpdateMemory(mem => ({
+                          ...mem,
+                          // La misma fusión que usa el repaso automático: lo ya
+                          // descubierto y lo que plantaste tú no se tocan.
+                          gm_secrets: fusionarTrama(mem.gm_secrets || [], trama),
+                          plan_de_campana: {
+                            premisa: trama.premisa || mem.plan_de_campana?.premisa || '',
+                            destino: trama.destino || mem.plan_de_campana?.destino,
+                            trazadoEl: new Date().toISOString()
+                          }
+                        }));
                       } catch (err: any) {
                         window.alert(err?.message || 'No se pudo trazar la historia. Inténtalo de nuevo.');
                       } finally {
@@ -1217,10 +1207,10 @@ export const MemoryManager: React.FC<{
                     }}
                     disabled={tramando}
                     className="min-h-[36px] px-2.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 shadow-xs"
-                    title="La IA decide la historia entera de antemano: las capas, qué hay debajo de cada una y cómo enganchan. Una sola llamada, del modelo de tareas de fondo."
+                    title="Esto se hace solo al empezar la campaña y en cada repaso de memoria. Aquí puedes forzarlo ahora, y sobre todo darle ideas de por dónde quieres que vaya."
                   >
                     <Sparkles className={`w-3.5 h-3.5 ${tramando ? 'animate-spin' : ''}`} />
-                    {tramando ? 'Tramando…' : secretos.length ? 'Retramar' : 'Que la IA trame la historia'}
+                    {tramando ? 'Tramando…' : 'Darle ideas y repasar ahora'}
                   </button>
                   <button
                     onClick={async () => {
@@ -1245,10 +1235,11 @@ export const MemoryManager: React.FC<{
                 </div>
 
                 <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed m-0">
-                  Ideas de trama que <strong>todavía no han pasado</strong>. Le llegan al Narrador con candado en cada
-                  turno: pone las pistas y hace que todo cuadre, pero tiene prohibido contarlo, insinuarlo o dejar que
-                  un PNJ lo suelte sin motivo. Cuando salga de verdad jugando, se marca solo. También puedes plantarlos
-                  hablando con el GM en su pestaña.
+                  La estructura de la historia, por capas: lo que parece que pasa, lo que pasa de verdad y quién está
+                  detrás. <strong>La traza la IA sola</strong> al empezar la campaña y la repasa en cada revisión de
+                  memoria, a la luz de lo que hayas jugado. Le llega al Narrador con candado en cada turno: siembra las
+                  pistas y hace que todo cuadre, pero tiene prohibido contarlo. Cuando algo salga jugando, se marca
+                  solo. Tú puedes darle ideas aquí o hablando con el GM en su pestaña.
                 </p>
 
                 {memory.plan_de_campana?.premisa && (
@@ -1273,9 +1264,8 @@ export const MemoryManager: React.FC<{
 
                 {secretos.length === 0 ? (
                   <p className="text-[11px] text-[var(--text-secondary)] italic m-0">
-                    Ninguno todavía. Pulsa <strong>Que la IA trame la historia</strong>: leerá tus documentos y lo ya
-                    jugado, y decidirá las capas —lo que parece que pasa, lo que pasa de verdad, quién está detrás— con
-                    lo que hay que ir sembrando desde ya.
+                    Todavía nada. La IA la trazará sola en cuanto empieces a jugar la campaña, leyendo tus documentos.
+                    Si quieres adelantarlo o decirle por dónde tirar, dale a <strong>Darle ideas y repasar ahora</strong>.
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">

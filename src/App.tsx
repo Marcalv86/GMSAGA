@@ -99,6 +99,8 @@ import {
   AVISO_TOKENS_POR_MINUTO,
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
+  tramarLaCampana,
+  fusionarTrama,
   isNarrativeIncomplete,
   novelizeUserMessage,
   generarNoticiasSaltoTemporal
@@ -1650,6 +1652,21 @@ export default function App() {
         const needsInitialSync = !currentProject.memory?.raw_project_memory;
         const needsDailySync = msSinceLastSync > 24 * 60 * 60 * 1000; // 24 horas
 
+        /*
+         * La trama de la campaña se traza sola, al mismo ritmo que la memoria.
+         *
+         * Estaba detrás de un botón, y un botón que hay que acordarse de pulsar
+         * es un botón que no se pulsa: la campaña arrancaba sin historia
+         * decidida y el Narrador improvisaba desde el primer turno, que es
+         * justo lo que no queremos. Ahora se traza en cuanto empieza la partida
+         * y se repasa con cada revisión de memoria, a la luz de lo que de
+         * verdad ha pasado jugando.
+         */
+        const sinTrama = !currentProject.memory?.plan_de_campana?.premisa;
+        const hayConQueTramar =
+          currentFiles.some(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200) ||
+          effectiveChats.some(c => (c.messages || []).length >= 2);
+
         if (needsInitialSync || needsDailySync) {
           setTimeout(async () => {
             try {
@@ -1669,6 +1686,38 @@ export default function App() {
               }
             } catch (err) {
               console.warn('Auto-background memory synthesis skipped:', err);
+            }
+
+            // Sin material no hay nada que tramar: una historia trazada sobre la
+            // nada sería la IA inventándose una campaña que no es la tuya.
+            if (!hayConQueTramar) return;
+            try {
+              const trama = await tramarLaCampana({
+                project: currentProject,
+                files: currentFiles,
+                chats: effectiveChats,
+                modo: sinTrama ? 'trazar' : 'revisar'
+              });
+              await handleUpdateProjectField(p => ({
+                memory: {
+                  ...(p.memory || {}),
+                  gm_secrets: fusionarTrama(p.memory?.gm_secrets || [], trama),
+                  plan_de_campana: {
+                    premisa: trama.premisa || p.memory?.plan_de_campana?.premisa || '',
+                    destino: trama.destino || p.memory?.plan_de_campana?.destino,
+                    trazadoEl: new Date().toISOString()
+                  }
+                }
+              }));
+              logInfo(
+                'threads',
+                sinTrama ? 'Historia de la campaña trazada' : 'Historia de la campaña repasada',
+                `${trama.secretos.length} piezas en ${new Set(trama.secretos.map(x => x.capa)).size} capas.`,
+                { projectName: currentProject.name }
+              );
+            } catch (err) {
+              // Que falle el trazado no puede estropear el turno ni la memoria.
+              console.warn('Trazado de la trama omitido:', err);
             }
           }, 1500);
         }

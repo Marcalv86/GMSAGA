@@ -3,6 +3,7 @@ import {
   Project,
   Chat,
   ProjectFile,
+  SecretoDeCampana,
   Memory,
   FileCategory,
   NPC,
@@ -4387,13 +4388,20 @@ export async function tramarLaCampana({
   project,
   files = [],
   chats = [],
-  ideas
+  ideas,
+  modo = 'trazar'
 }: {
   project: Project;
   files?: ProjectFile[];
   chats?: Chat[];
   /** Lo que la jugadora quiera aportar. Son semillas, no el guion. */
   ideas?: string;
+  /**
+   * `trazar` decide la historia de cero. `revisar` la repasa a la luz de lo que
+   * de verdad ha pasado jugando: una trama que no se revisa se queda apuntando
+   * a donde la campaña ya no va.
+   */
+  modo?: 'trazar' | 'revisar';
 }): Promise<TramaTrazada> {
   const modelo = getBackgroundTaskModel();
   const pc = project.memory?.player_character;
@@ -4417,9 +4425,26 @@ export async function tramarLaCampana({
     .map(x => `- ${x.titulo}: ${x.secreto}${x.revelado ? ' [YA DESCUBIERTO EN JUEGO]' : ''}`)
     .join('\n');
 
-  const prompt = `Eres el autor de esta campaña de rol, no su locutor. Antes de narrar una sola escena más, tu trabajo ahora es DECIDIR LA HISTORIA: qué está pasando de verdad, cuántas capas tiene y cómo encajan unas con otras.
+  const revisando = modo === 'revisar';
 
-Esto es lo que separa una buena historia de una sucesión de escenas. Quien improvisa turno a turno no puede sembrar nada, porque no sabe qué va a cosechar; a los tres capítulos tiene diez hilos que no llevan a ninguna parte y los resuelve con lo primero que se le ocurra. Tú vas a saberlo todo de antemano.
+  const encabezado = revisando
+    ? `Eres el autor de esta campaña de rol. Ya trazaste la historia y ahora toca REPASARLA a la luz de lo que de verdad ha pasado jugando.
+
+Una trama que no se revisa se queda apuntando a donde la campaña ya no va: el jugador tiró por otro lado, un personaje murió, una capa se destapó antes de tiempo o resultó que lo interesante era otra cosa. Tu trabajo ahora NO es reescribirla por gusto, sino dejarla útil.
+
+QUÉ HACES AL REVISAR:
+- **Lo que sigue en pie, se queda como está.** No cambies un giro solo por cambiarlo: si aún funciona, devuélvelo igual. La estabilidad vale más que la novedad.
+- **Lo que la partida ha dejado inservible, arréglalo.** Un giro que ya no puede pasar (el PNJ murió, el barco se hundió, el jugador se fue a otra ciudad) se reescribe para que siga siendo posible, o se sustituye por lo que ese mismo hueco pide ahora.
+- **Lo que la partida ha abierto, añádelo.** Si al jugar ha aparecido algo con más fuerza que lo previsto —una obsesión del jugador, un PNJ que se comió la escena, una pregunta que quedó en el aire— dale su capa y engánchalo con el resto.
+- **⛔ Lo YA DESCUBIERTO no se toca jamás.** Eso ya pasó, el protagonista lo sabe y es historia. Devuélvelo tal cual y construye encima.
+- **Afina la siembra.** A la luz de lo jugado, ¿qué detalle concreto se puede ir poniendo ahora en escena para lo que aún falta?
+
+Y todo lo demás sigue igual: las capas, cómo encajan y por qué.`
+    : `Eres el autor de esta campaña de rol, no su locutor. Antes de narrar una sola escena más, tu trabajo ahora es DECIDIR LA HISTORIA: qué está pasando de verdad, cuántas capas tiene y cómo encajan unas con otras.`;
+
+  const prompt = `${encabezado}
+
+${revisando ? '' : `Esto es lo que separa una buena historia de una sucesión de escenas. Quien improvisa turno a turno no puede sembrar nada, porque no sabe qué va a cosechar; a los tres capítulos tiene diez hilos que no llevan a ninguna parte y los resuelve con lo primero que se le ocurra. Tú vas a saberlo todo de antemano.`}
 
 CÓMO SE TRAMA UNA CEBOLLA:
 - **Capa 1 — lo que PARECE que pasa.** La lectura obvia de la situación. Tiene que ser creíble y suficiente por sí sola: si huele a tapadera desde el minuto uno, no engaña a nadie.
@@ -4437,10 +4462,10 @@ REGLAS DURAS:
 7. **Nada de metatrama vacía.** Ni profecías, ni elegidos, ni «el destino lo quiso», salvo que el material lo pida. Conflictos de gente con intereses.
 
 CAMPAÑA: ${project.name}
-${pc ? `PROTAGONISTA: ${pc.name}${pc.race ? `, ${pc.race}` : ''}${pc.class ? `, ${pc.class}` : ''}${pc.backstory ? `\nTrasfondo: ${pc.backstory.slice(0, 1200)}` : ''}${pc.personality ? `\nCarácter: ${pc.personality.slice(0, 600)}` : ''}` : ''}
+${revisando && project.memory?.plan_de_campana?.premisa ? `PREMISA QUE HABÍA: ${project.memory.plan_de_campana.premisa}${project.memory.plan_de_campana.destino ? `\nDESTINO QUE HABÍA: ${project.memory.plan_de_campana.destino}` : ''}\n` : ''}${pc ? `PROTAGONISTA: ${pc.name}${pc.race ? `, ${pc.race}` : ''}${pc.class ? `, ${pc.class}` : ''}${pc.backstory ? `\nTrasfondo: ${pc.backstory.slice(0, 1200)}` : ''}${pc.personality ? `\nCarácter: ${pc.personality.slice(0, 600)}` : ''}` : ''}
 
 ${ideas ? `⭐ LO QUE QUIERE LA JUGADORA (son semillas suyas: respétalas y hazlas encajar en la estructura, no las descartes):\n${ideas.slice(0, 6000)}\n` : ''}
-${yaPlantados ? `GIROS YA PLANTADOS (canon, incorpóralos):\n${yaPlantados}\n` : ''}
+${yaPlantados ? `${revisando ? 'LA TRAMA QUE HAY AHORA (devuélvela ENTERA: lo que siga en pie, igual; lo inservible, arreglado; y añade lo que falte):' : 'GIROS YA PLANTADOS (canon, incorpóralos):'}\n${yaPlantados}\n` : ''}
 ${yaJugado ? `LO QUE YA SE HA JUGADO (la trama tiene que salir de aquí, no contradecirlo):\n${yaJugado}\n` : ''}
 ${documentos ? `MATERIAL DE LA CAMPAÑA:\n${documentos}` : ''}
 
@@ -4460,7 +4485,7 @@ Devuelve ÚNICAMENTE un JSON:
   ]
 }
 
-Entre 5 y 9 secretos, repartidos por capas y todos enganchados. Nada de relleno.`;
+${revisando ? 'Devuelve la trama COMPLETA, no solo lo que cambies: lo que siga en pie con su mismo título y su misma verdad, y lo nuevo o arreglado donde toque.' : 'Entre 5 y 9 secretos, repartidos por capas y todos enganchados. Nada de relleno.'}`;
 
   const respuesta = await generateContentWithFailover({
     primaryModel: modelo,
@@ -4499,6 +4524,62 @@ Entre 5 y 9 secretos, repartidos por capas y todos enganchados. Nada de relleno.
     destino: String(parsed.destino || '').trim(),
     secretos
   };
+}
+
+/**
+ * Mete un trazado nuevo en la trama que ya había.
+ *
+ * Va aparte y se exporta para poder PROBARLO, porque esto decide si la historia
+ * de la campaña se conserva o se pisa cada vez que se revisa sola. Las dos
+ * reglas que importan:
+ *
+ * - Lo YA DESCUBIERTO es intocable. Eso ya pasó en la partida y el protagonista
+ *   lo sabe: reescribirlo sería cambiar el pasado.
+ * - Lo que la jugadora plantó a mano tampoco se reescribe. Sus ideas se
+ *   incorporan, no se corrigen.
+ *
+ * Lo demás —lo que trazó la propia IA y sigue en pie— sí puede afinarse: para
+ * eso es una revisión.
+ */
+export function fusionarTrama(
+  previos: SecretoDeCampana[],
+  trazada: TramaTrazada
+): SecretoDeCampana[] {
+  const clave = (v: string) =>
+    (v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+  const resultado = previos.map(p => {
+    const nuevo = trazada.secretos.find(t => clave(t.titulo) === clave(p.titulo));
+    if (!nuevo) return p;
+    // Intocables: lo que ya pasó y lo que puso ella.
+    if (p.revelado || p.origen === 'jugadora') {
+      return { ...p, conecta: p.conecta?.length ? p.conecta : nuevo.conecta };
+    }
+    return {
+      ...p,
+      secreto: nuevo.secreto || p.secreto,
+      comoSeDescubre: nuevo.comoSeDescubre || p.comoSeDescubre,
+      capa: nuevo.capa || p.capa,
+      conecta: nuevo.conecta?.length ? nuevo.conecta : p.conecta,
+      sembrar: nuevo.sembrar || p.sembrar
+    };
+  });
+
+  for (const t of trazada.secretos) {
+    if (resultado.some(p => clave(p.titulo) === clave(t.titulo))) continue;
+    resultado.push({
+      id: `sec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      titulo: t.titulo,
+      secreto: t.secreto,
+      comoSeDescubre: t.comoSeDescubre,
+      capa: t.capa,
+      conecta: t.conecta,
+      sembrar: t.sembrar,
+      origen: 'trama'
+    });
+  }
+
+  return resultado;
 }
 
 export async function generateClaudeProjectMemory({
