@@ -1994,6 +1994,19 @@ export default function App() {
      * acababan discrepando. Si la jugadora ha dicho cuántos, esa es la cifra y
      * viaja pegada a la instrucción para que el HUD la escriba tal cual.
      */
+    /*
+     * Un salto tiene que ENSEÑAR algo, no solo adelantar el reloj.
+     *
+     * Los presets ya lo piden, pero la jugadora puede escribir su propia
+     * transición, y sin esto salía lo de siempre: tres párrafos en pasado
+     * resumiendo una semana y ni una sola escena que se pudiera jugar. Se añade
+     * solo si el texto no lo trae ya, para no decirlo dos veces.
+     */
+    if (!text.includes('ESTO SE JUEGA, NO SE RESUME')) {
+      text +=
+        '\n\n🎬 [ESTO SE JUEGA, NO SE RESUME]: De este intervalo, ELIGE UN MOMENTO y NÁRRALO COMO ESCENA —con su sitio, su hora, lo que se ve y se huele, y al menos un PNJ hablando con sus palabras—, no como un parte de lo ocurrido. Puede llevar un párrafo de resumen, pero tiene que llevar también una escena, y termina DENTRO de ella con algo delante a lo que responder.';
+    }
+
     const dias = opciones?.dias || 0;
     if (dias > 0) {
       text += `\n\n📅 [DURACIÓN EXACTA DEL SALTO]: Pasan EXACTAMENTE ${dias} ${dias === 1 ? 'día' : 'días'}${opciones?.motivo ? `, con el protagonista ${opciones.motivo}` : ''}. Adelanta la fecha del HUD justo esos ${dias} ${dias === 1 ? 'día' : 'días'}, ni uno más ni uno menos, y escríbela completa. No digas «varios días»: di la fecha.`;
