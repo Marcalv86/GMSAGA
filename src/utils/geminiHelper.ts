@@ -1401,7 +1401,21 @@ const MAX_PNJS_EN_PROMPT = 12;
  */
 const MAX_ELENCO_EN_PROMPT = 24;
 
-function dosierDePersonajes(npcs: NPC[]): string {
+/**
+ * Cuánto hace que alguien no sale, en las mismas unidades que `diasVistos`.
+ *
+ * `diasVistos` guarda jornadas de campaña si hay calendario, y cuenta de
+ * mensajes si no lo hay. Da igual cuál sea mientras la comparación se haga
+ * contra la misma referencia: lo que importa es el ORDEN, quién lleva más
+ * tiempo fuera de escena.
+ */
+function jornadasSinSalir(n: NPC, marcaActual: number): number | null {
+  const vistos = n.diasVistos || [];
+  if (!vistos.length || !Number.isFinite(marcaActual)) return null;
+  return Math.max(0, marcaActual - Math.max(...vistos));
+}
+
+function dosierDePersonajes(npcs: NPC[], marcaActual = 0): string {
   const conNombre = (npcs || []).filter(n => n.name && n.name.trim().length > 1);
   const habituales = conNombre
     .filter(n => n.recurrente || (n.diasVistos?.length || 0) >= 2)
@@ -1498,6 +1512,24 @@ ${bloqueElenco}
       );
     }
     if (n.vinculo) lineas.push(`- Vínculo: ${corta(n.vinculo, 120)}`);
+    /*
+     * Cuánto hace que no sale.
+     *
+     * El dato existía —`diasVistos`— y solo se usaba para decidir quién entra
+     * en el dosier; al Narrador no se le contaba nunca. Sin él no puede rotar
+     * el reparto: tira de quien tiene delante, que es siempre el mismo, y hay
+     * personajes con secciones enteras en los documentos que no salen jamás.
+     */
+    const ausencia = jornadasSinSalir(n, marcaActual);
+    if (ausencia !== null) {
+      lineas.push(
+        ausencia === 0
+          ? `- 🎬 Está en escena AHORA MISMO.`
+          : ausencia <= 2
+          ? `- 🎬 Salió hace muy poco (${ausencia}).`
+          : `- 💤 LLEVA ${ausencia} SIN SALIR. Es candidato a volver si la escena le da un motivo.`
+      );
+    }
     if (typeof n.atr === 'number' || typeof n.vin === 'number' || typeof n.con === 'number') {
       lineas.push(`- Afinidad: atracción ${n.atr ?? 0}/20 · vínculo ${n.vin ?? 0}/20 · confianza ${n.con ?? 0}/20`);
     }
@@ -1523,6 +1555,8 @@ Esta es tu ficha interna de la gente recurrente de la campaña. Úsala: son sus 
 - 🔒 ES TUYO, NO DEL PROTAGONISTA. No se narra, no se insinúa gratis, ningún PNJ lo suelta sin un motivo ganado en escena y NUNCA aparece en el HUD, en la crónica ni en un resumen. Que tú lo sepas no es que ella lo sepa: si lo sueltas, has destripado el giro y ya no hay vuelta atrás.
 - 🔒 SE DESTAPA JUGÁNDOLO: investigando, ganándose la confianza, una indiscreción de un tercero, un descuido, una prueba física. Cuando de verdad salga a la luz en la escena, y SOLO entonces, cierra el mensaje con \`[REVELADO: Nombre — cómo se ha sabido]\`. A partir de ahí pasa a ser algo con lo que el protagonista puede contar.
 - 🔓 YA SE SUPO: eso ya no es un secreto. Puede mencionarse, tener consecuencias y salir en boca de quien corresponda. No hagas como si el protagonista no lo supiera.
+- 💤 ROTA EL REPARTO. Antes de decidir quién aparece, quién entra por la puerta o a quién se encuentran, MIRA quién lleva más tiempo sin salir —aquí arriba y en los documentos de la campaña— y pregúntate si esa escena es suya. Tirar siempre de los dos o tres que ya están delante convierte una banda entera en un dúo, y deja sin usar a gente con secciones propias en el material.
+- ⛔ Pero no es un sorteo: quien vuelve necesita un MOTIVO en la ficción para estar ahí —le mandaron, le conviene, pasaba por su territorio, quiere algo de alguien—. Un cameo sin motivo es peor que la repetición.
 - Lo marcado como 🎒 es lo que ESE personaje puede usar en escena. Si tiene medios para resolver algo a su manera, los usa (ver el protocolo de disfraces e ilusión).
 
 ${fichas.join('\n\n')}
@@ -1634,7 +1668,14 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
 `;
   }
 
-  const dosierPnjs = dosierDePersonajes(project.memory?.npcs || []);
+  /*
+   * La misma referencia con la que se apuntó `diasVistos`: jornada de campaña
+   * si hay calendario, y si no, cuenta de mensajes.
+   */
+  const marcaDeHoy = calendarioValido(project.calendar) && project.currentDate
+    ? aDiaAbsoluto(project.calendar!, project.currentDate)
+    : (chats || []).reduce((a, c) => a + (c.messages || []).length, 0);
+  const dosierPnjs = dosierDePersonajes(project.memory?.npcs || [], marcaDeHoy);
   const dosierLugares = dosierDeLugares(project.memory?.locations || []);
 
   /*
