@@ -46,7 +46,6 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   const memory: Memory = project.memory || {
     story: '',
     current_status: '',
-    manual_notes: '',
     quests: [],
     npcs: [],
     locations: []

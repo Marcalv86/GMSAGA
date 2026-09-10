@@ -59,7 +59,6 @@ import {
   Newspaper,
   Moon
 } from 'lucide-react';
-import { CreativeStudioModal } from './CreativeStudioModal';
 
 /**
  * Vista unificada de Calendario y Diario de Campaña.
@@ -143,11 +142,6 @@ export const CalendarView: React.FC<{
     tipo: 'acontecimiento' | 'hito' | 'descubrimiento' | 'secreto' | 'noticia' | 'descanso';
   }>({ title: '', summary: '', lugar: '', clima: '', hito: '', mood: '🌸', tipo: 'acontecimiento' });
 
-  const [studioModal, setStudioModal] = useState<{
-    isOpen: boolean;
-    tab?: 'image' | 'video' | 'music' | 'diary';
-    sceneText: string;
-  } | null>(null);
 
   // Diálogo de confirmación para borrados
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -2348,32 +2342,6 @@ export const CalendarView: React.FC<{
             </div>
           </div>
         </div>
-      )}
-      {/* Modal del Taller Creativo para acontecimientos del calendario */}
-      {studioModal?.isOpen && (
-        <CreativeStudioModal
-          isOpen={studioModal.isOpen}
-          initialTab={studioModal.tab || 'image'}
-          sceneText={studioModal.sceneText}
-          onClose={() => setStudioModal(null)}
-          onInsertIntoChat={async text => {
-            // Guardar en notas del narrador si se solicita
-            if (onUpdate) {
-              const prevNotes = project.memory?.manual_notes || '';
-              await onUpdate({
-                memory: {
-                  ...project.memory,
-                  story: project.memory?.story || '',
-                  quests: project.memory?.quests || [],
-                  npcs: project.memory?.npcs || [],
-                  locations: project.memory?.locations || [],
-                  current_status: project.memory?.current_status || '',
-                  manual_notes: prevNotes ? `${prevNotes}\n\n${text}` : text
-                }
-              });
-            }
-          }}
-        />
       )}
     </div>
   );

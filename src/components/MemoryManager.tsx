@@ -29,9 +29,6 @@ import {
   ChevronDown,
   ChevronUp,
   Compass,
-  Eye,
-  EyeOff,
-  FileText,
   GitMerge,
   Heart,
   Lock,
@@ -155,7 +152,7 @@ export type SeccionMemoria =
   | 'quests'
   | 'story'
   | 'status'
-  | 'notes';
+  | 'giros';
 
 export const MemoryManager: React.FC<{
   project: Project;
@@ -188,7 +185,7 @@ export const MemoryManager: React.FC<{
    */
   const seccionesVisibles: SeccionMemoria[] = secciones?.length
     ? secciones
-    : ['character', 'diary', 'npcs', 'locs', 'quests', 'story', 'status', 'notes'];
+    : ['character', 'diary', 'npcs', 'locs', 'quests', 'story', 'status', 'giros'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
 
@@ -323,21 +320,14 @@ export const MemoryManager: React.FC<{
     npcs: [],
     locations: [],
     current_status: '',
-    manual_notes: '',
     visual_memory: []
   };
 
   const allImageFiles = files.filter(f => f.isImage);
 
-  const [localNotes, setLocalNotes] = useState(memory.manual_notes || '');
-  const [showNarratorNotes, setShowNarratorNotes] = useState(false);
   const onUpdateMemoryRef = useRef(onUpdateMemory);
   onUpdateMemoryRef.current = onUpdateMemory;
 
-  // Sincronizar localNotes si cambia memory.manual_notes externamente (por reseteo, IA o cambio de tomo)
-  useEffect(() => {
-    setLocalNotes(project.memory?.manual_notes || '');
-  }, [project.memory?.manual_notes]);
 
   // AI Sync Handler
   const handleSyncWithAI = async () => {
@@ -476,7 +466,6 @@ export const MemoryManager: React.FC<{
       message:
         '¿Deseas vaciar y restablecer completamente toda la memoria de la campaña? Esta acción borrará los datos de todas las pestañas: el resumen e hitos del Protagonista, la cronología e hilos de la Agenda, la lista de PNJs y sus afinidades, los Lugares y mapas, las Tramas y misiones activas, el Resumen acumulado, el Estado de la compañía y las Notas del tomo.',
       onConfirm: async () => {
-        setLocalNotes('');
         setExpandedLocIds(new Set());
         setExpandedQuestIds(new Set());
         setSelectedNpcForDossier(null);
@@ -490,7 +479,6 @@ export const MemoryManager: React.FC<{
           npcs: [],
           companions: [],
           locations: [],
-          manual_notes: '',
           visual_memory: [],
           player_character: {
             /*
@@ -545,7 +533,7 @@ export const MemoryManager: React.FC<{
               Memoria Viva Autónoma en Tiempo Real (Solo Lectura)
             </p>
             <p className="text-[11px] text-indigo-800/80 dark:text-indigo-300/80 m-0 truncate">
-              La IA actualiza y preserva secretos, PNJs, lugares, tramas y notas en cada respuesta sin consumir llamadas extra.
+              La IA actualiza y preserva giros, PNJs, lugares y tramas en cada respuesta sin consumir llamadas extra.
             </p>
           </div>
         </div>
@@ -591,7 +579,13 @@ export const MemoryManager: React.FC<{
             },
             { id: 'story', label: 'Resumen', shortLabel: 'Resumen', icon: BookOpen, count: memory.story ? '' : '' },
             { id: 'status', label: 'Estado', shortLabel: 'Estado', icon: Compass, count: memory.current_status ? '' : '' },
-            { id: 'notes', label: 'Notas', shortLabel: 'Notas', icon: FileText, count: memory.manual_notes ? '' : '' }
+            {
+              id: 'giros',
+              label: 'Giros',
+              shortLabel: 'Giros',
+              icon: Lock,
+              count: memory.gm_secrets?.length ? `(${memory.gm_secrets.filter(x => !x.revelado).length})` : ''
+            }
           ]
             .filter(tab => seccionesVisibles.includes(tab.id as SeccionMemoria))
             .map(tab => {
@@ -1269,15 +1263,15 @@ export const MemoryManager: React.FC<{
         </div>
       )}
 
-      {/* Tab: Notes (Cuaderno Oculto del Narrador / IA) */}
-      {activeTab === 'notes' && (
+      {/* Pestaña: Giros de la campaña (lo que el Narrador guarda bajo llave) */}
+      {activeTab === 'giros' && (
         <div className="flex flex-col gap-3">
           {/*
-            Los giros pendientes, en una lista y no en un párrafo.
+            Los giros pendientes, en una lista y no en un párrafo de texto libre.
 
-            El cuaderno de abajo es texto libre: sirve para pensar, pero no
-            distingue lo que ya salió de lo que falta, y nada le dice al
-            Narrador que sea secreto. Estos sí: le llegan con candado, y pasan a
+            Aquí hubo un cuaderno de notas en blanco: servía para pensar, pero no
+            distinguía lo que ya había salido de lo que faltaba, y nada le decía al
+            Narrador que fuera secreto. Estos sí: le llegan con candado, y pasan a
             abiertos solos cuando se descubren jugando.
           */}
           {(() => {
@@ -1509,84 +1503,6 @@ export const MemoryManager: React.FC<{
             );
           })()}
 
-          <div className="flex flex-wrap justify-between items-center bg-amber-50/80 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50 gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-amber-900 dark:text-amber-200 font-cinzel font-bold">
-                ⚠️ Cuaderno oculto de dirección — contiene spoilers
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowNarratorNotes(!showNarratorNotes)}
-                className="flex items-center gap-1.5 px-3 py-1 text-xs font-cinzel rounded border border-amber-300 dark:border-amber-800 hover:border-[var(--accent)] hover:text-[var(--accent)] bg-[var(--surface)] transition-all cursor-pointer font-bold text-amber-900 dark:text-amber-200"
-                title={showNarratorNotes ? 'Ocultar notas para evitar spoilers' : 'Revelar cuaderno secreto del GM (Contiene Spoilers)'}
-              >
-                {showNarratorNotes ? (
-                  <>
-                    <EyeOff className="w-3.5 h-3.5" /> Ocultar cuaderno (Evitar Spoilers)
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-3.5 h-3.5" /> Revelar cuaderno secreto (Contiene Spoilers)
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          <p className="text-xs text-[var(--text-secondary)] font-lora italic px-1">
-            Tu cuaderno de dirección, en texto libre: planes en la sombra, tramas que aún no han asomado,
-            contingencias, notas de tono. Le llega al Narrador en cada turno marcado como secreto —lo usa para
-            mover el mundo y mantenerlo coherente, con prohibición de contarlo o insinuarlo— y no aparece en la
-            crónica ni en ningún resumen. Escríbelo tú: el Narrador lo lee, pero no escribe aquí. Para guardar un
-            giro concreto y poder seguirle la pista hasta que se descubra, usa los <strong>Giros de la campaña</strong>
-            de aquí arriba.
-          </p>
-
-          {showNarratorNotes ? (
-            <div className="flex flex-col gap-2">
-              <div className="w-full min-h-[380px] md:h-[480px] max-h-[600px] overflow-y-auto bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] p-5 rounded-lg text-sm md:text-base font-lora leading-relaxed shadow-inner">
-                {localNotes && localNotes.trim() ? (
-                  <div className="markdown-body">
-                    <ReactMarkdown>{localNotes}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center py-16 text-[var(--text-secondary)]">
-                    <BookOpen className="w-10 h-10 mb-3 opacity-40 text-amber-700" />
-                    <p className="font-cinzel font-semibold text-sm mb-1">El cuaderno está vacío</p>
-                    <p className="text-xs max-w-sm text-[var(--text-secondary)]/80">
-                      Escribe aquí lo que quieras que el Narrador tenga en cuenta sin contárselo a nadie: hacia dónde va la
-                      trama, qué trama cada facción, qué quieres que pase más adelante.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div
-              onClick={() => setShowNarratorNotes(true)}
-              className="w-full min-h-[260px] md:min-h-[320px] bg-[var(--sidebar-bg)] border-2 border-dashed border-amber-300 dark:border-amber-900/50 hover:border-[var(--accent)] rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all group"
-            >
-              <div className="p-3.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 group-hover:text-[var(--accent)] transition-colors mb-3">
-                <EyeOff className="w-8 h-8" />
-              </div>
-              <h4 className="font-cinzel text-base font-bold text-[var(--text-primary)] mb-1">
-                Cuaderno Oculto del Narrador (IA) Protegido
-              </h4>
-              <p className="text-xs text-[var(--text-secondary)] max-w-md mb-4 leading-relaxed">
-                El contenido está oculto para preservar la magia de la aventura y evitar spoilers. Haz clic para revelar los planes secretos que la IA mantiene en la sombra.
-              </p>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowNarratorNotes(true);
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-cinzel font-bold text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-md shadow-sm transition-all cursor-pointer"
-              >
-                <Eye className="w-4 h-4" /> Revelar cuaderno secreto (Contiene Spoilers)
-              </button>
-            </div>
-          )}
         </div>
       )}
 

@@ -390,7 +390,6 @@ export interface Memory {
   companions?: PlayerCharacter[];
   locations: Location[];
   current_status: string;
-  manual_notes: string;
   purpose_and_context?: string;
   tools_and_resources?: string;
   raw_project_memory?: string;

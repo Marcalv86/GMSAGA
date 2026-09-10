@@ -146,7 +146,6 @@ export function sanitizeProjectMemory(mem?: Memory): Memory {
       companions: [],
       locations: [],
       current_status: '',
-      manual_notes: '',
       visual_memory: [],
       player_character: sanitizePlayerCharacter()
     };
@@ -174,7 +173,6 @@ export function sanitizeProjectMemory(mem?: Memory): Memory {
     companions: Array.isArray(mem.companions) ? mem.companions : [],
     locations: Array.isArray(mem.locations) ? mem.locations : [],
     current_status: mem.current_status || '',
-    manual_notes: mem.manual_notes || '',
     visual_memory: Array.isArray(mem.visual_memory) ? mem.visual_memory : [],
     player_character: cleanPc
   };

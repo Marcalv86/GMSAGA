@@ -1281,7 +1281,6 @@ export function estimarCargaDelTurno({
   const mem = project.memory;
   const memoria =
     (mem?.raw_project_memory?.length || 0) +
-    (mem?.manual_notes?.length || 0) +
     (mem?.memory_edits || []).reduce((acc, e) => acc + (e.text?.length || 0), 0);
 
   // Un archivo de texto viaja entero salvo que sea una muestra de estilo (su
@@ -1744,10 +1743,6 @@ ${lista
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
 ${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
-${project.memory.manual_notes ? `### 🔒 CUADERNO OCULTO DEL NARRADOR (SOLO TÚ — CONTIENE SPOILERS)
-Esto es tu cuaderno privado: planes en la sombra, tramas que aún no han asomado, contingencias y notas de dirección. En la aplicación está guardado tras un aviso de spoilers, o sea que la jugadora NO lo lee mientras juega. Trátalo con las mismas reglas que los 🔒: te sirve para mover el mundo y mantenerlo coherente, NUNCA para contarlo, insinuarlo ni dejar que un PNJ lo suelte sin un motivo ganado en escena, y jamás aparece en el HUD, la crónica, la agenda ni un resumen. Lo que de aquí ya haya salido a la luz jugando, sí puedes usarlo con normalidad.
-${project.memory.manual_notes}
-` : ''}
 ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHistory}` : ''}
   `.trim()
     : 'No hay memoria acumulada aún.';
@@ -4549,7 +4544,7 @@ QUÉ SÍ PUEDES HACER AQUÍ:
 
 ⚖️ DÓNDE VA CADA COSA (las dos son buenas, no te cortes de usarlas):
 - \`[MEMORIA: ...]\` → lo importante que YA es cierto y sabido: reglas de mesa, preferencias de tono, datos del personaje, hechos de la partida, correcciones. Esto se ve en la pantalla de Memoria y viaja en cada turno. Es el sitio por defecto.
-- \`[SECRETO: ...]\` → lo que aún no ha pasado o el personaje aún no sabe: giros, identidades reales, quién está detrás de qué, tramas de enemigos, lo que se encontrará más adelante. Va al cuaderno oculto, tapado en la interfaz, y no se narra hasta que se descubra jugando.
+- \`[SECRETO: ...]\` → lo que aún no ha pasado o el personaje aún no sabe: giros, identidades reales, quién está detrás de qué, tramas de enemigos, lo que se encontrará más adelante. Va a los Giros de la campaña, tapado en la interfaz, y no se narra hasta que se descubra jugando.
 - La prueba: **¿esto le destriparía algo si lo leyera ahora mismo en su pantalla?** Sí → \`[SECRETO:]\`. No → \`[MEMORIA:]\`.
 - Ante la duda, \`[SECRETO:]\`: un giro guardado de más se puede contar mañana; uno destripado ya no se recupera.
 - Puedes usar las dos en el mismo mensaje: apuntar en memoria «Aryendell desconfía del capitán» y guardar aparte el giro de por qué tiene razón.

@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Project } from '../types';
-import { Eye, EyeOff, NotebookPen, Pencil, Save, Trash2, X } from 'lucide-react';
-import { CreativeStudioModal } from './CreativeStudioModal';
+import { NotebookPen, Pencil, Save, Trash2, X } from 'lucide-react';
 
 /**
  * El diario del Narrador — crónica, estado y notas — como una sección más de
@@ -26,28 +25,19 @@ export const DiaryView: React.FC<{
     quests: [],
     npcs: [],
     locations: [],
-    current_status: '',
-    manual_notes: ''
+    current_status: ''
   };
 
-  type Seccion = 'story' | 'status' | 'notes';
+  type Seccion = 'story' | 'status';
   const [editing, setEditing] = useState<Seccion | null>(null);
   const [storyDraft, setStoryDraft] = useState(memory.story || '');
   const [statusDraft, setStatusDraft] = useState(memory.current_status || '');
-  const [notesDraft, setNotesDraft] = useState(memory.manual_notes || '');
-  const [showNotes, setShowNotes] = useState(false);
   const [confirmClear, setConfirmClear] = useState<Seccion | null>(null);
-  const [studioModal, setStudioModal] = useState<{
-    isOpen: boolean;
-    tab?: 'image' | 'video' | 'music' | 'diary';
-    sceneText: string;
-  } | null>(null);
 
   useEffect(() => {
     setStoryDraft(memory.story || '');
     setStatusDraft(memory.current_status || '');
-    setNotesDraft(memory.manual_notes || '');
-  }, [project.id, memory.story, memory.current_status, memory.manual_notes]);
+  }, [project.id, memory.story, memory.current_status]);
 
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
@@ -62,14 +52,12 @@ export const DiaryView: React.FC<{
   const cancelEdit = () => {
     setStoryDraft(memory.story || '');
     setStatusDraft(memory.current_status || '');
-    setNotesDraft(memory.manual_notes || '');
     setEditing(null);
   };
 
   const saveEdit = async (s: Seccion) => {
     if (s === 'story') await onUpdateMemory(mem => ({ ...mem, story: storyDraft.trim() }));
-    else if (s === 'status') await onUpdateMemory(mem => ({ ...mem, current_status: statusDraft.trim() }));
-    else await onUpdateMemory(mem => ({ ...mem, manual_notes: notesDraft.trim() }));
+    else await onUpdateMemory(mem => ({ ...mem, current_status: statusDraft.trim() }));
     setEditing(null);
   };
 
@@ -77,12 +65,9 @@ export const DiaryView: React.FC<{
     if (s === 'story') {
       setStoryDraft('');
       await onUpdateMemory(mem => ({ ...mem, story: '' }));
-    } else if (s === 'status') {
+    } else {
       setStatusDraft('');
       await onUpdateMemory(mem => ({ ...mem, current_status: '' }));
-    } else {
-      setNotesDraft('');
-      await onUpdateMemory(mem => ({ ...mem, manual_notes: '' }));
     }
     setConfirmClear(null);
     setEditing(null);
@@ -120,17 +105,6 @@ export const DiaryView: React.FC<{
       empty: 'No hay estado actual registrado.',
       placeholder: 'Ubicación, heridas, tensión del grupo, recursos disponibles...',
       rows: 6
-    },
-    {
-      id: 'notes',
-      label: 'Notas manuales',
-      hint: 'Secretos, reglas de casa y giros futuros. Prioridad máxima para la IA.',
-      value: memory.manual_notes || '',
-      draft: notesDraft,
-      setDraft: setNotesDraft,
-      empty: 'Sin notas por ahora.',
-      placeholder: 'Secretos, reglas de casa, revelaciones futuras...',
-      rows: 8
     }
   ];
 
@@ -143,8 +117,9 @@ export const DiaryView: React.FC<{
           </h3>
         </div>
         <p className="text-xs text-[var(--text-secondary)] m-0">
-          La crónica, el estado y las notas que el Narrador relee antes de continuar la historia. Se leen y se
-          corrigen aquí mismo, como una entrada más de la agenda.
+          La crónica y el estado que el Narrador relee antes de continuar la historia. Se leen y se corrigen
+          aquí mismo, como una entrada más de la agenda. Los giros que aún no han pasado no viven aquí: van
+          a «Giros de la campaña», bajo llave.
         </p>
 
         <div className="space-y-5">
@@ -158,28 +133,8 @@ export const DiaryView: React.FC<{
 
                 {editing !== s.id && (
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {s.id === 'notes' && s.value && (
-                      <button
-                        onClick={() => setShowNotes(!showNotes)}
-                        title={showNotes ? 'Ocultar notas para evitar spoilers' : 'Mostrar notas secretas (Modo Narrador)'}
-                        className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer"
-                      >
-                        {showNotes ? (
-                          <>
-                            <EyeOff className="w-3 h-3" /> Ocultar notas
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="w-3 h-3" /> Mostrar notas
-                          </>
-                        )}
-                      </button>
-                    )}
                     <button
-                      onClick={() => {
-                        if (s.id === 'notes') setShowNotes(true);
-                        startEdit(s.id);
-                      }}
+                      onClick={() => startEdit(s.id)}
                       title={`Editar ${s.label}`}
                       className="flex items-center gap-1 rounded border border-[var(--user-border)] px-2 py-0.5 text-[11px] font-cinzel hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer"
                     >
@@ -224,34 +179,16 @@ export const DiaryView: React.FC<{
                   </div>
                 </div>
               ) : s.value ? (
-                s.id === 'notes' && !showNotes ? (
-                  <div
-                    onClick={() => setShowNotes(true)}
-                    className="p-3 mt-2 rounded-lg border border-dashed border-[var(--glass-border)] bg-[var(--surface-soft)]/20 hover:border-[var(--accent)] text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1 py-3 group"
-                  >
-                    <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] group-hover:text-[var(--accent)] font-medium">
-                      <EyeOff className="w-3.5 h-3.5" />
-                      <span>Notas del Narrador ocultas (Modo Narrador)</span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] m-0 opacity-80">
-                      Ocultas para evitar spoilers involuntarios. Haz clic para revelar.
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    className="markdown-body text-sm leading-relaxed mt-2 cursor-text"
-                    onClick={() => startEdit(s.id)}
-                  >
-                    <ReactMarkdown>{s.value}</ReactMarkdown>
-                  </div>
-                )
+                <div
+                  className="markdown-body text-sm leading-relaxed mt-2 cursor-text"
+                  onClick={() => startEdit(s.id)}
+                >
+                  <ReactMarkdown>{s.value}</ReactMarkdown>
+                </div>
               ) : (
                 <p
                   className="text-sm text-[var(--text-secondary)] italic mt-2 cursor-text"
-                  onClick={() => {
-                    if (s.id === 'notes') setShowNotes(true);
-                    startEdit(s.id);
-                  }}
+                  onClick={() => startEdit(s.id)}
                 >
                   {s.empty}
                 </p>
@@ -291,24 +228,6 @@ export const DiaryView: React.FC<{
             </div>
           </div>
         </div>
-      )}
-      {/* Modal del Taller Creativo basado en la escena / sección del diario */}
-      {studioModal?.isOpen && (
-        <CreativeStudioModal
-          isOpen={studioModal.isOpen}
-          initialTab={studioModal.tab || 'image'}
-          sceneText={studioModal.sceneText}
-          onClose={() => setStudioModal(null)}
-          onInsertIntoChat={async text => {
-            // If user inserts into chat or memory
-            if (onUpdateMemory) {
-              await onUpdateMemory(mem => ({
-                ...mem,
-                manual_notes: mem.manual_notes ? `${mem.manual_notes}\n\n${text}` : text
-              }));
-            }
-          }}
-        />
       )}
     </>
   );

@@ -180,7 +180,6 @@ RESPONDE EXCLUSIVAMENTE UN OBJETO JSON VÁLIDO CON ESTA ESTRUCTURA:
   ],
   "storySynopsis": "...",
   "currentStatus": "...",
-  "manualNotes": "...",
   "directives": "..."
 }`;
 
@@ -244,9 +243,7 @@ export function importCampaignLocalFallback(
     quests,
     npcs,
     locations,
-    current_status: 'Continuación de partida importada.',
-    manual_notes: `Texto original importado (${cleaned.length} caracteres).`,
-    
+    current_status: 'Continuación de partida importada.'
   };
 
   const project: Project = {
@@ -408,7 +405,6 @@ function formatParsedDataToCampaign(
     npcs,
     locations,
     current_status: parsed.currentStatus || 'En curso',
-    manual_notes: parsed.manualNotes || `Documento importado (${rawText.length} caracteres).`,
     player_character: playerCharacter
   };
   const memory = sanitizeProjectMemory(rawMemory);

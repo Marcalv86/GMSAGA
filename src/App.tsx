@@ -423,7 +423,6 @@ export default function App() {
             npcs: [],
             locations: [],
             current_status: '',
-            manual_notes: ''
           },
           chats: [],
           files: []
@@ -472,8 +471,7 @@ export default function App() {
                   : p.memory?.current_status || '',
                 quests: (p.memory?.quests || []).filter(q => q.title !== 'El Misterio del Tomo Ancestral'),
                 npcs: (p.memory?.npcs || []).filter(n => n.name !== 'Eldrin el Sabio'),
-                locations: (p.memory?.locations || []).filter(l => l.name !== 'La Posada del Cuervo Gris'),
-                manual_notes: p.memory?.manual_notes?.includes('Posada') ? '' : p.memory?.manual_notes || ''
+                locations: (p.memory?.locations || []).filter(l => l.name !== 'La Posada del Cuervo Gris')
               }
             };
           }
@@ -634,7 +632,6 @@ export default function App() {
             npcs: [],
             locations: [],
             current_status: '',
-            manual_notes: ''
           },
           chats: [],
           files: []
@@ -920,7 +917,6 @@ export default function App() {
       npcs: [],
       locations: [],
       current_status: '',
-      manual_notes: ''
     };
 
     // Sin calendario no hay días, así que se cuenta por escenas narradas: da la
@@ -1166,7 +1162,6 @@ export default function App() {
             npcs: [],
             locations: [],
             current_status: '',
-            manual_notes: ''
           }
         )
       )
@@ -2752,7 +2747,6 @@ export default function App() {
               npcs: [],
               locations: [],
               current_status: '',
-              manual_notes: ''
             },
             chats: [],
             files: []

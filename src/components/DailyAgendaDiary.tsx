@@ -53,7 +53,6 @@ import {
   Sparkles,
   RefreshCw
 } from 'lucide-react';
-import { CreativeStudioModal } from './CreativeStudioModal';
 
 export interface DailyAgendaDiaryProps {
   project: Project;
@@ -302,11 +301,6 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string; date?: string } | null>(null);
 
   // Creative Studio modal state
-  const [studioModal, setStudioModal] = useState<{
-    isOpen: boolean;
-    tab?: 'image' | 'video' | 'music' | 'diary';
-    sceneText: string;
-  } | null>(null);
 
   // Thread creator modal state
   const [isThreadModalOpen, setIsThreadModalOpen] = useState(false);
@@ -1960,31 +1954,6 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
         </div>
       )}
 
-      {/* Creative Studio Modal */}
-      {studioModal?.isOpen && (
-        <CreativeStudioModal
-          isOpen={studioModal.isOpen}
-          initialTab={studioModal.tab || 'image'}
-          sceneText={studioModal.sceneText}
-          onClose={() => setStudioModal(null)}
-          onInsertIntoChat={async text => {
-            if (onUpdate) {
-              const prevNotes = project.memory?.manual_notes || '';
-              await onUpdate({
-                memory: {
-                  ...project.memory,
-                  story: project.memory?.story || '',
-                  quests: project.memory?.quests || [],
-                  npcs: project.memory?.npcs || [],
-                  locations: project.memory?.locations || [],
-                  current_status: project.memory?.current_status || '',
-                  manual_notes: prevNotes ? `${prevNotes}\n\n${text}` : text
-                }
-              });
-            }
-          }}
-        />
-      )}
     </div>
   );
 };
