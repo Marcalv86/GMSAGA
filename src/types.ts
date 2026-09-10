@@ -358,6 +358,21 @@ export interface SecretoDeCampana {
    * con ella, como algo que estaba delante todo el rato.
    */
   sembrar?: string;
+  /**
+   * Quién puede traer esto a la mesa, y qué lo pondría en marcha.
+   *
+   * Es la pieza que faltaba entre la trama y el reparto. Una capa sabía qué
+   * era y qué sembrar, pero no QUIÉN la mueve, así que el Narrador tenía por
+   * un lado una historia y por otro una lista de personajes, sin nada que los
+   * uniera. Y sin eso, un personaje solo puede volver «porque toca» —que es un
+   * cameo— en vez de volver porque algo ha pasado y él es quien lo sabe:
+   * Entreri no aparece por variedad, aparece porque algo se ha movido en el
+   * sur y viene a decírselo a Jarlaxle en persona.
+   *
+   * Ejemplo: «Entreri, si se mueve algo en Calimport. Viene en persona porque
+   * no se fía de un mensajero, y le molesta tener que venir.»
+   */
+  quienLoTrae?: string;
   /** Quién lo plantó: la jugadora al preparar, el Narrador, o el trazado inicial. */
   origen?: 'jugadora' | 'narrador' | 'trama';
   /** Cuándo y cómo salió a la luz EN JUEGO, si ya ha salido. */

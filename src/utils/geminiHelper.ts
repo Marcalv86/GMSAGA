@@ -1555,7 +1555,7 @@ Esta es tu ficha interna de la gente recurrente de la campaña. Úsala: son sus 
 - 🔒 ES TUYO, NO DEL PROTAGONISTA. No se narra, no se insinúa gratis, ningún PNJ lo suelta sin un motivo ganado en escena y NUNCA aparece en el HUD, en la crónica ni en un resumen. Que tú lo sepas no es que ella lo sepa: si lo sueltas, has destripado el giro y ya no hay vuelta atrás.
 - 🔒 SE DESTAPA JUGÁNDOLO: investigando, ganándose la confianza, una indiscreción de un tercero, un descuido, una prueba física. Cuando de verdad salga a la luz en la escena, y SOLO entonces, cierra el mensaje con \`[REVELADO: Nombre — cómo se ha sabido]\`. A partir de ahí pasa a ser algo con lo que el protagonista puede contar.
 - 🔓 YA SE SUPO: eso ya no es un secreto. Puede mencionarse, tener consecuencias y salir en boca de quien corresponda. No hagas como si el protagonista no lo supiera.
-- 💤 ROTA EL REPARTO. Antes de decidir quién aparece, quién entra por la puerta o a quién se encuentran, MIRA quién lleva más tiempo sin salir —aquí arriba y en los documentos de la campaña— y pregúntate si esa escena es suya. Tirar siempre de los dos o tres que ya están delante convierte una banda entera en un dúo, y deja sin usar a gente con secciones propias en el material.
+- 💤 ROTA EL REPARTO, PERO CON MOTIVO. Antes de decidir quién aparece, mira DOS cosas en este orden: primero, si alguno de los portadores de la trama (🚪) tiene ya su disparador cumplido —ese entra con algo que contar y la escena se justifica sola—; y si no hay ninguno, quién lleva más tiempo sin salir de los de aquí arriba y de los documentos, y si esa escena es suya. Tirar siempre de los dos o tres que ya están delante convierte una banda entera en un dúo, y deja sin usar a gente con secciones propias en el material.
 - ⛔ Pero no es un sorteo: quien vuelve necesita un MOTIVO en la ficción para estar ahí —le mandaron, le conviene, pasaba por su territorio, quiere algo de alguien—. Un cameo sin motivo es peor que la repetición.
 - Lo marcado como 🎒 es lo que ESE personaje puede usar en escena. Si tiene medios para resolver algo a su manera, los usa (ver el protocolo de disfraces e ilusión).
 
@@ -1708,6 +1708,7 @@ Esto no es una lista de sorpresas sueltas: es la estructura de la historia, deci
 **QUÉ HACES CON ESTO EN CADA ESCENA:**
 - **SIEMBRA.** Lo de «se puede ir sembrando» va en escena AHORA, mucho antes de que nadie lo descubra, como detalle físico sin subrayar: se menciona y se sigue adelante. Un giro sin siembra previa se lee como un truco; con ella, como algo que estaba delante todo el rato. Si una escena te da ocasión de plantar una semilla, plántala.
 - **APUNTA HACIA ALLÍ.** Cuando decidas qué complicación aparece, quién entra por la puerta o qué encuentran, elige lo que empuje hacia esta estructura. Ese es el trabajo: que las escenas lleven a algún sitio.
+- **🚪 LA GENTE LLEGA CON ALGO, NO PORQUE TOQUE.** Cuando toque meter a alguien en escena, mira PRIMERO los portadores de aquí abajo: si a alguno se le ha cumplido lo que lo dispara, ese es quien aparece, y aparece CON LO SUYO. Un personaje que vuelve porque algo se ha movido y él es quien lo sabe hace avanzar la historia y justifica su propia presencia a la vez; el mismo personaje volviendo por variedad es relleno. Y si nadie tiene motivo todavía, no fuerces a nadie: haz que la escena lo genere.
 - **RESPETA EL ORDEN DE LAS CAPAS.** No destapes una capa profunda antes que la de encima. Si el protagonista se acerca a la capa 3 sin haber entendido la 2, lo que encuentra no tiene sentido todavía: dale la pieza que le falta, no la respuesta final.
 - **⛔ NUNCA LO CUENTAS.** Ni lo insinúas con guiños, ni lo resume el narrador, ni lo suelta un PNJ sin un motivo ganado en escena. No aparece en el HUD, la crónica, la agenda ni ningún resumen. Saberlo es para dirigir, no para contar.
 - **⛔ NO LO CONTRADIGAS NI LO SUSTITUYAS** por otra explicación que se te ocurra sobre la marcha: esto es canon, solo falta que se descubra.
@@ -1725,6 +1726,7 @@ ${lista
       `- La verdad: ${sec.secreto.slice(0, 600)}`,
       sec.conecta?.length ? `- Engancha con: ${sec.conecta.slice(0, 5).join(' · ')}` : '',
       !sec.revelado && sec.sembrar ? `- 🌱 SIEMBRA ESTO YA: ${sec.sembrar.slice(0, 300)}` : '',
+      !sec.revelado && sec.quienLoTrae ? `- 🚪 QUIÉN PUEDE TRAERLO A ESCENA: ${sec.quienLoTrae.slice(0, 300)}` : '',
       !sec.revelado && sec.comoSeDescubre ? `- Por dónde puede salir: ${sec.comoSeDescubre.slice(0, 300)}` : ''
     ]
       .filter(Boolean)
@@ -4729,6 +4731,7 @@ export interface TramaTrazada {
     conecta: string[];
     comoSeDescubre?: string;
     sembrar?: string;
+    quienLoTrae?: string;
   }[];
 }
 
@@ -4919,6 +4922,7 @@ REGLAS DURAS:
 2. **Todo engancha con algo.** Cada secreto declara con qué otros conecta, por su título exacto. Un giro que no engancha con nada es un giro suelto y sobra.
 3. **Todo se puede sembrar hoy.** De cada secreto dices qué detalle concreto y físico se puede ir poniendo en escena YA, meses antes de que se descubra: un objeto fuera de sitio, una cicatriz, una ausencia, una moneda de la ceca equivocada, alguien que no come cerdo. Sin siembra, un giro es un truco; con siembra, algo que estaba delante todo el rato.
 4. **Todo se puede descubrir jugando.** De cada secreto dices por dónde puede salir con acciones que un jugador de verdad haría. Un secreto que solo se destapa si el Narrador lo regala no es un secreto: es un anuncio.
+4 bis. **⭐ TODO TIENE QUIEN LO TRAIGA.** De cada capa dices QUIÉN puede meterla en una escena y QUÉ lo pondría en marcha. Un personaje del material, con nombre, que tenga un motivo propio para aparecer con eso: quien lo sabe y viene a contarlo, quien lo sufre y viene a pedir ayuda, quien lo esconde y viene a comprobar que sigue escondido, quien lo aprovecha y viene a cobrar. Di también qué lo dispara —«si se mueve algo en Calimport», «cuando el barco atraque», «en cuanto alguien pregunte por la carga»—. Esto es lo que convierte una historia en algo que pasa: sin un portador, una capa se queda esperando a que el Narrador se acuerde de ella, y no se acuerda.
 5. **Usa el material que ya existe.** Los personajes, las facciones y los lugares de los documentos, y lo que ya se haya jugado. No inventes un elenco paralelo.
 6. **Respeta lo ya plantado y lo ya descubierto.** Lo que aparece abajo como plantado es canon: incorpóralo a la estructura en la capa que le toque, sin cambiarlo. Lo marcado como YA DESCUBIERTO no puede volver a ser un secreto: constrúyele encima.
 7. **Nada de metatrama vacía.** Ni profecías, ni elegidos, ni «el destino lo quiso», salvo que el material lo pida. Conflictos de gente con intereses.
@@ -4942,7 +4946,8 @@ Devuelve ÚNICAMENTE un JSON:
       "capa": 1,
       "conecta": ["Título exacto de otro secreto"],
       "comoSeDescubre": "Acciones concretas que un jugador haría",
-      "sembrar": "El detalle físico que se puede poner en escena hoy"
+      "sembrar": "El detalle físico que se puede poner en escena hoy",
+      "quienLoTrae": "Nombre del personaje que puede meterlo en escena, su motivo propio y qué lo dispara"
     }
   ]
 }
@@ -4976,7 +4981,8 @@ ${revisando ? 'Devuelve la trama COMPLETA, no solo lo que cambies: lo que siga e
       capa: Number.isFinite(Number(x?.capa)) ? Math.max(1, Math.min(4, Math.round(Number(x.capa)))) : 1,
       conecta: Array.isArray(x?.conecta) ? x.conecta.map((c: any) => String(c).trim()).filter(Boolean) : [],
       comoSeDescubre: x?.comoSeDescubre ? String(x.comoSeDescubre).trim() : undefined,
-      sembrar: x?.sembrar ? String(x.sembrar).trim() : undefined
+      sembrar: x?.sembrar ? String(x.sembrar).trim() : undefined,
+      quienLoTrae: x?.quienLoTrae ? String(x.quienLoTrae).trim() : undefined
     }))
     .filter(x => x.titulo.length > 2 && x.secreto.length > 10);
 
@@ -5024,7 +5030,8 @@ export function fusionarTrama(
       comoSeDescubre: nuevo.comoSeDescubre || p.comoSeDescubre,
       capa: nuevo.capa || p.capa,
       conecta: nuevo.conecta?.length ? nuevo.conecta : p.conecta,
-      sembrar: nuevo.sembrar || p.sembrar
+      sembrar: nuevo.sembrar || p.sembrar,
+      quienLoTrae: nuevo.quienLoTrae || p.quienLoTrae
     };
   });
 
@@ -5038,6 +5045,7 @@ export function fusionarTrama(
       capa: t.capa,
       conecta: t.conecta,
       sembrar: t.sembrar,
+      quienLoTrae: t.quienLoTrae,
       origen: 'trama'
     });
   }

@@ -1361,8 +1361,8 @@ export const MemoryManager: React.FC<{
                 </div>
 
                 <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed m-0">
-                  La estructura de la historia, por capas: lo que parece que pasa, lo que pasa de verdad y quién está
-                  detrás. <strong>La traza la IA sola</strong> al empezar la campaña y la repasa en cada revisión de
+                  La estructura de la historia, por capas: lo que parece que pasa, lo que pasa de verdad, quién está
+                  detrás, y <strong>quién puede traer cada pieza a una escena y qué lo dispara</strong>. <strong>La traza la IA sola</strong> al empezar la campaña y la repasa en cada revisión de
                   memoria, a la luz de lo que hayas jugado. Le llega al Narrador con candado en cada turno: siembra las
                   pistas y hace que todo cuadre, pero tiene prohibido contarlo. Cuando algo salga jugando, se marca
                   solo. Tú puedes darle ideas aquí o hablando con el GM en su pestaña.
@@ -1477,6 +1477,11 @@ export const MemoryManager: React.FC<{
                               {sec.sembrar && (
                                 <p className="text-[11px] text-emerald-700 dark:text-emerald-400 m-0 mt-1">
                                   🌱 Se va sembrando con: {sec.sembrar}
+                                </p>
+                              )}
+                              {sec.quienLoTrae && (
+                                <p className="text-[11px] text-sky-700 dark:text-sky-400 m-0 mt-1">
+                                  🚪 Puede traerlo a escena: {sec.quienLoTrae}
                                 </p>
                               )}
                               {sec.conecta?.length ? (
