@@ -2902,20 +2902,32 @@ export default function App() {
         Barra de actualización.
 
         Va arriba del todo y ocupa una línea: es un aviso, no una interrupción.
-        No se puede posponer con un «más tarde» porque seguir en la versión
-        vieja es justamente el problema que resuelve, pero tampoco tapa nada ni
-        bloquea la partida: se puede seguir jugando y actualizar al terminar.
+
+        Aquí ponía que no se podía posponer, «porque seguir en la versión vieja
+        es justamente el problema que resuelve». Estaba mal, y se vio en una
+        tarde de diez despliegues: quien quería jugar acababa recargando cada
+        quince minutos. Un aviso que no se puede callar deja de ser un aviso y
+        pasa a ser una interrupción con otro nombre. Ahora se puede aparcar
+        hasta la próxima vez que se abra la aplicación —la versión nueva sigue
+        ahí, y se coge al terminar de jugar—.
       */}
       {hayActualizacion && (
-        <div className="fixed top-0 left-0 right-0 z-[130] bg-[var(--accent)] text-[var(--on-accent)] px-3 py-1.5 flex items-center justify-center gap-3 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="fixed top-0 left-0 right-0 z-[130] bg-[var(--accent)] text-[var(--on-accent)] px-3 py-1.5 flex items-center justify-center gap-2 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
           <span className="font-cinzel text-[11px] sm:text-xs font-bold truncate">
             Hay una versión nueva de GM Studio
           </span>
           <button
             onClick={() => void recargarConLaVersionNueva()}
-            className="shrink-0 rounded-lg bg-[var(--on-accent)] text-[var(--accent)] px-2.5 py-1 font-cinzel text-[11px] font-bold hover:brightness-95 active:scale-95 transition-all cursor-pointer"
+            className="shrink-0 min-h-[30px] rounded-lg bg-[var(--on-accent)] text-[var(--accent)] px-2.5 font-cinzel text-[11px] font-bold hover:brightness-95 active:scale-95 transition-all cursor-pointer"
           >
             Actualizar
+          </button>
+          <button
+            onClick={() => setHayActualizacion(false)}
+            className="shrink-0 min-h-[30px] rounded-lg border border-[var(--on-accent)]/50 px-2 font-cinzel text-[11px] hover:bg-[var(--on-accent)]/15 active:scale-95 transition-all cursor-pointer"
+            title="Sigue jugando. La versión nueva te espera y no se vuelve a avisar hasta que abras la aplicación otra vez."
+          >
+            Ahora no
           </button>
         </div>
       )}

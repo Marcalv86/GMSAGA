@@ -11,7 +11,7 @@ import {
   fechaInicial,
   fechaLegible
 } from '../utils/campaignCalendar';
-import { fusionarTrama, tramarLaCampana } from '../utils/geminiHelper';
+import { extraerIdentidadDeDocumentos, fusionarTrama, tramarLaCampana } from '../utils/geminiHelper';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
@@ -301,6 +301,7 @@ export const MemoryManager: React.FC<{
   /** Giros que la jugadora ha decidido leerse. No se guarda: se destapa y ya. */
   const [secretosDestapados, setSecretosDestapados] = useState<Set<string>>(new Set());
   const [tramando, setTramando] = useState(false);
+  const [leyendoFicha, setLeyendoFicha] = useState(false);
   const [verPremisa, setVerPremisa] = useState(false);
 
   // Confirmation state
@@ -707,6 +708,63 @@ export const MemoryManager: React.FC<{
                   orden de preguntar en vez de deducirla— pero peor que la
                   correcta, así que conviene verla.
                 */}
+                {/*
+                  Leer la identidad de la propia ficha subida.
+
+                  Estos cuatro campos solo se podían rellenar a mano, aunque la
+                  ficha del personaje estuviera subida en Archivos con todo
+                  dentro. «Sincronizar con IA» existía y no los tocaba: llenaba
+                  el resumen y los acontecimientos, y dejaba fuera justo los
+                  cuatro datos que viajan al Narrador en cada turno como hechos
+                  fijos. Copiar a mano lo que ya está escrito es trabajo que
+                  debería hacer la aplicación.
+                */}
+                <button
+                  onClick={async () => {
+                    if (leyendoFicha) return;
+                    setLeyendoFicha(true);
+                    try {
+                      const id = await extraerIdentidadDeDocumentos({ project, files });
+                      const encontrado = [
+                        id.race ? `Raza: ${id.race}` : '',
+                        id.class ? `Clase: ${id.class}` : '',
+                        id.languages?.length ? `Idiomas: ${id.languages.join(', ')}` : '',
+                        id.appearance ? `Rasgos: ${id.appearance.slice(0, 240)}${id.appearance.length > 240 ? '…' : ''}` : ''
+                      ].filter(Boolean);
+
+                      if (encontrado.length === 0) {
+                        window.alert('No he encontrado la raza, la clase, los idiomas ni la descripción física en tus documentos. Comprueba que la ficha del personaje esté subida en Archivos.');
+                        return;
+                      }
+                      // Se enseña ANTES de escribir: son datos que el Narrador
+                      // da por ciertos, y pisarlos sin avisar sería peor que no
+                      // ofrecer el botón.
+                      if (!window.confirm(`Esto es lo que he leído de tus documentos:\n\n${encontrado.join('\n\n')}\n\n¿Lo guardo en la ficha? Se sustituye lo que haya ahora en esos campos.`)) return;
+
+                      await onUpdateMemory(mem => ({
+                        ...mem,
+                        player_character: {
+                          ...(mem.player_character || { name: 'Protagonista' }),
+                          ...(id.race ? { race: id.race } : {}),
+                          ...(id.class ? { class: id.class } : {}),
+                          ...(id.languages ? { languages: id.languages } : {}),
+                          ...(id.appearance ? { appearance: id.appearance } : {})
+                        }
+                      }));
+                    } catch (err: any) {
+                      window.alert(err?.message || 'No se ha podido leer la ficha. Inténtalo de nuevo.');
+                    } finally {
+                      setLeyendoFicha(false);
+                    }
+                  }}
+                  disabled={leyendoFicha}
+                  className="mt-2.5 w-full min-h-[40px] px-3 rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] text-xs font-cinzel font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60"
+                  title="Lee la raza, la clase, los idiomas y los rasgos físicos de la ficha que tienes subida en Archivos, para no tener que copiarlos a mano."
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${leyendoFicha ? 'animate-spin' : ''}`} />
+                  {leyendoFicha ? 'Leyendo tu ficha…' : 'Rellenar leyendo mi ficha subida'}
+                </button>
+
                 {/*
                   Los rasgos físicos, que no se podían escribir en ningún sitio.
 

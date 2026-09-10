@@ -4684,6 +4684,107 @@ export interface TramaTrazada {
  * Se ejecuta a mano y una vez (o cuando se quiera rehacer), no en cada turno:
  * es una llamada al modelo de tareas de fondo, no un gasto por escena.
  */
+export interface IdentidadLeida {
+  race?: string;
+  class?: string;
+  languages?: string[];
+  appearance?: string;
+}
+
+/**
+ * Saca la identidad del protagonista de sus propios documentos.
+ *
+ * La ficha subida traía la raza, la clase, los idiomas y la descripción física
+ * —a veces con secciones enteras dedicadas a ello— y la aplicación pedía que se
+ * copiara todo a mano en cuatro campos. «Sincronizar con IA» existía, pero solo
+ * rellenaba el resumen y los acontecimientos: los cuatro datos que viajan al
+ * Narrador en cada turno como hechos fijos eran precisamente los únicos que
+ * nadie leía de ningún sitio.
+ */
+export async function extraerIdentidadDeDocumentos({
+  project,
+  files
+}: {
+  project: Project;
+  files: ProjectFile[];
+}): Promise<IdentidadLeida> {
+  const esFichaDelPj = (f: ProjectFile) => {
+    const n = f.name.toLowerCase();
+    return (
+      f.category === 'sheet_pj' ||
+      ['ficha', 'personaje', 'character', 'sheet', 'protagonista', 'pj', 'oc'].some(k => n.includes(k))
+    );
+  };
+
+  // Primero sus fichas; si no hay ninguna marcada, el resto de documentos de
+  // texto, que a veces el trasfondo vive en un archivo con otro nombre.
+  const candidatos = files.filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 50);
+  const fichas = candidatos.filter(esFichaDelPj);
+  const fuentes = (fichas.length ? fichas : candidatos).slice(0, 6);
+  if (fuentes.length === 0) {
+    throw new Error('No hay documentos de texto de los que leer la ficha. Sube la ficha del personaje en Archivos.');
+  }
+
+  const pc = project.memory?.player_character;
+  const texto = fuentes
+    .map(f => `=== ${f.name} ===\n${(f.content || '').slice(0, 30000)}`)
+    .join('\n\n')
+    .slice(0, 120000);
+
+  const prompt = `De los documentos de abajo, saca la identidad del PROTAGONISTA${pc?.name ? ` (se llama ${pc.name})` : ''} y devuélvela en JSON.
+
+Estos cuatro datos viajan al Narrador en cada turno como hechos fijos, así que la precisión importa más que la elegancia:
+
+- "race": su raza o especie, en pocas palabras y tal como la nombra el documento («Drow», «Elfa de la luna», «Humana»). Si el documento la matiza (mestiza, criada fuera, variante), respétalo.
+- "class": clase y arquetipo, corto («Druida», «Pícara / Arcana Trapacera»).
+- "languages": ARRAY con los idiomas que HABLA O ENTIENDE. Solo los que el documento le atribuya de verdad: no añadas el común «porque sí» si no consta, ni metas idiomas que solo se mencionan de pasada hablando de otros.
+- "appearance": los rasgos por los que se la reconoce al verla, en 2-4 frases. Céntrate en lo PERMANENTE y distintivo —color y forma de ojos, pelo, piel, marcas, tatuajes, cicatrices, estatura, porte— y deja fuera la ropa cambiante y el equipo. Si un rasgo depende de algo (la luz, el momento), dilo con su condición: «ojos que van de verde agua a magenta según la luz sea fría o cálida». USA LAS PALABRAS DEL DOCUMENTO, no sinónimos tuyos: si dice un color concreto, ese color va.
+
+⛔ Si un dato NO consta en los documentos, omite el campo. No lo deduzcas del nombre, del lugar de origen ni de lo que te parezca probable: un dato inventado aquí se convierte en canon y contradice lo que la jugadora tenga escrito.
+
+DOCUMENTOS:
+${texto}
+
+Responde ÚNICAMENTE con el JSON, sin nada más:
+{ "race": "...", "class": "...", "languages": ["..."], "appearance": "..." }`;
+
+  const modelo = getBackgroundTaskModel();
+  const respuesta = await generateContentWithFailover({
+    proposito: 'Leer la identidad del protagonista',
+    primaryModel: modelo,
+    contents: prompt,
+    config: {
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+      ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    } as any
+  });
+
+  const limpio = (respuesta.text || '{}').replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+  let p: any = {};
+  try {
+    p = JSON.parse(limpio);
+  } catch {
+    throw new Error('La lectura ha vuelto ilegible. Vuelve a intentarlo.');
+  }
+
+  const txt = (v: any, max: number) => {
+    const t = typeof v === 'string' ? v.trim() : '';
+    return !t || /^(\.{3}|n\/?a|desconocid[oa]|no consta|ningun[oa]?)$/i.test(t) ? undefined : t.slice(0, max);
+  };
+
+  const idiomas = Array.isArray(p?.languages)
+    ? p.languages.map((x: any) => String(x).trim()).filter(Boolean).slice(0, 12)
+    : undefined;
+
+  return {
+    race: txt(p?.race, 80),
+    class: txt(p?.class, 80),
+    languages: idiomas?.length ? idiomas : undefined,
+    appearance: txt(p?.appearance, 1200)
+  };
+}
+
 export async function tramarLaCampana({
   project,
   files = [],
