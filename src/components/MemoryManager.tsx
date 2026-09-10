@@ -344,6 +344,27 @@ export const MemoryManager: React.FC<{
     }
   };
 
+  /*
+   * Los tres datos que el Narrador da por ciertos en cada turno.
+   *
+   * La raza no se veía ni se podía tocar en ninguna pantalla: vivía en un valor
+   * cableado en el código («Elfa de la Luna») que se colaba en la ficha al
+   * vaciar la memoria y viajaba al Narrador turno tras turno como un hecho. Si
+   * un dato se le manda al Narrador como verdad, tiene que poder verse y
+   * corregirse aquí.
+   */
+  const cambiarIdentidad = async (campo: 'race' | 'class' | 'languages', valor: string) => {
+    await onUpdateMemory(mem => ({
+      ...mem,
+      player_character: {
+        ...(mem.player_character || { name: 'Protagonista' }),
+        ...(campo === 'languages'
+          ? { languages: valor.split(',').map(v => v.trim()).filter(Boolean) }
+          : { [campo]: valor.trim() })
+      }
+    }));
+  };
+
   // Protagonist (OC) Handlers
   const handleRemoveOcPortrait = async () => {
     await onUpdateMemory(mem => ({
@@ -433,10 +454,20 @@ export const MemoryManager: React.FC<{
           manual_notes: '',
           visual_memory: [],
           player_character: {
-            name: project.memory?.player_character?.name || 'Aryendell',
+            /*
+             * Vaciar la memoria conserva QUIÉN eres, no inventa a otra.
+             *
+             * Aquí había «Elfa de la Luna» y «Druida / Maga» cableados: al
+             * empezar de cero, la aplicación escribía esa raza en la ficha y se
+             * la mandaba al Narrador en cada turno. Si tu personaje era una
+             * drow, el Narrador recibía una contradicción y la resolvía a
+             * medias. Lo que no consta se queda sin constar.
+             */
+            name: project.memory?.player_character?.name || '',
             title: 'Protagonista (OC)',
-            race: project.memory?.player_character?.race || 'Elfa de la Luna',
-            class: project.memory?.player_character?.class || 'Druida / Maga',
+            race: project.memory?.player_character?.race || '',
+            class: project.memory?.player_character?.class || '',
+            languages: project.memory?.player_character?.languages || [],
             summary: '',
             events: [],
             notes: '',
@@ -575,7 +606,7 @@ export const MemoryManager: React.FC<{
 
       {/* Tab: Protagonist (OC) */}
       {activeTab === 'character' && (() => {
-        const cleanPc = sanitizePlayerCharacter(memory.player_character, 'Aryendell');
+        const cleanPc = sanitizePlayerCharacter(memory.player_character);
         return (
         <div className="flex flex-col gap-6">
           {/* Identity & Portrait Card */}
@@ -597,7 +628,7 @@ export const MemoryManager: React.FC<{
                           setTargetForPortraitPicker({
                             type: 'player',
                             id: 'oc_portrait',
-                            name: cleanPc.name || 'Aryendell',
+                            name: cleanPc.name || 'Protagonista',
                             desc: cleanPc.title || 'Personaje Jugador'
                           })
                         }
@@ -622,7 +653,7 @@ export const MemoryManager: React.FC<{
                         setTargetForPortraitPicker({
                           type: 'player',
                           id: 'oc_portrait',
-                          name: cleanPc.name || 'Aryendell',
+                          name: cleanPc.name || 'Protagonista',
                           desc: cleanPc.title || 'Personaje Jugador'
                         })
                       }
@@ -641,7 +672,7 @@ export const MemoryManager: React.FC<{
                 <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
                   <div>
                     <h2 className="font-cinzel text-xl sm:text-2xl font-bold text-[var(--accent)] m-0 flex items-center gap-2">
-                      {cleanPc.name || 'Aryendell'}
+                      {cleanPc.name || 'Protagonista'}
                     </h2>
                     {cleanPc.title && (
                       <p className="text-sm font-lora italic text-[var(--text-secondary)] mt-0.5 m-0">
@@ -660,6 +691,46 @@ export const MemoryManager: React.FC<{
                       <span>{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
                     </button>
                   )}
+                </div>
+
+                {/*
+                  Identidad: lo que el Narrador da por cierto en cada turno.
+
+                  Va con la etiqueta a la vista y editable porque estos tres
+                  campos no son decoración: viajan al prompt como hechos fijos.
+                  La raza vacía es mejor que una inventada —el Narrador tiene
+                  orden de preguntar en vez de deducirla— pero peor que la
+                  correcta, así que conviene verla.
+                */}
+                <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {([
+                    { campo: 'race' as const, rotulo: 'Raza / especie', valor: cleanPc.race || '', ph: 'Drow, humana, tiefling…' },
+                    { campo: 'class' as const, rotulo: 'Clase', valor: cleanPc.class || '', ph: 'Druida, pícara…' },
+                    { campo: 'languages' as const, rotulo: 'Idiomas', valor: (cleanPc.languages || []).join(', '), ph: 'Común, élfico, drow…' }
+                  ]).map(({ campo, rotulo, valor, ph }) => (
+                    <label key={campo} className="flex flex-col gap-1 min-w-0">
+                      <span className="font-cinzel text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1">
+                        {rotulo}
+                        {!valor && <span className="text-amber-600 dark:text-amber-400" title="Sin rellenar. El Narrador no lo dará por supuesto: preguntará.">⚠</span>}
+                      </span>
+                      <input
+                        defaultValue={valor}
+                        key={`${cleanPc.name}-${campo}-${valor}`}
+                        onBlur={e => { if (e.target.value.trim() !== valor.trim()) cambiarIdentidad(campo, e.target.value); }}
+                        placeholder={ph}
+                        title={
+                          campo === 'languages'
+                            ? 'Separados por comas. El Narrador NO le traducirá ningún idioma que no esté aquí: los oirá como ruido.'
+                            : campo === 'race'
+                            ? 'Manda sobre lo que sugieran el nombre, un tatuaje o los documentos. Si se deja vacío, el Narrador preguntará en vez de deducirlo.'
+                            : 'Clase y arquetipo del protagonista.'
+                        }
+                        className={`min-h-[40px] w-full rounded-lg border bg-[var(--surface)] px-2.5 text-xs font-lora text-[var(--text-primary)] outline-hidden focus:border-[var(--accent)] ${
+                          valor ? 'border-[var(--user-border)]' : 'border-amber-500/50'
+                        }`}
+                      />
+                    </label>
+                  ))}
                 </div>
 
                 {/* Level & Progress Bar */}
@@ -818,7 +889,7 @@ export const MemoryManager: React.FC<{
                             onUpdateMemory(prev => ({
                               ...prev,
                               player_character: {
-                                ...(prev.player_character || { name: 'Aryendell' }),
+                                ...(prev.player_character || { name: '' }),
                                 events: [...(prev.player_character?.events || []), newEv]
                               }
                             }));
@@ -935,7 +1006,7 @@ export const MemoryManager: React.FC<{
                                     onUpdateMemory(prev => ({
                                       ...prev,
                                       player_character: {
-                                        ...(prev.player_character || { name: 'Aryendell' }),
+                                        ...(prev.player_character || { name: '' }),
                                         events: (prev.player_character?.events || []).filter(e => e.id !== ev.id && e.title !== ev.title)
                                       }
                                     }));

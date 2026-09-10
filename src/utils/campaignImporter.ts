@@ -291,7 +291,7 @@ function formatParsedDataToCampaign(
   // Ficha de Protagonista
   const rawChar = parsed.character || {};
   const rawPlayerCharacter: PlayerCharacter = {
-    name: rawChar.name || 'Aryendell',
+    name: rawChar.name || 'Protagonista',
     race: rawChar.race || 'Elfa de la Luna',
     class: rawChar.class || 'Druida / Maga',
     level: String(rawChar.level || '1'),

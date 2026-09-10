@@ -1599,8 +1599,13 @@ ${
   pc
     ? `
 - NOMBRE DEL PROTAGONISTA: ${pc.name}
-${pc.race ? `- RAZA / ESPECIE: ${pc.race}` : ''}
+${pc.race
+  ? `- RAZA / ESPECIE: ${pc.race} ← DATO FIJO. Es lo que ES, por encima de lo que sugiera cualquier documento, nombre o descripción. No la cambies, no la "corrijas" y no describas al protagonista como de otra especie ni de pasada.`
+  : `- RAZA / ESPECIE: ⚠️ NO CONSTA EN LA FICHA. NO te la inventes ni la deduzcas del nombre, del tatuaje o del lugar de origen: describe al protagonista sin nombrar su especie y, si hace falta para la escena, pregúntaselo a la jugadora con [Pregunta de Mesa: ...].`}
 ${pc.class ? `- CLASE Y NIVEL: ${pc.class} ${pc.level || ''}` : ''}
+${pc.languages?.length
+  ? `- IDIOMAS QUE HABLA Y ENTIENDE: ${pc.languages.join(', ')} ← SOLO ESTOS. Cualquier otro idioma le resulta ruido: no capta palabras sueltas, ni el sentido general por el tono, ni los gestos de un código manual que no conozca.`
+  : `- IDIOMAS: no constan en la ficha. Da por supuesto ÚNICAMENTE el idioma común de la superficie. Lo exótico —drow, infracomún, códigos de signos de las Casas— NO lo entiende.`}
 ${pc.appearance ? `- APARIENCIA FÍSICA: ${pc.appearance}` : ''}
 ${pc.personality ? `- PERSONALIDAD Y COMPORTAMIENTO: ${pc.personality}` : ''}
 ${pc.backstory ? `- TRASFONDO E HISTORIA: ${pc.backstory}` : ''}
@@ -1886,6 +1891,18 @@ ${calendarioSection}
 
 ### ESTADO ACTUAL DEL PROTAGONISTA (AHORA MISMO)
 Estado actual conocido: PG ${pc?.hp ?? '?'}/${pc?.maxHp ?? '?'}, CA ${pc?.ac ?? '?'}${pc?.conditions?.length ? `, condiciones: ${pc.conditions.join(', ')}` : ''}.
+${
+  pc?.name || pc?.race || pc?.languages?.length
+    ? `
+⭐ RECORDATORIO DE IDENTIDAD, JUSTO ANTES DE ESCRIBIR: ${[
+        pc?.name ? `se llama ${pc.name}` : '',
+        pc?.race ? `ES ${pc.race} — ninguna otra especie, en ninguna frase` : '',
+        pc?.languages?.length ? `habla ${pc.languages.join(', ')} y NADA más` : ''
+      ]
+        .filter(Boolean)
+        .join(' · ')}.`
+    : ''
+}
 
 Narra la escena respetando las DIRECTIVAS DE RESPUESTA CRÍTICAS de más arriba, y ciérrala con los registros internos que correspondan según el punto 7 (solo los que hayan cambiado de verdad en este turno).`;
 
@@ -3602,14 +3619,14 @@ ${historyToAnalyze}`;
   ];
 
   const candidatePc: PlayerCharacter = {
-    ...(prevPc || { name: 'Aryendell' }),
-    name: prevPc?.name || 'Aryendell',
+    ...(prevPc || { name: '' }),
+    name: prevPc?.name || '',
     title: prevPc?.title,
     summary: parsed.player_summary || prevPc?.summary || '',
     events: mergedEvents,
     portrait: prevPc?.portrait
   };
-  const updatedPc = sanitizePlayerCharacter(candidatePc, 'Aryendell');
+  const updatedPc = sanitizePlayerCharacter(candidatePc);
 
   // Timeline / Diario con inferencia de horas
   const rawTimeline = Array.isArray(parsed.timeline) ? parsed.timeline : (Array.isArray(parsed.entradas) ? parsed.entradas : []);

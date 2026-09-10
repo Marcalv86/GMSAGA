@@ -47,16 +47,36 @@ export function isInvalidCharacterName(name?: string): boolean {
  * Si el nombre contiene texto narrativo largo o notas por error de importación/sincronización,
  * recupera el nombre canónico ("Aryendell") y traslada el texto a notas o resumen para no perder información.
  */
+/**
+ * Nombre de reserva cuando no hay ninguno.
+ *
+ * Era «Aryendell», el personaje de una campaña concreta, cableado en el código
+ * como si fuera el de todo el mundo. Un hueco se rellena con un hueco, no con
+ * los datos de otra partida.
+ */
+const NOMBRE_DE_RESERVA = 'Protagonista';
+
 export function sanitizePlayerCharacter(
   pc?: PlayerCharacter,
-  fallbackName = 'Aryendell'
+  fallbackName = NOMBRE_DE_RESERVA
 ): PlayerCharacter {
   if (!pc) {
+    /*
+     * ⛔ AQUÍ NO SE INVENTA UNA RAZA NI UNA CLASE.
+     *
+     * Esto devolvía «Elfa de la Luna · Druida / Maga» cuando no había ficha, y
+     * eso NO se quedaba en la pantalla: la raza viaja al Narrador en cada turno
+     * como «RAZA / ESPECIE: Elfa de la Luna». O sea que el Narrador no se
+     * confundía —se lo estábamos diciendo nosotros—, y luego chocaba con los
+     * documentos, que decían drow. De ahí salían párrafos con «la elfa de la
+     * luna» y «la piel de obsidiana de la prisionera» en la misma página.
+     *
+     * Un campo vacío es un campo vacío. Que no se sepa la raza es un dato
+     * cierto; inventarla es un dato falso.
+     */
     return {
       name: fallbackName,
       title: 'Protagonista (OC)',
-      race: 'Elfa de la Luna',
-      class: 'Druida / Maga',
       level: 'Nivel 1',
       levelProgress: 0,
       summary: '',
@@ -72,11 +92,7 @@ export function sanitizePlayerCharacter(
     // Es texto narrativo: limpiamos prefijos como ; o - y lo guardamos
     recoveredNote = name.replace(/^[;:*\-.,\s]+/, '').trim();
     // Buscamos si en el texto o en el nombre original se mencionaba un nombre reconocible
-    if (/\bAryendell\b/i.test(recoveredNote)) {
-      name = 'Aryendell';
-    } else {
-      name = fallbackName;
-    }
+    name = fallbackName;
   }
 
   // Comprobación de título
