@@ -110,7 +110,7 @@ import {
 } from './utils/geminiHelper';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa } from './utils/mesaStorage';
-import { aplicarInventario, aplicarMonedas, cambioVacio } from './utils/inventoryTag';
+import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie } from './utils/rollRequests';
 import { Probabilidad, formatoSignificado, nuevaConsulta } from './utils/oracle';
@@ -2824,16 +2824,43 @@ export default function App() {
         agregadas.filter(t => !previas.some(p => p.absDay === t.absDay)).map(t => t.absDay)
       ).size;
 
-      await handleUpdateProjectField(p => ({
-        memory: sanitizeProjectMemory({
+      /*
+       * La mochila se rehace leyendo el historial, no preguntándoselo a la IA.
+       *
+       * El Narrador lleva desde el primer turno apuntando [INVENTARIO: ...] y
+       * hasta ahora nadie lo leía, así que al estrenar la pestaña la mochila
+       * salía vacía aunque el chat estuviera lleno de objetos ganados y
+       * gastados. Está todo escrito: basta con recorrerlo en orden. Sale
+       * gratis —ni una llamada más— y se puede repetir, porque siempre se parte
+       * de cero sobre los mismos mensajes.
+       */
+      const mensajesDeLaCronica = [...currentChats]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .flatMap(c => c.messages || []);
+      const mochila = reconstruirInventario(
+        mensajesDeLaCronica,
+        currentProject.memory?.player_character?.inventory
+      );
+
+      await handleUpdateProjectField(p => {
+        const memoriaSincronizada = sanitizeProjectMemory({
           ...(p.memory || {}),
           ...syncResult.memory
-        }),
-        timeline: fusionarTimeline(p.timeline || [], syncResult.timeline || []).timeline,
-        currentDate: syncResult.currentDate || p.currentDate,
-        threads: syncResult.threads || p.threads,
-        calendar: p.calendar || syncResult.calendar
-      }));
+        });
+        return {
+          memory: {
+            ...memoriaSincronizada,
+            player_character: {
+              ...(memoriaSincronizada.player_character || { name: '' }),
+              inventory: mochila.inventario
+            }
+          },
+          timeline: fusionarTimeline(p.timeline || [], syncResult.timeline || []).timeline,
+          currentDate: syncResult.currentDate || p.currentDate,
+          threads: syncResult.threads || p.threads,
+          calendar: p.calendar || syncResult.calendar
+        };
+      });
 
       /*
        * «Sincronizar con IA» también traza la historia.
@@ -2887,6 +2914,14 @@ export default function App() {
           `• ${syncResult.totalQuests} tramas y misiones.\n` +
           `• ${syncResult.totalLocations} lugares registrados.\n` +
           `• Evolución del protagonista y consecuencias programadas.\n` +
+          (mochila.inventario.length
+            ? `• ${mochila.inventario.length} ${mochila.inventario.length === 1 ? 'objeto' : 'objetos'} en la mochila, recuperados de lo que el Narrador fue apuntando (pestaña Inventario).\n`
+            : `• La mochila sigue vacía: en la crónica no hay ni una anotación de inventario que recuperar.\n`) +
+          (Object.keys(mochila.netoDeMonedas).length
+            ? `• 💰 De dinero, la crónica suma ${Object.entries(mochila.netoDeMonedas)
+                .map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${({ pp: 'PP', gp: 'PO', ep: 'PE', sp: 'PA', cp: 'PC' } as any)[k] || k}`)
+                .join(', ')}. NO te lo he aplicado: la etiqueta anota lo que entra y sale, no el saldo, y con lo que empezaste está en tu ficha. Ajústalo tú si quieres.\n`
+            : '') +
           (girosTrazados > 0
             ? `• ${girosTrazados} ${girosTrazados === 1 ? 'giro' : 'giros'} en la estructura de la historia (pestaña Giros).\n\n`
             : `• La estructura de la historia no se ha podido trazar esta vez; mira el registro de errores.\n\n`) +

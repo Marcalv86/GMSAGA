@@ -231,3 +231,50 @@ export function aplicarMonedas(
 export function cambioVacio(c: CambioDeInventario): boolean {
   return c.altas.length === 0 && c.bajas.length === 0 && Object.keys(c.monedas).length === 0;
 }
+
+/**
+ * Rehace la mochila leyendo TODO el historial de golpe.
+ *
+ * Hace falta porque la etiqueta llevaba meses escribiéndose y nadie la leía:
+ * cuando por fin se le puso lector, la mochila seguía vacía aunque el chat
+ * estuviera lleno de objetos ganados y gastados. Esto los recupera sin gastar
+ * una sola llamada a la IA —ya está todo escrito, solo hay que aplicarlo en
+ * orden— y se puede repetir sin miedo: siempre se parte de cero y se recorre
+ * lo mismo, así que sincronizar dos veces da el mismo resultado.
+ *
+ * ⚠ El dinero NO se toca. La etiqueta anota lo que entra y sale, no el saldo,
+ * y el punto de partida está en la ficha, no aquí: reconstruirlo desde cero
+ * dejaría a cero a quien empezó con una bolsa llena. Se devuelve el neto para
+ * poder enseñárselo a la jugadora y que lo ajuste ella si quiere.
+ */
+export function reconstruirInventario(
+  mensajes: { role: string; content: string }[],
+  inventarioActual?: InventoryItem[]
+): { inventario: InventoryItem[]; netoDeMonedas: CambioDeInventario['monedas']; objetosVistos: number } {
+  // Lo que puso la jugadora a mano se respeta: solo se rehace lo que salió de
+  // las etiquetas, que es lo que se puede volver a deducir del historial.
+  const aMano = (inventarioActual || []).filter(i => i.id && !i.id.startsWith('inv_'));
+
+  let inventario: InventoryItem[] = [];
+  const neto: CambioDeInventario['monedas'] = {};
+  let objetosVistos = 0;
+
+  for (const m of mensajes) {
+    if (!m || m.role === 'user' || !m.content) continue;
+    const cambio = leerInventario(m.content);
+    if (cambioVacio(cambio)) continue;
+    objetosVistos += cambio.altas.length;
+    inventario = aplicarInventario(inventario, cambio);
+    for (const clave of Object.keys(cambio.monedas) as (keyof typeof neto)[]) {
+      neto[clave] = (neto[clave] || 0) + (cambio.monedas[clave] || 0);
+    }
+  }
+
+  // Lo escrito a mano vuelve, y lo reconstruido no lo pisa.
+  const nombres = new Set(inventario.map(i => (i.name || '').toLowerCase()));
+  return {
+    inventario: [...aMano.filter(i => !nombres.has((i.name || '').toLowerCase())), ...inventario],
+    netoDeMonedas: neto,
+    objetosVistos
+  };
+}
