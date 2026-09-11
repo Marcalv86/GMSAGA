@@ -1887,12 +1887,39 @@ ${misionesVivas
     `- **${i.name}**${i.quantity && i.quantity > 1 ? ` (x${i.quantity})` : ''} — lo tiene **${String(i.enPoderDe).slice(0, 80)}**${
       i.dondeEsta ? `, en ${String(i.dondeEsta).slice(0, 80)}` : ''
     }${i.description ? `: ${String(i.description).slice(0, 160)}` : ''}`;
+  /*
+   * Y SI LA MEMORIA ESTÁ VACÍA, EL BLOQUE NO DESAPARECE.
+   *
+   * Esto emitía algo solo cuando el inventario del panel tenía cosas, y eso
+   * era construir la regla encima del refuerzo en vez de encima de la fuente.
+   * La ficha viaja entera en cada turno: sus cosas SIEMPRE están ahí, se haya
+   * rellenado el panel o no. Una campaña recién empezada —o una en la que
+   * nadie tocó el botón— se quedaba sin el aviso justo cuando más falta hace.
+   *
+   * Así que cuando no hay nada registrado, el bloque sigue saliendo y manda a
+   * donde está de verdad: a la ficha.
+   */
+  const tieneFichaAdjunta = files.some(
+    f => !f.isImage && !f.isAudio && (f.category === 'sheet_pj' || looksLikeProtagonistSheet(f, project.memory))
+  );
+  const bloqueMochilaSinPanel =
+    tieneFichaAdjunta || project.memory?.player_character?.sheetText
+      ? `
+### 🎒 SUS COSAS ESTÁN EN SU FICHA — Y HAY QUE IR A MIRARLAS
+La aplicación no tiene ningún cambio de inventario registrado, y **eso no quiere decir que no lleve nada**: quiere decir que nada ha cambiado todavía. Todo su equipo está escrito en su ficha, que tienes entera en este mismo turno.
+- ⛔ Antes de inventarte un objeto, una lengua o un enigma, **ve a la sección de equipo de su ficha y léela** (§5 duodecies). Si algo de lo que lleva toca lo que ibas a inventar, la escena es que lo reconozca.
+- ✅ Sus cosas se usan: se leen, se tocan, se enseñan, se comparan, suenan si son instrumentos y se le pueden robar. Si llevas capítulos sin que nada de lo suyo aparezca, no es que no viniera a cuento: es que no lo has mirado.
+- ⛔ Y lo que no esté en su ficha, no se lo metes en la mochila para resolverte una escena.
+`.trim()
+      : '';
+
   const bloqueMochila = inventarioVivo.length
     ? `
 ### 🎒 SUS COSAS (material de escena, no una lista de la compra)
 Antes de inventarte un objeto, una lengua o un enigma, mira esta lista. Si algo de aquí toca lo que ibas a inventar, **la escena es que lo reconozca**, no que aparezca un misterio en paralelo.
 - ✅ Sus cosas se usan: se leen, se tocan, se enseñan, se comparan, suenan si son instrumentos y se le pueden robar.
 - ⛔ Y lo que NO está aquí ni en su ficha, no se lo metes en la mochila para resolverte una escena.
+- ⚠️ **Esta lista no es todo lo que lleva: es lo que la aplicación ha ido apuntando.** El resto de su equipo está en su ficha y lo sigue llevando. Que algo no salga aquí no es que no lo tenga.
 ${encargosVivos.length ? `\n**Encargos pendientes (objetos que son una tarea):**\n${encargosVivos.map(lineaDeObjeto).join('\n')}` : ''}${cosasSuyas.length ? `\n**Lo que lleva encima:**\n${cosasSuyas.map(lineaDeObjeto).join('\n')}` : ''}${
         requisadas.length
           ? `\n**⭐ LO QUE LE HAN QUITADO — sigue siendo suyo y alguien lo tiene delante:**\n${requisadas.map(lineaRequisada).join('\n')}\n
@@ -1900,7 +1927,7 @@ Esto NO es una lista de bajas: es la escena mejor servida que tienes. Quien lo g
           : ''
       }
 `.trim()
-    : '';
+    : bloqueMochilaSinPanel;
 
   /*
    * Los giros que aún no han pasado.
@@ -2339,8 +2366,8 @@ ${pc.backstory ? `- TRASFONDO E HISTORIA: ${pc.backstory}` : ''}
 ${pc.notes ? `- HABILIDADES / NOTAS: ${pc.notes}` : ''}
 ${
   pc.inventory && pc.inventory.length > 0
-    ? `- MODIFICACIONES DINÁMICAS DE INVENTARIO (adquiridas, gastadas o modificadas durante la partida):\n${pc.inventory.map(i => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? ' [Equipado]' : ''}${i.attuned ? ' [Sintonizado]' : ''}${i.damageOrAc ? ` [${i.damageOrAc}]` : ''}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ''}${i.description ? `: ${i.description}` : ''}`).join('\n')}\n\n- 🎒 OBJETOS Y EQUIPO DE PARTIDA (DENTRO DE SU FICHA):\nSus armas, armadura, vestimenta, diario personal, runas de adivinación, reliquias y herramientas están detallados dentro de su ficha (revisa el texto íntegro adjunto abajo), y los lleva encima. ⚠️ Pero esa ficha es **el equipo con el que EMPEZÓ**: lo de arriba es lo que ha cambiado jugando, y **manda lo de arriba**. Si algo consta como gastado, entregado o perdido, ya no lo tiene por mucho que siga escrito en la ficha.`
-    : `- 🎒 OBJETOS, EQUIPO Y PERTENENCIAS DEL PROTAGONISTA (ESTÁN DENTRO DE SU FICHA):\nTodos los objetos del protagonista (equipo, armas, ropa, zurrón, diario íntimo, runas de adivinación, reliquias, herramientas y posesiones de trasfondo) ESTÁN ESCRITOS DENTRO DEL TEXTO DE SU FICHA adjunta abajo. Existen plenamente en la ficción y los lleva consigo; consúltalos directamente en su ficha e intégralos con total naturalidad.`
+    ? `- 🎒 SU EQUIPO ESTÁ EN SU FICHA. LO DE AQUÍ ES LO QUE HA CAMBIADO DESDE ENTONCES:\n${pc.inventory.map(i => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? ' [Equipado]' : ''}${i.attuned ? ' [Sintonizado]' : ''}${i.damageOrAc ? ` [${i.damageOrAc}]` : ''}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ''}${i.enPoderDe ? ` [SE LO QUITARON — lo tiene ${String(i.enPoderDe).slice(0, 80)}]` : ''}${i.description ? `: ${i.description}` : ''}`).join('\n')}\n\n⛔⛔ **ESTA LISTA NO ES UN INVENTARIO COMPLETO, Y CONFUNDIRLA CON UNO ES EL ERROR CARO.** Es un registro de CAMBIOS: lo que ha ganado, gastado, perdido o le han quitado jugando. **Todo lo demás que ella lleva está escrito en su ficha, adjunta entera más abajo, y lo sigue llevando aunque no aparezca aquí.** Sus armas, su ropa, sus instrumentos, sus cuadernos, sus herramientas de oficio, sus reliquias y sus objetos de fe existen plenamente porque están en su ficha: **que no consten en esta lista no significa que no los tenga**, significa que no han cambiado.\n✅ Dónde manda cada cosa: si esta lista y la ficha se contradicen SOBRE UN MISMO OBJETO —consta gastado, entregado, perdido o requisado—, manda esta lista, porque es de hoy. Para todo lo que esta lista no menciona, **manda la ficha**.`
+    : `- 🎒 TODO SU EQUIPO ESTÁ EN SU FICHA, Y NO HAY NINGÚN CAMBIO REGISTRADO:\nTodos sus objetos (equipo, armas, ropa, zurrón, cuadernos y diarios, instrumentos, herramientas de su oficio, reliquias, objetos de culto y posesiones de trasfondo) ESTÁN ESCRITOS DENTRO DEL TEXTO DE SU FICHA, adjunta entera más abajo. **Los lleva todos.** ⛔ Que la aplicación no te mande aquí ninguna lista NO significa que vaya con las manos vacías: significa que nada ha cambiado todavía. Ve a la sección de equipo de su ficha y léela antes de dar por hecho lo que tiene o no tiene.`
 }
 ${pc.currencies ? `- MONEDAS ACTUALES: ${pc.currencies.gp || 0} PO (oro), ${pc.currencies.sp || 0} PP (plata), ${pc.currencies.cp || 0} PC (cobre), ${pc.currencies.ep || 0} PE (electro), ${pc.currencies.pp || 0} PT (platino)` : ''}
 ${pc.sheetText && !sheetTextDuplicado ? `\n--- RESUMEN DE HOJA DE PERSONAJE ---\n${pc.sheetText}` : ''}
@@ -2352,7 +2379,9 @@ ${
   pjSheetFiles.length > 0
     ? `DOCUMENTOS, DIARIO, RUNAS Y TRASFONDO PERSONAL DEL PROTAGONISTA (TEXTO ÍNTEGRO):\n` +
       `📌 Estos documentos son PARTE VIVA del protagonista: sus escritos, sus runas de adivinación, su diario íntimo, sus reliquias y su equipo. Están presentes y activos en la campaña, no son lore abstracto.\n` +
-      `⚠️ **PERO OJO: ESTA FICHA ES DONDE EMPEZÓ, NO DONDE ESTÁ.** Se subió una vez, al principio, y desde entonces la campaña ha seguido: ha gastado dinero, ha usado cosas, ha ganado otras, ha subido de nivel, ha cambiado de estado y ha aprendido lo que ha aprendido jugando. **Cuando la ficha y lo que te manda la aplicación en este turno digan cosas distintas, manda SIEMPRE lo de la aplicación** —el inventario, las monedas, el estado, el nivel, la memoria, el diario—, porque eso es de hoy y la ficha es del primer día. Lee la ficha para saber QUIÉN ES: su trasfondo, su voz, su gente, sus manías, de dónde viene y qué sabe hacer. Eso no caduca. Lo que sí caduca es el recuento de lo que lleva encima.\n` +
+      `⚠️ **ESTA FICHA ES LA FUENTE. LA MEMORIA DE LA APLICACIÓN ES UN REFUERZO ENCIMA, NO UN SUSTITUTO.**\n` +
+      `- **Lo que está escrito aquí, existe y es verdad**: su trasfondo, su voz, su gente, sus manías, de dónde viene, qué sabe hacer y qué lleva encima. No hace falta que nada de esto esté además en la memoria para que cuente. ⛔ Y al revés es el error caro: **que algo no aparezca en los paneles que te manda la aplicación NO significa que no exista.** Los paneles llevan lo que ha cambiado y lo que hay que recordar de lo jugado; no son un censo de este documento.\n` +
+      `- **Lo único que caduca es el recuento, y solo objeto por objeto.** La ficha es de donde empezó: desde entonces ha gastado dinero, ha consumido cosas, ha ganado otras, ha subido de nivel y puede que le hayan requisado equipo. Cuando la aplicación diga de UN OBJETO O DATO CONCRETO que está gastado, entregado, perdido, requisado o cambiado, manda la aplicación, porque eso es de hoy. Para todo lo demás —todo lo que la aplicación no menciona— manda la ficha.\n` +
       pjSheetFiles
         .map(
           f =>
