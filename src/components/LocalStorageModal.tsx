@@ -121,7 +121,20 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
 
       const saveRes = await writeCampaignToDisk(currentProject, currentChats, currentFiles, customTargetFileName);
       if (saveRes.written) {
-        setFolderSuccessMsg(`¡Campaña guardada con éxito como «${saveRes.fileName || customTargetFileName || getCampaignFileName(currentProject.name)}»!`);
+        /*
+         * Decir QUÉ se ha guardado, no solo que se ha guardado.
+         *
+         * «¡Guardada con éxito!» es verdad aunque dentro no haya una sola
+         * línea de roleo, así que no sirve para saber si el archivo vale. El
+         * recuento de capítulos y mensajes se lee de un vistazo y se compara
+         * con lo que hay en pantalla: si marca 0 mensajes, el problema está
+         * antes del guardado y no en el disco.
+         */
+        const capitulos = currentChats.length;
+        const mensajes = currentChats.reduce((a, c) => a + (c.messages?.length || 0), 0);
+        setFolderSuccessMsg(
+          `¡Campaña guardada como «${saveRes.fileName || customTargetFileName || getCampaignFileName(currentProject.name)}»! ${capitulos} ${capitulos === 1 ? 'capítulo' : 'capítulos'} · ${mensajes} ${mensajes === 1 ? 'mensaje' : 'mensajes'} · ${currentFiles.length} ${currentFiles.length === 1 ? 'documento' : 'documentos'}.`
+        );
         setTimeout(() => setFolderSuccessMsg(null), 5000);
         void fetchDiskFiles();
       } else if (saveRes.reason === 'no-permission') {
