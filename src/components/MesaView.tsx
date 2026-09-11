@@ -20,6 +20,7 @@ import {
   Swords,
   Trash2,
   Pencil,
+  Globe,
   Users
 } from 'lucide-react';
 import { Chat, Project, ProjectFile } from '../types';
@@ -114,6 +115,14 @@ export const MesaView: React.FC<{
    * Vacío significa «el de tareas de fondo», que es lo que hacía siempre.
    */
   const [modelo, setModelo] = useState<string>(() => leerModeloDeMesa());
+  /*
+   * Buscar en internet, apagado por defecto y por pregunta.
+   *
+   * Esta campaña tiene canon propio, y una respuesta anclada a la primera wiki
+   * que salga puede corregirle a la jugadora su propio mundo. Se enciende
+   * cuando hace falta comprobar algo de fuera, no como estado permanente.
+   */
+  const [buscarEnLaWeb, setBuscarEnLaWeb] = useState(false);
 
   /*
    * Los vídeos se leen del texto que se está escribiendo, no de un adjunto
@@ -185,6 +194,7 @@ export const MesaView: React.FC<{
         chats,
         currentChatId,
         files,
+        buscarEnLaWeb,
         historial: mensajes,
         pregunta:
           pregunta ||
@@ -712,6 +722,31 @@ export const MesaView: React.FC<{
               )}
             </div>
           )}
+
+          {/*
+            Buscar fuera, por pregunta y no como estado permanente.
+
+            Va apagado a propósito: esta campaña tiene canon propio, y una
+            respuesta anclada a la primera wiki que salga puede corregirle a la
+            jugadora su propio mundo. Cuando se enciende, al Director se le dice
+            por escrito que los documentos de la campaña mandan sobre internet.
+          */}
+          <button
+            onClick={() => setBuscarEnLaWeb(v => !v)}
+            className={`mb-2 inline-flex items-center gap-1.5 rounded-lg border px-2.5 min-h-[32px] text-[10px] font-cinzel transition-colors cursor-pointer ${
+              buscarEnLaWeb
+                ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
+                : 'border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]'
+            }`}
+            title={
+              buscarEnLaWeb
+                ? 'Puede mirar en internet para contestar, y te dirá qué ha consultado. Tus documentos siguen mandando sobre lo que encuentre.'
+                : 'Contesta solo con lo que tiene: tus documentos, la crónica y la memoria. Enciéndelo si necesitas que compruebe algo de fuera.'
+            }
+          >
+            <Globe className="w-3.5 h-3.5 shrink-0" />
+            {buscarEnLaWeb ? 'Puede buscar en internet' : 'Sin internet'}
+          </button>
 
           {adjuntos.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">

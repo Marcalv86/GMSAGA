@@ -62,6 +62,7 @@ import {
 } from './campaignCalendar';
 import { cambioVacio, leerInventario } from './inventoryTag';
 import { leerOlvidos } from './ordenesDeMesa';
+import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 import { logError, logWarn, logInfo } from './logger';
 import { abrirLlamada, cerrarLlamada } from './callLog';
@@ -1806,6 +1807,58 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
   const dosierLugares = dosierDeLugares(project.memory?.locations || []);
 
   /*
+   * Las tramas abiertas, que no le llegaban por ninguna vía.
+   *
+   * `memory.quests` se rellena en cada sincronización, se enseña en su pestaña
+   * y el Director de mesa las ve… pero al Narrador no le llegaba ni una. O sea
+   * que narraba sin saber qué tiene pendiente la protagonista: por qué está en
+   * esa ciudad, qué le encargaron, qué busca. Es barato —un título y un
+   * objetivo— y es la diferencia entre una escena que empuja la historia y una
+   * escena de relleno.
+   */
+  /*
+   * Lo último que se habló con él FUERA de personaje.
+   *
+   * El Narrador y el Director de la pestaña de mesa son el mismo: uno con el
+   * sombrero puesto y otro sin él. Pero el Narrador no veía ni una línea de esa
+   * conversación, así que «te lo dije en el chat» no funcionaba salvo que
+   * hubiera quedado apuntado como nota. Y no todo lo que se habla ahí es una
+   * nota: hay matices, medias decisiones y cosas dichas de pasada que son justo
+   * lo que uno espera que su GM recuerde.
+   *
+   * Va cortísimo —las últimas líneas y recortadas— porque es contexto de apoyo,
+   * no una segunda crónica.
+   */
+  const charlaDeMesa = leerMesa(project.id)
+    .slice(-6)
+    .map(m => `${m.role === 'user' ? 'Ella' : 'Tú, sin el sombrero'}: ${(m.content || '').slice(0, 500)}`)
+    .join('\n');
+  const bloqueMesa = charlaDeMesa
+    ? `
+### 🗣️ LO ÚLTIMO QUE HABLASTEIS FUERA DE PERSONAJE
+Esto no ha pasado en la ficción: es la jugadora hablando contigo en la mesa, y tú contestándole sin el sombrero de Narrador. **Eres el mismo**, así que lo que se acordó ahí vale aquí.
+- ✅ Si pidió algo sobre el tono, el ritmo o cómo llevar una escena, cúmplelo sin que haya que repetirlo.
+- ⛔ Pero NO lo narres, no lo menciones en la ficción y no hagas que ningún personaje se entere: ahí no había nadie más que vosotros dos.
+
+${charlaDeMesa}
+`.trim()
+    : '';
+
+  const misionesVivas = (project.memory?.quests || []).filter(q => q.status !== 'Completada').slice(-12);
+  const dosierMisiones = misionesVivas.length
+    ? `
+### 🎯 LO QUE TIENE ENTRE MANOS (tramas abiertas)
+Esto es lo que está pendiente AHORA. No es una lista de deberes que haya que recitar: es lo que da sentido a que esté donde está, y lo que una escena puede empujar, estorbar o complicar.
+- ⛔ No las des por resueltas por tu cuenta ni las cierres en prosa: se cierran jugándolas.
+- ✅ Y no hace falta que toda escena vaya de esto. Pero si llevas varias sin que ninguna las roce, algo va mal.
+
+${misionesVivas
+  .map(q => `- **${q.title}**${q.objective ? ` — ${String(q.objective).slice(0, 200)}` : ''}${q.progress ? `\n  · Por dónde va: ${String(q.progress).slice(0, 200)}` : ''}`)
+  .join('\n')}
+`.trim()
+    : '';
+
+  /*
    * Los giros que aún no han pasado.
    *
    * Van aparte del dosier de personajes porque no son de nadie: «el barco es
@@ -1992,7 +2045,7 @@ ${lista
     ? `
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
-${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
 ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHistory}` : ''}
   `.trim()
     : 'No hay memoria acumulada aún.';
@@ -2294,7 +2347,7 @@ ${enMarcha
     : ''
 }
 
-${diario.length ? `ÚLTIMOS DÍAS REGISTRADOS EN LA AGENDA:\n${diario.map(d => `- ${d.date}${d.lugar ? ` · ${d.lugar}` : ''}${d.clima ? ` · ${d.clima}` : ''}: ${d.summary}${d.hito ? ` [${d.hito}]` : ''}`).join('\n')}` : ''}
+${diario.length ? `ÚLTIMOS DÍAS REGISTRADOS EN LA AGENDA:\n${diario.map(d => `- ${d.date}${d.lugar ? ` · ${d.lugar}` : ''}${d.clima ? ` · ${d.clima}` : ''}: ${d.summary || d.title || d.hito || '(sin detalle)'}${d.hito && d.summary ? ` [${d.hito}]` : ''}`).join('\n')}` : ''}
 `.trim();
 
     tiempoDirectiva = `   - [TIEMPO: +Xm / +Xh / +Xd] — (Opcional) solo si transcurre un lapso apreciable de tiempo en la ficción (conversación larga, viaje o descanso).
@@ -4972,6 +5025,13 @@ export interface ConsultaDeMesa {
   /** Imágenes adjuntas al mensaje, que sí llegan al modelo. */
   imagenes?: ImagenDeMesa[];
   /**
+   * Si puede buscar en internet para contestar.
+   *
+   * Apagado por defecto: la campaña tiene canon propio y una respuesta anclada
+   * a la primera wiki que salga puede corregirle a la jugadora su propio mundo.
+   */
+  buscarEnLaWeb?: boolean;
+  /**
    * Con qué modelo contesta el Director, si se le quiere cambiar.
    *
    * Esta pestaña usaba el modelo «de tareas de fondo» —el más barato de la
@@ -5006,7 +5066,8 @@ export function construirPromptOOC({
   historial,
   pregunta,
   imagenes,
-  videos
+  videos,
+  buscarEnLaWeb
 }: ConsultaDeMesa): string {
   const pc = project.memory?.player_character;
   const cal = project.calendar;
@@ -5335,6 +5396,11 @@ QUÉ NO HACES AQUÍ:
 - ⛔ NO emites etiquetas de avance de partida ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:], [PRESENTES:]…): aquí no pasa el tiempo ni se registra crónica. Las únicas que puedes usar son las de arriba: \`[MEMORIA:]\`, \`[SECRETO:]\`, \`[OLVIDA:]\`, \`[VÍNCULO:]\` e \`[INVENTARIO:]\`.
 - ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
 - Si no sabes algo porque no consta en los documentos ni en lo que tienes delante, dilo. No lo inventes.
+${buscarEnLaWeb ? `
+🌐 PUEDES BUSCAR EN INTERNET EN ESTA PREGUNTA.
+- Úsalo para comprobar un dato, buscar una referencia o traerle algo que ella te pida de fuera. Di SIEMPRE qué has mirado y de dónde sale, para que pueda juzgarlo.
+- ⛔⭐ **PERO LOS DOCUMENTOS DE ESTA CAMPAÑA MANDAN SOBRE INTERNET, SIEMPRE.** Esta mesa tiene canon propio y decisiones tomadas que contradicen a la fuente oficial a propósito. Si lo que encuentras fuera choca con lo que pone en sus documentos o con lo ya jugado, **gana lo de aquí**, y lo que haces es AVISAR de la diferencia —«ojo, la fuente oficial dice otra cosa»—, nunca corregirle su mundo.
+- ⛔ Y no busques por deporte: si la respuesta está en sus documentos o en la crónica, contéstala con eso y no salgas fuera.` : ''}
 ${imagenes?.length ? `\n📎 LA JUGADORA TE HA ADJUNTADO ${imagenes.length === 1 ? 'UNA IMAGEN' : `${imagenes.length} IMÁGENES`}. Míralas y responde a lo que te pregunte sobre ellas: pueden ser una referencia visual de un personaje o un lugar, un mapa, una ficha, una captura de la propia aplicación o cualquier otra cosa. Describe lo que ves cuando sirva para contestar.` : ''}
 ${videos?.length ? `\n🎬 LA JUGADORA TE HA ADJUNTADO UN VÍDEO Y LO ESTÁS VIENDO DE VERDAD${videos[0].hastaSegundo ? ` (los primeros ${Math.round(videos[0].hastaSegundo / 60)} minutos)` : ''}. Míralo y escúchalo antes de contestar.
 - Responde a partir de lo que HAY en el vídeo, no de lo que sepas del tema por tu cuenta. Si el vídeo contradice lo que creías, manda el vídeo.
@@ -5485,9 +5551,19 @@ export async function preguntarAlDirectorOOC(
       ? getThinkingBudgetConfig('MINIMAL', modelo)
       : getThinkingBudgetConfig('HIGH', modelo);
 
+  /*
+   * Y, si se le pide, que mire en internet.
+   *
+   * Va apagado por defecto y con motivo: esta campaña tiene canon propio
+   * —decisiones de mesa que contradicen a la fuente oficial a propósito— y una
+   * respuesta apoyada en la primera wiki que salga puede corregirle a la
+   * jugadora su propio mundo. Encendido, la orden del prompt es explícita: los
+   * documentos de la campaña mandan sobre lo que encuentre fuera.
+   */
   const config = {
     temperature: 0.6,
     ...(pensar ? { thinkingConfig: pensar } : {}),
+    ...(consulta.buscarEnLaWeb ? { tools: [{ googleSearch: {} }] } : {}),
     ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
   } as any;
 
