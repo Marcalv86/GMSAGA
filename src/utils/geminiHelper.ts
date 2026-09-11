@@ -1867,6 +1867,8 @@ ${lista
       sec.conecta?.length ? `- Engancha con: ${sec.conecta.slice(0, 5).join(' · ')}` : '',
       !sec.revelado && sec.sembrar ? `- 🌱 SIEMBRA ESTO YA: ${sec.sembrar.slice(0, 300)}` : '',
       !sec.revelado && sec.quienLoTrae ? `- 🚪 QUIÉN PUEDE TRAERLO A ESCENA: ${sec.quienLoTrae.slice(0, 300)}` : '',
+      !sec.revelado && sec.abreCon ? `- 🗝️ LO ABRE LO QUE ELLA SABE: ${sec.abreCon.slice(0, 300)}. Pon la pieza delante y deja que la RECONOZCA ella: nada de pedir una tirada de investigación ni de que un PNJ se lo explique. Que su oficio sea la llave es el momento por el que se juega un personaje con oficio.` : '',
+      sec.siLoImpiden ? `- ♟️ SI SE LO IMPIDEN: ${sec.siLoImpiden.slice(0, 300)}. Quien está detrás NO se queda parado cuando le rompen el plan: improvisa algo peor, y eso suele ser mejor escena que el plan original. Una victoria del protagonista no cierra el hilo, lo escala.` : '',
       !sec.revelado && sec.comoSeDescubre ? `- Por dónde puede salir: ${sec.comoSeDescubre.slice(0, 300)}` : '',
       (() => {
         if (sec.revelado) return '';
@@ -5079,6 +5081,8 @@ export interface TramaTrazada {
     comoSeDescubre?: string;
     sembrar?: string;
     quienLoTrae?: string;
+    abreCon?: string;
+    siLoImpiden?: string;
     condicion?: SecretoDeCampana['condicion'];
   }[];
 }
@@ -5287,6 +5291,15 @@ Un giro puede necesitar que algo se cumpla antes de poder destaparse. Si es el c
 - **Omite "condicion" entera en los giros que puedan pasar en cualquier momento**, que serán la mayoría. Una campaña donde todo está cerrado detrás de un requisito no avanza.
 - ⚠️ Y ten claro esto: una condición NO impide sembrar. La siembra empieza el primer día igual; lo único que espera es la revelación.
 
+⭐ LAS DOS COSAS QUE SEPARAN UNA CAMPAÑA MEMORABLE DE UNA CORRECTA:
+
+**1. LA HISTORIA SE CONSTRUYE CON SU TRASFONDO, NO AL LADO.** Su ficha no es el punto de partida del personaje: es MATERIAL DE TRAMA. Lo que hizo antes de empezar, a quién perdió, de quién huye, qué juró, qué evitó una vez —todo eso son capas esperando a que alguien tire del hilo—. Revisa su trasfondo y haz que **al menos una capa profunda salga directamente de ahí**: que lo que ella creía su pasado resulte ser el centro de lo que está pasando ahora. Un giro que toca su historia vale por diez que pasan a su lado.
+- \`abreCon\`: y de cada capa di **QUÉ COMPETENCIA SUYA permite reconocer la pieza**. Esto es lo más valioso de todo y casi nadie lo hace. Una revelación no se destapa tirando Investigación: se destapa porque alguien reconoce algo que **solo él sabe reconocer**. En una partida real, una jugadora que sabía de plantas vio una flor en la mano de una dama de la corte, supo que era abortiva, y con eso se cayó el último velo de una campaña entera —nadie le pidió una tirada; le bastó saber lo que sabía—. Mira su clase, su oficio y su trasfondo, y diseña la pista para que **su saber sea la llave**: si es druida, una planta, un animal que no debería estar ahí, un cielo que no cuadra con la estación.
+
+**2. QUIEN ESTÁ DETRÁS TIENE UN PLAN, Y REACCIONA CUANDO SE LO ROMPEN.** Una trama no es una verdad quieta esperando a que la descubran. Es alguien con un objetivo, y si el protagonista se lo frustra, esa persona **no se queda parada: improvisa algo peor**.
+- \`siLoImpiden\`: de cada capa di qué hace su responsable si le salen mal las cosas. En esa misma partida: alguien secuestró a un líder rival para chantajear a su clan y que matasen a su propio hijo, porque prefería eso a la vergüenza; los jugadores lo impidieron, **así que intentó matar al testigo**; también lo impidieron, **así que acabó quitándose la vida en público**. Cada victoria de los jugadores producía la siguiente escena, y la escalada era mejor que el plan original.
+- Sin esto, impedir un giro lo MATA y la campaña pierde un hilo. Con esto, impedirlo **lo convierte en el siguiente**.
+
 SOBRE EL RELLENO (no lo hay):
 Lo secundario —trabajos de un tablón, recados, favores que alguien cobra— es **el vehículo principal de la siembra**, no un descanso entre escenas importantes. Cuando digas qué se puede sembrar de cada capa, piensa también en QUÉ ENCARGO podría poner esa pieza en sus manos sin que parezca que va de eso. Un mundo donde todo lo pequeño acaba encajando es lo que hace que al converger la jugadora sienta que estaba todo escrito; uno donde los recados son recados y la trama va aparte, no.
 
@@ -5321,6 +5334,8 @@ Devuelve ÚNICAMENTE un JSON:
       "comoSeDescubre": "Acciones concretas que un jugador haría",
       "sembrar": "El detalle físico que se puede poner en escena hoy",
       "quienLoTrae": "Nombre del personaje que puede meterlo en escena, su motivo propio y qué lo dispara",
+      "abreCon": "Qué competencia CONCRETA del protagonista permite reconocer la pieza que destapa esta capa",
+      "siLoImpiden": "Qué hace quien está detrás si le frustran esto",
       "condicion": { "nivelMinimo": 2, "trasSecreto": "Título exacto de otro secreto", "misionCompletada": "Título exacto de una trama", "conPnj": "Nombre de un PNJ", "afinidadMinima": { "pnj": "Nombre", "eje": "vin", "valor": 12 }, "diaAbsMinimo": 0, "nota": "Lo que no se puede medir con un número" }
     }
   ]
@@ -5357,6 +5372,8 @@ ${revisando ? 'Devuelve la trama COMPLETA, no solo lo que cambies: lo que siga e
       comoSeDescubre: x?.comoSeDescubre ? String(x.comoSeDescubre).trim() : undefined,
       sembrar: x?.sembrar ? String(x.sembrar).trim() : undefined,
       quienLoTrae: x?.quienLoTrae ? String(x.quienLoTrae).trim() : undefined,
+      abreCon: x?.abreCon ? String(x.abreCon).trim() : undefined,
+      siLoImpiden: x?.siLoImpiden ? String(x.siLoImpiden).trim() : undefined,
       condicion: (() => {
         const c = x?.condicion;
         if (!c || typeof c !== 'object') return undefined;
@@ -5428,6 +5445,8 @@ export function fusionarTrama(
       conecta: nuevo.conecta?.length ? nuevo.conecta : p.conecta,
       sembrar: nuevo.sembrar || p.sembrar,
       quienLoTrae: nuevo.quienLoTrae || p.quienLoTrae,
+      abreCon: nuevo.abreCon || p.abreCon,
+      siLoImpiden: nuevo.siLoImpiden || p.siLoImpiden,
       // Una condición puesta a mano por la jugadora manda sobre la del repaso.
       condicion: p.condicion || nuevo.condicion
     };
@@ -5444,6 +5463,8 @@ export function fusionarTrama(
       conecta: t.conecta,
       sembrar: t.sembrar,
       quienLoTrae: t.quienLoTrae,
+      abreCon: t.abreCon,
+      siLoImpiden: t.siLoImpiden,
       condicion: t.condicion,
       origen: 'trama'
     });

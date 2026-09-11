@@ -359,6 +359,26 @@ export interface SecretoDeCampana {
    */
   sembrar?: string;
   /**
+   * Qué SABE ELLA que abre esta capa.
+   *
+   * Una revelación no se destapa tirando Investigación: se destapa porque
+   * alguien reconoce algo que solo él sabe reconocer. En una partida que
+   * funcionó, una jugadora que sabía de plantas vio una flor en la mano de una
+   * dama de la corte, supo que era abortiva, y con eso se cayó el último velo
+   * de una campaña entera. Ese es el momento por el que se juega un personaje
+   * con oficio: aquí se declara cuál es el suyo para cada capa.
+   */
+  abreCon?: string;
+  /**
+   * Qué hace quien está detrás si le frustran ESTO.
+   *
+   * Una trama no es una verdad quieta esperando a que la descubran: es alguien
+   * con un plan. Si el plan se va al traste, esa persona no se queda parada,
+   * improvisa algo peor —y eso suele ser mejor escena que el plan original—.
+   * Sin esto, impedir un giro lo mata; con esto, lo convierte en el siguiente.
+   */
+  siLoImpiden?: string;
+  /**
    * Cuándo se puede DISPARAR, con condiciones que la aplicación sabe comprobar.
    *
    * «Puede salir al alcanzar un hito de nivel» estaba escrito en prosa, así que

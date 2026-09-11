@@ -1504,6 +1504,16 @@ export const MemoryManager: React.FC<{
                                   Engancha con: {sec.conecta.join(' · ')}
                                 </p>
                               ) : null}
+                              {sec.abreCon && (
+                                <p className="text-[11px] text-emerald-800 dark:text-emerald-300 m-0 mt-1">
+                                  🗝️ Lo abre lo que ella sabe: {sec.abreCon}
+                                </p>
+                              )}
+                              {sec.siLoImpiden && (
+                                <p className="text-[11px] text-rose-800 dark:text-rose-300 m-0 mt-1">
+                                  ♟️ Si se lo impiden: {sec.siLoImpiden}
+                                </p>
+                              )}
                               {sec.comoSeDescubre && (
                                 <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-1">
                                   Puede salir por: {sec.comoSeDescubre}
