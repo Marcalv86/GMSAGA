@@ -764,10 +764,22 @@ export const FilesView: React.FC<{
                           usan nunca: ni te acuerdas de que están ni la búsqueda
                           las encuentra. Aquí salen aparte y sin topónimos.
                         */}
+                        {/*
+                          La lista de categorías con botón era una lista de
+                          permitidas, y eso lo ataba al acierto del
+                          clasificador: un módulo mal etiquetado se quedaba sin
+                          botón y no había forma de sacarle las reglas. Ahora se
+                          nombra solo lo que NO tiene sentido —un retrato, un
+                          audio, un archivo de mecánicas ya extraído, un oráculo
+                          que tiene su propio destilado— y todo lo demás lo
+                          ofrece, que es más barato que adivinar.
+                        */}
                         {!f.isImage &&
                           !f.isAudio &&
                           onExtractMechanics &&
-                          ['document', 'compendio', 'lore', 'cantera', 'index', 'other'].includes(currentCat) && (
+                          !['mecanica', 'oracle', 'map', 'portrait_pj', 'portrait_npc', 'portrait_companion', 'scene', 'audio'].includes(
+                            currentCat
+                          ) && (
                             <button
                               onClick={() => onExtractMechanics(f)}
                               disabled={extractingFileIds.includes(f.id)}

@@ -2134,7 +2134,7 @@ ${pc.backstory ? `- TRASFONDO E HISTORIA: ${pc.backstory}` : ''}
 ${pc.notes ? `- HABILIDADES / NOTAS: ${pc.notes}` : ''}
 ${
   pc.inventory && pc.inventory.length > 0
-    ? `- MODIFICACIONES DINÁMICAS DE INVENTARIO (adquiridas, gastadas o modificadas durante la partida):\n${pc.inventory.map(i => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? ' [Equipado]' : ''}${i.attuned ? ' [Sintonizado]' : ''}${i.damageOrAc ? ` [${i.damageOrAc}]` : ''}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ''}${i.description ? `: ${i.description}` : ''}`).join('\n')}\n\n- 🎒 OBJETOS Y EQUIPO CANÓNICO (DENTRO DE SU FICHA):\nTodos los objetos de partida, armas, armadura, vestimenta, diario personal, runas de adivinación, reliquias, herramientas y pertenencias del protagonista ESTÁN DETALLADOS DENTRO DE SU FICHA (revisa el texto íntegro adjunto abajo). El protagonista los lleva encima y los conserva plenamente en la ficción, además de los cambios dinámicos listados arriba.`
+    ? `- MODIFICACIONES DINÁMICAS DE INVENTARIO (adquiridas, gastadas o modificadas durante la partida):\n${pc.inventory.map(i => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? ' [Equipado]' : ''}${i.attuned ? ' [Sintonizado]' : ''}${i.damageOrAc ? ` [${i.damageOrAc}]` : ''}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ''}${i.description ? `: ${i.description}` : ''}`).join('\n')}\n\n- 🎒 OBJETOS Y EQUIPO DE PARTIDA (DENTRO DE SU FICHA):\nSus armas, armadura, vestimenta, diario personal, runas de adivinación, reliquias y herramientas están detallados dentro de su ficha (revisa el texto íntegro adjunto abajo), y los lleva encima. ⚠️ Pero esa ficha es **el equipo con el que EMPEZÓ**: lo de arriba es lo que ha cambiado jugando, y **manda lo de arriba**. Si algo consta como gastado, entregado o perdido, ya no lo tiene por mucho que siga escrito en la ficha.`
     : `- 🎒 OBJETOS, EQUIPO Y PERTENENCIAS DEL PROTAGONISTA (ESTÁN DENTRO DE SU FICHA):\nTodos los objetos del protagonista (equipo, armas, ropa, zurrón, diario íntimo, runas de adivinación, reliquias, herramientas y posesiones de trasfondo) ESTÁN ESCRITOS DENTRO DEL TEXTO DE SU FICHA adjunta abajo. Existen plenamente en la ficción y los lleva consigo; consúltalos directamente en su ficha e intégralos con total naturalidad.`
 }
 ${pc.currencies ? `- MONEDAS ACTUALES: ${pc.currencies.gp || 0} PO (oro), ${pc.currencies.sp || 0} PP (plata), ${pc.currencies.cp || 0} PC (cobre), ${pc.currencies.ep || 0} PE (electro), ${pc.currencies.pp || 0} PT (platino)` : ''}
@@ -2147,6 +2147,7 @@ ${
   pjSheetFiles.length > 0
     ? `DOCUMENTOS, DIARIO, RUNAS Y TRASFONDO PERSONAL DEL PROTAGONISTA (TEXTO ÍNTEGRO):\n` +
       `📌 Estos documentos son PARTE VIVA del protagonista: sus escritos, sus runas de adivinación, su diario íntimo, sus reliquias y su equipo. Están presentes y activos en la campaña, no son lore abstracto.\n` +
+      `⚠️ **PERO OJO: ESTA FICHA ES DONDE EMPEZÓ, NO DONDE ESTÁ.** Se subió una vez, al principio, y desde entonces la campaña ha seguido: ha gastado dinero, ha usado cosas, ha ganado otras, ha subido de nivel, ha cambiado de estado y ha aprendido lo que ha aprendido jugando. **Cuando la ficha y lo que te manda la aplicación en este turno digan cosas distintas, manda SIEMPRE lo de la aplicación** —el inventario, las monedas, el estado, el nivel, la memoria, el diario—, porque eso es de hoy y la ficha es del primer día. Lee la ficha para saber QUIÉN ES: su trasfondo, su voz, su gente, sus manías, de dónde viene y qué sabe hacer. Eso no caduca. Lo que sí caduca es el recuento de lo que lleva encima.\n` +
       pjSheetFiles
         .map(
           f =>
@@ -5968,6 +5969,24 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
   const lowerAnalysis = (file.analysis || '').toLowerCase();
   const lowerDocContent = (file.content || '').substring(0, 4000).toLowerCase();
 
+  /*
+   * Una ficha de personaje no ocupa un libro.
+   *
+   * Las dos ramas de «esto es una ficha» se deciden por palabras del texto
+   * —«puntos de golpe», «alineamiento», fuerza+destreza+constitución— y eso lo
+   * cumple CUALQUIER manual o módulo de D&D, que va lleno de bloques de
+   * estadísticas. Un módulo de trescientas páginas acababa clasificado como
+   * ficha del protagonista: se le mandaba entero al Narrador en todos los
+   * turnos (las fichas van siempre presentes), se usaba para rellenar la
+   * identidad de ella, y encima el botón de sacar mecánicas no salía, porque
+   * solo aparece en el material de fondo.
+   *
+   * El tamaño zanja la duda sin depender de ninguna palabra: nadie escribe una
+   * ficha de sesenta mil caracteres, y ningún módulo baja de ahí.
+   */
+  const DEMASIADO_LARGO_PARA_SER_FICHA = 60000;
+  const esLibro = (file.content || '').length > DEMASIADO_LARGO_PARA_SER_FICHA;
+
   const palabraEnTexto = (claves: string[], texto: string) =>
     claves.some(k => new RegExp(`(^|[^\\p{L}])${k}([^\\p{L}]|$)`, 'u').test(texto));
 
@@ -6133,7 +6152,7 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
           lowerDocContent.includes('desafío') ||
           lowerDocContent.includes('vd')));
 
-    if (isNpcDoc) return 'sheet_npc';
+    if (isNpcDoc && !esLibro) return 'sheet_npc';
 
     const isGenericSheet =
       palabraEnNombre([
@@ -6157,7 +6176,7 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
         lowerDocContent.includes('destreza') &&
         lowerDocContent.includes('constitución'));
 
-    if (isGenericSheet) {
+    if (isGenericSheet && !esLibro) {
       if (matchesPcName || palabraEnNombre(pjKeywords)) return 'sheet_pj';
       return 'sheet_pj';
     }
@@ -6201,6 +6220,35 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
     ) {
       return 'mecanica';
     }
+    /*
+     * Un módulo es material de fondo, y hay que decirlo antes de que lo pille
+     * otra cosa. Sin esto no había NINGUNA rama que reconociera una aventura
+     * publicada: caía al cajón de «documento» si tenía suerte, y a «ficha» si
+     * no. Se detecta por el nombre y, para los que llegan con el título del
+     * editor sin más, por ser un libro entero con reparto y escenas dentro.
+     */
+    const nombreDeModulo = palabraEnNombre([
+      'modulo',
+      'módulo',
+      'aventura',
+      'aventuras',
+      'campana',
+      'campaña',
+      'adventure',
+      'module',
+      'sourcebook',
+      'manual',
+      'guia',
+      'guía',
+      'handbook'
+    ]);
+    const seLeeComoModulo =
+      esLibro &&
+      ['aventura', 'encuentro', 'capítulo', 'capitulo', 'pnj', 'tesoro', 'mapa', 'dungeon', 'chapter', 'encounter'].filter(
+        k => lowerDocContent.includes(k)
+      ).length >= 2;
+    if (nombreDeModulo || seLeeComoModulo) return 'lore';
+
     if (palabraEnNombre(['cantera', 'canteras'])) return 'cantera';
     if (palabraEnNombre(['compendio', 'compendios'])) return 'compendio';
     if (palabraEnNombre(['lore', 'ambientacion', 'ambientación', 'trasfondo del mundo', 'worldbuilding'])) {
