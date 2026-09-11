@@ -192,7 +192,17 @@ export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODE
   const trimmed = modelId.trim();
   const validIds = [
     ...AVAILABLE_MODELS.map(m => m.id),
-    ...AUXILIARY_BACKGROUND_MODELS.map(m => m.id)
+    ...AUXILIARY_BACKGROUND_MODELS.map(m => m.id),
+    /*
+     * Y lo que la clave admita de verdad, según el catálogo vivo.
+     *
+     * Sin esto, las listas escritas a mano eran la única verdad: un modelo que
+     * Google ofrece y que la propia aplicación sabe que existe —los abiertos
+     * tipo Gemma tienen aquí hasta su fila de cuotas— se rechazaba al elegirlo
+     * y se sustituía en silencio por otro. Elegir un modelo y que te conteste
+     * uno distinto es el peor de los fallos: parece que el ajuste no sirve.
+     */
+    ...(leerCatalogoModelos()?.modelos.map(m => m.id) || [])
   ];
   if (!validIds.includes(trimmed)) {
     return fallback;
@@ -399,6 +409,68 @@ export function setStoredAutoFailover(enabled: boolean): void {
  * Si el modelo principal está ocupado (503/429), la app salta automáticamente al siguiente
  * de forma transparente para que la partida nunca se detenga.
  */
+/**
+ * Una cadena de respaldo que NO se come la cuota de jugar.
+ *
+ * `getModelFailoverChain` escala siempre hacia los modelos de narrar, y para un
+ * turno de partida está bien. Para el Chat con el GM era un agujero: esa
+ * pestaña arranca en el modelo de fondo, y en cuanto se saturaba —o se elegía
+ * uno abierto y se pasaba de su techo de fichas por minuto— el respaldo saltaba
+ * solo a Gemini 3, que en la capa gratuita va racionado a VEINTE peticiones al
+ * día. Preguntar una duda de reglas podía costarle a la jugadora un turno de
+ * juego sin que nada se lo dijera.
+ *
+ * La regla es simple y se sostiene sola: nunca caer en un modelo con MENOS
+ * peticiones diarias que el elegido. Si no hay ninguno igual de holgado, se
+ * responde con el que se pidió o no se responde.
+ */
+/**
+ * Lo que se le puede ofrecer al Director, con su cuota delante.
+ *
+ * Junta los modelos de siempre con lo que el catálogo diga que admite la clave
+ * —ahí es donde aparecen los abiertos tipo Gemma, con su identificador REAL en
+ * vez de uno adivinado— y adjunta el dato que de verdad decide la elección en
+ * la capa gratuita: cuántas peticiones al día da cada uno. Los de narrar van
+ * racionados a veinte, y gastarlos preguntando dudas es quedarse sin jugar.
+ */
+export function modelosParaElDirector(): { id: string; nombre: string; rpd: number; abierto: boolean }[] {
+  const vistos = new Set<string>();
+  const salida: { id: string; nombre: string; rpd: number; abierto: boolean }[] = [];
+
+  const anadir = (id: string, nombre: string) => {
+    const limpio = (id || '').trim();
+    if (!limpio || vistos.has(limpio) || isModelDeprecated(limpio)) return;
+    vistos.add(limpio);
+    salida.push({
+      id: limpio,
+      nombre: nombre || limpio,
+      rpd: limitesGratuitos(limpio).rpd,
+      abierto: esModeloAbierto(limpio)
+    });
+  };
+
+  AVAILABLE_MODELS.forEach(m => anadir(m.id, m.name));
+  AUXILIARY_BACKGROUND_MODELS.forEach(m => anadir(m.id, m.name));
+  (leerCatalogoModelos()?.modelos || []).forEach(m => anadir(m.id, m.nombre));
+
+  // Primero los que más dan de sí al día, que es el criterio de esta pestaña.
+  return salida.sort((a, b) => b.rpd - a.rpd);
+}
+
+export function cadenaSinGastarCuotaDeJuego(initialModel: string): string[] {
+  const base = sanitizeModelId(initialModel, DEFAULT_BACKGROUND_MODEL_ID);
+  const suRpd = limitesGratuitos(base).rpd;
+  if (!getStoredAutoFailover()) return [base];
+
+  const candidatos = [...AVAILABLE_MODELS.map(m => m.id)].filter(
+    id => id !== base && !isModelDeprecated(id) && limitesGratuitos(id).rpd >= suRpd
+  );
+  // Los más holgados primero: el respaldo debe alejarse del racionamiento, no
+  // acercarse a él.
+  candidatos.sort((a, b) => limitesGratuitos(b).rpd - limitesGratuitos(a).rpd);
+  return [base, ...candidatos];
+}
+
 export function getModelFailoverChain(initialModel: string): string[] {
   const safeInitial = sanitizeModelId(initialModel, DEFAULT_MODEL_ID);
   const standardFallbacks = [
@@ -4905,9 +4977,27 @@ export function construirPromptOOC({
         .join('\n')
     : '(sin ficha registrada)';
 
+  /*
+   * La conversación de mesa, recortada por mensaje.
+   *
+   * Era la única parte del prompt sin tope: todo lo demás va acotado —la
+   * memoria a cuatro mil caracteres, la escena a cuatro líneas— y esto metía
+   * dieciséis mensajes enteros. Las respuestas del Director son largas, así que
+   * una charla de un rato podía triplicar el coste de la siguiente pregunta sin
+   * aportar nada: lo que importa de un mensaje viejo es de qué iba, no su
+   * redacción completa. Y con un modelo pequeño —que es el que conviene aquí
+   * para no gastar la cuota de jugar— la diferencia entre razonar bien y
+   * perderse es justamente cuánta paja lleva delante.
+   */
   const conversacion = historial
     .slice(-16)
-    .map(m => `${m.role === 'user' ? 'Jugadora' : 'Director'}: ${m.content}`)
+    .map((m, i, todos) => {
+      // Los dos últimos van enteros: son el hilo inmediato de lo que se está
+      // hablando y recortarlos sí se nota.
+      const tope = i >= todos.length - 2 ? 4000 : 900;
+      const texto = m.content.length > tope ? `${m.content.slice(0, tope)}…` : m.content;
+      return `${m.role === 'user' ? 'Jugadora' : 'Director'}: ${texto}`;
+    })
     .join('\n');
 
   const prompt = `Estás hablando con la jugadora FUERA DE PERSONAJE, en la mesa, como el Director de esta partida quitándose el sombrero de Narrador un momento.
@@ -5063,6 +5153,7 @@ export async function preguntarAlDirectorOOC(
     respuesta = await generateContentWithFailover({
       proposito: 'Chat con el GM',
       primaryModel: modelo,
+      preferredChain: cadenaSinGastarCuotaDeJuego(modelo),
       contents: armarContenido(true) as any,
       signal: consulta.signal,
       config
@@ -5080,6 +5171,7 @@ export async function preguntarAlDirectorOOC(
     respuesta = await generateContentWithFailover({
       proposito: 'Chat con el GM (reintento)',
       primaryModel: modelo,
+      preferredChain: cadenaSinGastarCuotaDeJuego(modelo),
       contents: armarContenido(false) as any,
       signal: consulta.signal,
       config

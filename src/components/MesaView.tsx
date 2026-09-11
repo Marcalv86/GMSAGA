@@ -23,7 +23,7 @@ import {
   Users
 } from 'lucide-react';
 import { Chat, Project } from '../types';
-import { AVAILABLE_MODELS, describeApiError, ImagenDeMesa, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
+import { describeApiError, ImagenDeMesa, modelosParaElDirector, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
 import { SecretoLeido } from '../utils/campaignCalendar';
 import {
   conMiles,
@@ -355,12 +355,13 @@ export const MesaView: React.FC<{
             guardarModeloDeMesa(e.target.value);
           }}
           className="shrink-0 rounded-lg border border-[var(--user-border)] bg-[var(--surface)] px-2 py-1.5 text-[11px] font-cinzel text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] cursor-pointer max-w-[150px] sm:max-w-none"
-          title="Con qué modelo contesta el Director en esta pestaña. Aquí no se narra: lo que importa es que razone bien con toda la campaña delante."
+          title="Con qué modelo contesta el Director en esta pestaña. El número es cuántas peticiones al día da en la capa gratuita: los de narrar van racionados a 20, y gastarlos preguntando dudas es quedarte sin jugar. Aquí no se narra, así que lo que importa es que razone, no que escriba bonito."
         >
           <option value="">Modelo de fondo (por defecto)</option>
-          {AVAILABLE_MODELS.map(m => (
+          {modelosParaElDirector().map(m => (
             <option key={m.id} value={m.id}>
-              {m.name}
+              {m.nombre} · {m.rpd >= 1000 ? `${Math.round(m.rpd / 1000)}k` : m.rpd}/día
+              {m.abierto ? ' (abierto)' : ''}
             </option>
           ))}
         </select>
