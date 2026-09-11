@@ -2449,7 +2449,10 @@ export default function App() {
 
   const handleUpdateFileCategory = async (fileId: string, category: FileCategory) => {
     if (!currentPId) return;
-    const updated = currentFiles.map(f => (f.id === fileId ? { ...f, category } : f));
+    const isAlwaysPresent = category === 'sheet_pj' || category === 'sheet_companion';
+    const updated = currentFiles.map(f =>
+      f.id === fileId ? { ...f, category, onDemand: isAlwaysPresent ? false : f.onDemand } : f
+    );
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
     // Marcar un documento como ficha del OC es decir quién es: se lee solo.
@@ -2458,6 +2461,10 @@ export default function App() {
 
   const handleToggleOnDemand = async (fileId: string, onDemand: boolean) => {
     if (!currentPId) return;
+    const target = currentFiles.find(f => f.id === fileId);
+    if (target && (target.category === 'sheet_pj' || target.category === 'sheet_companion')) {
+      return;
+    }
     const updated = currentFiles.map(f => (f.id === fileId ? { ...f, onDemand } : f));
     setCurrentFiles(updated);
     // Invalidar caché de tokens medidos para reflejar el nuevo peso de la biblioteca

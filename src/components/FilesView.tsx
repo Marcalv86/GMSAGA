@@ -138,7 +138,12 @@ export const FilesView: React.FC<{
     !f.isImage &&
     !f.isAudio &&
     f.category !== 'style_sample' &&
-    (!f.onDemand || f.category === 'oracle' || f.category === 'roster' || f.category === 'index');
+    (!f.onDemand ||
+      f.category === 'oracle' ||
+      f.category === 'roster' ||
+      f.category === 'index' ||
+      f.category === 'sheet_pj' ||
+      f.category === 'sheet_companion');
   const textChars = files.reduce((acc, f) => acc + (countsAsContext(f) ? f.length || 0 : 0), 0);
   const budgetShare = (textChars / CONTEXT_BUDGET_CHARS) * 100;
   const budgetLevel = budgetShare < 25 ? 'holgado' : budgetShare < 50 ? 'ajustado' : 'excesivo';
@@ -147,7 +152,18 @@ export const FilesView: React.FC<{
   // ni una petición a Google ni esperar a nadie.
   const [pruebaBusqueda, setPruebaBusqueda] = useState('');
   const archivosBuscables = useMemo(
-    () => files.filter(f => !f.isImage && !f.isAudio && f.onDemand && f.category !== 'oracle'),
+    () =>
+      files.filter(
+        f =>
+          !f.isImage &&
+          !f.isAudio &&
+          f.onDemand &&
+          f.category !== 'oracle' &&
+          f.category !== 'roster' &&
+          f.category !== 'index' &&
+          f.category !== 'sheet_pj' &&
+          f.category !== 'sheet_companion'
+      ),
     [files]
   );
   const resultadosPrueba = useMemo(() => {
@@ -207,8 +223,8 @@ export const FilesView: React.FC<{
 
   const categoryLabels: { key: FileCategory | 'all'; label: string; icon: React.ComponentType<{ className?: string }>; desc: string }[] = [
     { key: 'all', label: 'Todos', icon: Layers, desc: 'Todo el material' },
-    { key: 'sheet_pj', label: 'Fichas PJ (OC)', icon: User, desc: 'Ficha y datos del protagonista' },
-    { key: 'sheet_companion', label: 'Fichas Familiares', icon: Users, desc: 'Familiares, monturas y compañeros' },
+    { key: 'sheet_pj', label: 'Fichas y Diario PJ (OC)', icon: User, desc: 'Ficha, diario íntimo, runas y pertenencias del protagonista' },
+    { key: 'sheet_companion', label: 'Familiares y Compañeros', icon: Users, desc: 'Familiares mágicos, polillas, monturas y compañeros' },
     { key: 'sheet_npc', label: 'Fichas PNJs / Monstruos', icon: ShieldAlert, desc: 'Statblocks de PNJs y criaturas' },
     { key: 'portrait_pj', label: 'Retratos PJ', icon: Sparkles, desc: 'Personajes protagonistas' },
     { key: 'portrait_npc', label: 'Retratos PNJ', icon: Drama, desc: 'PNJs, criaturas y villanos' },
@@ -812,11 +828,21 @@ export const FilesView: React.FC<{
                             <Search className="w-3.5 h-3.5" /> Ver el destilado
                           </button>
                         )}
+                        {(currentCat === 'sheet_pj' || currentCat === 'sheet_companion') && (
+                          <span
+                            className="px-2 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded text-[10px] md:text-[11px] font-cinzel flex items-center gap-1 font-semibold select-none"
+                            title="Las fichas, diario personal y familiares viajan SIEMPRE íntegros al Narrador para preservar los detalles vivos del personaje."
+                          >
+                            <Pin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Siempre presente
+                          </span>
+                        )}
                         {onToggleOnDemand &&
                           currentCat !== 'style_sample' &&
                           currentCat !== 'oracle' &&
                           currentCat !== 'roster' &&
-                          currentCat !== 'index' && (
+                          currentCat !== 'index' &&
+                          currentCat !== 'sheet_pj' &&
+                          currentCat !== 'sheet_companion' && (
                           <button
                             onClick={() => onToggleOnDemand(f.id, !f.onDemand)}
                             className={`px-2 py-1 border rounded text-[10px] md:text-[11px] font-cinzel transition-colors cursor-pointer flex items-center gap-1 ${

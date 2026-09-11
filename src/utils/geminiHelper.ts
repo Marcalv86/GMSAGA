@@ -1305,7 +1305,10 @@ export function estimarCargaDelTurno({
       f.category === 'oracle' ||
       f.category === 'roster' ||
       f.category === 'index' ||
-      f.category === 'sheet_pj');
+      f.category === 'sheet_pj' ||
+      f.category === 'sheet_companion' ||
+      looksLikeProtagonistSheet(f) ||
+      looksLikeCompanionSheet(f));
   const archivos = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
 
   const deConsulta = files.filter(
@@ -1315,7 +1318,10 @@ export function estimarCargaDelTurno({
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
       f.category !== 'index' &&
-      f.category !== 'sheet_pj'
+      f.category !== 'sheet_pj' &&
+      f.category !== 'sheet_companion' &&
+      !looksLikeProtagonistSheet(f) &&
+      !looksLikeCompanionSheet(f)
   );
   const archivosDeConsulta = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
   const medios = files.filter(f => f.isImage || f.isAudio).length;
@@ -1934,25 +1940,20 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
    * Y tampoco vale meterlas con las del protagonista: entonces sus rasgos se
    * mezclan con los de ella, que es otra forma de estropearlo.
    */
-  const companionFiles = files.filter(f => esTexto(f) && f.category === 'sheet_companion');
+  const companionFiles = files.filter(
+    f => esTexto(f) && (f.category === 'sheet_companion' || looksLikeCompanionSheet(f, project.memory))
+  );
   const companionIds = new Set(companionFiles.map(f => f.id));
 
   const pjSheetFiles = files.filter(
     f =>
       esTexto(f) &&
       !companionIds.has(f.id) &&
-      (f.category === 'sheet_pj' ||
-        f.name.toLowerCase().includes('ficha') ||
-        f.name.toLowerCase().includes('personaje') ||
-        f.name.toLowerCase().includes('character') ||
-        f.name.toLowerCase().includes('sheet') ||
-        f.name.toLowerCase().includes('protagonista') ||
-        f.name.toLowerCase().includes('pj') ||
-        f.name.toLowerCase().includes('oc'))
+      (f.category === 'sheet_pj' || looksLikeProtagonistSheet(f, project.memory))
   );
   const pjSheetIds = new Set(pjSheetFiles.map(f => f.id));
 
-  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos, elencos, índices y fichas de PJ)
+  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos, elencos, índices, fichas de PJ y familiares)
   const deConsulta = files.filter(
     f =>
       esTexto(f) &&
@@ -1962,7 +1963,8 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
       f.category !== 'index' &&
-      f.category !== 'sheet_pj'
+      f.category !== 'sheet_pj' &&
+      f.category !== 'sheet_companion'
   );
   const deConsultaIds = new Set(deConsulta.map(f => f.id));
 
@@ -2027,15 +2029,29 @@ ${
        * meterlos aquí, un compañero o un objeto que la jugadora no nombre en su
        * turno desaparece de la campaña sin que nadie lo note.
        */
-      const loSuyo = [
-        ...(project.memory?.player_character?.inventory || [])
-          .map(i => (typeof i === 'string' ? i : i?.name))
-          .filter(Boolean) as string[],
-        ...(project.memory?.companions || []).map(c => c?.name).filter(Boolean) as string[],
-      ]
+      const nombresCompaneros = [
+        ...(project.memory?.companions || []).map(c => c?.name),
+        ...companionFiles.map(f => f.name.replace(/\.[^/.]+$/, ''))
+      ].filter(Boolean) as string[];
+
+      const nombresPosesiones = [
+        ...(project.memory?.player_character?.inventory || []).map(i => (typeof i === 'string' ? i : i?.name)),
+        ...pjSheetFiles.map(f => f.name.replace(/\.[^/.]+$/, '')),
+        'diario',
+        'runas',
+        'adivinacion',
+        'adivinación',
+        'pergamino',
+        'zurron',
+        'zurrón',
+        'pertenencias',
+        'equipo'
+      ].filter(Boolean) as string[];
+
+      const loSuyo = Array.from(new Set([...nombresPosesiones, ...nombresCompaneros]))
         .map(t => String(t).trim())
         .filter(t => t.length > 2)
-        .slice(0, 30);
+        .slice(0, 40);
 
       const consulta = consultaDelTurno({
         textoJugadora: userText,
@@ -2095,6 +2111,7 @@ ${companionFiles
 La ficha del protagonista y la memoria están vivas y vinculadas directamente al roleplay del chat.
 **EL ROLEPLAY DEL CHAT MANDA SOBRE LAS FICHAS SUBIDAS AL INICIO A LOS ARCHIVOS.**
 Las fichas y documentos iniciales representan el punto de partida o trasfondo, pero cualquier cambio acontecido en la partida (PG actuales, curación, daño, fatiga, condiciones, equipo gastado o adquirido, oro, deudas, juramentos y vínculos) es la verdad canónica viva y prevalece sobre cualquier texto estático previo.
+⚠️ ACLARACIÓN VITAL: Esto significa que si en el chat se gasta un objeto, se sufre una herida o se pierde una moneda, ese cambio prevalece. Pero las posesiones canónicas de su trasfondo (su diario personal, sus runas de adivinación, su familiar, su ropa o recuerdos) EXISTEN Y SE CONSERVAN plenamente a menos que hayan sido explícitamente destruidos o confiscados en una escena jugada del chat. No asumas que no existen por omisión.
 
 ${
   pc
@@ -2113,7 +2130,11 @@ ${pc.appearance
 ${pc.personality ? `- PERSONALIDAD Y COMPORTAMIENTO: ${pc.personality}` : ''}
 ${pc.backstory ? `- TRASFONDO E HISTORIA: ${pc.backstory}` : ''}
 ${pc.notes ? `- HABILIDADES / NOTAS: ${pc.notes}` : ''}
-${pc.inventory && pc.inventory.length > 0 ? `- INVENTARIO ACTUAL:\n${pc.inventory.map(i => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? ' [Equipado]' : ''}${i.attuned ? ' [Sintonizado]' : ''}${i.damageOrAc ? ` [${i.damageOrAc}]` : ''}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ''}${i.description ? `: ${i.description}` : ''}`).join('\n')}` : '- INVENTARIO ACTUAL: Mochila vacía.'}
+${
+  pc.inventory && pc.inventory.length > 0
+    ? `- INVENTARIO REGISTRADO:\n${pc.inventory.map(i => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? ' [Equipado]' : ''}${i.attuned ? ' [Sintonizado]' : ''}${i.damageOrAc ? ` [${i.damageOrAc}]` : ''}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ''}${i.description ? `: ${i.description}` : ''}`).join('\n')}`
+    : `- INVENTARIO Y POSESIONES PERSONALES: Sus pertenencias canónicas (diario personal, runas de adivinación, pergaminos, zurrón, atuendo y equipo de trasfondo) están detalladas en sus fichas y documentos adjuntos abajo. Existen plenamente y las lleva consigo.`
+}
 ${pc.currencies ? `- MONEDAS ACTUALES: ${pc.currencies.gp || 0} PO (oro), ${pc.currencies.sp || 0} PP (plata), ${pc.currencies.cp || 0} PC (cobre), ${pc.currencies.ep || 0} PE (electro), ${pc.currencies.pp || 0} PT (platino)` : ''}
 ${pc.sheetText ? `\n--- RESUMEN DE HOJA DE PERSONAJE ---\n${pc.sheetText}` : ''}
 `
@@ -2122,8 +2143,16 @@ ${pc.sheetText ? `\n--- RESUMEN DE HOJA DE PERSONAJE ---\n${pc.sheetText}` : ''}
 
 ${
   pjSheetFiles.length > 0
-    ? `DOCUMENTOS Y FICHAS ESPECÍFICAS DEL PROTAGONISTA (TEXTO ÍNTEGRO):\n` +
-      pjSheetFiles.map(f => `=== FICHA / TRASFONDO: ${f.name} ===\n${f.content || ''}`).join('\n\n')
+    ? `DOCUMENTOS, DIARIO, RUNAS Y TRASFONDO PERSONAL DEL PROTAGONISTA (TEXTO ÍNTEGRO):\n` +
+      `📌 Estos documentos son PARTE VIVA del protagonista: sus escritos, sus runas de adivinación, su diario íntimo, sus reliquias y su equipo. Están presentes y activos en la campaña, no son lore abstracto.\n` +
+      pjSheetFiles
+        .map(
+          f =>
+            `=== DOCUMENTO / FICHA DEL PROTAGONISTA: ${f.name} ===\n${f.content || ''}${
+              f.analysis?.trim() ? `\n[Notas / Análisis adjunto]:\n${f.analysis.trim()}` : ''
+            }`
+        )
+        .join('\n\n')
     : ''
 }
 `.trim();
@@ -2238,11 +2267,11 @@ ${diseaseConfig.customRules ? `\n- **Reglas de Enfermedad, Contagio y Estrés:**
     narrativeLengthSection = `
 ### RITMO NARRATIVO Y EXTENSIÓN ADAPTATIVA INTELIGENTE (MODO AUTOMÁTICO):
 El Narrador debe modular de forma inteligente y autónoma la extensión de cada respuesta según la naturaleza del turno actual:
-1. **Diálogos, Intercambios Rápidos y Conversaciones con PNJs:** Responde de forma **ágil y concisa en 1 o 2 párrafos**. Céntrate en la réplica directa del interlocutor, su tono de voz y microgestos inmediatos. **PROHIBIDO** soltar parrafadas kilométricas o descripciones ambientales redundantes cuando el jugador está manteniendo un intercambio verbal continuo.
-2. **Combates, Tensión y Decisiones Tácticas:** Responde en **1 o 2 párrafos viscerales, directos y cinéticos**, concluyendo en el punto de corte del impacto o pidiendo la tirada correspondiente.
+1. **Diálogos y Conversaciones con PNJs:** Responde con pulso cinematográfico y natural (generalmente **2 a 3 párrafos**). Entrelaza la réplica directa del interlocutor y sus microgestos con la atmósfera circundante inmediata, los objetos tangibles que se sostienen y la presencia sutil de acompañantes o familiares en escena. Evita el relleno redundante que congele la conversación, pero nunca amputes los detalles vivos del personaje ni su entorno sensorial.
+2. **Combates, Tensión y Decisiones Tácticas:** Responde en **1 a 3 párrafos viscerales, directos y cinéticos**, concluyendo en el punto de corte del impacto o pidiendo la tirada correspondiente.
 3. **Llegada a Nuevas Ubicaciones o Exploración de Escenarios:** Desarrolla la escena en **2 a 4 párrafos ricos en atmósfera sensorial** (iluminación, olores, sonido ambiental, arquitectura y sensación de peligro).
 4. **Hitos Mayores, Epifanías o Revelaciones Críticas:** Emplea la extensión literaria necesaria para dar peso dramático al momento sin caer en relleno gratuito.
-- **Regla de Oro de Concisión:** Adapta la longitud de tu respuesta al peso del input del jugador. Si el jugador hace una pregunta corta o dice una frase a un PNJ, no respondas con una novela; responde con la réplica y el latido presente.${customGuideline}`;
+- **Principio de Sutileza y Detalle:** La concisión no significa esterilidad. Los rasgos del protagonista, su atuendo, su diario, sus runas de adivinación o su familiar son anclas esenciales de inmersión; muéstralos interactuando con el entorno cuando el momento lo pida.${customGuideline}`;
   } else {
     narrativeLengthSection = `
 ### CONTROL DE EXTENSIÓN Y RITMO NARRATIVO (PÁRRAFOS MÍNIMO / MÁXIMO):
@@ -2512,7 +2541,7 @@ ${bloqueVivo}`;
     contents.push({ role: 'user', parts: [{ text: finalUserPayload }] });
   }
 
-  documentosDelTurno.enteros = [...pjSheetFiles, ...siemprePresentes].map(f => f.name);
+  documentosDelTurno.enteros = [...pjSheetFiles, ...companionFiles, ...siemprePresentes].map(f => f.name);
 
   return { sys, contents, documentos: documentosDelTurno };
 }
@@ -5990,14 +6019,22 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
     'pseudodragón',
     'homunculo',
     'homúnculo',
-    'cuervo familiar',
-    'lechuza familiar',
-    'gato familiar',
+    'cuervo',
+    'lechuza',
+    'gato',
+    'polilla',
+    'polilla lunar',
+    'moth',
+    'serpiente',
+    'sabueso',
+    'sidekick',
+    'espiritu familiar',
+    'espíritu familiar',
+    'espiritu animal',
+    'espíritu animal',
     'diablillo familiar',
     'quasit',
-    'sprite',
-    'sabueso',
-    'sidekick'
+    'sprite'
   ];
 
   // Palabras clave específicas de PNJ / monstruo / bestiario / enemigo
@@ -6067,12 +6104,53 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
       matchesCompanionMemory ||
       palabraEnNombre(companionKeywords) ||
       (palabraEnTexto(companionKeywords, lowerDocContent) &&
-        (lowerDocContent.includes('puntos de golpe') ||
+        (lowerDocContent.includes('familiar') ||
+          lowerDocContent.includes('polilla') ||
+          lowerDocContent.includes('vínculo') ||
+          lowerDocContent.includes('vinculo') ||
+          lowerDocContent.includes('puntos de golpe') ||
           lowerDocContent.includes('ficha') ||
           lowerDocContent.includes('stats') ||
           lowerDocContent.includes('atributos')));
 
     if (isCompanionDoc) return 'sheet_companion';
+
+    // Pertenencias personales, diario íntimo, runas de adivinación o trasfondo del protagonista
+    const personalPcKeywords = [
+      'diario',
+      'journal',
+      'bitacora',
+      'bitácora',
+      'cuaderno',
+      'runas',
+      'adivinacion',
+      'adivinación',
+      'runico',
+      'rúnico',
+      'pergamino de runas',
+      'posesiones',
+      'pertenencias',
+      'inventario',
+      'equipo personal',
+      'zurron',
+      'zurrón',
+      'mochila'
+    ];
+
+    const isPcPersonalDoc =
+      matchesPcName ||
+      palabraEnNombre(pjKeywords) ||
+      palabraEnNombre(personalPcKeywords) ||
+      (palabraEnTexto(personalPcKeywords, lowerDocContent) &&
+        (lowerDocContent.includes('diario') ||
+          lowerDocContent.includes('runas') ||
+          lowerDocContent.includes('adivinación') ||
+          lowerDocContent.includes('adivinacion') ||
+          lowerDocContent.includes('posesiones') ||
+          lowerDocContent.includes('pertenencias') ||
+          matchesPcName));
+
+    if (isPcPersonalDoc) return 'sheet_pj';
 
     const isNpcDoc =
       matchesNpcMemory ||
@@ -6299,26 +6377,52 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
 }
 
 /**
- * Decides whether a freshly uploaded file looks like the player character's own
- * sheet (OC), excluding companions and NPCs.
+ * Decides whether a file looks like the player character's own sheet (OC),
+ * diary, divination runes, personal gear or background.
  */
-export function looksLikePlayerSheet(file: ProjectFile): boolean {
+export function looksLikeProtagonistSheet(file: ProjectFile, memory?: Memory): boolean {
   if (file.isAudio) return false;
   if (file.category === 'sheet_pj') return true;
   if (file.category === 'sheet_companion' || file.category === 'sheet_npc') return false;
 
-  const name = file.name.toLowerCase();
+  if (looksLikeCompanionSheet(file, memory)) return false;
+
+  const name = (file.name || '').toLowerCase();
   const analysis = (file.analysis || '').toLowerCase();
 
-  // Si tiene pistas explícitas de familiar o pnj, NO es la ficha del jugador
-  const companionCues = ['familiar', 'compañero', 'companero', 'pet', 'mascota', 'montura', 'invocacion', 'invocación'];
-  if (companionCues.some(c => name.includes(c) || analysis.includes(c))) return false;
+  const pcName = (memory?.player_character?.name || '').toLowerCase().trim();
+  if (pcName.length > 2 && (name.includes(pcName) || analysis.includes(pcName))) {
+    return true;
+  }
 
-  const npcCues = ['pnj', 'npc', 'monstruo', 'monster', 'villano', 'bestiario', 'enemigo'];
-  if (npcCues.some(c => name.includes(c) || analysis.includes(c))) return false;
-
-  const hints = ['ficha pj', 'ficha oc', 'personaje jugador', 'protagonista', 'hoja_personaje', 'ficha de personaje', 'character sheet'];
-  if (hints.some(h => name.includes(h) || analysis.includes(h))) return true;
+  // Pistas explícitas de protagonista o posesiones personales
+  const pjCues = [
+    'ficha pj',
+    'ficha oc',
+    'personaje jugador',
+    'protagonista',
+    'hoja_personaje',
+    'ficha de personaje',
+    'character sheet',
+    'diario',
+    'journal',
+    'bitacora',
+    'bitácora',
+    'cuaderno',
+    'runas',
+    'adivinacion',
+    'adivinación',
+    'runico',
+    'rúnico',
+    'pergamino de runas',
+    'posesiones',
+    'pertenencias',
+    'inventario',
+    'equipo personal',
+    'zurron',
+    'zurrón'
+  ];
+  if (pjCues.some(h => name.includes(h) || analysis.includes(h))) return true;
 
   if (file.isImage) {
     return (
@@ -6330,26 +6434,94 @@ export function looksLikePlayerSheet(file: ProjectFile): boolean {
 
   const body = (file.content || '').substring(0, 4000).toLowerCase();
   const hasAttributes = body.includes('fuerza') && body.includes('destreza') && body.includes('constitución');
-  const hasSheetKeywords = body.includes('clase y nivel') || body.includes('puntos de golpe') || body.includes('trasfondo');
+  const hasSheetKeywords =
+    body.includes('clase y nivel') ||
+    body.includes('puntos de golpe') ||
+    body.includes('trasfondo') ||
+    body.includes('diario personal');
 
-  return (hasAttributes || hasSheetKeywords) && !companionCues.some(c => body.includes(c)) && !npcCues.some(c => body.includes(c));
+  const npcCues = ['pnj', 'npc', 'monstruo', 'monster', 'villano', 'bestiario', 'enemigo'];
+
+  return (hasAttributes || hasSheetKeywords) && !npcCues.some(c => body.includes(c));
 }
 
 /**
- * Checks whether a file looks like a companion / familiar sheet.
+ * Alias para compatibilidad con código existente.
  */
-export function looksLikeCompanionSheet(file: ProjectFile): boolean {
+export function looksLikePlayerSheet(file: ProjectFile, memory?: Memory): boolean {
+  return looksLikeProtagonistSheet(file, memory);
+}
+
+/**
+ * Checks whether a file looks like a companion / familiar sheet or narrative document.
+ */
+export function looksLikeCompanionSheet(file: ProjectFile, memory?: Memory): boolean {
   if (file.isAudio) return false;
   if (file.category === 'sheet_companion') return true;
 
-  const name = file.name.toLowerCase();
+  const name = (file.name || '').toLowerCase();
   const analysis = (file.analysis || '').toLowerCase();
-  const companionCues = ['familiar', 'compañero', 'companero', 'pet', 'mascota', 'montura', 'mount', 'pseudodragon', 'pseudodragón', 'homunculo', 'homúnculo', 'cuervo familiar', 'lechuza familiar', 'gato familiar'];
-  
-  if (companionCues.some(c => name.includes(c) || analysis.includes(c))) {
-    const sheetHints = ['ficha', 'sheet', 'stats', 'atributos', 'puntos de golpe', 'ataque', 'ca'];
-    return sheetHints.some(h => name.includes(h) || (file.content || '').toLowerCase().includes(h));
+  const content = (file.content || '').substring(0, 3000).toLowerCase();
+
+  // Comprobar coincidencia con compañeros guardados en memoria
+  if (
+    memory?.companions?.some(c => {
+      const clean = (c.name || '').toLowerCase().trim();
+      return clean.length > 2 && (name.includes(clean) || analysis.includes(clean) || content.includes(clean));
+    })
+  ) {
+    return true;
   }
+
+  const companionCues = [
+    'familiar',
+    'compañero',
+    'companero',
+    'companion',
+    'pet',
+    'mascota',
+    'montura',
+    'mount',
+    'steed',
+    'pseudodragon',
+    'pseudodragón',
+    'homunculo',
+    'homúnculo',
+    'cuervo',
+    'lechuza',
+    'gato',
+    'polilla',
+    'polilla lunar',
+    'moth',
+    'serpiente',
+    'sabueso',
+    'sidekick',
+    'espiritu familiar',
+    'espíritu familiar',
+    'espiritu animal',
+    'espíritu animal',
+    'diablillo familiar',
+    'quasit',
+    'sprite'
+  ];
+
+  if (companionCues.some(c => name.includes(c) || analysis.includes(c))) {
+    return true;
+  }
+
+  if (
+    (content.includes('espíritu familiar') ||
+      content.includes('espiritu familiar') ||
+      content.includes('vínculo empático') ||
+      content.includes('vinculo empatico') ||
+      content.includes('polilla lunar') ||
+      content.includes('familiar:')) &&
+    !name.includes('pnj') &&
+    !name.includes('npc')
+  ) {
+    return true;
+  }
+
   return false;
 }
 

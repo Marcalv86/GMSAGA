@@ -271,8 +271,10 @@ const PALABRAS_DE_CATEGORIA: Partial<Record<NonNullable<ProjectFile['category']>
   mecanica:
     'mecanica regla reglas subsistema procedimiento tirada prueba complicacion persecucion perseguir huir huida escapar carrera tejados sigilo urbano intriga frio helada ventisca temperatura exposicion agotamiento asedio viaje travesia peligro',
   sheet_npc: 'ficha pnj personaje monstruo criatura estadisticas',
-  sheet_pj: 'ficha protagonista personaje jugador',
-  sheet_companion: 'ficha compañero familiar montura animal',
+  sheet_pj:
+    'ficha protagonista personaje jugador diario runas adivinacion posesiones pertenencias equipo trasfondo cuaderno reliquia',
+  sheet_companion:
+    'ficha compañero familiar montura animal polilla lechuza cuervo mascota vinculo empatico espiritu',
   oracle: 'oraculo tabla tablas azar resultado',
   roster: 'elenco reparto personajes lista',
   index: 'indice ganchos aventura',
