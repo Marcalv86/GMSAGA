@@ -2114,6 +2114,41 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
   );
   const pjSheetIds = new Set(pjSheetFiles.map(f => f.id));
 
+  /*
+   * LA FICHA NO SE MANDA DOS VECES.
+   *
+   * `pc.sheetText` se llama «resumen de hoja de personaje», pero cuando se
+   * extrae de un documento largo no resume nada: es el documento entero. Y ese
+   * mismo documento vuelve a viajar unas líneas más abajo como ficha adjunta.
+   * Medido con la ficha real de la campaña: cuarenta y cinco mil caracteres
+   * repetidos, unos doce mil quinientos tokens por turno, gastados en contarle
+   * dos veces lo mismo.
+   *
+   * Y el coste no es solo de cuota. Un dato que aparece dos veces en dos sitios
+   * distintos del prompt no se lee el doble de bien: se lee peor, porque empuja
+   * hacia el centro —donde menos se mira— todo lo demás.
+   *
+   * Se queda la copia adjunta, que es la que va bien presentada y con el aviso
+   * de que la ficha es del primer día. El resumen se omite solo si de verdad es
+   * el mismo texto; si son distintos (un resumen corto de verdad, o una ficha
+   * que ya no está subida), viajan los dos.
+   */
+  const sheetTextDuplicado = (() => {
+    const texto = project.memory?.player_character?.sheetText || '';
+    if (texto.length < 1500 || !pjSheetFiles.length) return false;
+    const aplanar = (t: string) => t.replace(/\s+/g, ' ').toLowerCase();
+    const adjunto = aplanar(pjSheetFiles.map(f => f.content || '').join(' '));
+    const plano = aplanar(texto);
+    let dentro = 0;
+    const CATAS = 8;
+    for (let i = 0; i < CATAS; i++) {
+      const desde = Math.max(0, Math.floor((plano.length - 150) * (i / CATAS)));
+      if (adjunto.includes(plano.slice(desde, desde + 120))) dentro++;
+    }
+    return dentro >= 6;
+  })();
+
+
   // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos, elencos, índices, fichas de PJ y familiares)
   const deConsulta = files.filter(
     f =>
@@ -2297,7 +2332,7 @@ ${
     : `- 🎒 OBJETOS, EQUIPO Y PERTENENCIAS DEL PROTAGONISTA (ESTÁN DENTRO DE SU FICHA):\nTodos los objetos del protagonista (equipo, armas, ropa, zurrón, diario íntimo, runas de adivinación, reliquias, herramientas y posesiones de trasfondo) ESTÁN ESCRITOS DENTRO DEL TEXTO DE SU FICHA adjunta abajo. Existen plenamente en la ficción y los lleva consigo; consúltalos directamente en su ficha e intégralos con total naturalidad.`
 }
 ${pc.currencies ? `- MONEDAS ACTUALES: ${pc.currencies.gp || 0} PO (oro), ${pc.currencies.sp || 0} PP (plata), ${pc.currencies.cp || 0} PC (cobre), ${pc.currencies.ep || 0} PE (electro), ${pc.currencies.pp || 0} PT (platino)` : ''}
-${pc.sheetText ? `\n--- RESUMEN DE HOJA DE PERSONAJE ---\n${pc.sheetText}` : ''}
+${pc.sheetText && !sheetTextDuplicado ? `\n--- RESUMEN DE HOJA DE PERSONAJE ---\n${pc.sheetText}` : ''}
 `
     : 'El protagonista (OC) del jugador está detallado en los documentos y fichas adjuntas.'
 }
