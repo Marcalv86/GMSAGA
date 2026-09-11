@@ -109,6 +109,7 @@ import {
   anclarHistorialPorHud
 } from './utils/geminiHelper';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
+import { guardarMesa } from './utils/mesaStorage';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie } from './utils/rollRequests';
 import { Probabilidad, formatoSignificado, nuevaConsulta } from './utils/oracle';
@@ -3138,6 +3139,14 @@ export default function App() {
             saveLocalProjects(updated);
             saveLocalChats(proj.id, chatsImportados);
             if (archivosImportados.length) await saveFilesToDB(proj.id, archivosImportados);
+            /*
+             * La charla OOC vuelve a su sitio. Vive fuera del proyecto, en su
+             * propia clave, así que restaurarla es un paso aparte: sin esto, la
+             * copia se la llevaba y al importar se quedaba en el archivo.
+             */
+            if (Array.isArray(imported.mesa) && imported.mesa.length > 0) {
+              guardarMesa(proj.id, imported.mesa);
+            }
             setCurrentPId(proj.id);
 
             const mensajes = chatsImportados.reduce((a, c) => a + (c.messages || []).length, 0);
@@ -3145,8 +3154,12 @@ export default function App() {
               isOpen: true,
               title: reemplazando ? 'Campaña reemplazada' : 'Campaña importada',
               message: `${proj.name}\n${chatsImportados.length} capítulos · ${mensajes} mensajes${
-                imported.calendar ? '\nCalendario, agenda e hilos incluidos.' : ''
-              }`
+                archivosImportados.length ? ` · ${archivosImportados.length} documentos` : ''
+              }${
+                Array.isArray(imported.mesa) && imported.mesa.length
+                  ? `\nCharla de mesa (OOC): ${imported.mesa.length} mensajes.`
+                  : ''
+              }${imported.calendar ? '\nCalendario, agenda e hilos incluidos.' : ''}`
             });
             resolve();
           };

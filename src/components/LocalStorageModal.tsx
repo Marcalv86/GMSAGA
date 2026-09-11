@@ -31,6 +31,7 @@ import {
   getCampaignFileName,
   DiskCampaignFile
 } from '../utils/diskBackup';
+import { leerMesa } from '../utils/mesaStorage';
 import {
   requestPersistentStorage,
   getStorageEstimate
@@ -132,8 +133,9 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
          */
         const capitulos = currentChats.length;
         const mensajes = currentChats.reduce((a, c) => a + (c.messages?.length || 0), 0);
+        const mesa = leerMesa(currentProject.id).length;
         setFolderSuccessMsg(
-          `¡Campaña guardada como «${saveRes.fileName || customTargetFileName || getCampaignFileName(currentProject.name)}»! ${capitulos} ${capitulos === 1 ? 'capítulo' : 'capítulos'} · ${mensajes} ${mensajes === 1 ? 'mensaje' : 'mensajes'} · ${currentFiles.length} ${currentFiles.length === 1 ? 'documento' : 'documentos'}.`
+          `¡Campaña guardada como «${saveRes.fileName || customTargetFileName || getCampaignFileName(currentProject.name)}»! ${capitulos} ${capitulos === 1 ? 'capítulo' : 'capítulos'} · ${mensajes} ${mensajes === 1 ? 'mensaje' : 'mensajes'} · ${currentFiles.length} ${currentFiles.length === 1 ? 'documento' : 'documentos'}${mesa ? ` · ${mesa} de charla OOC` : ''}.`
         );
         setTimeout(() => setFolderSuccessMsg(null), 5000);
         void fetchDiskFiles();

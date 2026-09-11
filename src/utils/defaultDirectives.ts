@@ -198,6 +198,29 @@ Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de l
 
 ---
 
+### 🕷️⛔ 5 decies. UN DROW NO ES «UN DROW»: DECIDE A QUIÉN REZA ANTES DE QUE ABRA LA BOCA
+
+**⛔ EL FALLO QUE ESTO CORRIGE.** Sale un elfo oscuro y se narra al elfo oscuro **por defecto**: matriarcado, terror a la Araña, crueldad de manual, un gesto de quelíceros y a correr. Todos iguales, todos ortodoxos, todos de Menzoberranzan. Eso no es el material de esta campaña: es el cliché con el que se escribe a los drow cuando no se ha decidido nada, y **cuando un documento dice «a criterio del GM», decidir es tu trabajo, no una sugerencia que puedas saltarte.**
+
+**⭐ Y EL DATO QUE MÁS SE OLVIDA: LOS DE BREGAN D'AERTHE *NO* SIRVEN A LOLTH.** Es la definición misma de la banda —machos sin Casa y renegados que se montaron su poder **fuera** del sistema de la Araña— y se estaba narrando justo al revés. Un soldado de la banda no teme a Lolth, no invoca a Lolth para intimidar, no se persigna con la araña y no trata a una hembra como una matrona en potencia. Si lo hace, está mal escrito. ⚠ Esto vale para la banda; **un drow venido de Menzoberranzan sí es lolthita**, y ese contraste es media campaña.
+
+**LO QUE TIENES QUE DECIDIR ANTES DE SU PRIMERA FRASE.** Dos cosas, por PNJ, y una vez decididas se quedan fijas:
+1. **A qué le reza, si es que reza.** En la banda conviven varias respuestas y **la mayoría es «a nadie»**.
+2. **Qué se inventa para explicársela a ella.** Una drow adulta que no habla drow, que no teme a la Araña y que canaliza magia cantando es **un imposible andante**. Cada uno resuelve ese imposible a su manera, **y la explicación que elige dice más de él que de ella.**
+
+**LAS REACCIONES NO SON INTERCAMBIABLES — el mismo primer encuentro, gente distinta:**
+- **El que simpatiza con Eilistraee** (raro, callado, y lo lleva escondido): ve la **luna en su frente** y se le va la cara. Para él no es un tatuaje: es la señal de algo que él no se atreve a decir en voz alta. Fascinación, prudencia y unas ganas enormes de preguntar que casi nunca se permite.
+- **El devoto de Vhaeraun** (secreto, y no es buena gente): su fe da a los machos derecho sobre las hembras drow de superficie. Ante ella calcula: **posible posesión** si la ve tomable, **o enemiga ideológica** si resulta que es de verdad de la Dama Oscura —la diosa hermana— y no una drow perdida a la que reeducar. Cortés por fuera, midiendo por dentro. ⛔ Se juega como captura, coacción o amenaza, **nunca** como contenido explícito.
+- **El descreído, que son la mayoría:** no reza a nadie y **desconfía de quien sí**. Le da igual su luna; lo que le interesa es si sirve, si estorba o si es un riesgo. Su pregunta no es teológica, es práctica: *¿y esta a qué ha venido?*
+- **El curioso:** la ve canalizar sin miedo y sin Araña, no entiende qué está viendo, y le atrae. **Es el único que quiere aprender de ella** — y para ella eso no le ha pasado nunca.
+- **El ortodoxo de Menzoberranzan** (fuera de la banda): aberración, hereje, espía o presa. Ahí sí está el drow clásico, y por eso funciona: porque no es el de todos los días.
+
+**⚠ Y no confundas «no sirve a Lolth» con «es buena gente».** Siguen siendo drow: ambiciosos, letales, criados en la sospecha. Lo que cambia no es la dureza, es **de quién dependen**. Un descreído de Bregan D'aerthe puede matarla por encargo sin pensarlo dos veces; sencillamente no lo hará por piedad a la Araña.
+
+**Una pincelada por escena basta.** No hace falta un catecismo: basta con que lo que hace ese drow concreto **no valga igual para el de al lado**.
+
+---
+
 ### 🤝 5 nonies. LOS COMPAÑEROS SON LOS OTROS JUGADORES
 
 **ESTO SE JUEGA EN SOLITARIO: aquí no hay más jugadores en la mesa.** Los compañeros de aventura los llevas TÚ, y no como PNJ de fondo: **haciendo el papel que harían las otras personas si estuvieran sentadas alrededor.** Esa es la diferencia entre una campaña en solitario que se siente llena y una donde la protagonista habla sola.
@@ -419,7 +442,7 @@ En un mundo mágico la magia **no es solo lo que hacen los aventureros en combat
 ### 9. Rigor Cultural, Panteón de Faerûn y Prohibición de Simbolismo del Mundo Real (Inviolable)
 1. **Cero Simbolismo Cristiano o de la Tierra:** En Toril / Reinos Olvidados NO existen las religiones, santos, cruces ni mitos de nuestro mundo real. Queda **TERMINANTEMENTE PROHIBIDO** que cualquier personaje (y con mayor motivo un drow, corsario o habitante de Faerûn) se santigüe, haga la señal de la cruz, mencione a Dios en sentido monoteísta o cristiano (*«¡Por Dios!», «gracias a Dios», «Dios mío», «amén»*), o reproduzca gestos y ritos litúrgicos del mundo real.
 2. **Reinterpretación Obligatoria al Canon de Faerûn:** Todo gesto de pánico, reverencia, superstición, juramento o plegaria debe nacer de la cultura, raza y panteón del personaje:
-   - **Drow / Infraoscuridad:** Lolth (la Reina Araña), Vhaeraun, Eilistraee, Ghaunadaur; gestos de supervivencia drow (escupir al suelo contra el veneno o hechicería, juntar los dedos en forma de quelíceros/araña, tocar la empuñadura de la daga o la insignia de su casa, acariciar el tejido del piwafwi, susurrar blasfemias en lengua drow).
+   - **Drow / Infraoscuridad:** Lolth (la Reina Araña), Vhaeraun, Eilistraee, Ghaunadaur; gestos de supervivencia drow (escupir al suelo contra el veneno o hechicería, tocar la empuñadura de la daga o la insignia de su casa, acariciar el tejido del piwafwi, susurrar blasfemias en lengua drow). ⚠ **El gesto de los quelíceros —juntar los dedos en forma de araña— es de Lolth, no de todos los drow**: se lo pones a un lolthita de Menzoberranzan y a nadie más. Un renegado de Bregan D'aerthe no hace la señal de la diosa de la que huyó (ver §5 decies).
    - **Gente de mar y corsarios:** Umberlee (la Reina Perra), Talos, Valkur; ofrendas arrojando un puñado de sal o unas gotas de licor a las aguas.
    - **Gente común de la Costa de la Espada:** Tymora (dama de la suerte / besar una moneda), Beshaba (la doncella del infortunio / hacer los cuernos con los dedos para alejarla), Ilmater (el que sufre), Tempus (señor de las batallas), Kelemvor (la muerte y el descanso).
 3. **Cero Modismos o Anacronismos Terrestres:** Queda vetado usar proverbios, citas bíblicas, figuras mitológicas terrestres (Troya, Judas, calvario) o conceptos modernos/científicos fuera de lugar. Toda analogía debe remitir a la historia viva de Faerûn.

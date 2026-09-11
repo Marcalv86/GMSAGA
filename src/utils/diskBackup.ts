@@ -11,6 +11,7 @@ import {
   getStoredTopP,
   getStoredAutoFailover
 } from './geminiHelper';
+import { leerMesa } from './mesaStorage';
 
 /**
  * Copia automática de la campaña a una carpeta real del disco.
@@ -193,11 +194,21 @@ export async function writeCampaignToDisk(
     if (state !== 'granted') return { written: false, reason: 'no-permission' };
 
     const apiKeys = getStoredApiKeys();
+    /*
+     * La charla OOC con el Director también es la partida.
+     *
+     * Vive en su propia clave de localStorage, fuera del proyecto, y por eso
+     * llevaba desde siempre quedándose fuera de las copias: se guardaba la
+     * campaña entera —capítulos, documentos, memoria— y las decisiones que se
+     * habían tomado hablando fuera de personaje desaparecían con el navegador.
+     */
+    const mesa = leerMesa(project.id);
     const payload = JSON.stringify(
       {
         ...project,
         chats,
         files,
+        mesa: mesa.length > 0 ? mesa : undefined,
         apiKeys: apiKeys.length > 0 ? apiKeys : undefined,
         keyRotationMode: getStoredKeyRotationMode(),
         geminiSettings: {
