@@ -1859,6 +1859,39 @@ ${misionesVivas
     : '';
 
   /*
+   * LO QUE LLEVA ENCIMA, DONDE SE LEE.
+   *
+   * Sus cosas ya viajaban: dentro de la ficha, que son treinta mil caracteres,
+   * y en un renglón del bloque de identidad que remite a «revisa el texto
+   * íntegro adjunto abajo». Enterradas, vaya. Y se notó jugando: hizo falta un
+   * enigma, se inventó uno nuevo con unos signos raros, y resulta que ella
+   * llevaba desde el primer día el cuaderno con esos mismos trazos copiados.
+   * La aplicación lo tenía. El Narrador no lo miró.
+   *
+   * Así que va también aquí, corto y al lado de las tramas abiertas: no como
+   * recuento contable, sino como lo que es —material de escena—. Es el bloque
+   * que hace cumplible la §5 duodecies.
+   */
+  const inventarioVivo = (project.memory?.player_character?.inventory || []).slice(0, 30);
+  const lineaDeObjeto = (i: InventoryItem) =>
+    `- **${i.name}**${i.quantity && i.quantity > 1 ? ` (x${i.quantity})` : ''}${i.equipped ? ' [lo lleva puesto]' : ''}${
+      i.deMision && i.encargo ? ` — ENCARGO: ${String(i.encargo).slice(0, 140)}` : ''
+    }${i.deMision && i.origen ? ` (de ${String(i.origen).slice(0, 60)})` : ''}${
+      i.description ? `: ${String(i.description).slice(0, 160)}` : ''
+    }`;
+  const encargosVivos = inventarioVivo.filter(i => i.deMision && !i.resuelto);
+  const cosasSuyas = inventarioVivo.filter(i => !i.deMision || i.resuelto);
+  const bloqueMochila = inventarioVivo.length
+    ? `
+### 🎒 LO QUE LLEVA ENCIMA (y es material de escena, no una lista de la compra)
+Antes de inventarte un objeto, una lengua o un enigma, mira esta lista. Si algo de aquí toca lo que ibas a inventar, **la escena es que lo reconozca**, no que aparezca un misterio en paralelo.
+- ✅ Sus cosas se usan: se leen, se tocan, se enseñan, se comparan, se tocan si suenan y se le pueden robar.
+- ⛔ Y lo que NO está aquí ni en su ficha, no se lo metes en la mochila para resolverte una escena.
+${encargosVivos.length ? `\n**Encargos pendientes (objetos que son una tarea):**\n${encargosVivos.map(lineaDeObjeto).join('\n')}` : ''}${cosasSuyas.length ? `\n**Sus cosas:**\n${cosasSuyas.map(lineaDeObjeto).join('\n')}` : ''}
+`.trim()
+    : '';
+
+  /*
    * Los giros que aún no han pasado.
    *
    * Van aparte del dosier de personajes porque no son de nadie: «el barco es
@@ -2045,7 +2078,7 @@ ${lista
     ? `
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
-${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMochila ? `${bloqueMochila}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
 ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHistory}` : ''}
   `.trim()
     : 'No hay memoria acumulada aún.';

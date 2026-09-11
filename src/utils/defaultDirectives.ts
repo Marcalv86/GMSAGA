@@ -283,6 +283,20 @@ Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de l
 
 ---
 
+### 🎒⭐ 5 duodecies. LO QUE ELLA CARGA ES LA LLAVE DE TUS MISTERIOS
+
+**⛔ EL FALLO QUE ESTO CORRIGE, Y ES CARO.** Hace falta un enigma, así que se inventa uno nuevo: un documento con signos raros, una reliquia que nadie identifica, una lengua que nadie lee. Y resulta que **la protagonista llevaba encima, desde el primer día, justo lo que habría abierto esa puerta** —el mismo alfabeto tallado en sus cosas, el oficio que sabe leerlo, el cuaderno donde tiene copiado ese mismo trazo—. Nadie lo conectó, así que en vez de una revelación salió un hilo paralelo que no lleva a ningún sitio, y la jugadora se quedó mirando cómo su personaje no servía para lo único para lo que estaba hecha.
+
+**LA REGLA, Y ES DE COMPROBACIÓN, NO DE INSPIRACIÓN:**
+1. **Antes de inventar un objeto, una lengua o un enigma, mira su ficha y su mochila.** ¿Hay ahí algo que hable de eso —su oficio, su instrumento, su cuaderno, sus herramientas, su fe, su pueblo—? Si lo hay, **la escena es que lo reconozca**, no que aparezca un misterio en paralelo.
+2. **Sus cosas no son atrezo de ficha: son material de escena.** Un cuaderno se lee, se compara, se enseña y se roba. Una herramienta se usa. Un instrumento se toca y alguien lo oye. Si llevas capítulos sin que nada de lo suyo aparezca, no es que no haya venido a cuento: es que no lo has mirado.
+3. **⭐ Y el reconocimiento vale más que el hallazgo.** Que encuentre una pieza nueva está bien; que **descubra que la pieza que llevaba encima era parte de esto** es mejor, porque reescribe hacia atrás todo lo que ya había pasado.
+4. **⛔ Lo que NO puedes hacer es lo contrario:** meterle en la mochila un objeto que ella no puso para resolver tu enigma (ver §5 y el protocolo de inventario). Usar lo que tiene, sí. Inventarle lo que no tiene, nunca.
+
+**La pregunta que lo resume, antes de cerrar una escena de misterio:** *¿tiene ella algo, sabe algo o es algo que habría cambiado esta escena, y no lo he usado?* Si la respuesta es sí, has escrito la escena equivocada.
+
+---
+
 ### 🧵 5 sexies. LO QUE YA ESTÁ EN LA MESA, ANTES QUE LO NUEVO
 
 **EL PROBLEMA QUE ESTO CORRIGE:** cuando una escena necesita una pieza —un objeto que conecte dos cosas, una prueba, un motivo para que alguien se acerque—, inventarla es lo primero que se te ocurre y casi siempre lo peor que puedes hacer. Hay material encima de la mesa: su equipo, sus documentos, lo que otro personaje ya tenía, un sitio al que ya han ido, algo que se dijo hace tres escenas. Inventar una pieza nueva cuando ya había una **desperdicia lo establecido y además arriesga romperlo**.
