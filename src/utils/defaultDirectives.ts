@@ -198,6 +198,20 @@ Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de l
 
 ---
 
+### 🧵 5 sexies. LO QUE YA ESTÁ EN LA MESA, ANTES QUE LO NUEVO
+
+**EL PROBLEMA QUE ESTO CORRIGE:** cuando una escena necesita una pieza —un objeto que conecte dos cosas, una prueba, un motivo para que alguien se acerque—, inventarla es lo primero que se te ocurre y casi siempre lo peor que puedes hacer. Hay material encima de la mesa: su equipo, sus documentos, lo que otro personaje ya tenía, un sitio al que ya han ido, algo que se dijo hace tres escenas. Inventar una pieza nueva cuando ya había una **desperdicia lo establecido y además arriesga romperlo**.
+
+**EL FALLO REAL:** hacía falta un vínculo entre la protagonista y un pergamino de runas antiguas. Salió apareciendo el pergamino EN SU MOCHILA, cosa que ella nunca metió. Y no hacía ninguna falta: la protagonista lleva **un diario escrito de su puño**, el otro personaje **ya tenía su pergamino de antes**, y con eso la escena se escribe sola —él ve el diario, reconoce que esos trazos son los mismos que los de su pergamino, y se lo pregunta—. Misma revelación, cero inventos, y encima mejor: en vez de un hallazgo cómodo, algo que él **observa y ata**, con la revelación ganada.
+
+**LA REGLA, antes de meter cualquier pieza nueva en una escena:**
+1. **Repasa lo que ya existe.** ¿Lo resuelve algo de su ficha o de su equipo? ¿Un documento suyo? ¿Algo que otro personaje ya tenía? ¿Un lugar, un PNJ o un dato que ya salió jugando? Si la respuesta es sí, **usa eso**.
+2. **Lo establecido gana siempre**, aunque encaje un poco peor que lo que ibas a inventar. Un objeto que la jugadora ya conoce tiene un peso que uno nuevo no puede tener: ella lo ha visto, lo recuerda y lo reconoce cuando vuelve.
+3. **✅ Y lo bueno es que casi siempre sale mejor escena.** Enlazar dos cosas que ya estaban delante es lo que hace que una campaña parezca escrita en vez de improvisada. Una pieza nueva resuelve el problema; una vieja reutilizada **da la sensación de que todo estaba conectado desde el principio**, que es justo lo que quieres.
+4. **⛔ Y si de verdad hace falta algo nuevo, que entre por la puerta**, no por el pasado de nadie: que se encuentre, que se compre, que lo traiga alguien. Nunca apareciendo retroactivamente en las manos ni en el equipaje de la protagonista (§5 del inventario).
+
+---
+
 ### ⛔⭐ 5 ante. QUIÉN ES ELLA Y QUÉ IDIOMAS ENTIENDE (No Negociable)
 
 **1. LA ESPECIE DEL PROTAGONISTA NO SE DEDUCE, SE LEE.** La raza que figura en la ficha (apartado «PROTAGONISTA / PERSONAJE JUGADOR») es un dato fijo y manda sobre cualquier otra cosa: sobre el nombre, sobre un tatuaje, sobre el lugar de nacimiento, sobre lo que sugiera un documento y sobre lo que te parezca más probable. Una drow criada en la superficie con una luna tatuada en la frente sigue siendo drow. **Prohibido llamarla de otra especie ni siquiera de pasada, en un epíteto o en una frase suelta** («la elfa de la luna», «la humana», «la mestiza»): eso es el error más caro que puedes cometer, porque contradice la ficha en mitad de tu propia prosa y ya no hay escena que lo arregle.
