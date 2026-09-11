@@ -543,6 +543,7 @@ const NIVEL_RE = /\[\s*NIVEL\s*:\s*([^\]]+)\]/gi;
 const AGENDA_RE = /\[\s*AGENDA\s*:\s*([^\]]+)\]/gi;
 const HILO_RE = /\[\s*HILO\s*:\s*([^\]]+)\]/gi;
 const VIAJE_RE = /\[\s*VIAJE\s*:\s*([^\]]+)\]/gi;
+const LUGAR_RE = /\[\s*LUGAR\s*:\s*([^\]]+)\]/gi;
 
 /**
  * Lee `[TIEMPO: +2h]`, `[TIEMPO: +1d 6h]`, `[TIEMPO: +45m]` o `[TIEMPO: +3 días]`.
@@ -1446,6 +1447,7 @@ export function limpiarEtiquetasDePnj(texto: string): string {
     .replace(REVELADO_RE, '')
     .replace(SECRETO_RE, '')
     .replace(VIAJE_RE, '')
+    .replace(LUGAR_RE, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -1555,4 +1557,35 @@ export function esLaMismaEscena(
     if (pb.has(p)) comunes++;
   });
   return comunes >= 3;
+}
+
+
+/** Un detalle que queda fijado de un sitio: cómo abren sus puertas, a qué huele. */
+export interface LugarLeido {
+  nombre: string;
+  detalle: string;
+}
+
+/**
+ * Lee \`[LUGAR: One-Eyed Jax | las puertas abren con runa de custodia, no con llave]\`.
+ *
+ * El dosier de lugares llevaba solo los NOMBRES —decía expresamente que el
+ * detalle vive en los documentos— y por eso lo que se inventaba jugando no
+ * volvía: en una escena las puertas del local abrían con una runa lantanesa y
+ * dos escenas después alguien las abría con una llave corriente. Lo que se
+ * establece en mesa es canon del sitio y tiene que quedar escrito en alguna
+ * parte.
+ */
+export function leerLugares(texto: string): LugarLeido[] {
+  if (!texto) return [];
+  LUGAR_RE.lastIndex = 0;
+  const out: LugarLeido[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = LUGAR_RE.exec(texto)) !== null) {
+    const campos = m[1].split('|').map(x => x.trim());
+    const nombre = (campos[0] || '').slice(0, 80);
+    const detalle = campos.slice(1).join(' · ').trim().slice(0, 300);
+    if (nombre.length > 1 && detalle.length > 3) out.push({ nombre, detalle });
+  }
+  return out;
 }

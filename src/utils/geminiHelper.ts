@@ -37,7 +37,9 @@ import {
   leerAgenda,
   estacionDelDia,
   leerViaje,
+  leerLugares,
   type ViajeLeido,
+  type LugarLeido,
   leerAvanceDeTiempo,
   leerFechaDeHud,
   leerAvanceDeNivel,
@@ -1618,8 +1620,11 @@ function dosierDeLugares(locations: Location[]): string {
 
   const fichas = utiles.map(l => {
     const desc = (l.desc || '').trim().slice(0, 260);
-    const notas = (l.notes || '').trim().slice(0, 200);
-    return `- **${l.name.trim()}**${desc ? ` — ${desc}` : ''}${notas ? ` · ${notas}` : ''}`;
+    // Las notas suben de 200 a 420: aquí es donde vive lo que se ha fijado
+    // jugando —cómo abren las puertas, a qué huele, quién vigila la entrada— y
+    // recortarlo a dos líneas era perderlo igual que no tenerlo.
+    const notas = (l.notes || '').trim().slice(0, 420);
+    return `- **${l.name.trim()}**${desc ? ` — ${desc}` : ''}${notas ? `\n  · YA ESTABLECIDO: ${notas}` : ''}`;
   });
 
   return `
@@ -1628,7 +1633,9 @@ Estos sitios YA EXISTEN y ya tienen nombre. Es tu lista de nombres propios, no u
 - ⛔ NO renombres ninguno, ni lo traduzcas, ni le pongas un nombre «parecido» porque suene mejor. Si en la escena aparece uno de estos sitios, se llama EXACTAMENTE como está escrito aquí.
 - ⛔ NO inventes un local nuevo para una función que ya cubre uno de estos. Si el grupo va a la taberna de la banda, es la que figura aquí.
 - ✅ Puedes crear lugares nuevos cuando la escena lo pida de verdad; entonces el nombre lo pones tú y pasa a ser canon.
-- El detalle de cada sitio está en los documentos de la campaña; esto es solo para que los llames por su nombre.
+- **⛔ Y LO QUE PONGA EN «YA ESTABLECIDO» ES CANON DEL SITIO, NO UNA SUGERENCIA.** Son cosas concretas que ya se han visto en la partida y la jugadora las recuerda: si las puertas de un local abren con una runa de custodia, NO se abren con llave dos escenas después. Cambiarlo sin motivo en la ficción —que alguien las haya forzado, que hayan cambiado el cierre— rompe el sitio.
+- **✅ Y cuando establezcas algo concreto y distintivo de un lugar, FÍJALO** con \`[LUGAR: nombre del sitio | el detalle]\`: cómo se cierra, a qué huele, qué se oye desde allí, quién guarda la puerta, qué tecnología usa. Lo que no se apunta no vuelve, y un sitio al que le cambian los detalles cada vez que se entra deja de ser un sitio.
+- El resto del detalle está en los documentos de la campaña; esto es para que los llames por su nombre y respetes lo ya visto.
 
 ${fichas.join('\n')}
 `.trim();
@@ -3161,6 +3168,13 @@ export interface TiempoReportado {
    */
   viaje?: ViajeLeido | null;
   /**
+   * Detalles que quedan fijados de un sitio.
+   *
+   * Lo que se establece jugando —que las puertas abren con runa y no con
+   * llave— no vivía en ninguna parte y a las dos escenas se contradecía.
+   */
+  lugares?: LugarLeido[];
+  /**
    * La fecha que el Narrador ha escrito en la cabecera de HUD de este mensaje,
    * tal cual, sin resolver. Es la que ve la jugadora en el chat, así que es la
    * que debe mandar sobre el calendario.
@@ -3207,6 +3221,7 @@ async function saveStreamedMessage(
   const revelaciones = leerRevelaciones(cleanedText);
   const secretos = leerSecretos(cleanedText);
   const viaje = leerViaje(cleanedText);
+  const lugares = leerLugares(cleanedText);
   // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
   const hudDeEsteTurno = leerFechaDeHud(fullText);
   const avanceDeNivel = leerAvanceDeNivel(cleanedText) || undefined;
@@ -3230,6 +3245,7 @@ async function saveStreamedMessage(
       revelaciones.length ||
       secretos.length ||
       viaje ||
+      lugares.length ||
       hudDeEsteTurno?.fechaTexto ||
       avanceDeNivel)
   ) {
@@ -3243,6 +3259,7 @@ async function saveStreamedMessage(
         revelaciones,
         secretos,
         viaje,
+        lugares,
         fechaHud: hudDeEsteTurno?.fechaTexto,
         momentoHud: hudDeEsteTurno?.momento,
         avanceDeNivel

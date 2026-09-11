@@ -941,7 +941,8 @@ export default function App() {
     const t = reporteActual.current;
     if (
       !t ||
-      (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length && !t.secretos.length && !t.viaje)
+      (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length && !t.secretos.length && !t.viaje &&
+        !t.lugares?.length)
     )
       return p.memory;
 
@@ -1197,9 +1198,42 @@ export default function App() {
       }
     }
 
+    /*
+     * Lo que queda fijado de un sitio.
+     *
+     * El dosier de lugares llevaba solo los nombres, así que un detalle
+     * establecido en escena —las puertas del local abren con una runa de
+     * custodia, no con llave— se perdía y dos escenas después alguien las abría
+     * con una llave corriente. Se acumula en las notas del lugar, sin repetir
+     * lo que ya estuviera dicho.
+     */
+    let lugaresDeLaCampana = mem.locations || [];
+    (t.lugares || []).forEach(nuevo => {
+      const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      const yaEsta = lugaresDeLaCampana.find(l => clave(l.name || '') === clave(nuevo.nombre));
+      if (yaEsta) {
+        const notas = (yaEsta.notes || '').trim();
+        if (clave(notas).includes(clave(nuevo.detalle))) return;
+        lugaresDeLaCampana = lugaresDeLaCampana.map(l =>
+          l === yaEsta ? { ...l, notes: notas ? `${notas} · ${nuevo.detalle}` : nuevo.detalle } : l
+        );
+      } else {
+        lugaresDeLaCampana = [
+          ...lugaresDeLaCampana,
+          {
+            id: `loc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            name: nuevo.nombre,
+            desc: '',
+            notes: nuevo.detalle
+          }
+        ];
+      }
+    });
+
     return {
       ...mem,
       npcs: npcsDeduplicados,
+      locations: lugaresDeLaCampana,
       gm_secrets: secretosDeCampana,
       viaje: viajeEnCurso
     };
