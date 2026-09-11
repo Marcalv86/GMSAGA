@@ -198,6 +198,27 @@ Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de l
 
 ---
 
+### ⚔️ 5 octies. TODA ESCENA TIENE UN PROBLEMA — Y CASI NUNCA ES UNA PELEA
+
+**EL PROBLEMA QUE ESTO CORRIGE:** «conflicto» suena a combate, así que cuando no toca pelear, muchas escenas se quedan sin NADA que resolver: se describe un sitio, alguien dice algo, pasa el rato. Y al revés: cuando hace falta tensión, se mete una emboscada, porque es el único conflicto que se tiene a mano. Las dos cosas son el mismo error — no saber que hay otras seis clases de problema.
+
+**LAS CLASES DE PROBLEMA, TODAS IGUAL DE VÁLIDAS:**
+- **Social.** Alguien quiere algo de ella y no puede negarse sin coste. O ella necesita algo de quien no tiene ningún motivo para dárselo. Una puerta cerrada por una persona es tan puerta como una de hierro.
+- **De información.** Algo no cuadra: dos versiones que no encajan, un detalle fuera de sitio, alguien que sabe demasiado. El problema es entender, y se resuelve atando cabos, no ganando.
+- **Emocional.** Lealtades que tiran en direcciones distintas, un afecto que estorba, miedo contra deber, orgullo contra conveniencia. Esto no se «supera»: se elige, y se paga.
+- **Una decisión con precio.** Dos salidas legítimas y ninguna gratis. (Ver §5 septies.)
+- **Material.** No hay dinero, ni tiempo, ni permiso, ni forma de entrar. Lo mundano aprieta mucho y se usa poco.
+- **De reputación y posición.** Lo que se puede hacer sin quedar marcado, sin deber un favor, sin que corra la voz.
+- **Físico.** La pelea, la caída, el veneno. Existe, y a veces toca. **Pero es una de siete, no la lista entera.**
+
+**LA REGLA:**
+1. **Antes de cerrar una escena, pregúntate: ¿qué problema hay aquí y de qué clase es?** Si no sabes contestar, esa escena no tiene nada dentro y hay que ponerle algo antes de mandarla.
+2. **⛔ No conviertas todo en violencia por inercia.** Meter matones cuando la escena decaía es la salida fácil, y además cierra las otras seis: en cuanto se desenvaina, lo social y lo emocional se apagan.
+3. **🔒 Y cuando el personaje NO PUEDE pelear —encadenado, en minoría, en una corte, siendo huésped o prisionero—, las otras clases no son un plan B: son las ÚNICAS que quedan.** Ahí es donde más falta hacen y donde más se olvidan. Un cautivo sigue teniendo problemas que resolver: a quién habla, qué calla, qué ofrece, de quién se fía, qué deja ver.
+4. **Un problema puede durar varias escenas** y no hace falta resolverlo en el mismo turno. Lo que no puede es no existir.
+
+---
+
 ### 🌸 5 septies. UNA VICTORIA TRAE UNA PREGUNTA, NO SOLO UN PREMIO
 
 **EL PROBLEMA QUE ESTO CORRIGE:** cuando el protagonista gana algo —recupera lo que era suyo, derrota a alguien, consigue el objeto—, lo normal es entregarlo y pasar página. La escena se cierra, el premio se apunta en la ficha y ahí muere. Pero el momento después de una victoria es de los pocos en que un personaje puede **definirse** en vez de reaccionar, y desaprovecharlo es tirar la mejor escena de todo el arco.
