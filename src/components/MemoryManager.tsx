@@ -1522,6 +1522,17 @@ export const MemoryManager: React.FC<{
                                   {[
                                     sec.condicion.nivelMinimo ? `nivel ${sec.condicion.nivelMinimo}` : '',
                                     sec.condicion.trasSecreto ? `que se destape «${sec.condicion.trasSecreto}»` : '',
+                                    sec.condicion.misionCompletada ? `cerrar «${sec.condicion.misionCompletada}»` : '',
+                                    sec.condicion.conPnj ? `haber conocido a ${sec.condicion.conPnj}` : '',
+                                    sec.condicion.afinidadMinima
+                                      ? `${
+                                          sec.condicion.afinidadMinima.eje === 'atr'
+                                            ? 'atracción'
+                                            : sec.condicion.afinidadMinima.eje === 'vin'
+                                              ? 'vínculo'
+                                              : 'confianza'
+                                        } ${sec.condicion.afinidadMinima.valor} con ${sec.condicion.afinidadMinima.pnj}`
+                                      : '',
                                     sec.condicion.diaAbsMinimo ? `el día ${sec.condicion.diaAbsMinimo} de campaña` : '',
                                     sec.condicion.nota || ''
                                   ]

@@ -1735,10 +1735,13 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
     calendarioValido(project.calendar) && project.currentDate
       ? aDiaAbsoluto(project.calendar, project.currentDate)
       : undefined;
+  const plegarTexto = (v?: string) =>
+    (v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
   const revelados = new Set(
     secretos
       .filter(x => x.revelado)
-      .map(x => (x.titulo || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim())
+      .map(x => plegarTexto(x.titulo))
   );
 
   const queLeFalta = (sec: SecretoDeCampana): string[] => {
@@ -1749,11 +1752,33 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
       faltan.push(`llegar a nivel ${c.nivelMinimo} (va por el ${nivelActual})`);
     }
     if (c.trasSecreto) {
-      const clave = c.trasSecreto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-      if (!revelados.has(clave)) faltan.push(`que antes se destape «${c.trasSecreto}»`);
+      if (!revelados.has(plegarTexto(c.trasSecreto))) faltan.push(`que antes se destape «${c.trasSecreto}»`);
     }
     if (c.diaAbsMinimo !== undefined && diaDeHoyAbs !== undefined && diaDeHoyAbs < c.diaAbsMinimo) {
       faltan.push(`que pasen ${c.diaAbsMinimo - diaDeHoyAbs} días más`);
+    }
+    if (c.misionCompletada) {
+      const hecha = (project.memory?.quests || []).some(
+        q => plegarTexto(q.title) === plegarTexto(c.misionCompletada!) && /complet|resuelt|cerrad|termin/i.test(q.status || '')
+      );
+      if (!hecha) faltan.push(`cerrar la trama «${c.misionCompletada}»`);
+    }
+    if (c.conPnj) {
+      // Que exista su ficha no basta: se abre fichando a quien SALE en escena,
+      // así que lo que se comprueba es que se hayan cruzado de verdad.
+      const conocido = (project.memory?.npcs || []).some(
+        n => plegarTexto(n.name) === plegarTexto(c.conPnj!) && (n.diasVistos?.length || 0) > 0
+      );
+      if (!conocido) faltan.push(`haberse cruzado con ${c.conPnj}`);
+    }
+    if (c.afinidadMinima?.pnj) {
+      const { pnj, eje, valor } = c.afinidadMinima;
+      const ficha = (project.memory?.npcs || []).find(n => plegarTexto(n.name) === plegarTexto(pnj));
+      const actual = Number(ficha?.[eje]) || 0;
+      if (actual < valor) {
+        const comoSeLlama = eje === 'atr' ? 'la atracción' : eje === 'vin' ? 'el vínculo' : 'la confianza';
+        faltan.push(`que ${comoSeLlama} con ${pnj} llegue a ${valor} (va por ${actual})`);
+      }
     }
     return faltan;
   };
@@ -5248,6 +5273,10 @@ SOBRE "condicion" (OPCIONAL, y solo cuando de verdad haga falta):
 Un giro puede necesitar que algo se cumpla antes de poder destaparse. Si es el caso, dilo con números y la aplicación lo comprobará sola en cada turno, avisando al Narrador de si está abierto o cerrado:
 - \`nivelMinimo\`: cuando el giro dependa de una capacidad que el protagonista aún NO tiene. Si algo solo puede pasar cuando pueda invocar a su compañero animal, y eso llega a nivel 2, ese es el número. No lo pongas «por si acaso»: un giro que podría pasar hoy no lleva nivel.
 - \`trasSecreto\`: el TÍTULO EXACTO de otro secreto que tiene que destaparse antes. Es lo que hace que las capas salgan en orden en vez de de golpe.
+- \`misionCompletada\`: el TÍTULO EXACTO de una trama que tiene que estar cerrada antes.
+- \`conPnj\`: el nombre de un personaje al que hay que haberse cruzado en escena. Para los giros que no tienen sentido antes de conocer a quien los sostiene.
+- \`afinidadMinima\`: **lo que ata un hilo al ritmo de OTRO**, que es de las cosas más útiles que puedes hacer. Un umbral de relación con alguien —\`{ "pnj": "Nombre", "eje": "atr" | "vin" | "con", "valor": 0-20 }\`— para que algo no llegue hasta que esa relación esté donde tiene que estar. Ejemplo: la carta de casa con una mala noticia no aparece hasta que la relación con cierta persona ha avanzado de verdad, porque la noticia duele mucho más cuando hay algo que perder. No mide el hecho concreto; mide que la relación esté en el punto en que ese hecho ya podría haber pasado. Lo concreto va en \`nota\`.
+- **TODAS las condiciones que pongas se exigen A LA VEZ.** Puedes combinar nivel + trama cerrada + haber conocido a alguien, y no se abrirá hasta que se cumplan todas. Eso es lo que permite ajustar la dificultad y el ritmo: una pista que llega demasiado pronto se desperdicia, y una que llega tarde ya no importa.
 - \`diaAbsMinimo\`: solo si algo necesita que pase un tiempo real de campaña.
 - \`nota\`: la condición que no se puede medir —«cuando ya confíe en ella», «si llega a ver el mar del norte»—. La aplicación no la comprueba, pero el Narrador la lee.
 - **Omite "condicion" entera en los giros que puedan pasar en cualquier momento**, que serán la mayoría. Una campaña donde todo está cerrado detrás de un requisito no avanza.
@@ -5284,7 +5313,7 @@ Devuelve ÚNICAMENTE un JSON:
       "comoSeDescubre": "Acciones concretas que un jugador haría",
       "sembrar": "El detalle físico que se puede poner en escena hoy",
       "quienLoTrae": "Nombre del personaje que puede meterlo en escena, su motivo propio y qué lo dispara",
-      "condicion": { "nivelMinimo": 2, "trasSecreto": "Título exacto de otro secreto", "diaAbsMinimo": 0, "nota": "Lo que no se puede medir con un número" }
+      "condicion": { "nivelMinimo": 2, "trasSecreto": "Título exacto de otro secreto", "misionCompletada": "Título exacto de una trama", "conPnj": "Nombre de un PNJ", "afinidadMinima": { "pnj": "Nombre", "eje": "vin", "valor": 12 }, "diaAbsMinimo": 0, "nota": "Lo que no se puede medir con un número" }
     }
   ]
 }
@@ -5330,6 +5359,14 @@ ${revisando ? 'Devuelve la trama COMPLETA, no solo lo que cambies: lo que siga e
           nivelMinimo: Number.isFinite(nivel) && nivel > 1 ? Math.min(20, Math.round(nivel)) : undefined,
           trasSecreto: c.trasSecreto ? String(c.trasSecreto).trim().slice(0, 120) : undefined,
           diaAbsMinimo: Number.isFinite(dia) && dia > 0 ? Math.round(dia) : undefined,
+          misionCompletada: c.misionCompletada ? String(c.misionCompletada).trim().slice(0, 120) : undefined,
+          conPnj: c.conPnj ? String(c.conPnj).trim().slice(0, 80) : undefined,
+          afinidadMinima: (() => {
+            const a = c.afinidadMinima;
+            const v = Number(a?.valor);
+            if (!a?.pnj || !['atr', 'vin', 'con'].includes(a?.eje) || !Number.isFinite(v) || v <= 0) return undefined;
+            return { pnj: String(a.pnj).trim().slice(0, 80), eje: a.eje as 'atr' | 'vin' | 'con', valor: Math.min(20, Math.round(v)) };
+          })(),
           nota: c.nota ? String(c.nota).trim().slice(0, 200) : undefined
         };
         return Object.values(limpia).some(Boolean) ? limpia : undefined;

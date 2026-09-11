@@ -377,6 +377,24 @@ export interface SecretoDeCampana {
     trasSecreto?: string;
     /** Día absoluto de campaña antes del cual no toca. */
     diaAbsMinimo?: number;
+    /** Título de una trama que tiene que estar COMPLETADA. */
+    misionCompletada?: string;
+    /** Nombre de un PNJ al que hay que haber conocido en escena. */
+    conPnj?: string;
+    /**
+     * Un umbral de relación con alguien.
+     *
+     * Es lo que permite atar un hilo al ritmo de OTRO: que la carta de casa no
+     * llegue hasta que la relación con cierta persona haya avanzado de verdad.
+     * No mide el hecho concreto —eso va en `nota`—, mide que la relación esté
+     * donde tiene que estar para que ese hecho haya podido pasar.
+     */
+    afinidadMinima?: {
+      pnj: string;
+      /** atr = atracción · vin = vínculo · con = confianza. */
+      eje: 'atr' | 'vin' | 'con';
+      valor: number;
+    };
     /** Lo que no se puede comprobar con un número, dicho en una frase. */
     nota?: string;
   };
