@@ -32,9 +32,18 @@ export function interaccionesRequeridasParaNivel(nivel: number): number {
  * 1. Límite diario: No puede subir más de +1 punto por día de calendario (marca).
  * 2. Si ya subió en el mismo día de calendario, el valor no se incrementa adicionalmente.
  * 3. Progresión escalonada: Subir a niveles superiores (rangos 2, 3, 4, 5) exige más días acumulados.
- * 4. Puntuaciones iniciales / Arquetipos canónicos: Si el PNJ no tenía puntuación previa,
- *    se adopta el valor inicial clamped (0-20).
+ * 4. Puntuaciones iniciales: un eje SIEMPRE empieza en 0 y sube desde ahí.
  * 5. Si el reporte sugiere una bajada (desconfianza, conflicto), se aplica directamente.
+ *
+ * ⛔ Lo que corrige el punto 4. Aquí había una regla llamada «Arquetipos
+ * canónicos» que, la primera vez que un PNJ recibía puntuación, adoptaba tal
+ * cual la que hubiera escrito el Narrador. Los protocolos dicen lo contrario
+ * con todas las letras —«la atracción empieza en cero, siempre, para todos; no
+ * hay puntuación de partida por arquetipo»—, así que el modelo escribía un 7
+ * de salida y el código se lo firmaba, saltándose de paso el límite diario y
+ * los días de trato acumulados. De ahí que a la jugadora le saliera atracción
+ * en medio elenco desde el primer encuentro: no era el prompt desobedeciendo,
+ * era esta función concediéndolo.
  */
 export function calcularProgresoEje(
   valorActual: number | undefined,
@@ -50,9 +59,13 @@ export function calcularProgresoEje(
   // Clampear valor sugerido entre 0 y 20
   const sugerido = Math.max(0, Math.min(20, Math.round(valorReportado)));
 
-  // Si no tenía valor previo registrado
+  // Sin valor previo, el eje nace en 0 y a partir de ahí sube por las mismas
+  // reglas que los demás: un punto por día y con los días de trato pedidos.
+  // Un primer encuentro puede dejarlo en 1 como mucho, nunca en el número que
+  // le apetezca al Narrador.
   if (valorActual === undefined || valorActual === null) {
-    return { nuevoValor: sugerido, diaSubida: diaActual };
+    if (sugerido <= 0) return { nuevoValor: 0, diaSubida: ultimoDiaSubidaEje };
+    return { nuevoValor: 1, diaSubida: diaActual };
   }
 
   // Si el valor sugerido es menor o igual al actual (bajada o mantenimiento)
@@ -84,6 +97,12 @@ export function calcularProgresoEje(
 /**
  * Actualiza los tres ejes de afinidad (ATR, VÍN, CON) de un PNJ aplicando las reglas de nivel,
  * requisitos de días y límite diario de calendario.
+ *
+ * La atracción tiene además un candado propio: si la ficha del PNJ lo lleva
+ * puesto —porque su orientación o su disponibilidad no dan para ello—, ninguna
+ * subida que mande el Narrador entra. Pedírselo por escrito no bastaba: si la
+ * decisión de que alguien no siente nada por ella depende de que el modelo se
+ * acuerde, un turno cualquiera se le olvida y la barra ya no baja sola.
  */
 export function actualizarAfinidadNpc(
   npc: NPC,
@@ -94,7 +113,9 @@ export function actualizarAfinidadNpc(
   const totalDias = diasActualizados.length;
   const ultimosDias = npc.ultimoDiaSubida || {};
 
-  const progresoAtr = calcularProgresoEje(npc.atr, reportado.atr, totalDias, diaActual, ultimosDias.atr);
+  const progresoAtr = npc.atrBloqueada
+    ? { nuevoValor: 0, diaSubida: ultimosDias.atr }
+    : calcularProgresoEje(npc.atr, reportado.atr, totalDias, diaActual, ultimosDias.atr);
   const progresoVin = calcularProgresoEje(npc.vin, reportado.vin, totalDias, diaActual, ultimosDias.vin);
   const progresoCon = calcularProgresoEje(npc.con, reportado.con, totalDias, diaActual, ultimosDias.con);
 

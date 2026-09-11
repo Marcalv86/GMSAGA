@@ -562,6 +562,24 @@ export interface NPC {
   };
   /** En qué punto está la relación, en dos o tres palabras. */
   vinculo?: string;
+  /**
+   * Hacia quién siente atracción este personaje, si consta.
+   *
+   * No es adorno de ficha: es el dato que evita que TODO el elenco reaccione
+   * igual ante la misma persona. Sale de sus documentos cuando lo dicen, o de
+   * lo que se haya establecido jugando, y viaja al Narrador en cada turno
+   * junto a las barras. Vacío significa «no consta», que NO es lo mismo que
+   * «disponible»: sin que conste, la atracción no sube.
+   */
+  orientacion?: string;
+  /**
+   * Candado duro: este personaje no desarrolla atracción hacia la protagonista.
+   *
+   * Existe porque pedirlo en el prompt no bastaba. Con esto puesto, el código
+   * descarta cualquier subida de ATR que llegue del Narrador, venga como venga
+   * y por muy bien que la haya justificado la escena.
+   */
+  atrBloqueada?: boolean;
   /** Eje de Atracción / Química romántica y tensión (escala 0 - 20) */
   atr?: number;
   /** Eje de Vínculo afectivo / Camaradería y lealtad (escala 0 - 20) */

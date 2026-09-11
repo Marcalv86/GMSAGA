@@ -1146,7 +1146,18 @@ export default function App() {
         !nuevosNpcs.some(n => coincidenNombresNpc(n.name, v.nombre))
       ) {
         const relInfo = obtenerInfoRelacion(v.vinculo || '');
-        const atrInicial = v.atr !== undefined ? Math.max(0, Math.min(20, Math.round(v.atr))) : undefined;
+        /*
+         * La atracción nace en 0, aunque el Narrador la estrene en 7.
+         *
+         * Este era el segundo agujero por el que se colaba: la ficha de un PNJ
+         * se crea aquí la primera vez que sale en un [VÍNCULO:], y hasta ahora
+         * adoptaba tal cual la puntuación que trajera la etiqueta. Los
+         * protocolos dicen que ATR empieza en cero para todos sin excepción, y
+         * el primer encuentro era justo el momento en que nadie lo comprobaba:
+         * medio elenco entraba en la campaña ya con química. Que suba después,
+         * jugando, un punto por día como todo lo demás.
+         */
+        const atrInicial = 0;
         const vinInicial = v.vin !== undefined ? Math.max(0, Math.min(20, Math.round(v.vin))) : undefined;
         const conInicial = v.con !== undefined ? Math.max(0, Math.min(20, Math.round(v.con))) : undefined;
 
@@ -1163,8 +1174,9 @@ export default function App() {
           atr: atrInicial,
           vin: vinInicial,
           con: conInicial,
+          orientacion: v.orientacion,
           ultimoDiaSubida: {
-            atr: atrInicial !== undefined ? marca : undefined,
+            atr: undefined,
             vin: vinInicial !== undefined ? marca : undefined,
             con: conInicial !== undefined ? marca : undefined
           },

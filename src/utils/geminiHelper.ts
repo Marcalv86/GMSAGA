@@ -1557,6 +1557,22 @@ ${bloqueElenco}
     if (typeof n.atr === 'number' || typeof n.vin === 'number' || typeof n.con === 'number') {
       lineas.push(`- Afinidad: atracción ${n.atr ?? 0}/20 · vínculo ${n.vin ?? 0}/20 · confianza ${n.con ?? 0}/20`);
     }
+    /*
+     * A quién mira este personaje, dicho aquí y no dejado a la deducción.
+     *
+     * El protocolo ya decía que la orientación es de cada uno y no se da por
+     * supuesta, pero el dato no estaba en ninguna parte del turno: había que
+     * volver a sacarlo de los documentos en cada mensaje, y lo que se decidió
+     * en el primer capítulo se perdía en el segundo. Puesto junto a las barras,
+     * es lo que el modelo tiene delante justo cuando le toca moverlas.
+     */
+    if (n.atrBloqueada) {
+      lineas.push(
+        `- ⛔ NO SIENTE NI VA A SENTIR ATRACCIÓN POR ELLA${n.orientacion ? ` (${corta(n.orientacion, 120)})` : ''}. Trátalo con todo el afecto y la confianza que la relación dé de sí —eso es VÍN y CON, y pueden llegar a lo más alto—, pero de química, nada: ni tensión, ni miradas que se sostienen, ni un roce que signifique algo. No es frialdad, es que esa puerta no existe.`
+      );
+    } else if (n.orientacion) {
+      lineas.push(`- Orientación / disponibilidad: ${corta(n.orientacion, 120)}. Mándalo por encima de cualquier química que pida la escena.`);
+    }
     if (n.notes) lineas.push(`- Notas: ${corta(n.notes, 400)}`);
 
     /*
@@ -2373,7 +2389,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
 7. [REGISTROS INTERNOS - ACTUALIZACIÓN ESTRICTAMENTE ESENCIAL Y CONDICIONAL]:
    Después de la narración, añade las siguientes líneas según corresponda. Son registros internos de la aplicación que el jugador no ve. REGLA FUNDAMENTAL: En cada turno se actualiza ÚNICAMENTE lo esencial (Vida, enfermedad/condiciones/heridas, inventario/dinero, tiempo transcurrido y afinidad de PNJs). Y SOLO si ha habido cambios reales en la narración; si no ha habido cambios, NO alteres nada ni emitas etiquetas innecesarias.
    - [PRESENTES: nombres separados por comas] — quién ha estado en escena de forma reconocible, con nombre propio. No incluyas figurantes sin nombre («un marinero», «la multitud»). Sirve para saber quién vuelve: alguien que reaparece deja de ser un extra y se le abre una ficha de vínculo con el protagonista.
-   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | atr: 0-20 | vin: 0-20 | con: 0-20] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea.
+   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | orientacion: hacia quién le tira, si consta | atr: 0-20 | vin: 0-20 | con: 0-20] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea.
      «aparenta» es lo que el protagonista podría percibir observándolo. «oculta» es lo que hay debajo: sus reservas, sus intenciones, lo que calla.
      «grado» debe comenzar indicando el tipo para que la interfaz muestre el icono adecuado:
        - ⚔️ Rivalidad: «grado: rivalidad — ...»
@@ -2383,6 +2399,8 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
        - 🤝 Alianza: «grado: alianza — ...»
        - 🛡️ Mentor: «grado: mentor — ...»
      «atr» (0-20), «vin» (0-20) y «con» (0-20) representan la Atracción/Romance, Vínculo y Confianza que el PNJ siente hacia el protagonista. El Narrador los actualiza de forma autónoma según las vivencias y la química; son de solo lectura para el jugador.
+     «orientacion» es OPCIONAL y se manda UNA VEZ, la primera, cuando sus documentos lo digan o el juego lo haya dejado claro: «hombres», «mujeres», «le da igual», «asexual», «casado y va en serio», «no le interesa nadie ahora mismo». Se queda guardado en su ficha y vuelve a ti en todos los turnos siguientes, así que **no hace falta repetirlo** y NO te lo inventes para rellenar: si no consta, lo dejas fuera, y sin que conste la atracción no sube (ver el protocolo de la atracción).
+     ⚠️ Y un aviso sobre «atr»: la aplicación NO acepta puntuaciones de salida. Un personaje que aparece por primera vez entra con la atracción a 0 y sube como mucho un punto por día de trato, así que escribir «atr: 8» en un primer encuentro no consigue un 8: consigue un 0 o un 1. La química se juega, no se declara.
    - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, +Z PO, -W PO, +A PP, -B PC] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda o consuma objetos o dinero durante la escena (ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)], si come 3 de 10: [INVENTARIO: -3 Buenas Bayas], si gasta 15 de oro en una tienda: [INVENTARIO: +Disfraz noble, -15 PO], si Jarlaxle le entrega una Máscara de Disfraz: [INVENTARIO: +1 Máscara de Disfraz (mágica, equipada)], si pierde la máscara: [INVENTARIO: -1 Máscara de Disfraz]). Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;

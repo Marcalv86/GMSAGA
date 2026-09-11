@@ -407,6 +407,26 @@ export const MemoryManager: React.FC<{
     }));
   };
 
+  /*
+   * El candado de la atracción, y de paso el trapo para limpiar lo ya escrito.
+   *
+   * Bloquear pone la barra a 0 y deja el campo cerrado: a partir de ahí el
+   * código descarta cualquier subida que mande el Narrador. Hacía falta algo
+   * manual porque las puntuaciones que ya están guardadas no bajan solas —los
+   * arreglos impiden que vuelva a pasar, no deshacen lo hecho— y porque hay un
+   * dato que solo sabe quien ha leído los documentos: a quién mira cada uno.
+   */
+  const alternarAtraccion = async (id: string) => {
+    await onUpdateMemory(mem => ({
+      ...mem,
+      npcs: (mem.npcs || []).map(n =>
+        n.id === id
+          ? { ...n, atrBloqueada: !n.atrBloqueada, atr: 0, ultimoDiaSubida: { ...(n.ultimoDiaSubida || {}), atr: undefined } }
+          : n
+      )
+    }));
+  };
+
   // NPC & Location Portrait Assignment Handlers
   const handleAssignPortraitDirectly = async (imageContent: string) => {
     if (!targetForPortraitPicker) return;
@@ -1826,7 +1846,26 @@ export const MemoryManager: React.FC<{
                             sugiere que ahí hay un romance midiéndose. El
                             vínculo y la confianza sí valen para todos.
                           */}
-                          {(n.atr ?? 0) > 0 && (
+                          {/* Si la puerta está cerrada se dice, porque si no la
+                              ausencia de barra de atracción parece un dato que
+                              todavía no se ha movido en vez de una decisión. */}
+                          {n.atrBloqueada && (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--user-border)] text-[10px] font-cinzel"
+                              title={n.orientacion ? `Orientación / disponibilidad: ${n.orientacion}` : 'No desarrolla atracción por ella.'}
+                            >
+                              🚫❤️ Sin romance{n.orientacion ? ` · ${n.orientacion}` : ''}
+                            </span>
+                          )}
+                          {!n.atrBloqueada && n.orientacion && (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--user-border)] text-[10px] font-cinzel"
+                              title="Orientación / disponibilidad, tal y como consta. Viaja al Narrador en cada turno."
+                            >
+                              {n.orientacion}
+                            </span>
+                          )}
+                          {!n.atrBloqueada && (n.atr ?? 0) > 0 && (
                             <span
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 text-[10px] font-mono font-bold"
                               title={`Atracción: ${getAtrInfo(n.atr).label}`}
@@ -1913,13 +1952,33 @@ export const MemoryManager: React.FC<{
                         secas no bastaba: la siguiente sincronización lo volvía a
                         crear. Esto lo borra y lo veta para siempre.
                       */}
-                      <button
-                        onClick={() => setNoEsPnj(n)}
-                        className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 font-cinzel cursor-pointer flex items-center gap-0.5 shrink-0"
-                        title="Bórralo del elenco y veta el nombre: no volverá a crearse solo. Es lo que hay que usar cuando se cuela tu propio personaje."
-                      >
-                        <UserMinus className="w-3 h-3" /> Quitar del elenco
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => alternarAtraccion(n.id)}
+                          className={`text-[10px] sm:text-[11px] font-cinzel cursor-pointer flex items-center gap-0.5 shrink-0 ${
+                            n.atrBloqueada
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : 'text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400'
+                          }`}
+                          title={
+                            n.atrBloqueada
+                              ? 'Ahora mismo no puede sentir atracción por ella: el candado está puesto y el código descarta cualquier subida. Pulsa para quitarlo. El vínculo y la confianza siguen subiendo con normalidad.'
+                              : 'Ciérrale la puerta del romance a este personaje —por su orientación, porque está con otra persona o porque sencillamente no—. Pone la atracción a 0 y ya no vuelve a subir. El cariño y la confianza no se tocan.'
+                          }
+                        >
+                          <Heart className={`w-3 h-3 ${n.atrBloqueada ? 'fill-rose-500 text-rose-500' : ''}`} />
+                          {/* En el móvil no hay «title» que leer, así que el estado
+                              tiene que distinguirse por el texto y no solo por el color. */}
+                          {n.atrBloqueada ? 'Romance cerrado' : 'Sin atracción'}
+                        </button>
+                        <button
+                          onClick={() => setNoEsPnj(n)}
+                          className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 font-cinzel cursor-pointer flex items-center gap-0.5 shrink-0"
+                          title="Bórralo del elenco y veta el nombre: no volverá a crearse solo. Es lo que hay que usar cuando se cuela tu propio personaje."
+                        >
+                          <UserMinus className="w-3 h-3" /> Quitar del elenco
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

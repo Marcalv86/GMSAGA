@@ -1335,6 +1335,8 @@ export interface VinculoLeido {
   atr?: number;
   vin?: number;
   con?: number;
+  /** Hacia quién siente atracción, cuando la escena o sus documentos lo dejan claro. */
+  orientacion?: string;
 }
 
 /**
@@ -1361,7 +1363,8 @@ export function leerVinculos(texto: string): VinculoLeido[] {
         const campo = sinTildes(parte.slice(0, corte)).trim().toLowerCase();
         const valor = parte.slice(corte + 1).trim();
         if (!valor) continue;
-        if (campo === 'aparenta' || campo === 'muestra') v.aparenta = valor;
+        if (campo === 'orientacion' || campo === 'orienta') v.orientacion = valor.slice(0, 120);
+        else if (campo === 'aparenta' || campo === 'muestra') v.aparenta = valor;
         else if (campo === 'oculta' || campo === 'calla' || campo === 'piensa') v.oculta = valor;
         else if (campo === 'grado' || campo === 'vinculo' || campo === 'relacion') v.vinculo = valor;
         else if (campo === 'atr' || campo === 'atraccion') {
