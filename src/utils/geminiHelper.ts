@@ -35,6 +35,7 @@ import {
   hilosPendientes,
   hilosQueVencen,
   leerAgenda,
+  estacionDelDia,
   leerViaje,
   type ViajeLeido,
   leerAvanceDeTiempo,
@@ -1957,6 +1958,14 @@ ${
 ### CALENDARIO Y PASO DEL TIEMPO
 Calendario en uso: ${cal.name} (${diasPorAno(cal)} días por año).
 AHORA MISMO SON: ${fechaCompleta(cal, fecha)}.
+${(() => {
+  // La estación la calcula la aplicación desde el primer día y NUNCA se la
+  // decía al Narrador. Sin ella, el tiempo atmosférico deja de depender del
+  // año y pasa a ser una etiqueta pegada a cada ciudad: Luskan gris siempre,
+  // Aguasprofundas soleada siempre.
+  const e = estacionDelDia(cal, fecha.dayOfYear);
+  return `${e.icono} ESTACIÓN: ${e.nombre.toUpperCase()}. El tiempo que hace sale de la estación y del día anterior, no del tono de la escena ni de la fama del sitio.`;
+})()}
 Ten presente la hora al describir la luz, quién está despierto, qué está abierto y qué no.
 📈 Y ten presente el AÑO: esta fecha no es solo el reloj, es el punto del mundo en que estamos. Todo lo que sepas de estos personajes y de este mundo por novelas o material publicado ANTERIOR a esta fecha es su pasado —explica por qué son como son, no dice cómo son ahora—. Quien tenga décadas de libros detrás ha cambiado en ellas: escríbelo como está HOY, no como en su primera aparición.
 

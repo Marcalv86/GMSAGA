@@ -1074,9 +1074,21 @@ export function estacionDelDia(cal: CalendarConfig, dayOfYear: number): Estacion
   if (/otono/.test(nombreMes)) return { nombre: 'otoño', icono: '🍂' };
   if (/invierno/.test(nombreMes)) return { nombre: 'invierno', icono: '❄️' };
 
-  // El año se reparte en cuatro, pero desde la estación en la que ARRANCA ese
-  // calendario. Antes se daba por hecho que era primavera, y con Harptos —que
-  // abre en pleno invierno— la estación salía desplazada un cuarto de año.
+  /*
+   * El año en cuatro, con la estación de arranque CENTRADA, no empezando.
+   *
+   * `estacionInicial` dice en qué estación está el primer mes, y ese mes está
+   * en MITAD de ella, no en su primer día: Martillo es «Deepwinter» y el
+   * festival de Pleno Invierno cae justo detrás. Tomándolo como el comienzo del
+   * invierno, todo el año salía corrido un mes largo, y se notaba en lo
+   * absurdo: el Festín de la Cosecha caía en verano y Anochecer —el mes del
+   * solsticio— en otoño. Se desplaza medio cuarto para que cada estación quede
+   * centrada en sus meses.
+   *
+   * Y el reparto va con módulo, no recortado al 3: con el desplazamiento, los
+   * últimos días del año se salen del cuarto 3 y hay que darles la vuelta al 0,
+   * que es lo que devuelve el invierno al final del calendario.
+   */
   const RUEDA: Estacion[] = [
     { nombre: 'primavera', icono: '🌱' },
     { nombre: 'verano', icono: '🌞' },
@@ -1084,8 +1096,9 @@ export function estacionDelDia(cal: CalendarConfig, dayOfYear: number): Estacion
     { nombre: 'invierno', icono: '❄️' }
   ];
   const arranque = Math.max(0, RUEDA.findIndex(e => e.nombre === (cal.estacionInicial || 'primavera')));
-  const fraccion = (dayOfYear - 1) / Math.max(1, slots.length);
-  const cuarto = Math.min(3, Math.floor(fraccion * 4));
+  const total = Math.max(1, slots.length);
+  const fraccion = (dayOfYear - 1 + total / 8) / total;
+  const cuarto = ((Math.floor(fraccion * 4) % 4) + 4) % 4;
   return RUEDA[(arranque + cuarto) % 4];
 }
 
