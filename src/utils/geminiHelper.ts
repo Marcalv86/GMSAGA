@@ -4090,7 +4090,7 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
     }
   ],
   "locations": [
-    { "id": "id existente o nuevo", "name": "Nombre del lugar", "desc": "Descripción del lugar y relevancia" }
+    { "id": "id existente o nuevo", "name": "Nombre del lugar", "desc": "Descripción del lugar y relevancia", "notes": "LO CONCRETO QUE YA SE HA VISTO DE ESE SITIO EN LA PARTIDA y que tiene que seguir siendo verdad la próxima vez que se entre: cómo se cierran sus puertas, qué tecnología o magia usa, a qué huele, qué se oye desde dentro, quién guarda la entrada, cómo se cobra, qué está prohibido allí. Rescátalo del texto de los capítulos, literal si hace falta. Esto NO es ambientación bonita: es lo que impide que un local cuyas puertas abrían con una runa de custodia acabe abriéndose con una llave corriente dos escenas después. Déjalo vacío solo si de verdad no se ha establecido nada." }
   ],
   "diasTranscurridosTotal": 3,
   "fechaFinal": { "year": 1492, "dayOfYear": 3, "minute": 1260 },
