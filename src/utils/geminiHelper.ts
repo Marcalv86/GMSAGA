@@ -2183,9 +2183,11 @@ El Narrador debe modular de forma inteligente y autónoma la extensión de cada 
   // lee, al final se repite en dos líneas el compromiso de formato, que es lo
   // que de verdad necesita estar fresco.
   const manualDmRollsSection = project.manualDmRolls ? `
-### TIRADAS DE DM / PNJS MANUALES (EXIGENCIA DE MESA)
-- **MODO DE TIRADAS MANUALES ACTIVADO:** NUNCA resuelvas tiradas de PNJs, guardias, trampas o del DM de forma automática ni escribas resultados numéricos de dados de PNJs.
-- Cuando un PNJ intente algo, perciba algo, ataque, mienta o compita contra el personaje, o cuando haya una oposición activa, **detén la narración y pide explícitamente al jugador que realice la tirada de dados manual** para el PNJ o la situación (ej. indicando qué atributo o CD debe superar el jugador, o pidiendo que el jugador tire por el PNJ).
+### ⛔🎲 TIRADAS DE DM / PNJS MANUALES (EXIGENCIA DE MESA)
+- **MODO DE TIRADAS MANUALES ACTIVADO:** NUNCA resuelvas tiradas de PNJs, guardias, trampas o del DM de forma automática, ni escribas un resultado numérico de un dado de PNJ, ni emitas \`[Tirada DM (...)]\` con un número dentro. **En esta mesa no tienes dados.**
+- Cuando un PNJ intente algo, perciba algo, ataque, mienta o compita contra el personaje, o cuando haya una oposición activa, **detén la narración AHÍ MISMO y pídele la tirada a la jugadora**, diciendo qué se tira y contra qué (ej. «tira SAB por la perspicacia del guardia, contra tu Engaño»). Ella lanza el dado de verdad y te da el número.
+- **⛔ Y no te adelantes al resultado.** Nada de narrar lo que pasa «mientras tanto» dando por hecho un éxito o un fallo: si la tirada decide el desenlace, el turno se acaba en la petición. Un turno que termina esperando un dado está BIEN hecho; uno que resuelve y sigue ha dado por cierto algo que nadie ha tirado.
+- El motivo de esta mesa es que los dados se vean. Resolver por tu cuenta, aunque el resultado sea justo, rompe justamente lo que se quería arreglar.
 ` : '';
 
   const bloqueEstable = `${CORE_INTERFACE_PROTOCOLS}
@@ -2372,7 +2374,21 @@ ${bloqueVivo}`;
     }
   }
 
-  const diceContext = `\n\n[DADOS SECRETOS TRAS LA PANTALLA DEL DIRECTOR (USO INTERNO MECÁNICO): d20: ${dicePool.d20.join(', ')} | d100: ${dicePool.d100.join(', ')} | d6: ${dicePool.d6.join(', ')}]\n(⚠️ PROHIBIDO NOMBRAR LA "RESERVA DE DADOS" EN LA PROSA. Úsalos en secreto para resolver éxitos/fallos de PNJs o con la etiqueta [Tirada DM (...)], pero nunca los redactes dentro del relato literario).`;
+  /*
+   * EN MODO MANUAL NO SE MANDA LA RESERVA DE DADOS.
+   *
+   * Aquí estaba el fallo de «lo pongo en manual y le da igual, sigue tirando
+   * la IA». El modo manual dice «NUNCA resuelvas tiradas de PNJs de forma
+   * automática»... y esto, que es LO ÚLTIMO que lee en cada turno, le ponía
+   * delante una reserva de dados con la orden de «úsalos en secreto para
+   * resolver éxitos/fallos de PNJs». Dos instrucciones opuestas, y ganaba la
+   * de abajo por ser la más concreta y la más reciente. Quitarle los dados es
+   * lo único que hace la prohibición creíble: no se le puede pedir que no
+   * tire mientras se le da con qué.
+   */
+  const diceContext = project.manualDmRolls
+    ? `\n\n[⛔ TIRADAS MANUALES: ESTA MESA NO TE DA DADOS. No hay reserva secreta este turno y no la vas a recibir. NO resuelvas por tu cuenta ninguna tirada de PNJ, guardia, trampa ni oposición, ni inventes el número. Cuando la escena llegue a un punto que exija una tirada, PÁRATE AHÍ y pídesela a la jugadora diciendo qué se tira y contra qué: ella tirará el dado de verdad y te dará el resultado. Detenerte a media escena esperando su tirada es lo correcto, no un turno a medias.]`
+    : `\n\n[DADOS SECRETOS TRAS LA PANTALLA DEL DIRECTOR (USO INTERNO MECÁNICO): d20: ${dicePool.d20.join(', ')} | d100: ${dicePool.d100.join(', ')} | d6: ${dicePool.d6.join(', ')}]\n(⚠️ PROHIBIDO NOMBRAR LA "RESERVA DE DADOS" EN LA PROSA. Úsalos en secreto para resolver éxitos/fallos de PNJs o con la etiqueta [Tirada DM (...)], pero nunca los redactes dentro del relato literario).`;
   /**
    * El recordatorio va AQUÍ, pegado al turno de la jugadora, y no solo en las
    * directivas de arriba.
