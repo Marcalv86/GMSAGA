@@ -265,6 +265,11 @@ const PALABRAS_DE_CATEGORIA: Partial<Record<NonNullable<ProjectFile['category']>
   compendio: 'compendio resumen novelas trasfondo material de fondo canon',
   cantera: 'cantera lugar lugares localizacion escenario ciudad barrio taberna edificio sitio',
   lore: 'lore ambientacion historia cultura facciones religion costumbres mundo',
+  // Aquí van las palabras de la SITUACIÓN, no las del módulo de origen: una
+  // persecución por los tejados de Luskan tiene que enganchar con las reglas de
+  // persecución vengan de donde vengan.
+  mecanica:
+    'mecanica regla reglas subsistema procedimiento tirada prueba complicacion persecucion perseguir huir huida escapar carrera tejados sigilo urbano intriga frio helada ventisca temperatura exposicion agotamiento asedio viaje travesia peligro',
   sheet_npc: 'ficha pnj personaje monstruo criatura estadisticas',
   sheet_pj: 'ficha protagonista personaje jugador',
   sheet_companion: 'ficha compañero familiar montura animal',

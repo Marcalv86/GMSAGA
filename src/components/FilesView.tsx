@@ -112,6 +112,7 @@ export const FilesView: React.FC<{
       compendio: 0,
       cantera: 0,
       lore: 0,
+      mecanica: 0,
       style_sample: 0,
       oracle: 0,
       roster: 0,
@@ -214,6 +215,7 @@ export const FilesView: React.FC<{
     { key: 'compendio', label: 'Compendios', icon: BookOpen, desc: 'Resúmenes de novelas y material de fondo de la campaña' },
     { key: 'cantera', label: 'Canteras', icon: Map, desc: 'Lugares, barrios y escenarios listos para usar' },
     { key: 'lore', label: 'Lore', icon: Scroll, desc: 'Ambientación, facciones, historia y cultura' },
+    { key: 'mecanica', label: 'Mecánicas', icon: Dices, desc: 'Subsistemas portátiles: persecuciones, clima extremo, intriga urbana' },
     { key: 'document', label: 'Documentos', icon: BookOpen, desc: 'Reglas y todo lo que no encaje en las otras' },
     {
       key: 'style_sample',
@@ -495,6 +497,7 @@ export const FilesView: React.FC<{
                         <option value="compendio">Compendio</option>
                         <option value="cantera">Cantera (lugares y escenarios)</option>
                         <option value="lore">Lore / ambientación</option>
+                        <option value="mecanica">Mecánica / subsistema</option>
                         <option value="document">Documento</option>
                         <option value="style_sample">Muestra de estilo</option>
                         <option value="oracle">Oráculo / tablas</option>

@@ -556,6 +556,15 @@ export type FileCategory =
   | 'compendio'
   | 'cantera'
   | 'lore'
+  /**
+   * Subsistemas de juego: persecuciones, frío extremo, intriga urbana, asedios.
+   *
+   * Van aparte del lore porque son PORTÁTILES: las reglas de persecución por
+   * los tejados de un módulo urbano sirven igual en otra ciudad, y las de frío
+   * de una campaña ártica sirven en cualquier invierno. Atarlas a su módulo de
+   * origen es perderlas para el resto de la campaña.
+   */
+  | 'mecanica'
   | 'style_sample'
   | 'oracle'
   | 'roster'

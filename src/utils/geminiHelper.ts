@@ -1906,7 +1906,12 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
   if (deConsulta.length > 0) {
     deConsultaCatalogo = `\n\n### 📚 COMPENDIOS Y ARCHIVOS DE CONSULTA EN LA BIBLIOTECA (ON-DEMAND):
 Los siguientes compendios de lore, ambientación y reglas forman parte del archivo del proyecto. Para optimizar tokens y agilizar la respuesta, su texto completo permanece en la biblioteca y sus fragmentos pertinentes se rescatan dinámicamente según lo que suceda en la escena. Si necesitas verificar un dato muy específico no recogido en los fragmentos, indícalo a la jugadora:
-${deConsulta.map(f => `- 📄 **${f.name}**${f.analysis ? `: ${f.analysis.slice(0, 220).trim()}...` : (f.category ? ` [Categoría: ${f.category}]` : '')}`).join('\n')}`;
+${deConsulta.map(f => `- 📄 **${f.name}**${f.analysis ? `: ${f.analysis.slice(0, 220).trim()}...` : (f.category ? ` [Categoría: ${f.category}]` : '')}`).join('\n')}
+${
+      deConsulta.some(f => f.category === 'mecanica')
+        ? '\n⚙️ **Los archivos de MECÁNICA son PORTÁTILES.** Un subsistema traído de un módulo —persecución por los tejados, frío extremo, intriga urbana, asedio— NO está atado a la ciudad ni a la región donde se publicó: si en esta escena hay una huida por los tejados, se usan esas reglas aunque el documento hable de otra ciudad. Lo que se adapta es el decorado, no el procedimiento.'
+        : ''
+    }`;
 
     if (getStoredBusquedaLocal()) {
       const ultimosMensajes = currentChat.messages || [];
@@ -5947,6 +5952,20 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
      * mejor, que es lo peor que se le puede poner: lo mete en el saco de los
      * statblocks.
      */
+    if (
+      palabraEnNombre([
+        'mecanica',
+        'mecánica',
+        'mecanicas',
+        'mecánicas',
+        'subsistema',
+        'persecucion',
+        'persecución',
+        'reglas de'
+      ])
+    ) {
+      return 'mecanica';
+    }
     if (palabraEnNombre(['cantera', 'canteras'])) return 'cantera';
     if (palabraEnNombre(['compendio', 'compendios'])) return 'compendio';
     if (palabraEnNombre(['lore', 'ambientacion', 'ambientación', 'trasfondo del mundo', 'worldbuilding'])) {
