@@ -2132,8 +2132,8 @@ ${pc.backstory ? `- TRASFONDO E HISTORIA: ${pc.backstory}` : ''}
 ${pc.notes ? `- HABILIDADES / NOTAS: ${pc.notes}` : ''}
 ${
   pc.inventory && pc.inventory.length > 0
-    ? `- INVENTARIO REGISTRADO:\n${pc.inventory.map(i => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? ' [Equipado]' : ''}${i.attuned ? ' [Sintonizado]' : ''}${i.damageOrAc ? ` [${i.damageOrAc}]` : ''}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ''}${i.description ? `: ${i.description}` : ''}`).join('\n')}`
-    : `- INVENTARIO Y POSESIONES PERSONALES: Sus pertenencias canónicas (diario personal, runas de adivinación, pergaminos, zurrón, atuendo y equipo de trasfondo) están detalladas en sus fichas y documentos adjuntos abajo. Existen plenamente y las lleva consigo.`
+    ? `- MODIFICACIONES DINÁMICAS DE INVENTARIO (adquiridas, gastadas o modificadas durante la partida):\n${pc.inventory.map(i => `  * ${i.name} (x${i.quantity || 1})${i.equipped ? ' [Equipado]' : ''}${i.attuned ? ' [Sintonizado]' : ''}${i.damageOrAc ? ` [${i.damageOrAc}]` : ''}${i.durationNote ? ` [⏳ ${i.durationNote}]` : ''}${i.description ? `: ${i.description}` : ''}`).join('\n')}\n\n- 🎒 OBJETOS Y EQUIPO CANÓNICO (DENTRO DE SU FICHA):\nTodos los objetos de partida, armas, armadura, vestimenta, diario personal, runas de adivinación, reliquias, herramientas y pertenencias del protagonista ESTÁN DETALLADOS DENTRO DE SU FICHA (revisa el texto íntegro adjunto abajo). El protagonista los lleva encima y los conserva plenamente en la ficción, además de los cambios dinámicos listados arriba.`
+    : `- 🎒 OBJETOS, EQUIPO Y PERTENENCIAS DEL PROTAGONISTA (ESTÁN DENTRO DE SU FICHA):\nTodos los objetos del protagonista (equipo, armas, ropa, zurrón, diario íntimo, runas de adivinación, reliquias, herramientas y posesiones de trasfondo) ESTÁN ESCRITOS DENTRO DEL TEXTO DE SU FICHA adjunta abajo. Existen plenamente en la ficción y los lleva consigo; consúltalos directamente en su ficha e intégralos con total naturalidad.`
 }
 ${pc.currencies ? `- MONEDAS ACTUALES: ${pc.currencies.gp || 0} PO (oro), ${pc.currencies.sp || 0} PP (plata), ${pc.currencies.cp || 0} PC (cobre), ${pc.currencies.ep || 0} PE (electro), ${pc.currencies.pp || 0} PT (platino)` : ''}
 ${pc.sheetText ? `\n--- RESUMEN DE HOJA DE PERSONAJE ---\n${pc.sheetText}` : ''}
@@ -6395,15 +6395,14 @@ export function looksLikeProtagonistSheet(file: ProjectFile, memory?: Memory): b
     return true;
   }
 
-  // Pistas explícitas de protagonista o posesiones personales
+  // Pistas explícitas de protagonista o posesiones personales en nombre o análisis
   const pjCues = [
-    'ficha pj',
-    'ficha oc',
-    'personaje jugador',
+    'ficha',
+    'personaje',
+    'character',
+    'sheet',
     'protagonista',
-    'hoja_personaje',
-    'ficha de personaje',
-    'character sheet',
+    'hoja',
     'diario',
     'journal',
     'bitacora',
@@ -6414,35 +6413,55 @@ export function looksLikeProtagonistSheet(file: ProjectFile, memory?: Memory): b
     'adivinación',
     'runico',
     'rúnico',
-    'pergamino de runas',
+    'pergamino',
     'posesiones',
     'pertenencias',
     'inventario',
-    'equipo personal',
+    'equipo',
     'zurron',
-    'zurrón'
+    'zurrón',
+    'trasfondo',
+    'backstory'
   ];
-  if (pjCues.some(h => name.includes(h) || analysis.includes(h))) return true;
+  if (pjCues.some(h => name.includes(h) || analysis.includes(h))) {
+    const npcCues = ['pnj', 'npc', 'monstruo', 'monster', 'villano', 'bestiario', 'enemigo'];
+    if (!npcCues.some(c => name.includes(c) || analysis.includes(c))) {
+      return true;
+    }
+  }
+
+  // Comprobar si el nombre contiene "pj" o "oc" como palabra o separador
+  if (/\b(pj|oc)\b/i.test(name) || /[-_](pj|oc)[-_.]/i.test(name)) {
+    return true;
+  }
 
   if (file.isImage) {
     return (
-      (analysis.includes('ficha de personaje') || analysis.includes('hoja de personaje')) &&
+      (analysis.includes('ficha') || analysis.includes('hoja de personaje') || analysis.includes('character sheet')) &&
       !analysis.includes('familiar') &&
       !analysis.includes('pnj')
     );
   }
 
-  const body = (file.content || '').substring(0, 4000).toLowerCase();
-  const hasAttributes = body.includes('fuerza') && body.includes('destreza') && body.includes('constitución');
-  const hasSheetKeywords =
-    body.includes('clase y nivel') ||
+  const body = (file.content || '').substring(0, 5000).toLowerCase();
+  const hasAttributes =
+    (body.includes('fuerza') || body.includes('fue:') || body.includes('fue ')) &&
+    (body.includes('destreza') || body.includes('des:') || body.includes('des ')) &&
+    (body.includes('constitución') || body.includes('constitucion') || body.includes('con:') || body.includes('con '));
+
+  const hasDndKeywords =
+    (body.includes('clase') && (body.includes('nivel') || body.includes('raza'))) ||
     body.includes('puntos de golpe') ||
+    body.includes('hit points') ||
+    body.includes('iniciativa') ||
+    body.includes('clase de armadura') ||
     body.includes('trasfondo') ||
-    body.includes('diario personal');
+    body.includes('diario personal') ||
+    (body.includes('inventario') && body.includes('equipo'));
 
   const npcCues = ['pnj', 'npc', 'monstruo', 'monster', 'villano', 'bestiario', 'enemigo'];
 
-  return (hasAttributes || hasSheetKeywords) && !npcCues.some(c => body.includes(c));
+  return (hasAttributes || hasDndKeywords) && !npcCues.some(c => body.includes(c));
 }
 
 /**
