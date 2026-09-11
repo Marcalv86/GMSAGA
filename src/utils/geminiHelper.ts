@@ -5143,8 +5143,30 @@ export async function preguntarAlDirectorOOC(
         }
       : prompt;
 
+  /*
+   * Y aquí el Director SÍ piensa antes de contestar.
+   *
+   * Esta llamada no pasaba `thinkingConfig` en absoluto, así que el modelo
+   * respondía a bote pronto — dijera lo que dijera el ajuste de razonamiento, y
+   * fuera cual fuera el modelo elegido. En la pestaña donde se le hacen las
+   * preguntas más difíciles de la aplicación («cómo va la trama», «esto encaja
+   * con aquello?») eso se nota mucho más que cualquier cambio de modelo, y es
+   * la explicación más probable de que pareciera poco despierto.
+   *
+   * Va aparte del ajuste global a propósito: ese regula el ritmo de NARRAR, y
+   * aquí no se narra. Pensar cuesta fichas de salida, no una petición más, así
+   * que no toca la cuota diaria. Solo se respeta el «mínimo» explícito, por si
+   * alguien lo ha puesto a cero queriendo.
+   */
+  const nivelDePensamiento = getStoredThinkingLevel();
+  const pensar =
+    nivelDePensamiento === 'MINIMAL'
+      ? getThinkingBudgetConfig('MINIMAL', modelo)
+      : getThinkingBudgetConfig('HIGH', modelo);
+
   const config = {
     temperature: 0.6,
+    ...(pensar ? { thinkingConfig: pensar } : {}),
     ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
   } as any;
 
