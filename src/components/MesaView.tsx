@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MensajeDeMesa, TOPE_MENSAJES, leerMesa, guardarMesa, borrarMesa } from '../utils/mesaStorage';
+import { MensajeDeMesa, TOPE_MENSAJES, leerMesa, guardarMesa, borrarMesa, leerModeloDeMesa, guardarModeloDeMesa } from '../utils/mesaStorage';
 
 // Se siguen exportando desde aquí porque es donde el resto de la app las
 // buscaba antes de que el almacén se mudara a utils/mesaStorage.
@@ -19,10 +19,11 @@ import {
   Send,
   Swords,
   Trash2,
+  Pencil,
   Users
 } from 'lucide-react';
 import { Chat, Project } from '../types';
-import { describeApiError, ImagenDeMesa, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
+import { AVAILABLE_MODELS, describeApiError, ImagenDeMesa, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
 import { SecretoLeido } from '../utils/campaignCalendar';
 import {
   conMiles,
@@ -99,6 +100,12 @@ export const MesaView: React.FC<{
   /** Cuánto del vídeo mira el Director, y si lo mira siquiera. */
   const [tramo, setTramo] = useState<TramoDeVideo>('corto');
   const [mirarElVideo, setMirarElVideo] = useState(true);
+  /*
+   * El Director no necesita el modelo de narrar ni merece el de fondo.
+   *
+   * Vacío significa «el de tareas de fondo», que es lo que hacía siempre.
+   */
+  const [modelo, setModelo] = useState<string>(() => leerModeloDeMesa());
 
   /*
    * Los vídeos se leen del texto que se está escribiendo, no de un adjunto
@@ -174,7 +181,8 @@ export const MesaView: React.FC<{
           pregunta ||
           (adjuntos.length ? '(sin texto: mira la imagen adjunta)' : '(sin texto: mira el vídeo)'),
         imagenes: adjuntos.map(a => a.imagen),
-        videos
+        videos,
+        modelo
       });
       const completo: MensajeDeMesa[] = [
         ...conLaPregunta,
@@ -219,6 +227,68 @@ export const MesaView: React.FC<{
     borrarMesa(project.id);
     setMensajes([]);
     setError('');
+  };
+
+  /*
+   * Poder corregir y borrar lo que ya está dicho.
+   *
+   * Esta conversación es un cuaderno de trabajo, no una crónica: aquí se
+   * piensa en voz alta, se manda una pregunta mal formulada y se pega un enlace
+   * equivocado. Sin poder tocarlos, cada tropiezo se quedaba dentro para
+   * siempre —y encima viaja al Director en las siguientes preguntas, porque el
+   * historial entra en el prompt—, así que una pregunta torcida seguía
+   * torciendo las respuestas de después.
+   */
+  const [editando, setEditando] = useState<number | null>(null);
+  const [borrador, setBorrador] = useState('');
+
+  const guardarMensajes = (nuevos: MensajeDeMesa[]) => {
+    setMensajes(nuevos);
+    guardarMesa(project.id, nuevos);
+  };
+
+  const empezarAEditar = (i: number) => {
+    setEditando(i);
+    setBorrador(mensajes[i]?.content || '');
+  };
+
+  const guardarEdicion = () => {
+    if (editando === null) return;
+    const texto = borrador.trim();
+    const i = editando;
+    setEditando(null);
+    setBorrador('');
+    // Vaciarlo del todo es borrarlo: es lo que espera cualquiera que se deja
+    // el campo en blanco, y ahorra tener que ir a buscar la papelera.
+    if (!texto) {
+      guardarMensajes(mensajes.filter((_, k) => k !== i));
+      return;
+    }
+    guardarMensajes(mensajes.map((m, k) => (k === i ? { ...m, content: texto } : m)));
+  };
+
+  const borrarMensaje = (i: number) => {
+    if (editando === i) {
+      setEditando(null);
+      setBorrador('');
+    }
+    guardarMensajes(mensajes.filter((_, k) => k !== i));
+  };
+
+  /**
+   * Borra un envío y la respuesta que arrastró.
+   *
+   * Rehacer una pregunta y dejar la respuesta vieja debajo deja la
+   * conversación contradiciéndose a sí misma, y esa contradicción viaja al
+   * Director en el siguiente turno.
+   */
+  const borrarConSuRespuesta = (i: number) => {
+    const hastaDonde = mensajes[i]?.role === 'user' && mensajes[i + 1]?.role === 'model' ? i + 2 : i + 1;
+    guardarMensajes([...mensajes.slice(0, i), ...mensajes.slice(hastaDonde)]);
+    if (editando !== null) {
+      setEditando(null);
+      setBorrador('');
+    }
   };
 
   return (
@@ -268,6 +338,32 @@ export const MesaView: React.FC<{
               {mensajes.length}/{TOPE_MENSAJES}
             </span>
           )}
+        {/*
+          Qué modelo contesta aquí, elegible y a la vista.
+
+          Esta pestaña heredaba el modelo «de tareas de fondo» —el más barato de
+          la lista— solo por cómo se montó, y es al revés de lo que pide: aquí se
+          le plantean las preguntas más difíciles de la aplicación y no hay que
+          narrar nada. Además el reparto de cuota lo cambia todo: los modelos
+          grandes van racionados por día y los pequeños por minuto, así que
+          conviene poder elegir según lo que vayas a preguntar.
+        */}
+        <select
+          value={modelo}
+          onChange={e => {
+            setModelo(e.target.value);
+            guardarModeloDeMesa(e.target.value);
+          }}
+          className="shrink-0 rounded-lg border border-[var(--user-border)] bg-[var(--surface)] px-2 py-1.5 text-[11px] font-cinzel text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] cursor-pointer max-w-[150px] sm:max-w-none"
+          title="Con qué modelo contesta el Director en esta pestaña. Aquí no se narra: lo que importa es que razone bien con toda la campaña delante."
+        >
+          <option value="">Modelo de fondo (por defecto)</option>
+          {AVAILABLE_MODELS.map(m => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
         {mensajes.length > 0 && (
           <button
             onClick={limpiar}
@@ -343,7 +439,7 @@ export const MesaView: React.FC<{
           {mensajes.map((m, i) => (
             <div
               key={i}
-              className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
+              className={`group relative max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
                 m.role === 'user'
                   ? 'self-end bg-[var(--msg-user)] border border-[var(--user-border)]'
                   : 'self-start bg-[var(--surface-soft)] border border-[var(--glass-border)] markdown-body'
@@ -366,11 +462,48 @@ export const MesaView: React.FC<{
                   <Eye className="w-3 h-3 shrink-0" /> Lo vio · {m.videoVisto}
                 </div>
               ) : null}
-              {m.content
-                ? m.role === 'user'
-                  ? m.content
-                  : <ReactMarkdown>{m.content}</ReactMarkdown>
-                : null}
+              {editando === i ? (
+                <div className="flex flex-col gap-2">
+                  <textarea
+                    value={borrador}
+                    onChange={e => setBorrador(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Escape') {
+                        setEditando(null);
+                        setBorrador('');
+                      }
+                      // Ctrl/Cmd+Enter guarda, como en cualquier editor. Enter
+                      // a secas hace salto de línea: aquí se escriben párrafos.
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) guardarEdicion();
+                    }}
+                    autoFocus
+                    rows={Math.min(12, Math.max(3, borrador.split('\n').length + 1))}
+                    className="w-full resize-y rounded-lg border border-[var(--accent)]/50 bg-[var(--surface)] px-2.5 py-2 text-sm font-lora text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                  />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={guardarEdicion}
+                      className="rounded-md bg-[var(--accent)] px-2.5 py-1 font-cinzel text-[11px] font-bold text-[var(--on-accent)] cursor-pointer"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditando(null);
+                        setBorrador('');
+                      }}
+                      className="rounded-md border border-[var(--user-border)] px-2.5 py-1 font-cinzel text-[11px] cursor-pointer text-[var(--text-secondary)]"
+                    >
+                      Cancelar
+                    </button>
+                    <span className="text-[10px] font-lora text-[var(--text-secondary)] opacity-80">
+                      Si lo dejas vacío, se borra.
+                    </span>
+                  </div>
+                </div>
+              ) : m.content ? (
+                m.role === 'user' ? m.content : <ReactMarkdown>{m.content}</ReactMarkdown>
+              ) : null}
               {/*
                 Los enlaces se ven, como en el chat de juego. Aquí es donde se
                 comparte una referencia visual o una pieza de música para una
@@ -432,6 +565,39 @@ export const MesaView: React.FC<{
                   ))}
                 </div>
               ) : null}
+
+              {/*
+                Visibles en el móvil, que es donde se juega: en una pantalla
+                táctil no hay «hover» que revele nada, así que van tenues y
+                siempre puestos, y se marcan al pasar por encima en escritorio.
+              */}
+              {editando !== i && (
+                <div className="mt-1.5 flex items-center gap-2.5 opacity-50 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => empezarAEditar(i)}
+                    className="flex items-center gap-1 font-cinzel text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+                    title="Corregir lo que dice este mensaje. Lo que quede escrito es lo que verá el Director en las siguientes preguntas."
+                  >
+                    <Pencil className="w-3 h-3" /> Editar
+                  </button>
+                  <button
+                    onClick={() => borrarMensaje(i)}
+                    className="flex items-center gap-1 font-cinzel text-[10px] text-[var(--text-secondary)] hover:text-red-500 cursor-pointer"
+                    title="Quitar solo este mensaje de la conversación."
+                  >
+                    <Trash2 className="w-3 h-3" /> Borrar
+                  </button>
+                  {m.role === 'user' && mensajes[i + 1]?.role === 'model' && (
+                    <button
+                      onClick={() => borrarConSuRespuesta(i)}
+                      className="flex items-center gap-1 font-cinzel text-[10px] text-[var(--text-secondary)] hover:text-red-500 cursor-pointer"
+                      title="Quitar esta pregunta y la respuesta que provocó. Es lo que quieres si vas a reformularla: dejar la respuesta vieja debajo deja la conversación contradiciéndose."
+                    >
+                      <Trash2 className="w-3 h-3" /> …y su respuesta
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
 

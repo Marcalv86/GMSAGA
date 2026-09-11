@@ -68,3 +68,31 @@ export function borrarMesa(projectId: string): void {
     /* nada que hacer */
   }
 }
+
+/**
+ * Con qué modelo contesta el Director en esta pestaña.
+ *
+ * Va aparte del modelo de narración y del de tareas de fondo porque no hace
+ * ninguna de las dos cosas: aquí no se narra —así que no importa la prosa— y
+ * las preguntas son de las más exigentes de la aplicación, con toda la campaña
+ * delante. Que herede el modelo «de fondo», que es el más barato de la lista,
+ * era un accidente de cómo se montó, no una decisión.
+ */
+const CLAVE_MODELO_MESA = 'gmstudio_mesa_modelo';
+
+export function leerModeloDeMesa(): string {
+  try {
+    return localStorage.getItem(CLAVE_MODELO_MESA)?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+export function guardarModeloDeMesa(id: string): void {
+  try {
+    if (id.trim()) localStorage.setItem(CLAVE_MODELO_MESA, id.trim());
+    else localStorage.removeItem(CLAVE_MODELO_MESA);
+  } catch {
+    /* sin sitio: se seguirá usando el de fondo */
+  }
+}

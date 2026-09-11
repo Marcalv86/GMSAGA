@@ -4844,6 +4844,17 @@ export interface ConsultaDeMesa {
   /** Imágenes adjuntas al mensaje, que sí llegan al modelo. */
   imagenes?: ImagenDeMesa[];
   /**
+   * Con qué modelo contesta el Director, si se le quiere cambiar.
+   *
+   * Esta pestaña usaba el modelo «de tareas de fondo» —el más barato de la
+   * lista— por venir de ahí, y es justo al revés de lo que pide: aquí es donde
+   * se le plantean las preguntas más difíciles de toda la aplicación («cómo va
+   * la trama», «ayúdame a pensar esto»), sin nada que narrar y con toda la
+   * campaña delante. Un modelo pequeño en la tarea más exigente se nota
+   * enseguida. Sin esto, manda el de fondo.
+   */
+  modelo?: string;
+  /**
    * Vídeos de YouTube que el Director debe mirar.
    *
    * La capa gratuita admite UN vídeo por petición, así que aquí llega como
@@ -4999,7 +5010,7 @@ export async function preguntarAlDirectorOOC(
   consulta: ConsultaDeMesa & { signal?: AbortSignal }
 ): Promise<RespuestaDeMesa> {
   const prompt = construirPromptOOC(consulta);
-  const modelo = getBackgroundTaskModel();
+  const modelo = consulta.modelo?.trim() || getBackgroundTaskModel();
 
   /*
    * Las imágenes van como `inlineData` junto al texto, que es como las recibe
