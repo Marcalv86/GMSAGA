@@ -289,8 +289,9 @@ export const ContextUsageWidget: React.FC<{
                   </h4>
 
                   <p className="text-[11px] text-[var(--text-secondary)] m-0 mb-3">
-                    Reparto de los {compact(totalChars)} caracteres que se envían en cada turno. Del historial
-                    solo viaja el tramo reciente: lo viejo ya está resumido en la Memoria Viva.
+                    Reparto de los {compact(totalChars)} caracteres que se envían en cada turno. De los capítulos
+                    cerrados solo viaja el tramo final de cada uno; lo que hay que recordar de lo viejo vive en el
+                    diario y en la memoria.
                   </p>
 
                   <ul className="flex flex-col gap-2.5 m-0 p-0 list-none">
@@ -522,26 +523,51 @@ export const ContextUsageWidget: React.FC<{
                     <Landmark className="w-4 h-4 shrink-0" /> Cómo recuerda la campaña
                   </h4>
                   <p className="text-xs md:text-sm text-[var(--text-primary)] m-0">
-                    Todo lo que ves arriba viaja al modelo en cada turno. Se organiza en tres capas para que
-                    la partida no pierda el hilo tras cientos de mensajes:
+                    En cada turno le llegan al Narrador <strong>cuatro cosas distintas</strong>, y no valen lo
+                    mismo. Entender cuál es cuál es lo que evita la mitad de los problemas:
                   </p>
-                  <ul className="list-disc pl-5 text-xs md:text-sm space-y-1.5 text-[var(--text-secondary)]">
+                  <ol className="list-decimal pl-5 text-xs md:text-sm space-y-2 text-[var(--text-secondary)] marker:text-[var(--accent)] marker:font-bold">
                     <li>
-                      <strong className="text-[var(--text-primary)]">Base de conocimiento.</strong> Tus
-                      documentos, íntegros. Al ser lo que menos cambia, van al principio del mensaje, donde
-                      Google puede reutilizarlos entre turnos en vez de reprocesarlos.
+                      <strong className="text-[var(--text-primary)]">Documentos — lo que el mundo ES.</strong>{' '}
+                      Tu ficha, las de tus compañeros, los compendios, el módulo. <strong>Son la fuente.</strong>{' '}
+                      Lo que está escrito ahí existe y es verdad aunque no haya salido jugando todavía y aunque no
+                      lo repita ningún panel. Van íntegros y al principio del mensaje, donde Google los reutiliza
+                      entre turnos en vez de reprocesarlos.
                     </li>
                     <li>
-                      <strong className="text-[var(--text-primary)]">Memoria viva.</strong> PNJs, lugares,
-                      tramas y estado actual. Se guarda en tu navegador y se inyecta en cada escena, junto al
-                      final del mensaje, que es donde el modelo más atención presta.
+                      <strong className="text-[var(--text-primary)]">Chat actual — lo que pasa AHORA.</strong>{' '}
+                      La conversación de esta sesión, entera y sin resumir. Manda sobre el estado de la escena:
+                      quién tienes delante, qué se acaba de decir, dónde estás.
                     </li>
                     <li>
-                      <strong className="text-[var(--text-primary)]">Sincronización.</strong> Al pulsar{' '}
-                      <em>Sincronizar con IA</em> en Memoria, se releen los capítulos y se actualizan esas
-                      fichas. Cuanto más al día esté la memoria, menos historial hace falta arrastrar.
+                      <strong className="text-[var(--text-primary)]">Chats cerrados — el pasado de la aventura.</strong>{' '}
+                      El <em>final</em> de los capítulos anteriores, <strong>recortado</strong>: los últimos mensajes
+                      de cada uno y hasta donde cabe. Sirve para enlazar con lo último que pasó.{' '}
+                      <strong className="text-[var(--text-primary)]">No es el registro de la campaña</strong> — de eso
+                      se encargan el diario y la memoria.
                     </li>
-                  </ul>
+                    <li>
+                      <strong className="text-[var(--text-primary)]">Memoria persistente y fichas de PNJ — el refuerzo.</strong>{' '}
+                      Personajes, lugares, tramas, diario, inventario, vínculos y secretos. Se guarda en tu navegador y
+                      viaja cerca del final, que es donde el modelo más mira.{' '}
+                      <strong className="text-[var(--text-primary)]">No sustituye a nada:</strong> existe para que no se
+                      olvide lo que se ha jugado, igual que la memoria de un proyecto no reemplaza a sus documentos.
+                    </li>
+                  </ol>
+                  <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] rounded-lg p-3 text-xs text-[var(--text-secondary)] space-y-1.5">
+                    <p className="m-0">
+                      <strong className="text-[var(--accent)] font-cinzel">Lo importante, y va escrito en los
+                      protocolos:</strong> que algo <em>no</em> salga en un panel no significa que no exista. Un panel
+                      vacío es un panel vacío, no un mundo vacío. La memoria solo manda{' '}
+                      <strong className="text-[var(--text-primary)]">dato por dato</strong>, sobre lo que dice que ha
+                      cambiado —gastado, perdido, requisado, revelado—; para todo lo demás manda el documento.
+                    </p>
+                    <p className="m-0">
+                      Por eso <em>Sincronizar con IA</em> en Memoria no es obligatorio para jugar: relee los capítulos
+                      y pone al día esas fichas, y cuanto más al día estén, menos se apoya la partida en arrastrar
+                      historial.
+                    </p>
+                  </div>
                 </div>
 
                 {/* File Optimization Guide */}

@@ -2117,7 +2117,15 @@ ${lista
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
 ${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMochila ? `${bloqueMochila}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
-${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHistory}` : ''}
+${
+  allPreviousHistory.length > 0
+    ? `### 📖 EL PASADO DE ESTA AVENTURA (capítulos ya cerrados)
+⚠️ **Esto NO es un resumen y NO está completo.** Es el FINAL EN BRUTO de las sesiones anteriores, recortado hasta donde cabe: de cada capítulo llegan sus últimos mensajes y nada más. Sirve para enlazar con lo último que ocurrió y para no contradecir lo que se acababa de decir.
+⛔ **No lo uses para decidir que algo no pasó.** Si una persona, un objeto o un suceso no aparece aquí, pudo jugarse igualmente en el tramo que no te llega: está en el diario, en la memoria o en los documentos. El registro de la campaña son esos, no esta cola.
+
+${allPreviousHistory}`
+    : ''
+}
   `.trim()
     : 'No hay memoria acumulada aún.';
 
