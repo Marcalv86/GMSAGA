@@ -15,6 +15,7 @@ import {
   ScheduledThread,
   Message
 } from '../types';
+import type { CambioDeInventario } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import {
@@ -59,6 +60,7 @@ import {
   VinculoLeido,
   HiloLeido
 } from './campaignCalendar';
+import { cambioVacio, leerInventario } from './inventoryTag';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 import { logError, logWarn, logInfo } from './logger';
 import { abrirLlamada, cerrarLlamada } from './callLog';
@@ -2389,6 +2391,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
      «orientacion» es OPCIONAL y se manda UNA VEZ, la primera, cuando sus documentos lo digan o el juego lo haya dejado claro: «hombres», «mujeres», «le da igual», «asexual», «casado y va en serio», «no le interesa nadie ahora mismo». Se queda guardado en su ficha y vuelve a ti en todos los turnos siguientes, así que **no hace falta repetirlo** y NO te lo inventes para rellenar: si no consta, lo dejas fuera, y sin que conste la atracción no sube (ver el protocolo de la atracción).
      ⚠️ Y un aviso sobre «atr»: la aplicación NO acepta puntuaciones de salida. Un personaje que aparece por primera vez entra con la atracción a 0 y sube como mucho un punto por día de trato, así que escribir «atr: 8» en un primer encuentro no consigue un 8: consigue un 0 o un 1. La química se juega, no se declara.
    - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, +Z PO, -W PO, +A PP, -B PC] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda o consuma objetos o dinero durante la escena (ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)], si come 3 de 10: [INVENTARIO: -3 Buenas Bayas], si gasta 15 de oro en una tienda: [INVENTARIO: +Disfraz noble, -15 PO], si Jarlaxle le entrega una Máscara de Disfraz: [INVENTARIO: +1 Máscara de Disfraz (mágica, equipada)], si pierde la máscara: [INVENTARIO: -1 Máscara de Disfraz]). Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
+     ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
 
@@ -3303,6 +3306,14 @@ export interface TiempoReportado {
   /** Cómo han cambiado los vínculos de los personajes habituales. */
   vinculos: VinculoLeido[];
   /**
+   * Lo que ha entrado o salido de su mochila, y el dinero que se ha movido.
+   *
+   * El Narrador escribía esta etiqueta desde el primer día y la aplicación la
+   * borraba sin leerla: su equipo era una lista de la ficha que no cambiaba
+   * nunca por mucho que gastara, comprara o le regalaran.
+   */
+  inventario: CambioDeInventario;
+  /**
    * Giros nuevos que quedan plantados para más adelante.
    *
    * Es la forma de que una idea que la jugadora suelta al preparar la escena
@@ -3379,6 +3390,7 @@ async function saveStreamedMessage(
   const secretos = leerSecretos(cleanedText);
   const viaje = leerViaje(cleanedText);
   const lugares = leerLugares(cleanedText);
+  const inventario = leerInventario(cleanedText);
   // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
   const hudDeEsteTurno = leerFechaDeHud(fullText);
   const avanceDeNivel = leerAvanceDeNivel(cleanedText) || undefined;
@@ -3404,13 +3416,15 @@ async function saveStreamedMessage(
       viaje ||
       lugares.length ||
       hudDeEsteTurno?.fechaTexto ||
-      avanceDeNivel)
+      avanceDeNivel ||
+      !cambioVacio(inventario))
   ) {
     try {
       onTimeReported({
         minutos: avance.minutos,
         agenda,
         hilos,
+        inventario,
         presentes,
         vinculos,
         revelaciones,

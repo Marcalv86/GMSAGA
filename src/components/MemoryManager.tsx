@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, Memory, NPC, Location, ProjectFile, TimelineEntry } from '../types';
+import { Project, Memory, NPC, Location, ProjectFile, TimelineEntry, InventoryItem } from '../types';
 import {
   obtenerInfoRelacion,
   CALENDARIO_FANTASTICO,
@@ -41,6 +41,9 @@ import {
   Trash2,
   UserMinus,
   User,
+  Backpack,
+  Coins,
+  PackageCheck,
   Users
 } from 'lucide-react';
 
@@ -147,6 +150,7 @@ export function tieneAfinidadActiva(npc: NPC): boolean {
 
 export type SeccionMemoria =
   | 'character'
+  | 'inventario'
   | 'diary'
   | 'npcs'
   | 'locs'
@@ -186,7 +190,7 @@ export const MemoryManager: React.FC<{
    */
   const seccionesVisibles: SeccionMemoria[] = secciones?.length
     ? secciones
-    : ['character', 'diary', 'npcs', 'locs', 'quests', 'story', 'status', 'giros'];
+    : ['character', 'inventario', 'diary', 'npcs', 'locs', 'quests', 'story', 'status', 'giros'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
 
@@ -574,6 +578,16 @@ export const MemoryManager: React.FC<{
               shortLabel: 'Protagonista',
               icon: User,
               count: memory.player_character?.name ? `(${memory.player_character.name})` : ''
+            },
+            {
+              id: 'inventario',
+              label: 'Inventario',
+              shortLabel: 'Mochila',
+              icon: Backpack,
+              count: (() => {
+                const n = (memory.player_character?.inventory || []).filter(i => !i.resuelto).length;
+                return n ? `(${n})` : '';
+              })()
             },
             {
               id: 'diary',
@@ -2002,6 +2016,232 @@ export const MemoryManager: React.FC<{
           </div>
         </div>
       )}
+
+      {/* Tab: Inventario (la mochila del OC) */}
+      {activeTab === 'inventario' && (() => {
+        const todo = memory.player_character?.inventory || [];
+        const monedas = memory.player_character?.currencies;
+
+        /*
+         * La separación que pidió la jugadora, y que es la que de verdad
+         * importa: su violín, su diario y sus pociones son SUYOS y están ahí;
+         * una carta que entregar o un pergamino que traducir son una tarea con
+         * forma de objeto. Mezclarlos escondía el hilo entre las pociones.
+         */
+        const deMision = todo.filter(i => i.deMision && !i.resuelto);
+        const resueltos = todo.filter(i => i.deMision && i.resuelto);
+        const propios = todo.filter(i => !i.deMision);
+
+        const alternarMision = async (id: string) => {
+          await onUpdateMemory(mem => ({
+            ...mem,
+            player_character: {
+              ...(mem.player_character || { name: '' }),
+              inventory: (mem.player_character?.inventory || []).map(i =>
+                i.id === id ? { ...i, deMision: !i.deMision } : i
+              )
+            }
+          }));
+        };
+        const alternarResuelto = async (id: string) => {
+          await onUpdateMemory(mem => ({
+            ...mem,
+            player_character: {
+              ...(mem.player_character || { name: '' }),
+              inventory: (mem.player_character?.inventory || []).map(i =>
+                i.id === id ? { ...i, resuelto: !i.resuelto } : i
+              )
+            }
+          }));
+        };
+        const quitar = async (id: string) => {
+          await onUpdateMemory(mem => ({
+            ...mem,
+            player_character: {
+              ...(mem.player_character || { name: '' }),
+              inventory: (mem.player_character?.inventory || []).filter(i => i.id !== id)
+            }
+          }));
+        };
+
+        const Tarjeta: React.FC<{ item: InventoryItem; tono: 'mision' | 'propio' | 'hecho' }> = ({ item, tono }) => (
+          <div
+            className={`p-3.5 rounded-lg border flex flex-col gap-1.5 group transition-colors ${
+              tono === 'mision'
+                ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60'
+                : tono === 'hecho'
+                ? 'bg-[var(--surface-soft)] border-[var(--user-border)] opacity-70'
+                : 'bg-[var(--surface-soft)] border-[var(--user-border)] hover:border-[var(--accent)]/40'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                <span className={`font-cinzel font-bold text-xs sm:text-sm break-words ${tono === 'hecho' ? 'text-[var(--text-secondary)] line-through' : 'text-[var(--accent)]'}`}>
+                  {item.name}
+                </span>
+                {(item.quantity ?? 0) > 1 && (
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]">
+                    ×{item.quantity}
+                  </span>
+                )}
+                {item.equipped && (
+                  <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
+                    equipado
+                  </span>
+                )}
+                {item.durationNote && (
+                  <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]">
+                    ⏳ {item.durationNote}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => quitar(item.id)}
+                className="text-[var(--text-secondary)] hover:text-red-500 p-1 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer shrink-0"
+                title="Quitarlo de la mochila"
+                aria-label={`Quitar «${item.name}» de la mochila`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {item.encargo && (
+              <p className="text-xs font-lora text-[var(--text-primary)] m-0 leading-relaxed">
+                <strong className="font-cinzel text-[11px] text-[var(--accent)]">Hay que:</strong> {item.encargo}
+              </p>
+            )}
+            {item.origen && (
+              <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
+                De: {item.origen}
+              </p>
+            )}
+            {item.description && (
+              <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed whitespace-pre-wrap">
+                {item.description}
+              </p>
+            )}
+
+            <div className="flex items-center gap-2 flex-wrap pt-0.5">
+              {item.mision && (
+                <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                  {item.mision}
+                </span>
+              )}
+              <button
+                onClick={() => alternarMision(item.id)}
+                className="text-[10px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+                title={item.deMision ? 'Pasarlo a sus cosas de siempre' : 'Marcarlo como objeto de misión: algo que hay que entregar, traducir o devolver'}
+              >
+                {item.deMision ? '↩ Es cosa suya' : '⭐ Es de misión'}
+              </button>
+              {item.deMision && (
+                <button
+                  onClick={() => alternarResuelto(item.id)}
+                  className="text-[10px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+                  title={item.resuelto ? 'Volver a dejarlo pendiente' : 'Ya está entregado, traducido o devuelto'}
+                >
+                  {item.resuelto ? '↩ Sigue pendiente' : '✓ Ya está hecho'}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+
+        return (
+          <div className="flex flex-col gap-5">
+            {/* El monedero */}
+            <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                <Coins className="w-3.5 h-3.5 text-[var(--accent)]" /> Bolsa
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {([
+                  ['pp', 'PP', 'text-slate-500'],
+                  ['gp', 'PO', 'text-amber-600'],
+                  ['ep', 'PE', 'text-cyan-600'],
+                  ['sp', 'PA', 'text-zinc-500'],
+                  ['cp', 'PC', 'text-orange-700']
+                ] as [keyof typeof monedas & string, string, string][])
+                  .filter(([k]) => (monedas?.[k] ?? 0) > 0)
+                  .map(([k, etiqueta, color]) => (
+                    <span
+                      key={k}
+                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
+                    >
+                      {monedas?.[k]} {etiqueta}
+                    </span>
+                  ))}
+                {!monedas || Object.values(monedas).every(v => !v) ? (
+                  <span className="text-[11px] font-lora italic text-[var(--text-secondary)]">Sin blanca.</span>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Objetos de misión */}
+            <div className="flex flex-col gap-2.5">
+              <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-amber-500/30">
+                <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                  <Scroll className="w-3.5 h-3.5 text-amber-600" />
+                  Lo que lleva por encargo ({deMision.length})
+                </span>
+                <p className="text-[11px] text-[var(--text-secondary)] opacity-80 m-0 mt-0.5 leading-relaxed">
+                  Una carta que entregar, un pergamino que traducir, algo que ha tenido que robar. No es equipo: es
+                  trama con forma de objeto, y por eso va aparte.
+                </p>
+              </div>
+              {deMision.length === 0 ? (
+                <div className="text-[var(--text-secondary)] italic py-5 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs">
+                  Ahora mismo no lleva nada por encargo de nadie.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {deMision.map(i => <Tarjeta key={i.id} item={i} tono="mision" />)}
+                </div>
+              )}
+            </div>
+
+            {/* Sus cosas */}
+            <div className="flex flex-col gap-2.5">
+              <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
+                <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                  <Backpack className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  Sus cosas ({propios.length})
+                </span>
+                <p className="text-[11px] text-[var(--text-secondary)] opacity-80 m-0 mt-0.5 leading-relaxed">
+                  Su violín, su diario, las pociones, lo que ha comprado. Lo que es suyo y no le debe nada a nadie.
+                </p>
+              </div>
+              {propios.length === 0 ? (
+                <div className="text-[var(--text-secondary)] italic py-5 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs">
+                  Aquí aparece lo que gane, compre o le den jugando. Lo que trae de casa está en el texto de su ficha.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {propios.map(i => <Tarjeta key={i.id} item={i} tono="propio" />)}
+                </div>
+              )}
+            </div>
+
+            {/* Lo ya resuelto: no se borra, porque cuenta lo que pasó */}
+            {resueltos.length > 0 && (
+              <div className="flex flex-col gap-2.5">
+                <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
+                  <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                    <PackageCheck className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                    Encargos cerrados ({resueltos.length})
+                  </span>
+                  <p className="text-[11px] text-[var(--text-secondary)] opacity-80 m-0 mt-0.5 leading-relaxed">
+                    Ya entregado, traducido o devuelto. Se queda aquí porque sigue contando lo que pasó.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {resueltos.map(i => <Tarjeta key={i.id} item={i} tono="hecho" />)}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Tab: Locations (Lugares) */}
       {activeTab === 'locs' && (

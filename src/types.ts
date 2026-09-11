@@ -164,6 +164,42 @@ export interface InventoryItem {
   cost?: string;
   expiresInMinutes?: number;
   durationNote?: string;
+
+  /*
+   * Lo que separa el violín de un pergamino que hay que traducir.
+   *
+   * Su equipo es suyo y no hace nada: está ahí. Un objeto de misión, en
+   * cambio, es una tarea con forma de objeto —una carta que entregar, un
+   * colgante robado que quema, unas runas que alguien tiene que leer— y
+   * mezclarlo con las pociones es perder de vista el hilo que arrastra.
+   */
+  /** Si es un objeto que arrastra trama, y no equipo de uso. */
+  deMision?: boolean;
+  /** Qué hay que hacer con él: «entregar a Beniago», «traducir», «devolver a su dueño». */
+  encargo?: string;
+  /** De dónde salió: quién se lo dio, a quién se lo quitó, dónde apareció. */
+  origen?: string;
+  /** La misión de la que cuelga, para poder agruparlo con lo demás de ese encargo. */
+  mision?: string;
+  /** Día absoluto de campaña en que entró en su mochila. */
+  diaAbs?: number;
+  /**
+   * Ya entregado, traducido o devuelto.
+   *
+   * No se borra: un objeto de misión resuelto sigue contando lo que pasó, y
+   * borrarlo deja la trama sin rastro. Se aparta a un lado y deja de pesar.
+   */
+  resuelto?: boolean;
+}
+
+/** Un cambio de inventario leído de la etiqueta `[INVENTARIO: ...]` de un turno. */
+export interface CambioDeInventario {
+  /** Objetos que entran, con su cantidad. */
+  altas: { nombre: string; cantidad: number; detalles?: string; encargo?: string; origen?: string; deMision?: boolean }[];
+  /** Objetos que salen, con su cantidad. */
+  bajas: { nombre: string; cantidad: number }[];
+  /** Monedas que entran o salen, en su propia denominación. */
+  monedas: Partial<Record<'cp' | 'sp' | 'ep' | 'gp' | 'pp', number>>;
 }
 
 export interface PlayerAttributes {

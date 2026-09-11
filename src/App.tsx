@@ -110,6 +110,7 @@ import {
 } from './utils/geminiHelper';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa } from './utils/mesaStorage';
+import { aplicarInventario, aplicarMonedas, cambioVacio } from './utils/inventoryTag';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie } from './utils/rollRequests';
 import { Probabilidad, formatoSignificado, nuevaConsulta } from './utils/oracle';
@@ -945,7 +946,7 @@ export default function App() {
     if (
       !t ||
       (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length && !t.secretos.length && !t.viaje &&
-        !t.lugares?.length)
+        !t.lugares?.length && cambioVacio(t.inventario))
     )
       return p.memory;
 
@@ -1245,11 +1246,33 @@ export default function App() {
       }
     });
 
+    /*
+     * Y la mochila, que hasta ahora no se movía nunca.
+     *
+     * El Narrador venía escribiendo su [INVENTARIO: +1 esto, -15 PO] en cada
+     * turno con botín y la aplicación lo borraba sin leerlo. Aquí es donde ese
+     * apunte se convierte por fin en lo que ella lleva encima y en lo que le
+     * queda en el bolsillo.
+     */
+    const pcPrevio = mem.player_character;
+    const player_character = cambioVacio(t.inventario)
+      ? pcPrevio
+      : {
+          ...(pcPrevio || { name: '' }),
+          inventory: aplicarInventario(
+            pcPrevio?.inventory,
+            t.inventario,
+            calendarioValido(p.calendar) ? diaActual : undefined
+          ),
+          currencies: aplicarMonedas(pcPrevio?.currencies, t.inventario.monedas)
+        };
+
     return {
       ...mem,
       npcs: npcsDeduplicados,
       locations: lugaresDeLaCampana,
       gm_secrets: secretosDeCampana,
+      player_character,
       viaje: viajeEnCurso
     };
   };
