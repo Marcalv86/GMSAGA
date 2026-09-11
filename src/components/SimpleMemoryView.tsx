@@ -229,6 +229,10 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
 
   const handleRegenerateClaudeMemory = async () => {
     if (isLocalUpdating || isGenerating) return;
+    if (onTriggerAIUpdate) {
+      onTriggerAIUpdate();
+      return;
+    }
     setIsLocalUpdating(true);
     try {
       const effectiveChats = chats.length > 0 ? chats : project.chats || [];
@@ -263,8 +267,8 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
 
   return (
     <div id="simple-memory-container" className="flex-1 flex flex-col h-full bg-[var(--bg-color)] overflow-hidden">
-      {/* Top memory mode toggle bar */}
-      <div id="memory-mode-toggle-bar" className="px-3 sm:px-6 py-2.5 bg-[var(--surface)] border-b border-[var(--glass-border)] flex items-center justify-between gap-3 shrink-0">
+      {/* Top memory mode toggle bar con botón único de sincronización unificada */}
+      <div id="memory-mode-toggle-bar" className="px-3 sm:px-6 py-2.5 bg-[var(--surface)] border-b border-[var(--glass-border)] flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-1.5 p-1 bg-[color-mix(in_srgb,var(--surface-soft)_80%,transparent)] rounded-lg border border-[var(--glass-border)]">
           <button
             id="tab-btn-character-memory"
@@ -291,6 +295,20 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             <span>Memoria Persistente de Proyecto</span>
           </button>
         </div>
+
+        {/* Botón único para sincronizar simultáneamente memoria persistente y entidades */}
+        {onTriggerAIUpdate && (
+          <button
+            id="btn-unified-sync-memory"
+            onClick={onTriggerAIUpdate}
+            disabled={isCurrentlyWorking}
+            className="px-3.5 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold hover:opacity-90 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+            title="Sincroniza simultáneamente la memoria persistente del proyecto y la de personajes/entidades leyendo todos los chats y documentos."
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isCurrentlyWorking ? 'animate-spin' : ''}`} />
+            <span>{isCurrentlyWorking ? 'Sincronizando…' : 'Sincronizar Memoria Completa con IA'}</span>
+          </button>
+        )}
       </div>
 
       {memoryMode === 'character' ? (

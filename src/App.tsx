@@ -95,7 +95,6 @@ import {
   setStoredKeyRotationMode,
   syncFullCampaignFromChats,
   fusionarTimeline,
-  consolidarCronicaAlCerrarCapitulo,
   AVISO_TOKENS_POR_MINUTO,
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
@@ -1332,51 +1331,7 @@ export default function App() {
     }));
   };
 
-  /**
-   * Deja la crónica al día con el capítulo que se acaba de cerrar.
-   *
-   * Va en segundo plano a propósito: cerrar un capítulo tiene que ser
-   * instantáneo. Si la consolidación fallara —sin clave, sin cuota, sin red— no
-   * pasa nada grave: la crónica se queda como estaba y la sincronización
-   * general la pondrá al día cuando toque. Por eso no interrumpe con un aviso;
-   * se apunta en el registro y ya.
-   */
-  const consolidarCronicaEnSegundoPlano = async (pId: string, capitulo: Chat, proyecto: Project) => {
-    if (!hasConfiguredApiKey()) return;
-    setTopProgress({ active: true, label: 'Poniendo la crónica al día…', type: 'sync' });
-    try {
-      const cronica = await consolidarCronicaAlCerrarCapitulo({ project: proyecto, capitulo });
-      if (!cronica) return;
-      /*
-       * Se actualiza por id y con el estado más reciente, no con el que hubiera
-       * cuando arrancó la petición: entre que se pide y se responde, la jugadora
-       * puede haber cambiado de campaña o seguido escribiendo.
-       */
-      setProjects(prev => {
-        const actualizados = prev.map(p =>
-          p.id === pId
-            ? { ...p, memory: sanitizeProjectMemory({ ...(p.memory || {}), story: cronica }) }
-            : p
-        );
-        saveLocalProjects(actualizados);
-        return actualizados;
-      });
-      logInfo(
-        'memory_sync',
-        `Crónica actualizada al cerrar «${capitulo.name}»`,
-        `La crónica de la campaña se ha reescrito incorporando el capítulo (${cronica.length} caracteres).`,
-        { projectName: proyecto.name }
-      );
-    } catch (err) {
-      logWarn(
-        'memory_sync',
-        'No se pudo poner la crónica al día al cerrar el capítulo',
-        describeApiError(err)
-      );
-    } finally {
-      setTopProgress({ active: false, label: '' });
-    }
-  };
+
 
   /**
    * Guarda lo que el Director haya apuntado desde la mesa.
@@ -1524,32 +1479,6 @@ export default function App() {
   const handleCreateChat = () => {
     if (!currentPId || !currentProject) return;
 
-    /*
-     * AL CERRAR CAPÍTULO YA NO SE PEGA NADA A LA MEMORIA.
-     *
-     * Aquí se cogían los seis últimos mensajes del Narrador, se juntaban y se
-     * añadían al final de `memory.story` cortados a 1.500 caracteres. Tres
-     * cosas iban mal, y la tercera es la que zanja el asunto:
-     *
-     * 1. No era un resumen. Eran los últimos párrafos en bruto, cortados a
-     *    mitad de palabra. Guardaba el final del capítulo, no el capítulo.
-     * 2. Crecía sin freno. `story` viaja en CADA turno, así que cada capítulo
-     *    cerrado añadía unos cuatrocientos tokens permanentes a todos los
-     *    turnos siguientes, para siempre.
-     * 3. Y no servía de nada: `syncFullCampaignFromChats` REEMPLAZA `story`
-     *    con su versión consolidada (`story: parsed.story || ...`). O sea que
-     *    todo lo acumulado aquí desaparecía en la siguiente sincronización.
-     *    Engordaba cada petición hasta que algo lo borraba en silencio.
-     *
-     * Lo que de verdad conserva la campaña ya existe y está mejor hecho: el
-     * `story` que reescribe la sincronización, el diario día a día, y los PNJs,
-     * tramas y lugares de la memoria viva. Un pegado que no sobrevive a la
-     * primera sincronización no es memoria persistente; es lastre.
-     *
-     * (Consolidar de verdad al cerrar —resumen generado y `story` reescrita con
-     * un tope— es trabajo aparte, y va con la revisión de la memoria.)
-     */
-
     const newChatId = 'cap_' + Date.now();
     const newChat: Chat = {
       id: newChatId,
@@ -1563,10 +1492,10 @@ export default function App() {
     setCurrentChatId(newChatId);
     setActiveTab('chat');
 
-    // Y con el capítulo ya cerrado detrás, se pone la crónica al día.
+    // Al cerrar capítulo, se actualiza simultáneamente la memoria persistente y la de la pestaña de memoria del personaje y entidades.
     const capituloCerrado = currentChat;
     if (capituloCerrado && (capituloCerrado.messages || []).length > 0) {
-      void consolidarCronicaEnSegundoPlano(currentPId, capituloCerrado, currentProject);
+      void handleTriggerMemorySyncWithAI();
     }
   };
 
@@ -2897,11 +2826,24 @@ export default function App() {
     setIsSyncingMemory(true);
     setTopProgress({
       active: true,
-      label: 'Sincronizando memoria de campaña en segundo plano con la IA...',
+      label: 'Sincronizando memoria completa con la IA (proyecto y entidades)...',
       type: 'sync'
     });
     try {
-      const syncResult = await syncFullCampaignFromChats(currentProject, currentChats, currentFiles);
+      // Sincronización simultánea estilo Claude Projects:
+      // 1. Memoria de entidades, crónica, PNJs, lugares, tramas, inventario y diario
+      // 2. Memoria persistente general del proyecto en Markdown (Purpose & context, Current state, Tools)
+      const [syncResult, claudeProjectMem] = await Promise.all([
+        syncFullCampaignFromChats(currentProject, currentChats, currentFiles),
+        generateClaudeProjectMemory({
+          project: currentProject,
+          chats: currentChats,
+          files: currentFiles
+        }).catch(err => {
+          logWarn('memory_sync', 'No se pudo generar la memoria persistente del proyecto en formato Claude', describeApiError(err));
+          return null;
+        })
+      ]);
 
       /*
        * La sincronización RELLENA HUECOS; no reescribe el diario.
@@ -2959,7 +2901,8 @@ export default function App() {
       await handleUpdateProjectField(p => {
         const memoriaSincronizada = sanitizeProjectMemory({
           ...(p.memory || {}),
-          ...syncResult.memory
+          ...syncResult.memory,
+          ...(claudeProjectMem ? { raw_project_memory: claudeProjectMem } : {})
         });
         /*
          * Las dos lecturas de la mochila, juntas y sin pisarse.
@@ -2998,7 +2941,8 @@ export default function App() {
           timeline: fusionarTimeline(p.timeline || [], syncResult.timeline || []).timeline,
           currentDate: syncResult.currentDate || p.currentDate,
           threads: syncResult.threads || p.threads,
-          calendar: p.calendar || syncResult.calendar
+          calendar: p.calendar || syncResult.calendar,
+          lastMemoryUpdate: Date.now()
         };
       });
 
@@ -3045,7 +2989,8 @@ export default function App() {
         isOpen: true,
         title: '¡Sincronización Total con IA Completada!',
         message:
-          `Se ha repasado toda la campaña a partir de las sesiones jugadas:\n\n` +
+          `Se ha actualizado de forma unificada la memoria del proyecto y las entidades a partir de las sesiones y documentos:\n\n` +
+          (claudeProjectMem ? `• Memoria persistente del proyecto sintetizada (Purpose & context, Current state, Key entities & tools).\n` : '') +
           `• ${anotacionesNuevas} ${anotacionesNuevas === 1 ? 'anotación nueva' : 'anotaciones nuevas'} en el diario, con sus horas deducidas` +
           (jornadasNuevas > 0
             ? ` (${jornadasNuevas} ${jornadasNuevas === 1 ? 'jornada' : 'jornadas'} que no tenían nada escrito).\n`
