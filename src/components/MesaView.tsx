@@ -349,7 +349,16 @@ export const MesaView: React.FC<{
             fuera de personaje
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        {/*
+          La fila de la derecha puede encoger y envolver.
+
+          Era toda `shrink-0` con cuatro cosas dentro, así que en un móvil de
+          412px no cabía y se montaba encima del grupo de la izquierda: los
+          botones de Jugar y GM quedaban debajo del selector de modelo. Los
+          controles de «cómo contesta» se han bajado al compositor, que es su
+          sitio, y lo que queda aquí ya puede ceder espacio.
+        */}
+        <div className="flex items-center justify-end gap-2 flex-wrap min-w-0">
           {onAbrirNovela && (
             <button
               onClick={onAbrirNovela}
@@ -372,33 +381,6 @@ export const MesaView: React.FC<{
               {mensajes.length}/{TOPE_MENSAJES}
             </span>
           )}
-        {/*
-          Qué modelo contesta aquí, elegible y a la vista.
-
-          Esta pestaña heredaba el modelo «de tareas de fondo» —el más barato de
-          la lista— solo por cómo se montó, y es al revés de lo que pide: aquí se
-          le plantean las preguntas más difíciles de la aplicación y no hay que
-          narrar nada. Además el reparto de cuota lo cambia todo: los modelos
-          grandes van racionados por día y los pequeños por minuto, así que
-          conviene poder elegir según lo que vayas a preguntar.
-        */}
-        <select
-          value={modelo}
-          onChange={e => {
-            setModelo(e.target.value);
-            guardarModeloDeMesa(e.target.value);
-          }}
-          className="shrink-0 rounded-lg border border-[var(--user-border)] bg-[var(--surface)] px-2 py-1.5 text-[11px] font-cinzel text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] cursor-pointer max-w-[150px] sm:max-w-none"
-          title="Con qué modelo contesta el Director en esta pestaña. El número es cuántas peticiones al día da en la capa gratuita: los de narrar van racionados a 20, y gastarlos preguntando dudas es quedarte sin jugar. Aquí no se narra, así que lo que importa es que razone, no que escriba bonito."
-        >
-          <option value="">Modelo de fondo (por defecto)</option>
-          {modelosParaElDirector().map(m => (
-            <option key={m.id} value={m.id}>
-              {m.nombre} · {m.rpd >= 1000 ? `${Math.round(m.rpd / 1000)}k` : m.rpd}/día
-              {m.abierto ? ' (abierto)' : ''}
-            </option>
-          ))}
-        </select>
         {mensajes.length > 0 && (
           <button
             onClick={limpiar}
@@ -731,9 +713,36 @@ export const MesaView: React.FC<{
             jugadora su propio mundo. Cuando se enciende, al Director se le dice
             por escrito que los documentos de la campaña mandan sobre internet.
           */}
-          <button
-            onClick={() => setBuscarEnLaWeb(v => !v)}
-            className={`mb-2 inline-flex items-center gap-1.5 rounded-lg border px-2.5 min-h-[32px] text-[10px] font-cinzel transition-colors cursor-pointer ${
+          {/*
+            Cómo contesta el Director: el modelo y si puede mirar fuera.
+
+            Los dos viven aquí abajo, junto a lo que se escribe, y no en la
+            cabecera: son decisiones de esta pregunta, no de la pantalla. Y en
+            la cabecera no cabían — se montaban encima de los botones de Jugar
+            y GM en cuanto la pantalla era la de un móvil.
+          */}
+          <div className="mb-2 flex items-center gap-2 flex-wrap">
+            <select
+              value={modelo}
+              onChange={e => {
+                setModelo(e.target.value);
+                guardarModeloDeMesa(e.target.value);
+              }}
+              className="min-w-0 max-w-full flex-1 sm:flex-none sm:max-w-[260px] rounded-lg border border-[var(--user-border)] bg-[var(--surface)] px-2 min-h-[32px] text-[10px] font-cinzel text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] cursor-pointer"
+              title="Con qué modelo contesta el Director. El número es cuántas peticiones al día da en la capa gratuita: los de narrar van racionados a 20, y gastarlos preguntando dudas es quedarte sin jugar. Aquí no se narra, así que lo que importa es que razone, no que escriba bonito."
+              aria-label="Modelo del Director"
+            >
+              <option value="">Modelo de fondo (por defecto)</option>
+              {modelosParaElDirector().map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre} · {m.rpd >= 1000 ? `${Math.round(m.rpd / 1000)}k` : m.rpd}/día
+                  {m.abierto ? ' (abierto)' : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setBuscarEnLaWeb(v => !v)}
+              className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 min-h-[32px] text-[10px] font-cinzel transition-colors cursor-pointer ${
               buscarEnLaWeb
                 ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
                 : 'border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]'
@@ -744,9 +753,10 @@ export const MesaView: React.FC<{
                 : 'Contesta solo con lo que tiene: tus documentos, la crónica y la memoria. Enciéndelo si necesitas que compruebe algo de fuera.'
             }
           >
-            <Globe className="w-3.5 h-3.5 shrink-0" />
-            {buscarEnLaWeb ? 'Puede buscar en internet' : 'Sin internet'}
-          </button>
+              <Globe className="w-3.5 h-3.5 shrink-0" />
+              {buscarEnLaWeb ? 'Puede buscar en internet' : 'Sin internet'}
+            </button>
+          </div>
 
           {adjuntos.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
