@@ -5021,6 +5021,14 @@ export function construirPromptOOC({
     .join('\n');
 
   // Inventario y monedas actuales en panel
+  /*
+   * La mochila, con los encargos marcados y las monedas en castellano.
+   *
+   * Un objeto de encargo —una carta que entregar, algo que traducir— no es
+   * equipo: es trama con forma de objeto, y va en su propio apartado de la
+   * pantalla. Si aquí llega mezclado con las pociones, el Director no puede
+   * corregir la separación porque no la ve.
+   */
   const inventarioActual =
     pc?.inventory && pc.inventory.length > 0
       ? pc.inventory
@@ -5028,16 +5036,21 @@ export function construirPromptOOC({
             i =>
               `- ${i.name}${i.quantity && i.quantity > 1 ? ` (x${i.quantity})` : ''}${
                 i.equipped ? ' [equipado]' : ''
+              }${
+                i.deMision
+                  ? ` [ENCARGO${i.encargo ? `: ${i.encargo.slice(0, 90)}` : ''}${i.resuelto ? ', ya cumplido' : ''}]`
+                  : ''
               }${i.description ? `: ${i.description}` : ''}`
           )
           .join('\n')
       : '(mochila vacía o sin registrar en panel)';
 
+  const NOMBRE_DE_MONEDA: Record<string, string> = { pp: 'PP', gp: 'PO', ep: 'PE', sp: 'PA', cp: 'PC' };
   const monedasActuales = pc?.currencies
-    ? Object.entries(pc.currencies)
-        .filter(([_, v]) => typeof v === 'number' && v > 0)
-        .map(([k, v]) => `${v} ${k.toUpperCase()}`)
-        .join(', ') || '0 monedas'
+    ? (['pp', 'gp', 'ep', 'sp', 'cp'] as const)
+        .filter(k => (pc.currencies?.[k] || 0) > 0)
+        .map(k => `${pc.currencies?.[k]} ${NOMBRE_DE_MONEDA[k]}`)
+        .join(', ') || 'sin blanca'
     : 'sin registrar';
 
   const ficha = pc
@@ -5050,7 +5063,7 @@ export function construirPromptOOC({
           ? `- Hitos hacia el siguiente nivel: ${pc.hitosActuales}/${pc.hitosParaSubir}`
           : '',
         `- Dinero actual en panel: ${monedasActuales}`,
-        `- Inventario actual registrado en panel:\n${inventarioActual}`,
+        `- Inventario actual registrado en panel — es lo que puedes corregir con [INVENTARIO: ...]:\n${inventarioActual}`,
         pc.sheetText ? `\n--- FICHA BASE (TEXTO REGISTRADO EN MEMORIA) ---\n${pc.sheetText}` : ''
       ]
         .filter(Boolean)
@@ -5168,6 +5181,101 @@ export function construirPromptOOC({
   }
 
   /*
+   * Y la memoria viva de la campaña, que tampoco le llegaba.
+   *
+   * Con los documentos ya resuelto arriba, seguía sin ver una sola ficha de
+   * PNJ, ni un lugar, ni una trama, ni el diario, ni los giros — y ahora puede
+   * EDITAR esas cosas, con lo que trabajar a ciegas pasó de incómodo a
+   * peligroso: se le pedía corregir a alguien cuyo nombre no tenía delante.
+   *
+   * Todo recortado a propósito: es una charla de mesa, no un turno de partida.
+   * Lo que hace falta es que sepa QUÉ existe y cómo se llama.
+   */
+  const corta = (t: string | undefined, n: number) => (!t ? '' : t.length > n ? `${t.slice(0, n)}…` : t);
+
+  const npcsDeLaCampana = project.memory?.npcs || [];
+  const bloqueNpcs = npcsDeLaCampana.length
+    ? `\nPNJs FICHADOS (${npcsDeLaCampana.length}) — son los que puedes corregir con [VÍNCULO: ...]:\n` +
+      npcsDeLaCampana
+        .slice(0, 40)
+        .map(n => {
+          const barras =
+            typeof n.atr === 'number' || typeof n.vin === 'number' || typeof n.con === 'number'
+              ? ` · atr ${n.atr ?? 0}/vin ${n.vin ?? 0}/con ${n.con ?? 0}`
+              : '';
+          const extra = [
+            n.orientacion ? `orientación: ${n.orientacion}` : '',
+            n.atrBloqueada ? 'sin romance (candado puesto)' : '',
+            n.recurrente ? 'habitual' : '',
+            corta(n.aparenta || n.description, 90)
+          ]
+            .filter(Boolean)
+            .join(' · ');
+          return `- ${n.name}${n.relation ? ` (${n.relation})` : ''}${barras}${extra ? ` — ${extra}` : ''}`;
+        })
+        .join('\n')
+    : '';
+
+  const lugaresDeLaCampana = project.memory?.locations || [];
+  const bloqueLugares = lugaresDeLaCampana.length
+    ? `\nLUGARES (${lugaresDeLaCampana.length}): ${lugaresDeLaCampana.slice(0, 30).map(l => l.name).join(' · ')}\n`
+    : '';
+
+  const misionesAbiertas = (project.memory?.quests || []).filter(q => q.status !== 'Completada');
+  const bloqueMisiones = misionesAbiertas.length
+    ? `\nTRAMAS ABIERTAS:\n${misionesAbiertas
+        .slice(0, 15)
+        .map(q => `- ${q.title}${q.objective ? `: ${corta(q.objective, 110)}` : ''}`)
+        .join('\n')}\n`
+    : '';
+
+  const companerosDeMesa = project.memory?.companions || [];
+  const bloqueCompaneros = companerosDeMesa.length
+    ? `\nVA ACOMPAÑADA DE: ${companerosDeMesa.slice(0, 12).map((c: any) => c?.name || c).filter(Boolean).join(' · ')}\n`
+    : '';
+
+  const hilosPendientes = (project.threads || []).filter(h => h.status === 'pending');
+  const bloqueHilos = hilosPendientes.length
+    ? `\nCONSECUENCIAS PROGRAMADAS (aún sin estallar): ${hilosPendientes.slice(0, 10).map(h => h.title).join(' · ')}\n`
+    : '';
+
+  const ultimasJornadas = [...(project.timeline || [])]
+    .sort((a, b) => (b.absDay || 0) - (a.absDay || 0))
+    .slice(0, 12);
+  const bloqueDiario = ultimasJornadas.length
+    ? `\nÚLTIMO DEL DIARIO (lo más reciente arriba) — se borra con [OLVIDA: ...]:\n${ultimasJornadas
+        .map(e => `- ${e.date ? `${e.date}: ` : ''}${e.title || e.hito || corta(e.summary, 80)}`)
+        .join('\n')}\n`
+    : '';
+
+  const notasApuntadas = project.memory?.memory_edits || [];
+  const bloqueNotas = notasApuntadas.length
+    ? `\nNOTAS DE MEMORIA QUE YA LLEVAS APUNTADAS (también se borran con [OLVIDA: ...]):\n${notasApuntadas
+        .slice(-25)
+        .map(n => `- ${corta(n.text, 140)}`)
+        .join('\n')}\n`
+    : '';
+
+  /*
+   * Los giros van CON su contenido, no solo con el título: es la pestaña donde
+   * se pregunta «¿cómo va la trama?», y con títulos a secas se contesta a
+   * ciegas. La discreción no se consigue ocultándoselos a él, sino diciéndole
+   * que no los destape.
+   */
+  const girosTapados = (project.memory?.gm_secrets || []).filter(g => !g.revelado);
+  const bloqueGiros = girosTapados.length
+    ? `\n🔒 LA HISTORIA, YA TRAZADA — SOLO TÚ (${girosTapados.length} giros sin destapar):\n${girosTapados
+        .slice(0, 20)
+        .map(
+          g =>
+            `- **${g.titulo}**${typeof g.capa === 'number' ? ` (capa ${g.capa})` : ''}: ${corta(g.secreto, 300)}${
+              g.comoSeDescubre ? ` — se descubre: ${corta(g.comoSeDescubre, 140)}` : ''
+            }`
+        )
+        .join('\n')}\n⛔ La jugadora NO ha descubierto nada de esto y no lo lee mientras juega. Te sirve para contestarle con criterio —si algo encaja, si una idea suya choca con lo ya plantado, qué conviene sembrar—, NUNCA para contarlo. Si te lo pregunta directamente y como jugadora que quiere saber la verdad, avísale de que se lo vas a destripar y espera a que lo confirme.\n`
+    : '';
+
+  /*
    * La conversación de mesa, recortada por mensaje.
    */
   const conversacion = historial
@@ -5242,7 +5350,7 @@ ${ficha}
 
 DÓNDE ESTAMOS (memoria de la campaña):
 ${project.memory?.raw_project_memory || project.memory?.story || 'Todavía no hay memoria registrada.'}
-
+${bloqueCompaneros}${bloqueNpcs}${bloqueLugares}${bloqueMisiones}${bloqueHilos}${bloqueDiario}${bloqueNotas}${bloqueGiros}
 ### 📚 BASE DE CONOCIMIENTO (DOCUMENTOS Y FICHAS CARGADOS EN LA CAMPAÑA):
 ${pjSheetSection}
 ${companionSection}
