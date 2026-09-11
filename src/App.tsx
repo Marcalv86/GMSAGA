@@ -2918,9 +2918,9 @@ export default function App() {
             ? `• ${mochila.inventario.length} ${mochila.inventario.length === 1 ? 'objeto' : 'objetos'} en la mochila, recuperados de lo que el Narrador fue apuntando (pestaña Inventario).\n`
             : `• La mochila sigue vacía: en la crónica no hay ni una anotación de inventario que recuperar.\n`) +
           (Object.keys(mochila.netoDeMonedas).length
-            ? `• 💰 De dinero, la crónica suma ${Object.entries(mochila.netoDeMonedas)
+            ? `• 💰 De dinero, lo apuntado en la crónica suma ${Object.entries(mochila.netoDeMonedas)
                 .map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${({ pp: 'PP', gp: 'PO', ep: 'PE', sp: 'PA', cp: 'PC' } as any)[k] || k}`)
-                .join(', ')}. NO te lo he aplicado: la etiqueta anota lo que entra y sale, no el saldo, y con lo que empezaste está en tu ficha. Ajústalo tú si quieres.\n`
+                .join(', ')}, y te lo digo solo para que lo sepas: la bolsa no se rehace desde aquí, porque la etiqueta anota lo que entra y sale, no el saldo, y con lo que empezaste está en tu ficha. De ahora en adelante sube y baja sola con lo que ganes y gastes en escena.\n`
             : '') +
           (girosTrazados > 0
             ? `• ${girosTrazados} ${girosTrazados === 1 ? 'giro' : 'giros'} en la estructura de la historia (pestaña Giros).\n\n`

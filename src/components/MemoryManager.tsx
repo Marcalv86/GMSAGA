@@ -2103,29 +2103,6 @@ export const MemoryManager: React.FC<{
           setAnadiendoObjeto(false);
         };
 
-        /*
-         * Y la bolsa, editable.
-         *
-         * Al reconstruir desde la crónica el dinero NO se toca a propósito —la
-         * etiqueta anota lo que entra y sale, no el saldo, y el punto de partida
-         * está en su ficha—, así que se le enseña el neto y se le dice que lo
-         * ajuste ella. Sin un sitio donde ajustarlo, eso era una promesa vacía.
-         */
-        const cambiarMoneda = async (clave: 'cp' | 'sp' | 'ep' | 'gp' | 'pp', valor: number) => {
-          const limpio = Math.max(0, Math.min(9_999_999, Math.round(valor) || 0));
-          await onUpdateMemory(mem => ({
-            ...mem,
-            player_character: {
-              ...(mem.player_character || { name: '' }),
-              currencies: {
-                cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
-                ...(mem.player_character?.currencies || {}),
-                [clave]: limpio
-              }
-            }
-          }));
-        };
-
         const quitar = async (id: string) => {
           await onUpdateMemory(mem => ({
             ...mem,
@@ -2221,11 +2198,18 @@ export const MemoryManager: React.FC<{
 
         return (
           <div className="flex flex-col gap-5">
-            {/* El monedero, editable */}
+            {/*
+              El monedero, de SOLO LECTURA.
+
+              Es dinero de partida: lo lleva el juego, no la jugadora. Poder
+              teclear el saldo convierte la cuenta en una sugerencia —y entonces
+              da igual que el Narrador apunte lo que cuesta cada cosa—. Sube y
+              baja con lo que se gana y se gasta EN ESCENA, y punto.
+            */}
             <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] flex items-center justify-between gap-3 flex-wrap">
               <span
                 className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5"
-                title="Lo que lleva encima. Al sincronizar NO se toca —la etiqueta del Narrador anota lo que entra y sale, no el saldo—, así que aquí se ajusta a mano."
+                title="Lo que lleva encima. Sube y baja sola con lo que gana y gasta jugando: no se teclea a mano."
               >
                 <Coins className="w-3.5 h-3.5 text-[var(--accent)]" /> Bolsa
               </span>
@@ -2236,23 +2220,19 @@ export const MemoryManager: React.FC<{
                   ['ep', 'PE', 'text-cyan-600'],
                   ['sp', 'PA', 'text-zinc-500'],
                   ['cp', 'PC', 'text-orange-700']
-                ] as ['cp' | 'sp' | 'ep' | 'gp' | 'pp', string, string][]).map(([k, etiqueta, color]) => (
-                  <label
-                    key={k}
-                    className={`flex items-center gap-1 text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
-                    title={`Monedas de ${etiqueta}. Puedes corregirlo a mano.`}
-                  >
-                    <input
-                      type="number"
-                      min={0}
-                      value={monedas?.[k] ?? 0}
-                      onChange={e => cambiarMoneda(k, Number(e.target.value))}
-                      className="w-12 bg-transparent text-right outline-none focus:text-[var(--accent)]"
-                      aria-label={`Monedas de ${etiqueta}`}
-                    />
-                    {etiqueta}
-                  </label>
-                ))}
+                ] as ['cp' | 'sp' | 'ep' | 'gp' | 'pp', string, string][])
+                  .filter(([k]) => (monedas?.[k] ?? 0) > 0)
+                  .map(([k, etiqueta, color]) => (
+                    <span
+                      key={k}
+                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
+                    >
+                      {monedas?.[k]} {etiqueta}
+                    </span>
+                  ))}
+                {!monedas || Object.values(monedas).every(v => !v) ? (
+                  <span className="text-[11px] font-lora italic text-[var(--text-secondary)]">Sin blanca.</span>
+                ) : null}
               </div>
             </div>
 
