@@ -101,6 +101,7 @@ import {
   generateClaudeProjectMemory,
   tramarLaCampana,
   extraerIdentidadDeDocumentos,
+  extraerMecanicasDeDocumento,
   fusionarTrama,
   isNarrativeIncomplete,
   novelizeUserMessage,
@@ -2493,6 +2494,66 @@ export default function App() {
     }
   };
 
+  /**
+   * Saca las mecánicas de un módulo a su propio archivo.
+   *
+   * A diferencia del destilado de oráculos, esto NO sustituye al documento: lo
+   * que hay dentro de un módulo es lore Y mecánicas, y el lore sigue haciendo
+   * falta. Se crea un archivo aparte, etiquetado como mecánica, para que el
+   * subsistema pueda subir en la búsqueda cuando la escena lo pida sin tener
+   * que arrastrar consigo trescientas páginas que hablan de otra ciudad.
+   */
+  const handleExtractMechanics = async (file: ProjectFile) => {
+    if (!currentPId) return;
+    if (extractingFileIds.includes(file.id)) return;
+
+    setExtractingFileIds(prev => [...prev, file.id]);
+    setTopProgress({
+      active: true,
+      label: `Buscando mecánicas y subsistemas en "${file.name}" en 2º plano...`,
+      type: 'general'
+    });
+    try {
+      const mecanicas = await extraerMecanicasDeDocumento(file);
+      const refreshedFiles = await loadFilesFromDB(currentPId);
+      const base = file.name.replace(/\.[^.]+$/, '');
+      const nombre = `Mecánicas — ${base}.md`;
+      const nuevo: ProjectFile = {
+        id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: nombre,
+        type: 'text/markdown',
+        content: mecanicas,
+        length: mecanicas.length,
+        category: 'mecanica',
+        // Pequeño y muy pertinente cuando toca: no tiene sentido gastarlo en
+        // cada turno, pero sí que suba solo cuando haya una persecución.
+        onDemand: true
+      } as ProjectFile;
+      const updated = [...refreshedFiles.filter(f => f.name !== nombre), nuevo];
+      setCurrentFiles(updated);
+      await saveFilesToDB(currentPId, updated);
+
+      const cuantas = (mecanicas.match(/^##\s/gm) || []).length;
+      setAlertConfig({
+        isOpen: true,
+        title: 'Mecánicas extraídas',
+        message:
+          `He sacado ${cuantas || 'varios'} ${cuantas === 1 ? 'subsistema' : 'subsistemas'} a "${nombre}" (${mecanicas.length.toLocaleString('es-ES')} caracteres), sin los topónimos del módulo original.\n\n` +
+          `Queda marcado de consulta: no gasta fichas en cada turno, pero sube solo cuando la escena lo pida —una huida por los tejados, una ventisca—, aunque pase en otra ciudad.\n\n` +
+          `El documento original no se ha tocado: su lore sigue donde estaba.`
+      });
+    } catch (err) {
+      setAlertConfig({
+        isOpen: true,
+        title: 'No se han extraído mecánicas',
+        message: describeApiError(err)
+      });
+    } finally {
+      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
+      setTopProgress({ active: false });
+    }
+  };
+
   const handleAutoClassifyAll = async () => {
     if (!currentProject || !currentPId) return;
     setTopProgress({
@@ -3788,6 +3849,7 @@ export default function App() {
               onUpdateFileCategory={handleUpdateFileCategory}
               onToggleOnDemand={handleToggleOnDemand}
               onDistillOracle={handleDistillOracle}
+              onExtractMechanics={handleExtractMechanics}
               onAutoClassifyAll={handleAutoClassifyAll}
               onExtractNpc={handleExtractNpc}
               onCreateNpcFromImage={handleCreateNpcFromImage}

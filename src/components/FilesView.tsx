@@ -42,6 +42,7 @@ export const FilesView: React.FC<{
   onToggleOnDemand?: (fileId: string, onDemand: boolean) => Promise<void>;
   /** Deja de una hoja de oráculo solo las tablas y las reglas. */
   onDistillOracle?: (file: ProjectFile) => Promise<void>;
+  onExtractMechanics?: (file: ProjectFile) => Promise<void>;
   onAutoClassifyAll?: () => Promise<void>;
   onExtractNpc?: (file: ProjectFile) => Promise<void>;
   onCreateNpcFromImage?: (file: ProjectFile) => Promise<void>;
@@ -60,6 +61,7 @@ export const FilesView: React.FC<{
   onUpdateFileCategory,
   onToggleOnDemand,
   onDistillOracle,
+  onExtractMechanics,
   onAutoClassifyAll,
   onExtractNpc,
   onCreateNpcFromImage,
@@ -738,6 +740,37 @@ export const FilesView: React.FC<{
                             )}
                           </button>
                         )}
+                        {/*
+                          Sacar las mecánicas a su propio archivo.
+                          Un módulo trae lore Y subsistemas en el mismo libro, y
+                          mientras las reglas de persecución vivan dentro de
+                          trescientas páginas que hablan de otra ciudad, no se
+                          usan nunca: ni te acuerdas de que están ni la búsqueda
+                          las encuentra. Aquí salen aparte y sin topónimos.
+                        */}
+                        {!f.isImage &&
+                          !f.isAudio &&
+                          onExtractMechanics &&
+                          ['document', 'compendio', 'lore', 'cantera', 'index', 'other'].includes(currentCat) && (
+                            <button
+                              onClick={() => onExtractMechanics(f)}
+                              disabled={extractingFileIds.includes(f.id)}
+                              className="px-2 py-1 bg-[var(--surface)] border border-[var(--user-border)] rounded text-[10px] md:text-[11px] font-cinzel font-bold hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
+                              title="Buscar dentro subsistemas de juego —persecuciones, frío extremo, intriga urbana— y sacarlos a un archivo aparte, sin los nombres de lugar del módulo, para poder usarlos en cualquier sitio. El documento original no se toca."
+                            >
+                              {extractingFileIds.includes(f.id) ? (
+                                <>
+                                  <span className="inline-block w-3 h-3 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+                                  <span>Buscando…</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Dices className="w-3.5 h-3.5" />
+                                  Sacar mecánicas
+                                </>
+                              )}
+                            </button>
+                          )}
                         {currentCat === 'oracle' && onDistillOracle && (
                           <button
                             onClick={() => onDistillOracle(f)}

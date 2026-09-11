@@ -7176,6 +7176,75 @@ ${texto.slice(0, 200000)}`;
 }
 
 /**
+ * Saca de un módulo las MECÁNICAS, dejando fuera su ambientación.
+ *
+ * Un módulo publicado trae dos cosas mezcladas en el mismo libro: el lore de
+ * su ciudad y unos subsistemas de juego que no tienen por qué quedarse allí.
+ * Las reglas de persecución por los tejados de un módulo urbano funcionan
+ * igual en cualquier otra ciudad, y las de frío extremo de una campaña ártica
+ * valen en cualquier invierno. Pero mientras vivan dentro de trescientas
+ * páginas que hablan de OTRO sitio, no se usan nunca: ni la jugadora se acuerda
+ * de que están ahí ni la búsqueda las encuentra, porque el documento habla de
+ * Aguasprofundas y la escena pasa en Luskan.
+ *
+ * Esto las saca aparte, en un documento corto y sin topónimos, listo para
+ * usarse donde haga falta.
+ */
+export async function extraerMecanicasDeDocumento(file: ProjectFile): Promise<string> {
+  const texto = (file.content || '').trim();
+  if (!texto) throw new Error('Ese archivo no tiene texto del que extraer mecánicas.');
+
+  const prompt = `Te doy el texto de un módulo o suplemento de juego de rol. Extrae ÚNICAMENTE sus SUBSISTEMAS DE JUEGO, para poder usarlos en otra campaña y en otro lugar.
+
+QUÉ ES UN SUBSISTEMA (esto es lo que buscas):
+Un procedimiento reglado que resuelve un tipo de situación y que se podría aplicar en cualquier otra parte del mundo: persecuciones, huidas por los tejados, intriga urbana y reputación con facciones, frío extremo o clima peligroso, viajes largos y desgaste, asedios, infiltración, investigación, negocios y contrabando, locura o miedo, navegación, combate de masas, tiempo muerto entre aventuras.
+
+QUÉ CONSERVAR, literalmente:
+- El procedimiento paso a paso: qué se tira, contra qué, cuántas rondas dura, cómo se gana y cómo se pierde.
+- Todas las tablas con sus rangos numéricos EXACTOS. Un número mal copiado inutiliza la mecánica.
+- Las CDs, los modificadores, los umbrales y los efectos de cada resultado.
+- Las condiciones de entrada y de salida: cuándo empieza a aplicarse y cuándo deja de aplicarse.
+
+⛔ QUÉ ELIMINAR SIN PIEDAD:
+- **Los topónimos y los nombres propios del módulo.** Si la regla dice «al cruzar el Mercado de Aguasprofundas», escríbela como «al cruzar una plaza concurrida». Lo que se adapta es el decorado; el procedimiento se queda igual. Esta es la parte más importante: un subsistema atado a su ciudad de origen no se usa en ninguna otra.
+- Todo el lore, la historia, las facciones concretas, los PNJs con nombre y la trama del módulo. Eso NO es una mecánica.
+- Mapas, cajas de texto para leer en voz alta, ilustraciones, créditos y números de página.
+- Las estadísticas de criaturas concretas.
+
+FORMATO:
+- Markdown. Un encabezado \`##\` por subsistema, con un nombre que diga QUÉ RESUELVE («Persecución a pie por terreno urbano», no «Persecuciones de Aguasprofundas»).
+- Debajo del encabezado, una línea en cursiva: *Cuándo usarlo:* y la situación de juego que lo dispara.
+- Después el procedimiento, en pasos numerados, y las tablas como tablas.
+- Conserva el idioma original del documento.
+- No añadas nada de tu cosecha ni expliques lo que has hecho.
+
+⚠️ Si el documento NO contiene ningún subsistema de juego —es solo lore, aventura o ambientación—, responde EXACTAMENTE con la palabra: NINGUNA
+
+TEXTO DEL DOCUMENTO:
+${texto.slice(0, 200000)}`;
+
+  const modelo = getBackgroundTaskModel();
+  const response = await generateContentWithFailover({
+    proposito: 'Extraer mecánicas de un módulo',
+    primaryModel: modelo,
+    contents: prompt,
+    config: {
+      temperature: 0,
+      ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    } as any
+  });
+
+  const salida = (response.text || '').trim();
+  if (!salida) throw new Error('El modelo no ha devuelto nada al buscar mecánicas.');
+  if (/^ninguna\b/i.test(salida) || salida.length < 120) {
+    throw new Error(
+      `En "${file.name}" no he encontrado subsistemas de juego: parece lore, aventura o ambientación. Etiquétalo como Lore o Cantera.`
+    );
+  }
+  return salida;
+}
+
+/**
  * Saca de un documento de lore la lista de quién es quién.
  *
  * El problema que resuelve no es que el modelo no sepa: es que no busca. Al
