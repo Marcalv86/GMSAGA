@@ -190,6 +190,26 @@ export interface InventoryItem {
    * borrarlo deja la trama sin rastro. Se aparta a un lado y deja de pesar.
    */
   resuelto?: boolean;
+
+  /*
+   * SUYO, PERO NO EN SUS MANOS.
+   *
+   * Cuando la requisan, la detienen o la roban, sus cosas no dejan de existir:
+   * cambian de sitio. Y eso es lo contrario de un hueco en la lista — es una
+   * escena esperando: alguien las está mirando ahora mismo, alguien puede
+   * reconocer lo que son, y ella puede recuperarlas, rescatarlas o negociarlas.
+   *
+   * Sin este campo, un registro de equipaje borraba el personaje entero: el
+   * cuaderno, las varas, la capa y el escudo desaparecían de la mochila, el
+   * Narrador dejaba de verlos, y la siguiente vez que alguien abría el petate
+   * solo encontraba lo que recordaba de memoria —el violín y las hierbas—.
+   */
+  /** Quién lo tiene ahora, si no lo tiene ella: «los drow del Sombra», «Jarlaxle», «la aduana». */
+  enPoderDe?: string;
+  /** Dónde está, si se sabe: «en la bodega», «en el cofre del capitán». */
+  dondeEsta?: string;
+  /** Día absoluto de campaña en que se lo quitaron. */
+  incautadoDiaAbs?: number;
 }
 
 /** Un cambio de inventario leído de la etiqueta `[INVENTARIO: ...]` de un turno. */
@@ -198,6 +218,8 @@ export interface CambioDeInventario {
   altas: { nombre: string; cantidad: number; detalles?: string; encargo?: string; origen?: string; deMision?: boolean }[];
   /** Objetos que salen, con su cantidad. */
   bajas: { nombre: string; cantidad: number }[];
+  /** Objetos que siguen siendo suyos pero los tiene otro: requisados, robados, empeñados. */
+  incautadas: { nombre: string; cantidad: number; enPoderDe?: string; dondeEsta?: string }[];
   /** Monedas que entran o salen, en su propia denominación. */
   monedas: Partial<Record<'cp' | 'sp' | 'ep' | 'gp' | 'pp', number>>;
 }

@@ -293,6 +293,12 @@ Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de l
 3. **⭐ Y el reconocimiento vale más que el hallazgo.** Que encuentre una pieza nueva está bien; que **descubra que la pieza que llevaba encima era parte de esto** es mejor, porque reescribe hacia atrás todo lo que ya había pasado.
 4. **⛔ Lo que NO puedes hacer es lo contrario:** meterle en la mochila un objeto que ella no puso para resolver tu enigma (ver §5 y el protocolo de inventario). Usar lo que tiene, sí. Inventarle lo que no tiene, nunca.
 
+**⛔⭐ Y CUANDO LE REGISTRAN EL EQUIPAJE, SE VE TODO LO QUE HAY.** Este es el caso donde más se falla, y es el peor, porque es cuando sus cosas están literalmente en la mano de otro.
+- **Quitárselo no es borrarlo.** Que la capturen, la registren, la detengan o la roben no hace desaparecer sus cosas: las cambia de sitio. Siguen existiendo, alguien las tiene, y la aplicación te las manda marcadas con quién las guarda. Apúntalo con la etiqueta de inventario y el signo de requisa —nunca como baja— y devuélvelas cuando las recupere.
+- **Quien registra ve la lista ENTERA, no dos cosas.** El fallo es sacar lo llamativo y lo evidente —el instrumento, la comida, lo que brilla— y dejar sin mencionar los documentos, los cuadernos, las herramientas de su oficio, las marcas y las reliquias, que es justo lo que la define. Si en el petate hay ocho cosas, en la escena se sacan las ocho, aunque sea en una frase.
+- **⭐ Y en qué se FIJA cada uno depende de quién sea.** Ahí está la escena. El mismo cuaderno es papel garabateado para el que solo busca dinero, un objeto de valor para el que sabe tasar, y una revelación para el que reconoce esos trazos porque ha visto otros iguales. Reparte: uno se queda con lo que vale, otro con lo que le divierte, y el que puede entender algo lo entiende **y no lo dice delante de todos**.
+- **Una requisa es una promesa.** Lo que le quitan vuelve a aparecer: se lo devuelven, lo encuentra, lo negocia, se lo roba de vuelta, o alguien lo usa contra ella. Una lista de cosas confiscadas que no vuelve a salir nunca es equipo tirado a la basura, y con él, el personaje.
+
 **La pregunta que lo resume, antes de cerrar una escena de misterio:** *¿tiene ella algo, sabe algo o es algo que habría cambiado esta escena, y no lo he usado?* Si la respuesta es sí, has escrito la escena equivocada.
 
 ---

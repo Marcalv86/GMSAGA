@@ -60,7 +60,7 @@ const INVENTARIO_RE = /\[\s*INVENTARIO\s*:\s*([^\]]*)\]/gi;
  * escribe el nombre a secas.
  */
 export function leerInventario(texto: string): CambioDeInventario {
-  const cambio: CambioDeInventario = { altas: [], bajas: [], monedas: {} };
+  const cambio: CambioDeInventario = { altas: [], bajas: [], incautadas: [], monedas: {} };
   if (!texto || !/INVENTARIO/i.test(texto)) return cambio;
 
   INVENTARIO_RE.lastIndex = 0;
@@ -70,8 +70,15 @@ export function leerInventario(texto: string): CambioDeInventario {
       const entrada = trozo.trim();
       if (!entrada) continue;
 
+      /*
+       * Tres signos, no dos. `~` es «se lo han quitado»: sigue siendo suyo,
+       * pero lo tiene otro. Sin ese tercer signo, una requisa solo se podía
+       * apuntar como baja, y una baja BORRA — que es como la mochila se quedó
+       * vacía después de un registro y el Narrador dejó de ver sus cosas.
+       */
       const signo = entrada.startsWith('-') ? -1 : 1;
-      let resto = entrada.replace(/^[+-]\s*/, '').trim();
+      const incautado = entrada.startsWith('~');
+      let resto = entrada.replace(/^[+~-]\s*/, '').trim();
       if (!resto) continue;
 
       // «3 Buenas Bayas» → cantidad 3; «Máscara de Disfraz» → cantidad 1.
@@ -98,8 +105,19 @@ export function leerInventario(texto: string): CambioDeInventario {
       }
 
       const nombre = resto.slice(0, 120);
-      if (signo > 0) cambio.altas.push({ nombre, cantidad, ...leerCampos(detalles) });
-      else cambio.bajas.push({ nombre, cantidad });
+      const campos = leerCampos(detalles);
+      /*
+       * Y una red por si el Narrador escribe la requisa como baja. Pasa: la
+       * etiqueta lleva meses con dos signos y la costumbre tira. Si en el
+       * paréntesis dice quién lo tiene, es una requisa aunque lleve un menos.
+       */
+      if (incautado || (signo < 0 && campos.enPoderDe)) {
+        cambio.incautadas.push({ nombre, cantidad, enPoderDe: campos.enPoderDe, dondeEsta: campos.dondeEsta });
+      } else if (signo > 0) {
+        cambio.altas.push({ nombre, cantidad, ...campos });
+      } else {
+        cambio.bajas.push({ nombre, cantidad });
+      }
     }
   }
 
@@ -114,11 +132,20 @@ export function leerInventario(texto: string): CambioDeInventario {
  * clasificado y la jugadora no tiene que marcarlo a mano. Lo que no sea
  * ninguno de los dos se queda como descripción, que es lo que era antes.
  */
-function leerCampos(detalles?: string): { detalles?: string; encargo?: string; origen?: string; deMision?: boolean } {
+function leerCampos(detalles?: string): {
+  detalles?: string;
+  encargo?: string;
+  origen?: string;
+  enPoderDe?: string;
+  dondeEsta?: string;
+  deMision?: boolean;
+} {
   if (!detalles) return {};
   const sueltos: string[] = [];
   let encargo: string | undefined;
   let origen: string | undefined;
+  let enPoderDe: string | undefined;
+  let dondeEsta: string | undefined;
 
   for (const parte of detalles.split('|')) {
     const t = parte.trim();
@@ -128,6 +155,9 @@ function leerCampos(detalles?: string): { detalles?: string; encargo?: string; o
     const valor = corte > 0 ? t.slice(corte + 1).trim() : '';
     if (valor && (campo === 'encargo' || campo === 'mision')) encargo = valor.slice(0, 200);
     else if (valor && (campo === 'de' || campo === 'origen')) origen = valor.slice(0, 200);
+    else if (valor && (campo === 'en poder de' || campo === 'lo tiene' || campo === 'incautado por'))
+      enPoderDe = valor.slice(0, 200);
+    else if (valor && (campo === 'donde' || campo === 'esta en')) dondeEsta = valor.slice(0, 200);
     else sueltos.push(t);
   }
 
@@ -135,6 +165,8 @@ function leerCampos(detalles?: string): { detalles?: string; encargo?: string; o
     detalles: sueltos.join(', ') || undefined,
     encargo,
     origen,
+    enPoderDe,
+    dondeEsta,
     deMision: encargo ? true : undefined
   };
 }
@@ -179,6 +211,10 @@ export function aplicarInventario(
         quantity: Math.max(0, (fuera[i].quantity || 0) + alta.cantidad),
         // Un objeto que vuelve a entrar deja de estar resuelto.
         resuelto: false,
+        // Y si se lo habían quitado, recuperarlo lo devuelve a sus manos.
+        enPoderDe: undefined,
+        dondeEsta: undefined,
+        incautadoDiaAbs: undefined,
         description: fuera[i].description || alta.detalles,
         encargo: fuera[i].encargo || alta.encargo,
         origen: fuera[i].origen || alta.origen,
@@ -193,6 +229,37 @@ export function aplicarInventario(
         encargo: alta.encargo,
         origen: alta.origen,
         deMision: alta.deMision,
+        diaAbs
+      });
+    }
+  }
+
+  /*
+   * LO REQUISADO CAMBIA DE MANOS, NO DESAPARECE.
+   *
+   * Si el objeto ya estaba en la mochila se queda donde está y solo se le
+   * apunta quién lo tiene. Y si NO estaba —porque se lo quitaron antes de que
+   * nadie llevara la cuenta, que es lo normal— se crea igualmente: que le
+   * requisen algo es justo cuando la aplicación se entera de que lo tenía.
+   */
+  for (const quitado of cambio.incautadas) {
+    const i = fuera.findIndex(it => it && mismaCosa(it.name || '', quitado.nombre));
+    if (i >= 0) {
+      fuera[i] = {
+        ...fuera[i],
+        quantity: Math.max(fuera[i].quantity || 0, quitado.cantidad),
+        enPoderDe: quitado.enPoderDe || fuera[i].enPoderDe || 'sin saber quién',
+        dondeEsta: quitado.dondeEsta || fuera[i].dondeEsta,
+        incautadoDiaAbs: fuera[i].incautadoDiaAbs ?? diaAbs
+      };
+    } else {
+      fuera.push({
+        id: `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+        name: quitado.nombre,
+        quantity: quitado.cantidad,
+        enPoderDe: quitado.enPoderDe || 'sin saber quién',
+        dondeEsta: quitado.dondeEsta,
+        incautadoDiaAbs: diaAbs,
         diaAbs
       });
     }
@@ -229,7 +296,12 @@ export function aplicarMonedas(
 
 /** Si un cambio leído no mueve nada, no hace falta tocar la ficha. */
 export function cambioVacio(c: CambioDeInventario): boolean {
-  return c.altas.length === 0 && c.bajas.length === 0 && Object.keys(c.monedas).length === 0;
+  return (
+    c.altas.length === 0 &&
+    c.bajas.length === 0 &&
+    c.incautadas.length === 0 &&
+    Object.keys(c.monedas).length === 0
+  );
 }
 
 /**
@@ -263,7 +335,7 @@ export function reconstruirInventario(
     if (!m || m.role === 'user' || !m.content) continue;
     const cambio = leerInventario(m.content);
     if (cambioVacio(cambio)) continue;
-    objetosVistos += cambio.altas.length;
+    objetosVistos += cambio.altas.length + cambio.incautadas.length;
     inventario = aplicarInventario(inventario, cambio);
     for (const clave of Object.keys(cambio.monedas) as (keyof typeof neto)[]) {
       neto[clave] = (neto[clave] || 0) + (cambio.monedas[clave] || 0);

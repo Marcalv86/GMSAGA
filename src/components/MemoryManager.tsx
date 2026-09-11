@@ -43,6 +43,7 @@ import {
   Backpack,
   Coins,
   PackageCheck,
+  PackageX,
   Users
 } from 'lucide-react';
 
@@ -1871,15 +1872,27 @@ export const MemoryManager: React.FC<{
          * una carta que entregar o un pergamino que traducir son una tarea con
          * forma de objeto. Mezclarlos escondía el hilo entre las pociones.
          */
-        const deMision = todo.filter(i => i.deMision && !i.resuelto);
-        const resueltos = todo.filter(i => i.deMision && i.resuelto);
-        const propios = todo.filter(i => !i.deMision);
+        /*
+         * Y la tercera pila, que faltaba: lo que le han quitado.
+         *
+         * Una requisa vaciaba la mochila y punto. Pero sus cosas no dejan de
+         * ser suyas porque se las guarde otro: están en algún sitio, alguien
+         * las está mirando, y volverán. Verlas aquí es lo que evita que se
+         * olviden — a ella y al Narrador.
+         */
+        const requisados = todo.filter(i => i.enPoderDe);
+        const enSusManos = todo.filter(i => !i.enPoderDe);
+        const deMision = enSusManos.filter(i => i.deMision && !i.resuelto);
+        const resueltos = enSusManos.filter(i => i.deMision && i.resuelto);
+        const propios = enSusManos.filter(i => !i.deMision);
 
-        const Tarjeta: React.FC<{ item: InventoryItem; tono: 'mision' | 'propio' | 'hecho' }> = ({ item, tono }) => (
+        const Tarjeta: React.FC<{ item: InventoryItem; tono: 'mision' | 'propio' | 'hecho' | 'requisado' }> = ({ item, tono }) => (
           <div
             className={`p-3.5 rounded-lg border flex flex-col gap-1.5 group transition-colors ${
               tono === 'mision'
                 ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60'
+                : tono === 'requisado'
+                ? 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/60'
                 : tono === 'hecho'
                 ? 'bg-[var(--surface-soft)] border-[var(--user-border)] opacity-70'
                 : 'bg-[var(--surface-soft)] border-[var(--user-border)] hover:border-[var(--accent)]/40'
@@ -1905,6 +1918,11 @@ export const MemoryManager: React.FC<{
                     ⏳ {item.durationNote}
                   </span>
                 )}
+                {item.enPoderDe && (
+                  <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
+                    lo tiene {item.enPoderDe}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -1916,6 +1934,11 @@ export const MemoryManager: React.FC<{
             {item.origen && (
               <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
                 De: {item.origen}
+              </p>
+            )}
+            {item.dondeEsta && (
+              <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
+                Está en: {item.dondeEsta}
               </p>
             )}
             {item.description && (
@@ -2046,6 +2069,25 @@ export const MemoryManager: React.FC<{
                 </div>
               )}
             </div>
+
+            {/* Lo que le han quitado: sigue siendo suyo, y alguien lo tiene */}
+            {requisados.length > 0 && (
+              <div className="flex flex-col gap-2.5">
+                <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-rose-500/30">
+                  <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                    <PackageX className="w-3.5 h-3.5 text-rose-600" />
+                    Lo que le han quitado ({requisados.length})
+                  </span>
+                  <p className="text-[11px] text-[var(--text-secondary)] opacity-80 m-0 mt-0.5 leading-relaxed">
+                    Requisado, robado o dejado en prenda. Sigue siendo suyo: no está en su mochila, pero está en algún
+                    sitio y alguien lo guarda. El Narrador lo ve y sabe quién lo tiene.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {requisados.map(i => <Tarjeta key={i.id} item={i} tono="requisado" />)}
+                </div>
+              </div>
+            )}
 
             {/* Lo ya resuelto: no se borra, porque cuenta lo que pasó */}
             {resueltos.length > 0 && (

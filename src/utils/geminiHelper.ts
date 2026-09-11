@@ -1879,15 +1879,26 @@ ${misionesVivas
     }${i.deMision && i.origen ? ` (de ${String(i.origen).slice(0, 60)})` : ''}${
       i.description ? `: ${String(i.description).slice(0, 160)}` : ''
     }`;
-  const encargosVivos = inventarioVivo.filter(i => i.deMision && !i.resuelto);
-  const cosasSuyas = inventarioVivo.filter(i => !i.deMision || i.resuelto);
+  const requisadas = inventarioVivo.filter(i => i.enPoderDe);
+  const enSusManos = inventarioVivo.filter(i => !i.enPoderDe);
+  const encargosVivos = enSusManos.filter(i => i.deMision && !i.resuelto);
+  const cosasSuyas = enSusManos.filter(i => !i.deMision || i.resuelto);
+  const lineaRequisada = (i: InventoryItem) =>
+    `- **${i.name}**${i.quantity && i.quantity > 1 ? ` (x${i.quantity})` : ''} — lo tiene **${String(i.enPoderDe).slice(0, 80)}**${
+      i.dondeEsta ? `, en ${String(i.dondeEsta).slice(0, 80)}` : ''
+    }${i.description ? `: ${String(i.description).slice(0, 160)}` : ''}`;
   const bloqueMochila = inventarioVivo.length
     ? `
-### 🎒 LO QUE LLEVA ENCIMA (y es material de escena, no una lista de la compra)
+### 🎒 SUS COSAS (material de escena, no una lista de la compra)
 Antes de inventarte un objeto, una lengua o un enigma, mira esta lista. Si algo de aquí toca lo que ibas a inventar, **la escena es que lo reconozca**, no que aparezca un misterio en paralelo.
-- ✅ Sus cosas se usan: se leen, se tocan, se enseñan, se comparan, se tocan si suenan y se le pueden robar.
+- ✅ Sus cosas se usan: se leen, se tocan, se enseñan, se comparan, suenan si son instrumentos y se le pueden robar.
 - ⛔ Y lo que NO está aquí ni en su ficha, no se lo metes en la mochila para resolverte una escena.
-${encargosVivos.length ? `\n**Encargos pendientes (objetos que son una tarea):**\n${encargosVivos.map(lineaDeObjeto).join('\n')}` : ''}${cosasSuyas.length ? `\n**Sus cosas:**\n${cosasSuyas.map(lineaDeObjeto).join('\n')}` : ''}
+${encargosVivos.length ? `\n**Encargos pendientes (objetos que son una tarea):**\n${encargosVivos.map(lineaDeObjeto).join('\n')}` : ''}${cosasSuyas.length ? `\n**Lo que lleva encima:**\n${cosasSuyas.map(lineaDeObjeto).join('\n')}` : ''}${
+        requisadas.length
+          ? `\n**⭐ LO QUE LE HAN QUITADO — sigue siendo suyo y alguien lo tiene delante:**\n${requisadas.map(lineaRequisada).join('\n')}\n
+Esto NO es una lista de bajas: es la escena mejor servida que tienes. Quien lo guarda puede abrirlo, leerlo, reconocerlo, preguntar por ello, usarlo de moneda de cambio o devolvérselo. Y cuando alguien registre o examine sus cosas, **ve TODO lo de esta lista, no solo lo llamativo**: en qué se fija y qué entiende depende de quién sea él —lo que a uno le parece un cuaderno garabateado, otro lo reconoce a la primera—. ⛔ Que se lo hayan quitado no borra que lo tenga: si lo recupera, emite la etiqueta de inventario para devolverlo a sus manos.`
+          : ''
+      }
 `.trim()
     : '';
 
@@ -2585,7 +2596,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
      «atr» (0-20), «vin» (0-20) y «con» (0-20) representan la Atracción/Romance, Vínculo y Confianza que el PNJ siente hacia el protagonista. El Narrador los actualiza de forma autónoma según las vivencias y la química; son de solo lectura para el jugador.
      «orientacion» es OPCIONAL y se manda UNA VEZ, la primera, cuando sus documentos lo digan o el juego lo haya dejado claro: «hombres», «mujeres», «le da igual», «asexual», «casado y va en serio», «no le interesa nadie ahora mismo». Se queda guardado en su ficha y vuelve a ti en todos los turnos siguientes, así que **no hace falta repetirlo** y NO te lo inventes para rellenar: si no consta, lo dejas fuera, y sin que conste la atracción no sube (ver el protocolo de la atracción).
      ⚠️ Y un aviso sobre «atr»: la aplicación NO acepta puntuaciones de salida. Un personaje que aparece por primera vez entra con la atracción a 0 y sube como mucho un punto por día de trato, así que escribir «atr: 8» en un primer encuentro no consigue un 8: consigue un 0 o un 1. La química se juega, no se declara.
-   - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, +Z PO, -W PO, +A PP, -B PC] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda o consuma objetos o dinero durante la escena (ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)], si come 3 de 10: [INVENTARIO: -3 Buenas Bayas], si gasta 15 de oro en una tienda: [INVENTARIO: +Disfraz noble, -15 PO], si Jarlaxle le entrega una Máscara de Disfraz: [INVENTARIO: +1 Máscara de Disfraz (mágica, equipada)], si pierde la máscara: [INVENTARIO: -1 Máscara de Disfraz]). Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
+   - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, ~Z Nombre (en poder de: Quién | donde: Dónde), +Z PO, -W PO] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda, consuma o LE QUITEN objetos o dinero durante la escena. **«+» entra · «-» se acabó (consumido, gastado, entregado para siempre) · «~» SE LO HAN QUITADO pero sigue siendo suyo.** ⛔ El signo «~» es obligatorio cuando la requisan, la detienen, la registran, la roban o deja algo en prenda: esas cosas NO se borran de su ficha, cambian de manos, y hay que apuntar quién las tiene. Ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)]; si come 3: [INVENTARIO: -3 Buenas Bayas]; si gasta 15 de oro: [INVENTARIO: +Disfraz noble, -15 PO]; **si le requisan el equipaje al capturarla: [INVENTARIO: ~1 Violín (en poder de: la tripulación | donde: la bodega), ~1 Diario ilustrado (en poder de: la tripulación | donde: la bodega)]**; y cuando se lo devuelven o lo recupera: [INVENTARIO: +1 Violín, +1 Diario ilustrado]. Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
@@ -4437,9 +4448,9 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
   ],
   "_nota_player_events": "⛔ NO es una segunda copia del diario. 'daily_events' lleva lo que PASÓ cada día; 'player_events' lleva solo los HITOS que cambian al protagonista y que se recordarán dentro de un año: un juramento, una pérdida, una cicatriz, subir de nivel, un pacto, una decisión que no tiene vuelta atrás, un vínculo que se rompe o se sella. Una escena cotidiana —una conversación, un registro, un trato, una inspección— va en 'daily_events' y NO se repite aquí. Si dudas, no lo pongas: repetir la misma escena en las dos listas la muestra DOS VECES en el diario de la jugadora, con dos títulos y dos horas distintas. Es preferible una lista de hitos corta y vacía que un diario duplicado.",
   "inventory": [
-    { "name": "Objeto", "quantity": 1, "notas": "Qué es o para qué sirve, si hace falta", "deMision": false, "encargo": "", "origen": "" }
+    { "name": "Objeto", "quantity": 1, "notas": "Qué es o para qué sirve, si hace falta", "deMision": false, "encargo": "", "origen": "", "enPoderDe": "", "dondeEsta": "" }
   ],
-  "_nota_inventory": "LA MOCHILA DEL PROTAGONISTA, LEÍDA DE LO JUGADO. Repasa la crónica y devuelve lo que LLEVA ENCIMA AHORA MISMO, no todo lo que ha tocado: lo que le dieron y no ha entregado, lo que compró, lo que cogió, lo que traía y se menciona en escena. ⛔ Lo consumido, gastado, entregado, robado o perdido NO se pone. ⛔ Y no te inventes equipo estándar de aventurero que nadie ha nombrado: si no sale en el texto, no existe. Marca deMision:true y rellena 'encargo' SOLO si es una tarea con forma de objeto —una carta que entregar, algo que traducir, algo que hay que devolver— con lo que hay que hacer con él; 'origen' es de quién salió. Lo demás son sus cosas. Devuelve la lista vacía si en la crónica no se ve que lleve nada.",
+  "_nota_inventory": "LA MOCHILA DEL PROTAGONISTA, LEÍDA DE LO JUGADO. Repasa la crónica y devuelve TODO LO QUE SIGUE SIENDO SUYO, no solo lo que lleva puesto: lo que le dieron y no ha entregado, lo que compró, lo que cogió, lo que traía y se menciona en escena. ⛔ Lo consumido, lo gastado y lo entregado para siempre NO se pone. ⭐⭐ PERO LO QUE LE HAN QUITADO SÍ SE PONE, Y ES IMPORTANTE: si la capturaron, la registraron, la detuvieron o la robaron, sus cosas NO desaparecen —cambian de manos—. Devuélvelas con 'enPoderDe' (quién las tiene: la tripulación, el capitán, la aduana) y 'dondeEsta' si se sabe. Borrarlas es hacer desaparecer al personaje: sus documentos, sus herramientas y sus reliquias son lo que la define, y alguien las está mirando ahora mismo. ⛔ Y no te inventes equipo estándar de aventurero que nadie ha nombrado: si no sale en el texto, no existe. Marca deMision:true y rellena 'encargo' SOLO si es una tarea con forma de objeto —una carta que entregar, algo que traducir, algo que hay que devolver— con lo que hay que hacer con él; 'origen' es de quién salió. Lo demás son sus cosas. Devuelve la lista vacía si en la crónica no se ve que lleve nada.",
   "currencies": { "gp": 0, "sp": 0, "cp": 0, "ep": 0, "pp": 0 },
   "_nota_currencies": "El dinero que le queda AHORA, si la crónica permite saberlo (le pagaron tanto, gastó tanto). Si no hay ni un dato de dinero en toda la crónica, devuelve el objeto con todo a 0 y NO lo toques: se conservará lo que ya constaba en su ficha.",
   "quests": [
@@ -4624,6 +4635,9 @@ ${historyToAnalyze}`;
         description: String(it?.notas || it?.description || '').trim().slice(0, 400) || undefined,
         encargo: encargo.slice(0, 200) || undefined,
         origen: String(it?.origen || '').trim().slice(0, 200) || undefined,
+        // Suyo, pero en manos de otro: una requisa no borra, cambia de sitio.
+        enPoderDe: String(it?.enPoderDe || '').trim().slice(0, 200) || undefined,
+        dondeEsta: String(it?.dondeEsta || '').trim().slice(0, 200) || undefined,
         deMision: Boolean(it?.deMision) || Boolean(encargo) || undefined
       } as InventoryItem;
     })
@@ -5166,6 +5180,10 @@ export function construirPromptOOC({
               `- ${i.name}${i.quantity && i.quantity > 1 ? ` (x${i.quantity})` : ''}${
                 i.equipped ? ' [equipado]' : ''
               }${
+                i.enPoderDe
+                  ? ` [SE LO QUITARON — lo tiene ${String(i.enPoderDe).slice(0, 80)}${i.dondeEsta ? `, en ${String(i.dondeEsta).slice(0, 80)}` : ''}]`
+                  : ''
+              }${
                 i.deMision
                   ? ` [ENCARGO${i.encargo ? `: ${i.encargo.slice(0, 90)}` : ''}${i.resuelto ? ', ya cumplido' : ''}]`
                   : ''
@@ -5451,7 +5469,8 @@ QUÉ SÍ PUEDES HACER AQUÍ:
 La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: **te lo pide a ti y lo arreglas tú**, igual que en una mesa de verdad nadie le abre el cuaderno al Director. Así que cuando te digan que algo está mal, no contestes «entra en Memoria y bórralo»: **hazlo**, dilo en palabras, y ya está.
 - \`[OLVIDA: lo que hay que quitar]\` — borra una nota de memoria, una entrada del diario, un hito o la ficha de un personaje que no debería existir. Escribe el texto o el nombre tal como aparece. Para borrar la ficha de alguien hace falta su **nombre exacto**; lo demás vale con un trozo reconocible.
 - \`[VÍNCULO: Nombre | ...]\` — corrige a un personaje QUE YA EXISTE: lo que aparenta, lo que calla, su orientación, su afinidad. Aquí no se fichan personajes nuevos; eso se hace jugando.
-- \`[INVENTARIO: +1 Objeto, -2 Otro, -15 PO]\` — corrige la mochila y el dinero. Sirve para meter lo que el personaje ya traía de casa y nunca se apuntó («mi violín no está en la lista»), y para quitar lo que sobra.
+- \`[INVENTARIO: +1 Objeto, -2 Otro, ~1 Objeto (en poder de: Quién | donde: Dónde), -15 PO]\` — corrige la mochila y el dinero. Sirve para meter lo que el personaje ya traía de casa y nunca se apuntó («mi violín no está en la lista»), y para quitar lo que sobra.
+  - **\`~\` es «se lo han quitado»**, y es distinto de \`-\`. Si la requisaron, la detuvieron, la registraron o la robaron, sus cosas siguen siendo suyas y las tiene otro: van con \`~\` y con quién las tiene. Borrarlas con \`-\` hace desaparecer al personaje de la partida —sus documentos, sus herramientas y sus reliquias son lo que la define—. Cuando las recupere, \`+\` se las devuelve a las manos.
 
 **⚖️ PERO ESTO NO ES UN PANEL DE MANDOS: ERES EL DIRECTOR Y PUEDES DECIR QUE NO.**
 - ✅ **Corrige sin discutir** lo que es un error de registro: algo apuntado dos veces, una escena que se rehízo y quedó anotada, un nombre mal escrito, un objeto suyo que nunca se fichó, una barra que subió cuando no debía.
