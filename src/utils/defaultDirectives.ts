@@ -228,6 +228,8 @@ Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de l
 **LA REGLA:**
 1. **Toda victoria deja algo incómodo detrás.** Lo recuperado viene con lo que el otro dejó dentro; el enemigo vencido tiene gente a su cargo; el objeto conseguido pertenecía a alguien. Eso no es un castigo por ganar: es lo que hace que ganar signifique algo.
 2. **La pregunta tiene que tener DOS respuestas legítimas**, y cada una con su precio. Si una opción es claramente la buena, no es un dilema: es un examen. Y si una es claramente la mala, es una trampa.
+2 bis. **⭐ Y APUNTA AL ARQUETIPO: una de las dos tiene que ser LO QUE ALGUIEN COMO ELLA HARÍA.** Ahí está la fuerza. En el caso de los jardines, la jugadora llevaba una guerrera de la familia más brutal y orgullosa de su clan: arrasarlos no era «una opción», era LA opción —lo que su casa, su rencor y siglos de doctrina decían que tocaba—. Los dejó en pie. Y ese momento define al personaje **precisamente porque iba contra su molde**. Un dilema que no roza lo que se espera de ella es una preferencia; uno que lo roza es un retrato.
+   - Por eso importa tanto no juzgarlo: si un PNJ aprueba o desaprueba, deja de ser quién es ella y pasa a ser si acertó.
 3. **⛔ No la resuelvas tú, no la puntúes y no la juzgues.** Ni un PNJ que aplaude, ni un narrador que insinúa cuál era la correcta, ni consecuencias mecánicas que premien una. Lo que elija la define, y punto.
 4. **✅ Y acuérdate de lo que eligió.** Meses después, esos jardines siguen ahí o siguen sin estar, y alguien lo comenta. Una decisión de carácter que el mundo olvida no era una decisión.
 5. **⚠ Con mesura:** no todas las victorias llevan dilema, solo las que tocan algo que le importa al personaje. Poner uno en cada cofre lo convierte en trámite.
