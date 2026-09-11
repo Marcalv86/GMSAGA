@@ -109,6 +109,9 @@ export const FilesView: React.FC<{
       portrait_npc: 0,
       scene: 0,
       document: 0,
+      compendio: 0,
+      cantera: 0,
+      lore: 0,
       style_sample: 0,
       oracle: 0,
       roster: 0,
@@ -208,7 +211,10 @@ export const FilesView: React.FC<{
     { key: 'portrait_npc', label: 'Retratos PNJ', icon: Drama, desc: 'PNJs, criaturas y villanos' },
     { key: 'map', label: 'Mapas', icon: Map, desc: 'Mapas tácticos y del mundo' },
     { key: 'scene', label: 'Ilustraciones', icon: Image, desc: 'Paisajes y escenas' },
-    { key: 'document', label: 'Documentos', icon: BookOpen, desc: 'Reglas, lore y libros' },
+    { key: 'compendio', label: 'Compendios', icon: BookOpen, desc: 'Resúmenes de novelas y material de fondo de la campaña' },
+    { key: 'cantera', label: 'Canteras', icon: Map, desc: 'Lugares, barrios y escenarios listos para usar' },
+    { key: 'lore', label: 'Lore', icon: Scroll, desc: 'Ambientación, facciones, historia y cultura' },
+    { key: 'document', label: 'Documentos', icon: BookOpen, desc: 'Reglas y todo lo que no encaje en las otras' },
     {
       key: 'style_sample',
       label: 'Muestras de estilo',
@@ -486,6 +492,9 @@ export const FilesView: React.FC<{
                         <option value="portrait_npc">Retrato PNJ</option>
                         <option value="map">Mapa</option>
                         <option value="scene">Ilustración</option>
+                        <option value="compendio">Compendio</option>
+                        <option value="cantera">Cantera (lugares y escenarios)</option>
+                        <option value="lore">Lore / ambientación</option>
                         <option value="document">Documento</option>
                         <option value="style_sample">Muestra de estilo</option>
                         <option value="oracle">Oráculo / tablas</option>

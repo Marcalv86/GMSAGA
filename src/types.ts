@@ -544,6 +544,18 @@ export type FileCategory =
   | 'portrait_npc'
   | 'scene'
   | 'document'
+  /**
+   * Material de fondo, separado por PARA QUÉ SIRVE.
+   *
+   * «Documento» lo englobaba todo y no decía nada, así que un compendio de
+   * novelas acababa etiquetado como ficha de PNJ por no tener sitio mejor. La
+   * categoría no es decoración: pesa en la búsqueda local, y saber que un
+   * archivo es una cantera de lugares ayuda a que suba cuando la escena
+   * necesita un lugar.
+   */
+  | 'compendio'
+  | 'cantera'
+  | 'lore'
   | 'style_sample'
   | 'oracle'
   | 'roster'

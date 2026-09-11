@@ -252,8 +252,42 @@ export function trocear(file: ProjectFile): Fragmento[] {
   return salida;
 }
 
+/**
+ * Con qué palabras describe cada etiqueta lo que hay dentro.
+ *
+ * La categoría NO se indexaba: el índice se construía solo con el título y el
+ * texto del fragmento, así que marcar un archivo como «cantera de lugares» no
+ * cambiaba absolutamente nada en la búsqueda, por mucho que sea justo lo que
+ * uno espera de una etiqueta. Aquí se convierte en términos de verdad, que es
+ * lo único que entiende un índice BM25.
+ */
+const PALABRAS_DE_CATEGORIA: Partial<Record<NonNullable<ProjectFile['category']>, string>> = {
+  compendio: 'compendio resumen novelas trasfondo material de fondo canon',
+  cantera: 'cantera lugar lugares localizacion escenario ciudad barrio taberna edificio sitio',
+  lore: 'lore ambientacion historia cultura facciones religion costumbres mundo',
+  sheet_npc: 'ficha pnj personaje monstruo criatura estadisticas',
+  sheet_pj: 'ficha protagonista personaje jugador',
+  sheet_companion: 'ficha compañero familiar montura animal',
+  oracle: 'oraculo tabla tablas azar resultado',
+  roster: 'elenco reparto personajes lista',
+  index: 'indice ganchos aventura',
+  document: 'documento'
+};
+
 function crearFragmento(file: ProjectFile, titulo: string, texto: string): Fragmento {
-  const tokens = tokenizar(`${titulo} ${texto}`);
+  /*
+   * El NOMBRE del archivo y su etiqueta entran en el índice de cada fragmento.
+   *
+   * Un párrafo suelto sobre un barrio no dice de qué documento sale, así que
+   * una consulta como «buscamos un sitio donde dormir en Aguas Profundas» no
+   * enganchaba con la cantera de Aguas Profundas salvo que esas palabras
+   * estuvieran literalmente en el párrafo. Con el nombre y la etiqueta dentro,
+   * todos los fragmentos de ese archivo saben de dónde vienen y para qué son.
+   */
+  const procedencia = `${file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')} ${
+    PALABRAS_DE_CATEGORIA[file.category as NonNullable<ProjectFile['category']>] || ''
+  }`;
+  const tokens = tokenizar(`${procedencia} ${titulo} ${texto}`);
   const frecuencias = new Map<string, number>();
   for (const t of tokens) frecuencias.set(t, (frecuencias.get(t) || 0) + 1);
   return {

@@ -5938,6 +5938,21 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
     const nombreDeIndice = palabraEnNombre(['indice', 'índice', 'ganchos', 'index']);
     if (nombreDeIndice) return 'index';
 
+    /*
+     * Material de fondo, clasificado por para qué sirve.
+     *
+     * Va DESPUÉS del elenco y el índice —esos son más específicos— y ANTES del
+     * oráculo y del cajón de «documento». Sin estas tres, un compendio de
+     * novelas acababa etiquetado a mano como ficha de PNJ por no tener sitio
+     * mejor, que es lo peor que se le puede poner: lo mete en el saco de los
+     * statblocks.
+     */
+    if (palabraEnNombre(['cantera', 'canteras'])) return 'cantera';
+    if (palabraEnNombre(['compendio', 'compendios'])) return 'compendio';
+    if (palabraEnNombre(['lore', 'ambientacion', 'ambientación', 'trasfondo del mundo', 'worldbuilding'])) {
+      return 'lore';
+    }
+
     const nombreDeOraculo = ['oraculo', 'oráculo', 'oracle', 'mythic', 'gme', 'tabla', 'tablas'].some(k =>
       lowerName.includes(k)
     );
