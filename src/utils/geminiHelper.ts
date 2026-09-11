@@ -4964,6 +4964,8 @@ export interface ConsultaDeMesa {
   project: Project;
   chats: Chat[];
   currentChatId?: string | null;
+  /** Archivos y documentos de la campaña cargados en el proyecto. */
+  files?: ProjectFile[];
   /** La conversación de mesa que ya se lleva, para que tenga hilo. */
   historial: { role: 'user' | 'model'; content: string }[];
   pregunta: string;
@@ -5000,6 +5002,7 @@ export function construirPromptOOC({
   project,
   chats,
   currentChatId,
+  files = [],
   historial,
   pregunta,
   imagenes,
@@ -5017,6 +5020,26 @@ export function construirPromptOOC({
     .map(m => `${m.role === 'user' ? 'Jugadora' : 'Narrador'}: ${stripStateTag(limpiarEtiquetasDeTiempo(m.content)).slice(0, 1200)}`)
     .join('\n');
 
+  // Inventario y monedas actuales en panel
+  const inventarioActual =
+    pc?.inventory && pc.inventory.length > 0
+      ? pc.inventory
+          .map(
+            i =>
+              `- ${i.name}${i.quantity && i.quantity > 1 ? ` (x${i.quantity})` : ''}${
+                i.equipped ? ' [equipado]' : ''
+              }${i.description ? `: ${i.description}` : ''}`
+          )
+          .join('\n')
+      : '(mochila vacía o sin registrar en panel)';
+
+  const monedasActuales = pc?.currencies
+    ? Object.entries(pc.currencies)
+        .filter(([_, v]) => typeof v === 'number' && v > 0)
+        .map(([k, v]) => `${v} ${k.toUpperCase()}`)
+        .join(', ') || '0 monedas'
+    : 'sin registrar';
+
   const ficha = pc
     ? [
         `- Protagonista: ${pc.name}${pc.title ? ` — ${pc.title}` : ''}`,
@@ -5025,29 +5048,131 @@ export function construirPromptOOC({
         pc.conditions?.length ? `- Condiciones: ${pc.conditions.join(', ')}` : '',
         typeof pc.hitosActuales === 'number' && pc.hitosParaSubir
           ? `- Hitos hacia el siguiente nivel: ${pc.hitosActuales}/${pc.hitosParaSubir}`
-          : ''
+          : '',
+        `- Dinero actual en panel: ${monedasActuales}`,
+        `- Inventario actual registrado en panel:\n${inventarioActual}`,
+        pc.sheetText ? `\n--- FICHA BASE (TEXTO REGISTRADO EN MEMORIA) ---\n${pc.sheetText}` : ''
       ]
         .filter(Boolean)
         .join('\n')
     : '(sin ficha registrada)';
 
+  // Gestión de archivos del proyecto (Fichas de PJ, familiares, siempre presentes y de consulta)
+  const allFiles = (files && files.length > 0 ? files : project.files) || [];
+  const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
+
+  const companionFiles = allFiles.filter(
+    f => esTexto(f) && (f.category === 'sheet_companion' || looksLikeCompanionSheet(f, project.memory))
+  );
+  const companionIds = new Set(companionFiles.map(f => f.id));
+
+  const pjSheetFiles = allFiles.filter(
+    f =>
+      esTexto(f) &&
+      !companionIds.has(f.id) &&
+      (f.category === 'sheet_pj' || looksLikeProtagonistSheet(f, project.memory))
+  );
+  const pjSheetIds = new Set(pjSheetFiles.map(f => f.id));
+
+  const deConsulta = allFiles.filter(
+    f =>
+      esTexto(f) &&
+      Boolean(f.onDemand) &&
+      !pjSheetIds.has(f.id) &&
+      !companionIds.has(f.id) &&
+      f.category !== 'oracle' &&
+      f.category !== 'roster' &&
+      f.category !== 'index' &&
+      f.category !== 'sheet_pj' &&
+      f.category !== 'sheet_companion'
+  );
+  const deConsultaIds = new Set(deConsulta.map(f => f.id));
+
+  const siemprePresentes = allFiles.filter(
+    f => esTexto(f) && !deConsultaIds.has(f.id) && !pjSheetIds.has(f.id) && !companionIds.has(f.id)
+  );
+
+  const pjSheetSection =
+    pjSheetFiles.length > 0
+      ? `\n### 📜 FICHAS, TRASFONDO Y DOCUMENTOS DEL PROTAGONISTA EN ARCHIVOS (TEXTO ÍNTEGRO):\n` +
+        pjSheetFiles
+          .map(
+            f =>
+              `=== DOCUMENTO / FICHA DEL PROTAGONISTA: ${f.name} ===\n${f.content || ''}${
+                f.analysis?.trim() ? `\n[Notas / Análisis adjunto]:\n${f.analysis.trim()}` : ''
+              }`
+          )
+          .join('\n\n')
+      : '';
+
+  const companionSection =
+    companionFiles.length > 0
+      ? `\n### 🐾 COMPAÑEROS / FAMILIARES EN ARCHIVOS (TEXTO ÍNTEGRO):\n` +
+        companionFiles
+          .map(
+            f =>
+              `=== FICHA DE COMPAÑERO / FAMILIAR: ${f.name} ===\n${f.content || ''}${
+                f.analysis?.trim() ? `\n[Notas / Análisis adjunto]:\n${f.analysis.trim()}` : ''
+              }`
+          )
+          .join('\n\n')
+      : '';
+
+  const siemprePresentesSection =
+    siemprePresentes.length > 0
+      ? `\n### 📚 DOCUMENTOS DE CAMPAÑA SIEMPRE PRESENTES (CANON, COMPENDIOS, REGLAS Y LORE - TEXTO ÍNTEGRO):\n` +
+        siemprePresentes
+          .map(
+            f =>
+              `=== DOCUMENTO: ${f.name} ===\n${f.content || ''}${
+                f.analysis?.trim() ? `\n[Notas / Análisis adjunto de ${f.name}]:\n${f.analysis.trim()}` : ''
+              }`
+          )
+          .join('\n\n')
+      : '';
+
+  const deConsultaSection =
+    deConsulta.length > 0
+      ? `\n### 📖 DOCUMENTOS DE CONSULTA (SOLO LECTURA / BAJO DEMANDA):\n` +
+        deConsulta
+          .map(
+            f =>
+              `- ${f.name} (${f.length ? `${Math.round(f.length / 1000)}k caracteres` : 'documento'})${
+                f.analysis ? `: ${f.analysis}` : ''
+              }`
+          )
+          .join('\n')
+      : '';
+
+  // Rescate de fragmentos de consulta si la pregunta o la conversación reciente tocan temas pertinentes
+  let deConsultaFragmentosText = '';
+  if (deConsulta.length > 0) {
+    try {
+      const textoContextoBusqueda = [pregunta, (historial.slice(-2).map(m => m.content).join(' ')).slice(-800)].filter(Boolean).join(' ');
+      const rescatados = recuperar(deConsulta, textoContextoBusqueda, 6000);
+      if (rescatados && rescatados.length > 0) {
+        deConsultaFragmentosText =
+          `\n### 🔍 FRAGMENTOS RECUPERADOS DE DOCUMENTOS DE CONSULTA:\n` +
+          rescatados
+            .map(
+              r =>
+                `--- [Extracto de: ${r.fragmento.fileName}${
+                  r.fragmento.titulo ? ` · ${r.fragmento.titulo}` : ''
+                }] ---\n${r.fragmento.texto}`
+            )
+            .join('\n\n');
+      }
+    } catch {
+      // Ignorar fallo de búsqueda local
+    }
+  }
+
   /*
    * La conversación de mesa, recortada por mensaje.
-   *
-   * Era la única parte del prompt sin tope: todo lo demás va acotado —la
-   * memoria a cuatro mil caracteres, la escena a cuatro líneas— y esto metía
-   * dieciséis mensajes enteros. Las respuestas del Director son largas, así que
-   * una charla de un rato podía triplicar el coste de la siguiente pregunta sin
-   * aportar nada: lo que importa de un mensaje viejo es de qué iba, no su
-   * redacción completa. Y con un modelo pequeño —que es el que conviene aquí
-   * para no gastar la cuota de jugar— la diferencia entre razonar bien y
-   * perderse es justamente cuánta paja lleva delante.
    */
   const conversacion = historial
     .slice(-16)
     .map((m, i, todos) => {
-      // Los dos últimos van enteros: son el hilo inmediato de lo que se está
-      // hablando y recortarlos sí se nota.
       const tope = i >= todos.length - 2 ? 4000 : 900;
       const texto = m.content.length > tope ? `${m.content.slice(0, tope)}…` : m.content;
       return `${m.role === 'user' ? 'Jugadora' : 'Director'}: ${texto}`;
@@ -5059,6 +5184,15 @@ export function construirPromptOOC({
 QUÉ ERES AQUÍ:
 - El Director de juego respondiendo de tú a tú: dudas de reglas, aclaraciones de lo que ha pasado, ajustes de tono o de ritmo, decisiones de mesa, problemas técnicos de la partida.
 - Hablas normal, en primera persona y sin prosa literaria. Nada de narrar, nada de describir el viento ni los olores. Esto es una conversación, no una escena.
+
+📚 DOCUMENTOS, FICHAS Y MATERIAL DE LA CAMPAÑA CARGADOS (ACCESO COMPLETO):
+- **Tienes acceso ÍNTEGRO a todos los documentos del proyecto desplegados abajo en la sección BASE DE CONOCIMIENTO.**
+- ⛔ **QUEDA TERMINANTEMENTE PROHIBIDO decir frases como "no tengo la ficha desplegada aquí mismo en la pestaña de chat para consultarla de memoria" o pedirle a la jugadora que te escriba una lista de memoria de lo que ya consta en su ficha o documentos** (armas, equipo, ropa de repuesto, herramientas de druida o herboristería, instrumentos como el violín, trasfondo, hechizos o estadísticas).
+- Si la jugadora te indica que algo está en sus archivos (ej. «lo tienes en los archivos», «en la ficha de Aryendell», «méteme las cosas que faltan en el inventario», etc.):
+  1. Consulta directamente la ficha y los documentos adjuntos abajo.
+  2. Compara el equipo y pertenencias de la ficha con lo que figura en «Inventario actual registrado en panel».
+  3. Emite de inmediato la orden \`[INVENTARIO: +1 Objeto1, +1 Objeto2, ...]\` para corregir y sincronizar la mochila de la jugadora.
+  4. Responde con naturalidad indicando en palabras llanas qué has consultado en su ficha y qué objetos has sincronizado en su mochila.
 
 QUÉ SÍ PUEDES HACER AQUÍ:
 - APUNTAR EN LA MEMORIA DE LA CAMPAÑA. Si la jugadora te pide recordar algo, corregir un dato que estaba mal, o establecer una regla de mesa («a partir de ahora no describas comida», «mi personaje tiene fobia a las alturas», «Kieron es zurdo»), emites al final de tu respuesta una línea por cada cosa a recordar:
@@ -5092,7 +5226,7 @@ QUÉ NO HACES AQUÍ:
 - ⛔ NO narras, NO haces avanzar la historia y NO decides acciones del personaje. Si te piden jugar algo, recuérdales que eso va en la pestaña de Jugar.
 - ⛔ NO emites etiquetas de avance de partida ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:], [PRESENTES:]…): aquí no pasa el tiempo ni se registra crónica. Las únicas que puedes usar son las de arriba: \`[MEMORIA:]\`, \`[SECRETO:]\`, \`[OLVIDA:]\`, \`[VÍNCULO:]\` e \`[INVENTARIO:]\`.
 - ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
-- Si no sabes algo porque no consta en lo que tienes delante, dilo. No lo inventes.
+- Si no sabes algo porque no consta en los documentos ni en lo que tienes delante, dilo. No lo inventes.
 ${imagenes?.length ? `\n📎 LA JUGADORA TE HA ADJUNTADO ${imagenes.length === 1 ? 'UNA IMAGEN' : `${imagenes.length} IMÁGENES`}. Míralas y responde a lo que te pregunte sobre ellas: pueden ser una referencia visual de un personaje o un lugar, un mapa, una ficha, una captura de la propia aplicación o cualquier otra cosa. Describe lo que ves cuando sirva para contestar.` : ''}
 ${videos?.length ? `\n🎬 LA JUGADORA TE HA ADJUNTADO UN VÍDEO Y LO ESTÁS VIENDO DE VERDAD${videos[0].hastaSegundo ? ` (los primeros ${Math.round(videos[0].hastaSegundo / 60)} minutos)` : ''}. Míralo y escúchalo antes de contestar.
 - Responde a partir de lo que HAY en el vídeo, no de lo que sepas del tema por tu cuenta. Si el vídeo contradice lo que creías, manda el vídeo.
@@ -5103,11 +5237,18 @@ ${videos?.length ? `\n🎬 LA JUGADORA TE HA ADJUNTADO UN VÍDEO Y LO ESTÁS VIE
 CAMPAÑA: ${project.name}
 ${cal && fecha ? `MOMENTO ACTUAL: ${fechaCompleta(cal, fecha)}` : ''}
 
-FICHA:
+FICHA DEL PROTAGONISTA EN PANEL:
 ${ficha}
 
 DÓNDE ESTAMOS (memoria de la campaña):
-${(project.memory?.raw_project_memory || project.memory?.story || 'Todavía no hay memoria registrada.').slice(0, 4000)}
+${project.memory?.raw_project_memory || project.memory?.story || 'Todavía no hay memoria registrada.'}
+
+### 📚 BASE DE CONOCIMIENTO (DOCUMENTOS Y FICHAS CARGADOS EN LA CAMPAÑA):
+${pjSheetSection}
+${companionSection}
+${siemprePresentesSection}
+${deConsultaSection}
+${deConsultaFragmentosText}
 
 ${ultimasLineas ? `ÚLTIMAS LÍNEAS DE LA ESCENA EN CURSO (para que sepas a qué se refiere):\n${ultimasLineas}\n` : ''}
 ${conversacion ? `CONVERSACIÓN DE MESA HASTA AHORA:\n${conversacion}\n` : ''}

@@ -22,7 +22,7 @@ import {
   Pencil,
   Users
 } from 'lucide-react';
-import { Chat, Project } from '../types';
+import { Chat, Project, ProjectFile } from '../types';
 import { describeApiError, ImagenDeMesa, modelosParaElDirector, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
 import { SecretoLeido, VinculoLeido } from '../utils/campaignCalendar';
 import type { CambioDeInventario } from '../types';
@@ -84,6 +84,7 @@ export const MesaView: React.FC<{
   project: Project;
   chats: Chat[];
   currentChatId?: string | null;
+  files?: ProjectFile[];
   onVolverAJugar?: () => void;
   onAbrirNovela?: () => void;
   /** Apunta en la memoria de la campaña lo que el Director haya pedido recordar. */
@@ -96,7 +97,7 @@ export const MesaView: React.FC<{
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
   }) => Promise<void> | void;
-}> = ({ project, chats, currentChatId, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria, onPlantarSecretos, onCorregirDesdeLaMesa }) => {
+}> = ({ project, chats, currentChatId, files, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria, onPlantarSecretos, onCorregirDesdeLaMesa }) => {
   const [mensajes, setMensajes] = useState<MensajeDeMesa[]>(() => leerMesa(project.id));
   const [texto, setTexto] = useState('');
   const [adjuntos, setAdjuntos] = useState<{ dataUrl: string; imagen: ImagenDeMesa }[]>([]);
@@ -183,6 +184,7 @@ export const MesaView: React.FC<{
         project,
         chats,
         currentChatId,
+        files,
         historial: mensajes,
         pregunta:
           pregunta ||

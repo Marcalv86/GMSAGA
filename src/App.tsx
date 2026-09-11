@@ -4028,6 +4028,7 @@ export default function App() {
               project={currentProject}
               chats={currentChats}
               currentChatId={currentChatId}
+              files={currentFiles}
               onVolverAJugar={() => setActiveTab('chat')}
               onAbrirNovela={() => setActiveTab('novel')}
               onAnotarEnMemoria={anotarEnMemoriaDesdeLaMesa}
