@@ -39,7 +39,6 @@ import {
   Shield,
   Sparkles,
   Trash2,
-  UserMinus,
   User,
   Backpack,
   Coins,
@@ -206,25 +205,6 @@ export const MemoryManager: React.FC<{
   const [targetForPortraitPicker, setTargetForPortraitPicker] = useState<ImagePickerTarget | null>(null);
 
   // Character Events / Milestones state
-  const [isAddingPcEvent, setIsAddingPcEvent] = useState(false);
-  /*
-   * Meter algo a mano en la mochila.
-   *
-   * La pestaña solo recogía lo que el Narrador fuera apuntando, así que lo que
-   * la protagonista trae de casa —su violín, su diario, sus runas— no había
-   * forma de ponerlo: vive en el texto de su ficha, que es un documento, no una
-   * lista. Y sin poder añadir, tampoco se podía corregir un nombre mal escrito
-   * ni reponer algo que se tiró por error.
-   */
-  const [anadiendoObjeto, setAnadiendoObjeto] = useState(false);
-  const [objNombre, setObjNombre] = useState('');
-  const [objCantidad, setObjCantidad] = useState(1);
-  const [objEncargo, setObjEncargo] = useState('');
-  const [objOrigen, setObjOrigen] = useState('');
-  const [objNotas, setObjNotas] = useState('');
-  const [newPcEventTitle, setNewPcEventTitle] = useState('');
-  const [newPcEventDesc, setNewPcEventDesc] = useState('');
-  const [newPcEventDate, setNewPcEventDate] = useState('');
   const [milestonesSearchQuery, setMilestonesSearchQuery] = useState('');
   const [milestonesSortOrder, setMilestonesSortOrder] = useState<'desc' | 'asc'>('desc');
 
@@ -319,7 +299,6 @@ export const MemoryManager: React.FC<{
   const [secretosDestapados, setSecretosDestapados] = useState<Set<string>>(new Set());
   const [tramando, setTramando] = useState(false);
   const [leyendoFicha, setLeyendoFicha] = useState(false);
-  const [noEsPnj, setNoEsPnj] = useState<NPC | null>(null);
   const [verPremisa, setVerPremisa] = useState(false);
 
   // Confirmation state
@@ -423,26 +402,6 @@ export const MemoryManager: React.FC<{
         ...(mem.player_character || { name: 'Protagonista' }),
         portrait: undefined
       }
-    }));
-  };
-
-  /*
-   * El candado de la atracción, y de paso el trapo para limpiar lo ya escrito.
-   *
-   * Bloquear pone la barra a 0 y deja el campo cerrado: a partir de ahí el
-   * código descarta cualquier subida que mande el Narrador. Hacía falta algo
-   * manual porque las puntuaciones que ya están guardadas no bajan solas —los
-   * arreglos impiden que vuelva a pasar, no deshacen lo hecho— y porque hay un
-   * dato que solo sabe quien ha leído los documentos: a quién mira cada uno.
-   */
-  const alternarAtraccion = async (id: string) => {
-    await onUpdateMemory(mem => ({
-      ...mem,
-      npcs: (mem.npcs || []).map(n =>
-        n.id === id
-          ? { ...n, atrBloqueada: !n.atrBloqueada, atr: 0, ultimoDiaSubida: { ...(n.ultimoDiaSubida || {}), atr: undefined } }
-          : n
-      )
     }));
   };
 
@@ -1016,93 +975,13 @@ export const MemoryManager: React.FC<{
                     <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
                     Acontecimientos e Hitos Registrados del Protagonista ({allPersonalEventsCount}):
                   </span>
-                  <button
-                    onClick={() => setIsAddingPcEvent(!isAddingPcEvent)}
-                    className="px-2.5 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded-md hover:bg-[var(--accent-hover)] transition-all flex items-center gap-1 cursor-pointer font-bold shadow-xs"
-                  >
-                    <Plus className="w-3 h-3" /> {isAddingPcEvent ? 'Cancelar' : 'Añadir Hito'}
-                  </button>
                 </div>
 
-                {/* Formulario para añadir hito */}
-                {isAddingPcEvent && (
-                  <div className="bg-[var(--surface-soft)] border border-[var(--accent)]/40 p-4 rounded-lg flex flex-col gap-2.5 shadow-sm">
-                    <input
-                      type="text"
-                      placeholder="Título del hito o acontecimiento (ej: Rescate en la nave, Juramento del Círculo...)"
-                      value={newPcEventTitle}
-                      onChange={e => setNewPcEventTitle(e.target.value)}
-                      className="w-full bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-cinzel font-semibold"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Fecha o momento (opcional, ej: 15 de Eleint, Día 3...)"
-                      value={newPcEventDate}
-                      onChange={e => setNewPcEventDate(e.target.value)}
-                      className="w-full bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                    />
-                    <textarea
-                      placeholder="Descripción de lo sucedido y su trascendencia para el personaje..."
-                      value={newPcEventDesc}
-                      onChange={e => setNewPcEventDesc(e.target.value)}
-                      className="w-full bg-[var(--surface)] border border-[var(--glass-border)] rounded-md p-3 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] resize-none h-20 font-lora"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => setIsAddingPcEvent(false)}
-                        className="px-3 py-1 text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!newPcEventTitle.trim()) return;
-                          const newEv = {
-                            id: `pcev_${Date.now()}`,
-                            title: newPcEventTitle.trim(),
-                            description: newPcEventDesc.trim(),
-                            dateOrTime: newPcEventDate.trim() || undefined,
-                            createdAt: Date.now()
-                          };
-                          if (onUpdateProject) {
-                            onUpdateProject(prev => ({
-                              timeline: [
-                                ...(prev.timeline || []),
-                                {
-                                  id: newEv.id,
-                                  absDay: 1,
-                                  date: newEv.dateOrTime || 'Fecha actual',
-                                  title: newEv.title,
-                                  summary: newEv.description || newEv.title,
-                                  mood: '⭐',
-                                  tipo: 'personal',
-                                  hito: newEv.title
-                                }
-                              ]
-                            }));
-                          } else {
-                            onUpdateMemory(prev => ({
-                              ...prev,
-                              player_character: {
-                                ...(prev.player_character || { name: '' }),
-                                events: [...(prev.player_character?.events || []), newEv]
-                              }
-                            }));
-                          }
-                          setNewPcEventTitle('');
-                          setNewPcEventDesc('');
-                          setNewPcEventDate('');
-                          setIsAddingPcEvent(false);
-                        }}
-                        disabled={!newPcEventTitle.trim()}
-                        className="px-3.5 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] font-bold rounded-md hover:bg-[var(--accent-hover)] transition-all disabled:opacity-40 cursor-pointer shadow-xs"
-                      >
-                        Guardar Acontecimiento
-                      </button>
-                    </div>
-                  </div>
-                )}
-
+                {/*
+                  Aquí había un formulario para añadir hitos a mano. Fuera: un
+                  hito lo registra quien lleva la crónica. Si falta uno, se le
+                  cuenta al Director y lo apunta él.
+                */}
                 {/* Search & Sort Controls + Scrollable List */}
                 <div className="flex flex-col gap-2.5">
                   {allPersonalEventsCount > 0 && (
@@ -1195,38 +1074,12 @@ export const MemoryManager: React.FC<{
                                   </span>
                                 )}
                               </div>
-                              <button
-                                onClick={() => {
-                                  if (ev.source === 'pc') {
-                                    onUpdateMemory(prev => ({
-                                      ...prev,
-                                      player_character: {
-                                        ...(prev.player_character || { name: '' }),
-                                        events: (prev.player_character?.events || []).filter(e => e.id !== ev.id && e.title !== ev.title)
-                                      }
-                                    }));
-                                  } else if (onUpdateProject) {
-                                    onUpdateProject(prev => ({
-                                      timeline: (prev.timeline || []).filter(entry => entry.id !== ev.id)
-                                    }));
-                                  }
-                                }}
-                                /*
-                                 * Visible en el móvil, que es donde se juega.
-                                 *
-                                 * Estaba en opacity-0 esperando un group-hover
-                                 * que en una pantalla táctil no llega nunca: el
-                                 * botón existía y no había forma de verlo ni de
-                                 * pulsarlo, así que un hito que sobraba no se
-                                 * podía quitar a mano. En pantalla grande sigue
-                                 * apareciendo al pasar por encima.
-                                 */
-                                className="text-[var(--text-secondary)] hover:text-red-500 p-1 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer shrink-0"
-                                title="Eliminar este hito"
-                                aria-label={`Eliminar el hito «${ev.title || 'sin título'}»`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {/*
+                                Sin papelera: un hito es memoria de la campaña.
+                                Si sobra uno —porque se rehizo la escena, o
+                                porque nunca llegó a pasar— se le dice al
+                                Director en el Chat con el GM y lo quita él.
+                              */}
                             </div>
                             {ev.description && (
                               <p className="text-xs font-lora text-[var(--text-secondary)] leading-relaxed m-0 whitespace-pre-wrap">
@@ -1986,39 +1839,14 @@ export const MemoryManager: React.FC<{
                       </div>
 
                       {/*
-                        La salida de emergencia cuando algo se cuela como PNJ y
-                        no debería —el caso típico es el propio protagonista,
-                        que sale nombrado en todos los documentos—. Borrarlo a
-                        secas no bastaba: la siguiente sincronización lo volvía a
-                        crear. Esto lo borra y lo veta para siempre.
+                        Aquí estaban «Sin atracción» y «Quitar del elenco».
+
+                        Los dos tocaban el cuaderno del Director con las manos, y
+                        eso ahora se pide hablando: «Beniago no va a sentir nada
+                        por ella, está casado» o «Aryendell no es un PNJ, quítala
+                        del elenco» en el Chat con el GM. Lo hace él, lo dice, y
+                        puede preguntar antes si algo no le cuadra.
                       */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => alternarAtraccion(n.id)}
-                          className={`text-[10px] sm:text-[11px] font-cinzel cursor-pointer flex items-center gap-0.5 shrink-0 ${
-                            n.atrBloqueada
-                              ? 'text-rose-600 dark:text-rose-400'
-                              : 'text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400'
-                          }`}
-                          title={
-                            n.atrBloqueada
-                              ? 'Ahora mismo no puede sentir atracción por ella: el candado está puesto y el código descarta cualquier subida. Pulsa para quitarlo. El vínculo y la confianza siguen subiendo con normalidad.'
-                              : 'Ciérrale la puerta del romance a este personaje —por su orientación, porque está con otra persona o porque sencillamente no—. Pone la atracción a 0 y ya no vuelve a subir. El cariño y la confianza no se tocan.'
-                          }
-                        >
-                          <Heart className={`w-3 h-3 ${n.atrBloqueada ? 'fill-rose-500 text-rose-500' : ''}`} />
-                          {/* En el móvil no hay «title» que leer, así que el estado
-                              tiene que distinguirse por el texto y no solo por el color. */}
-                          {n.atrBloqueada ? 'Romance cerrado' : 'Sin atracción'}
-                        </button>
-                        <button
-                          onClick={() => setNoEsPnj(n)}
-                          className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 font-cinzel cursor-pointer flex items-center gap-0.5 shrink-0"
-                          title="Bórralo del elenco y veta el nombre: no volverá a crearse solo. Es lo que hay que usar cuando se cuela tu propio personaje."
-                        >
-                          <UserMinus className="w-3 h-3" /> Quitar del elenco
-                        </button>
-                      </div>
                     </div>
                   </div>
                 );
@@ -2046,72 +1874,6 @@ export const MemoryManager: React.FC<{
         const deMision = todo.filter(i => i.deMision && !i.resuelto);
         const resueltos = todo.filter(i => i.deMision && i.resuelto);
         const propios = todo.filter(i => !i.deMision);
-
-        const alternarMision = async (id: string) => {
-          await onUpdateMemory(mem => ({
-            ...mem,
-            player_character: {
-              ...(mem.player_character || { name: '' }),
-              inventory: (mem.player_character?.inventory || []).map(i =>
-                i.id === id ? { ...i, deMision: !i.deMision } : i
-              )
-            }
-          }));
-        };
-        const alternarResuelto = async (id: string) => {
-          await onUpdateMemory(mem => ({
-            ...mem,
-            player_character: {
-              ...(mem.player_character || { name: '' }),
-              inventory: (mem.player_character?.inventory || []).map(i =>
-                i.id === id ? { ...i, resuelto: !i.resuelto } : i
-              )
-            }
-          }));
-        };
-        /*
-         * Lo que se mete a mano lleva id propio (no `inv_`), y eso importa: al
-         * reconstruir la mochila desde la crónica solo se rehace lo que salió
-         * de las etiquetas, así que su violín no desaparece al sincronizar.
-         */
-        const anadirObjeto = async () => {
-          const nombre = objNombre.trim();
-          if (!nombre) return;
-          const cantidad = Math.max(1, Math.min(9999, Math.round(objCantidad) || 1));
-          const encargo = objEncargo.trim();
-          const nuevo: InventoryItem = {
-            id: `manual_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
-            name: nombre.slice(0, 120),
-            quantity: cantidad,
-            description: objNotas.trim() || undefined,
-            encargo: encargo || undefined,
-            origen: objOrigen.trim() || undefined,
-            deMision: encargo ? true : undefined
-          };
-          await onUpdateMemory(mem => ({
-            ...mem,
-            player_character: {
-              ...(mem.player_character || { name: '' }),
-              inventory: [...(mem.player_character?.inventory || []), nuevo]
-            }
-          }));
-          setObjNombre('');
-          setObjCantidad(1);
-          setObjEncargo('');
-          setObjOrigen('');
-          setObjNotas('');
-          setAnadiendoObjeto(false);
-        };
-
-        const quitar = async (id: string) => {
-          await onUpdateMemory(mem => ({
-            ...mem,
-            player_character: {
-              ...(mem.player_character || { name: '' }),
-              inventory: (mem.player_character?.inventory || []).filter(i => i.id !== id)
-            }
-          }));
-        };
 
         const Tarjeta: React.FC<{ item: InventoryItem; tono: 'mision' | 'propio' | 'hecho' }> = ({ item, tono }) => (
           <div
@@ -2144,14 +1906,6 @@ export const MemoryManager: React.FC<{
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => quitar(item.id)}
-                className="text-[var(--text-secondary)] hover:text-red-500 p-1 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer shrink-0"
-                title="Quitarlo de la mochila"
-                aria-label={`Quitar «${item.name}» de la mochila`}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
             </div>
 
             {item.encargo && (
@@ -2170,29 +1924,22 @@ export const MemoryManager: React.FC<{
               </p>
             )}
 
-            <div className="flex items-center gap-2 flex-wrap pt-0.5">
-              {item.mision && (
+            {/*
+              Sin botones de editar ni de borrar, a propósito.
+
+              La mochila la lleva el juego: lo que hay dentro entró jugando, y
+              si algo está mal se le dice al Director en el Chat con el GM —él
+              lo quita, lo cambia de sitio o lo marca por cumplido, y encima
+              puede preguntar antes si le chirría—. Poder tacharlo aquí
+              convertía la lista en una sugerencia.
+            */}
+            {item.mision && (
+              <div className="flex items-center gap-2 flex-wrap pt-0.5">
                 <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
                   {item.mision}
                 </span>
-              )}
-              <button
-                onClick={() => alternarMision(item.id)}
-                className="text-[10px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
-                title={item.deMision ? 'Pasarlo a sus cosas de siempre' : 'Marcarlo como objeto de misión: algo que hay que entregar, traducir o devolver'}
-              >
-                {item.deMision ? '↩ Es cosa suya' : '⭐ Es de misión'}
-              </button>
-              {item.deMision && (
-                <button
-                  onClick={() => alternarResuelto(item.id)}
-                  className="text-[10px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
-                  title={item.resuelto ? 'Volver a dejarlo pendiente' : 'Ya está entregado, traducido o devuelto'}
-                >
-                  {item.resuelto ? '↩ Sigue pendiente' : '✓ Ya está hecho'}
-                </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         );
 
@@ -2236,85 +1983,12 @@ export const MemoryManager: React.FC<{
               </div>
             </div>
 
-            {/* Meter algo a mano */}
-            <div className="flex flex-col gap-2.5">
-              <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-[11px] text-[var(--text-secondary)] font-lora leading-relaxed m-0 max-w-xl">
-                  Esta lista recoge lo que ganas, compras o gastas <strong>jugando</strong>. Lo que tu personaje trae
-                  de casa vive en el texto de su ficha, así que si quieres verlo aquí —su violín, su diario, sus
-                  runas— méteselo tú una vez.
-                </span>
-                <button
-                  onClick={() => setAnadiendoObjeto(v => !v)}
-                  className="shrink-0 px-2.5 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded-md hover:bg-[var(--accent-hover)] transition-all flex items-center gap-1 cursor-pointer font-bold shadow-xs"
-                >
-                  <Plus className="w-3 h-3" /> {anadiendoObjeto ? 'Cancelar' : 'Añadir objeto'}
-                </button>
-              </div>
-
-              {anadiendoObjeto && (
-                <div className="bg-[var(--surface-soft)] border border-[var(--accent)]/40 p-4 rounded-lg flex flex-col gap-2.5 shadow-sm">
-                  <div className="flex gap-2 flex-wrap">
-                    <input
-                      type="text"
-                      autoFocus
-                      placeholder="Qué es (ej: Violín del Filí, Diario de viaje, Poción de curación…)"
-                      value={objNombre}
-                      onChange={e => setObjNombre(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') anadirObjeto();
-                        if (e.key === 'Escape') setAnadiendoObjeto(false);
-                      }}
-                      className="flex-1 min-w-[180px] bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-cinzel font-semibold"
-                    />
-                    <input
-                      type="number"
-                      min={1}
-                      value={objCantidad}
-                      onChange={e => setObjCantidad(Number(e.target.value))}
-                      className="w-20 bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-mono"
-                      aria-label="Cantidad"
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Notas (opcional): qué hace, cómo es, lo que quieras recordar"
-                    value={objNotas}
-                    onChange={e => setObjNotas(e.target.value)}
-                    className="w-full bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-lora"
-                  />
-                  <div className="flex gap-2 flex-wrap">
-                    <input
-                      type="text"
-                      placeholder="¿Es un encargo? Qué hay que hacer con él"
-                      value={objEncargo}
-                      onChange={e => setObjEncargo(e.target.value)}
-                      className="flex-1 min-w-[160px] bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-lora"
-                    />
-                    <input
-                      type="text"
-                      placeholder="De quién salió (opcional)"
-                      value={objOrigen}
-                      onChange={e => setObjOrigen(e.target.value)}
-                      className="flex-1 min-w-[140px] bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-lora"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={anadirObjeto}
-                      disabled={!objNombre.trim()}
-                      className="px-3 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Meterlo en la mochila
-                    </button>
-                    <span className="text-[10px] font-lora text-[var(--text-secondary)] opacity-80">
-                      Si rellenas «encargo», va al apartado de arriba en vez de a sus cosas.
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
+            {/*
+              Aquí había un formulario para meter objetos a mano, y se ha
+              quitado a propósito: al Director no se le abre el cuaderno. Si
+              falta el violín en la lista, se le dice en el Chat con el GM y lo
+              mete él, que además puede preguntar de dónde ha salido.
+            */}
             {/* Objetos de misión */}
             <div className="flex flex-col gap-2.5">
               <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-amber-500/30">
@@ -2504,47 +2178,6 @@ export const MemoryManager: React.FC<{
       )}
 
       {/* Confirmación de «esto no es un PNJ» */}
-      {noEsPnj && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[160] p-4">
-          <div className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-xl shadow-2xl w-[400px] max-w-full font-lora overflow-hidden">
-            <div className="p-4 border-b border-[var(--glass-border)] bg-[var(--sidebar-bg)]">
-              <h4 className="font-cinzel text-base text-[var(--accent)] font-bold m-0">Quitar «{noEsPnj.name}» del elenco</h4>
-            </div>
-            <div className="p-4">
-              <p className="text-sm mb-4 leading-relaxed text-[var(--text-primary)]">
-                Se borra su ficha y su nombre queda vetado: <strong>ninguna extracción ni sincronización volverá a
-                crearlo solo</strong>. Es lo que hay que usar cuando se cuela tu propio personaje, que sale nombrado en
-                todos los documentos de la campaña.
-              </p>
-              <p className="text-xs mb-5 leading-relaxed text-[var(--text-secondary)] m-0">
-                Si algún día lo quieres de vuelta, tendrás que añadirlo a mano.
-              </p>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setNoEsPnj(null)}
-                  className="px-3.5 py-1.5 text-xs font-cinzel border border-[var(--user-border)] rounded hover:border-[var(--accent)] cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={async () => {
-                    const fuera = noEsPnj;
-                    setNoEsPnj(null);
-                    await onUpdateMemory(mem => ({
-                      ...mem,
-                      npcs: (mem.npcs || []).filter(x => x.id !== fuera.id),
-                      no_son_pnj: [...new Set([...(mem.no_son_pnj || []), fuera.name])]
-                    }));
-                  }}
-                  className="px-3.5 py-1.5 text-xs font-cinzel bg-red-600 hover:bg-red-700 text-white rounded font-bold cursor-pointer"
-                >
-                  Quitar para siempre
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* NPC Full Dossier Modal ("Página que se abre") */}
       {selectedNpcForDossier && (

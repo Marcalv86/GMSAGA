@@ -111,6 +111,9 @@ import {
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
+import { aplicarOlvidos } from './utils/ordenesDeMesa';
+import type { VinculoLeido } from './utils/campaignCalendar';
+import type { CambioDeInventario } from './types';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie } from './utils/rollRequests';
 import { Probabilidad, formatoSignificado, nuevaConsulta } from './utils/oracle';
@@ -1408,6 +1411,70 @@ export default function App() {
         }));
       if (!nuevas.length) return mem;
       return { ...mem, memory_edits: [...previas, ...nuevas].slice(-TOPE_NOTAS_DE_MEMORIA) };
+    });
+  };
+
+  /**
+   * Lo que el Director corrige cuando se lo piden en el chat de mesa.
+   *
+   * Es la pieza que faltaba para que esa pestaña sea de verdad la herramienta:
+   * se le pide arreglar algo y lo arregla ÉL. La alternativa —ir a la pantalla
+   * de Memoria y tocarlo con las manos— es entrar en casa del Director y
+   * tacharle el cuaderno, que no es cómo funciona una mesa.
+   */
+  const corregirDesdeLaMesa = async (orden: {
+    olvidos: string[];
+    vinculos: VinculoLeido[];
+    inventario: CambioDeInventario;
+  }) => {
+    const hayAlgo =
+      orden.olvidos.length || orden.vinculos.length || !cambioVacio(orden.inventario);
+    if (!hayAlgo) return;
+
+    await handleUpdateProjectField(p => {
+      const marca = calendarioValido(p.calendar) && p.currentDate ? aDiaAbsoluto(p.calendar, p.currentDate) : 0;
+      const { memoria, timeline } = aplicarOlvidos(p.memory, p.timeline, orden.olvidos);
+      let mem = memoria;
+
+      // Correcciones sobre personajes que YA existen. Aquí no se fichan nuevos:
+      // para eso está la partida; esto es una corrección, no una escena.
+      if (orden.vinculos.length) {
+        mem = {
+          ...mem,
+          npcs: (mem.npcs || []).map(n => {
+            const v = orden.vinculos.find(x => coincidenNombresNpc(n.name, x.nombre, { alias: n.alias, trueIdentity: n.trueIdentity }));
+            if (!v) return n;
+            return {
+              ...n,
+              ...(v.aparenta ? { aparenta: v.aparenta } : {}),
+              ...(v.oculta ? { oculta: v.oculta } : {}),
+              ...(v.vinculo ? { vinculo: v.vinculo } : {}),
+              ...(v.orientacion ? { orientacion: v.orientacion } : {}),
+              /*
+               * Un ajuste pedido a mano sí puede BAJAR de golpe —para eso se
+               * pide—, pero no puede saltarse la progresión hacia arriba: que
+               * el Director regale afinidad porque se lo piden convertiría las
+               * barras en un ajuste más.
+               */
+              ...actualizarAfinidadNpc(n, v, n.diasVistos || [], marca)
+            };
+          })
+        };
+      }
+
+      if (!cambioVacio(orden.inventario)) {
+        const pc = mem.player_character;
+        mem = {
+          ...mem,
+          player_character: {
+            ...(pc || { name: '' }),
+            inventory: aplicarInventario(pc?.inventory, orden.inventario, marca || undefined),
+            currencies: aplicarMonedas(pc?.currencies, orden.inventario.monedas)
+          }
+        };
+      }
+
+      return { memory: sanitizeProjectMemory(mem), timeline };
     });
   };
 
@@ -3944,6 +4011,7 @@ export default function App() {
               onAbrirNovela={() => setActiveTab('novel')}
               onAnotarEnMemoria={anotarEnMemoriaDesdeLaMesa}
               onPlantarSecretos={plantarSecretosDesdeLaMesa}
+              onCorregirDesdeLaMesa={corregirDesdeLaMesa}
             />
           )}
 

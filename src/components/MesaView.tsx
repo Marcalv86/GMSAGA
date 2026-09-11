@@ -24,7 +24,8 @@ import {
 } from 'lucide-react';
 import { Chat, Project } from '../types';
 import { describeApiError, ImagenDeMesa, modelosParaElDirector, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
-import { SecretoLeido } from '../utils/campaignCalendar';
+import { SecretoLeido, VinculoLeido } from '../utils/campaignCalendar';
+import type { CambioDeInventario } from '../types';
 import {
   conMiles,
   estimarCosteDeVideo,
@@ -89,7 +90,13 @@ export const MesaView: React.FC<{
   onAnotarEnMemoria?: (notas: string[]) => void;
   /** Guarda como secretos de campaña los giros que se planten aquí. */
   onPlantarSecretos?: (secretos: SecretoLeido[]) => void;
-}> = ({ project, chats, currentChatId, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria, onPlantarSecretos }) => {
+  /** Lo que el Director corrige cuando se lo piden: borrar, tocar un PNJ, la mochila. */
+  onCorregirDesdeLaMesa?: (orden: {
+    olvidos: string[];
+    vinculos: VinculoLeido[];
+    inventario: CambioDeInventario;
+  }) => Promise<void> | void;
+}> = ({ project, chats, currentChatId, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria, onPlantarSecretos, onCorregirDesdeLaMesa }) => {
   const [mensajes, setMensajes] = useState<MensajeDeMesa[]>(() => leerMesa(project.id));
   const [texto, setTexto] = useState('');
   const [adjuntos, setAdjuntos] = useState<{ dataUrl: string; imagen: ImagenDeMesa }[]>([]);
@@ -205,6 +212,21 @@ export const MesaView: React.FC<{
       // lee la jugadora en cada turno, y un giro ahí es un giro destripado.
       if (respuesta.secretos.length && onPlantarSecretos) {
         onPlantarSecretos(respuesta.secretos);
+      }
+      /*
+       * Y lo que haya corregido se aplica de verdad.
+       *
+       * Es lo que convierte esta pestaña en la herramienta que dice ser: se le
+       * pide al Director que arregle algo, y lo arregla ÉL. La alternativa era
+       * que la jugadora fuese a la pantalla de Memoria a tocarlo con las manos,
+       * que es como entrar en casa del Director y tacharle el cuaderno.
+       */
+      if (onCorregirDesdeLaMesa) {
+        await onCorregirDesdeLaMesa({
+          olvidos: respuesta.olvidos,
+          vinculos: respuesta.vinculos,
+          inventario: respuesta.inventario
+        });
       }
     } catch (err) {
       /*

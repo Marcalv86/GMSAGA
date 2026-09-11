@@ -61,6 +61,7 @@ import {
   HiloLeido
 } from './campaignCalendar';
 import { cambioVacio, leerInventario } from './inventoryTag';
+import { leerOlvidos } from './ordenesDeMesa';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 import { logError, logWarn, logInfo } from './logger';
 import { abrirLlamada, cerrarLlamada } from './callLog';
@@ -5022,9 +5023,21 @@ QUÉ SÍ PUEDES HACER AQUÍ:
 - Ante la duda, \`[SECRETO:]\`: un giro guardado de más se puede contar mañana; uno destripado ya no se recupera.
 - Puedes usar las dos en el mismo mensaje: apuntar en memoria «Aryendell desconfía del capitán» y guardar aparte el giro de por qué tiene razón.
 
+🔧 Y ARREGLAR LO QUE ESTÉ MAL, QUE ES LA RAZÓN DE SER DE ESTA PESTAÑA.
+La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: **te lo pide a ti y lo arreglas tú**, igual que en una mesa de verdad nadie le abre el cuaderno al Director. Así que cuando te digan que algo está mal, no contestes «entra en Memoria y bórralo»: **hazlo**, dilo en palabras, y ya está.
+- \`[OLVIDA: lo que hay que quitar]\` — borra una nota de memoria, una entrada del diario, un hito o la ficha de un personaje que no debería existir. Escribe el texto o el nombre tal como aparece. Para borrar la ficha de alguien hace falta su **nombre exacto**; lo demás vale con un trozo reconocible.
+- \`[VÍNCULO: Nombre | ...]\` — corrige a un personaje QUE YA EXISTE: lo que aparenta, lo que calla, su orientación, su afinidad. Aquí no se fichan personajes nuevos; eso se hace jugando.
+- \`[INVENTARIO: +1 Objeto, -2 Otro, -15 PO]\` — corrige la mochila y el dinero. Sirve para meter lo que el personaje ya traía de casa y nunca se apuntó («mi violín no está en la lista»), y para quitar lo que sobra.
+
+**⚖️ PERO ESTO NO ES UN PANEL DE MANDOS: ERES EL DIRECTOR Y PUEDES DECIR QUE NO.**
+- ✅ **Corrige sin discutir** lo que es un error de registro: algo apuntado dos veces, una escena que se rehízo y quedó anotada, un nombre mal escrito, un objeto suyo que nunca se fichó, una barra que subió cuando no debía.
+- ⚠️ **Pregunta antes** si lo que te piden cambia la historia ya jugada o beneficia al personaje sin haberlo ganado en escena: subir una afinidad, hacer aparecer un objeto valioso, borrar una consecuencia incómoda. Di lo que te chirría y proponle una vía jugable: «eso no te lo puedo dar así, pero podemos jugarlo».
+- ⛔ **Y niégate**, con educación y explicando por qué, a borrar algo que pasó de verdad solo porque no le gustó cómo salió. Para deshacer una escena está el botón de rehacer del chat, no la goma de tu cuaderno.
+- Ante la duda, pregunta. Y **di siempre en palabras qué has cambiado**, que nadie pueda enterarse de un cambio por casualidad.
+
 QUÉ NO HACES AQUÍ:
 - ⛔ NO narras, NO haces avanzar la historia y NO decides acciones del personaje. Si te piden jugar algo, recuérdales que eso va en la pestaña de Jugar.
-- ⛔ NO emites etiquetas técnicas de partida ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:]…): aquí no pasa el tiempo, no se registra la crónica y la ficha no cambia. La ÚNICA etiqueta que puedes usar es [MEMORIA: ...].
+- ⛔ NO emites etiquetas de avance de partida ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:], [PRESENTES:]…): aquí no pasa el tiempo ni se registra crónica. Las únicas que puedes usar son las de arriba: \`[MEMORIA:]\`, \`[SECRETO:]\`, \`[OLVIDA:]\`, \`[VÍNCULO:]\` e \`[INVENTARIO:]\`.
 - ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
 - Si no sabes algo porque no consta en lo que tienes delante, dilo. No lo inventes.
 ${imagenes?.length ? `\n📎 LA JUGADORA TE HA ADJUNTADO ${imagenes.length === 1 ? 'UNA IMAGEN' : `${imagenes.length} IMÁGENES`}. Míralas y responde a lo que te pregunte sobre ellas: pueden ser una referencia visual de un personaje o un lugar, un mapa, una ficha, una captura de la propia aplicación o cualquier otra cosa. Describe lo que ves cuando sirva para contestar.` : ''}
@@ -5066,6 +5079,12 @@ export interface RespuestaDeMesa {
    * en esta conversación, que se recorta a los doscientos mensajes.
    */
   secretos: SecretoLeido[];
+  /** Lo que le ha pedido olvidar: notas, entradas del diario, hitos o fichas. */
+  olvidos: string[];
+  /** Correcciones sobre personajes: afinidad, orientación, lo que aparenta y lo que calla. */
+  vinculos: VinculoLeido[];
+  /** Correcciones sobre la mochila y el dinero. */
+  inventario: CambioDeInventario;
   /**
    * Lo que costó de verdad la pregunta, en fichas de entrada.
    *
@@ -5205,14 +5224,38 @@ export async function preguntarAlDirectorOOC(
 
   const memorias = leerMemoriasDeMesa(bruto);
   const secretos = leerSecretos(bruto);
+  /*
+   * Y lo que el Director CORRIGE, no solo lo que apunta.
+   *
+   * Las tres etiquetas de abajo ya existían y ya tenían lector: las usa el
+   * Narrador en cada turno de partida. Lo que faltaba era dejárselas usar aquí,
+   * que es donde la jugadora le pide arreglar algo. Sin esto, el chat de mesa
+   * servía para hablar y para nada más, y cualquier corrección de verdad había
+   * que ir a hacerla a mano en las pantallas de Memoria — que es exactamente lo
+   * que no debe pasar: al Director no se le abre el cuaderno, se le dice.
+   */
+  const olvidos = leerOlvidos(bruto);
+  const vinculos = leerVinculos(bruto);
+  const inventario = leerInventario(bruto);
+
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
-  const texto = stripStateTag(limpiarEtiquetasDeTiempo(bruto))
+  const texto = stripStateTag(limpiarEtiquetasDeTiempo(limpiarEtiquetasDePnj(bruto)))
     .replace(MEMORIA_MESA_RE, '')
+    .replace(/\[\s*OLVIDA\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  return { texto, memorias, secretos, fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount };
+  return {
+    texto,
+    memorias,
+    secretos,
+    olvidos,
+    vinculos,
+    inventario,
+    fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount
+  };
 }
 
 export interface TramaTrazada {
