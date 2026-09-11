@@ -1193,6 +1193,12 @@ export interface TurnPayload {
   sys: string;
   /** Los turnos de la conversación que viajan literales. */
   contents: any[];
+  /** Qué documentos han viajado, para poder enseñarlo en el registro. */
+  documentos?: {
+    enteros?: string[];
+    fragmentos?: string[];
+    sinUsar?: string[];
+  };
 }
 
 /**
@@ -1859,6 +1865,19 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
   let deConsultaCatalogo = '';
   let fragmentosConsultaText = '';
 
+  /*
+   * Qué documentos han viajado de verdad en este turno.
+   *
+   * Se recoge aquí, donde se decide, y se devuelve con el envío para que el
+   * registro de llamadas pueda enseñarlo. Discutir «no manda los documentos»
+   * sin esta lista era discutir a ciegas.
+   */
+  let documentosDelTurno: {
+    enteros?: string[];
+    fragmentos?: string[];
+    sinUsar?: string[];
+  } = {};
+
   if (deConsulta.length > 0) {
     deConsultaCatalogo = `\n\n### 📚 COMPENDIOS Y ARCHIVOS DE CONSULTA EN LA BIBLIOTECA (ON-DEMAND):
 Los siguientes compendios de lore, ambientación y reglas forman parte del archivo del proyecto. Para optimizar tokens y agilizar la respuesta, su texto completo permanece en la biblioteca y sus fragmentos pertinentes se rescatan dinámicamente según lo que suceda en la escena. Si necesitas verificar un dato muy específico no recogido en los fragmentos, indícalo a la jugadora:
@@ -1872,13 +1891,37 @@ ${deConsulta.map(f => `- 📄 **${f.name}**${f.analysis ? `: ${f.analysis.slice(
         ...(project.memory?.player_character?.name ? [project.memory.player_character.name] : [])
       ];
 
+      /*
+       * Lo que lleva encima y quien la acompaña pesa en cada consulta.
+       *
+       * Su equipo, sus compañeros animales y los objetos con nombre de su ficha
+       * no son lore que haya que ir a buscar: son suyos y están siempre. Sin
+       * meterlos aquí, un compañero o un objeto que la jugadora no nombre en su
+       * turno desaparece de la campaña sin que nadie lo note.
+       */
+      const loSuyo = [
+        ...(project.memory?.player_character?.inventory || [])
+          .map(i => (typeof i === 'string' ? i : i?.name))
+          .filter(Boolean) as string[],
+        ...(project.memory?.companions || []).map(c => c?.name).filter(Boolean) as string[],
+      ]
+        .map(t => String(t).trim())
+        .filter(t => t.length > 2)
+        .slice(0, 30);
+
       const consulta = consultaDelTurno({
         textoJugadora: userText,
         ultimaNarracion: ultimoMensajeNarrador,
-        nombres: nombresVivos
+        nombres: nombresVivos,
+        suyo: loSuyo
       });
 
       const rescatados = recuperar(deConsulta, consulta, PRESUPUESTO_FRAGMENTOS_CONSULTA);
+      const conFragmento = new Set(rescatados.map(r => r.fragmento.fileName));
+      documentosDelTurno = {
+        fragmentos: [...conFragmento],
+        sinUsar: deConsulta.map(f => f.name).filter(n => !conFragmento.has(n))
+      };
       if (rescatados.length > 0) {
         fragmentosConsultaText = `### 📖 FRAGMENTOS RELEVANTES RESCATADOS DE ARCHIVOS DE CONSULTA:
 (El sistema ha recuperado estos extractos de tus documentos de consulta por su pertinencia directa con la escena presente):
@@ -2292,7 +2335,9 @@ ${bloqueVivo}`;
     contents.push({ role: 'user', parts: [{ text: finalUserPayload }] });
   }
 
-  return { sys, contents };
+  documentosDelTurno.enteros = [...pjSheetFiles, ...siemprePresentes].map(f => f.name);
+
+  return { sys, contents, documentos: documentosDelTurno };
 }
 
 /** Cuántas veces se insiste con la MISMA clave cuando Google está saturado. */
@@ -2660,7 +2705,7 @@ export async function generateStoryTurnStream({
             setLoadingText(`El Narrador está hilvanando los hilos del destino${keyLabel}...`);
           }
 
-          const { sys, contents } = buildTurnPayload({
+          const { sys, contents, documentos: documentosDelEnvio } = buildTurnPayload({
             project,
             currentChatId,
             chats,
@@ -2716,6 +2761,7 @@ export async function generateStoryTurnStream({
             intento,
             esRespaldo: isFallback,
             caracteresEnviados: (sys?.length || 0) + JSON.stringify(contents || '').length,
+            documentos: documentosDelEnvio,
             proyecto: project.name,
             capitulo: currentChat.name
           });

@@ -15,9 +15,16 @@
 
 /** El archivo principal que cargó ESTA pestaña, leído del propio documento. */
 function guionActual(): string | null {
-  const el = document.querySelector<HTMLScriptElement>('script[src*="assets/index-"]');
-  const src = el?.getAttribute('src') || '';
-  return src.match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] || null;
+  // Sin DOM —al arrancar, en un worker, o en una prueba fuera del navegador—
+  // no hay versión que leer, y eso no puede tumbar a quien pregunte.
+  if (typeof document === 'undefined') return null;
+  try {
+    const el = document.querySelector<HTMLScriptElement>('script[src*="assets/index-"]');
+    const src = el?.getAttribute('src') || '';
+    return src.match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] || null;
+  } catch {
+    return null;
+  }
 }
 
 /**

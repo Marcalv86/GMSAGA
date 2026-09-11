@@ -51,6 +51,22 @@ export interface LlamadaRegistrada {
   fichasDePensamiento?: number;
   /** Lo que se midió al construir el envío, para cuando la API no lo diga. */
   caracteresEnviados?: number;
+  /**
+   * Qué documentos viajaron en este turno y cómo.
+   *
+   * «No envía todos los documentos» era imposible de comprobar desde fuera: se
+   * discutía a ojo. Con la lista delante se ve de un vistazo cuáles fueron
+   * enteros, cuáles se quedaron en la biblioteca y de cuáles se rescataron
+   * fragmentos, que es lo que separa «se le ha olvidado» de «nunca lo tuvo».
+   */
+  documentos?: {
+    /** Nombres que viajaron con su texto completo. */
+    enteros?: string[];
+    /** Nombres de consulta de los que se rescataron fragmentos este turno. */
+    fragmentos?: string[];
+    /** Nombres de consulta que NO aportaron nada a este turno. */
+    sinUsar?: string[];
+  };
   /** STOP, MAX_TOKENS, SAFETY… Es lo que explica un relato cortado. */
   motivoDeCierre?: string;
   /** Cuándo llegó el primer trozo: separa «pensando» de «colgado». */
@@ -123,6 +139,7 @@ export function abrirLlamada(datos: {
   intento?: number;
   esRespaldo?: boolean;
   caracteresEnviados?: number;
+  documentos?: LlamadaRegistrada['documentos'];
   proyecto?: string;
   capitulo?: string;
 }): string {
@@ -294,6 +311,16 @@ export function llamadasComoTexto(llamadas: LlamadaRegistrada[]): string {
       `[${l.horaLegible}] ${l.proposito} — ${l.estado.toUpperCase()}`,
       `  modelo: ${l.modelo}${l.claveN ? ` · clave ${l.claveN}${l.totalClaves ? `/${l.totalClaves}` : ''}` : ''}${l.intento ? ` · intento ${l.intento}` : ''}${l.esRespaldo ? ' · respaldo' : ''}`,
       `  duración: ${duracionLegible(l.duracionMs)}${l.primerTrozoMs !== undefined ? ` · primer trozo: ${duracionLegible(l.primerTrozoMs)}` : ''}`,
+      (() => {
+        const d = l.documentos;
+        if (!d) return '';
+        const filas = [
+          d.enteros?.length ? `  documentos enteros (${d.enteros.length}): ${d.enteros.join(', ')}` : '',
+          d.fragmentos?.length ? `  fragmentos rescatados de: ${d.fragmentos.join(', ')}` : '',
+          d.sinUsar?.length ? `  de consulta, SIN usar este turno (${d.sinUsar.length}): ${d.sinUsar.join(', ')}` : ''
+        ].filter(Boolean);
+        return filas.join('\n');
+      })(),
       (() => {
         const e = entradaMostrable(l);
         if (e.fichas === undefined) return '';

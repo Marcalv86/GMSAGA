@@ -384,12 +384,32 @@ export function recuperar(files: ProjectFile[], consulta: string, presupuesto = 
 export function consultaDelTurno({
   textoJugadora,
   ultimaNarracion,
-  nombres
+  nombres,
+  suyo
 }: {
   textoJugadora: string;
   ultimaNarracion?: string;
   nombres?: string[];
+  /**
+   * Lo que es DE ELLA: su equipo, su compañero animal, su diario.
+   *
+   * Sin esto la consulta se armaba solo con lo que YA estaba en escena, y eso
+   * es circular: el Narrador no podía mencionar la polilla lunar porque no
+   * tenía el fragmento, y no tenía el fragmento porque nadie había mencionado
+   * la polilla lunar. Sus cosas no son lore que haya que ir a buscar cuando
+   * salga: van con ella a todas partes, así que pesan en la consulta de cada
+   * turno y sus fragmentos suben solos.
+   */
+  suyo?: string[];
 }): string {
-  const partes = [textoJugadora || '', (ultimaNarracion || '').slice(-1200), (nombres || []).join(' ')];
+  const partes = [
+    textoJugadora || '',
+    (ultimaNarracion || '').slice(-1200),
+    (nombres || []).join(' '),
+    // Repetido a propósito: en BM25 un término que aparece dos veces pesa más,
+    // y lo suyo tiene que competir con mil palabras de narración reciente.
+    (suyo || []).join(' '),
+    (suyo || []).join(' ')
+  ];
   return partes.filter(Boolean).join('\n');
 }
