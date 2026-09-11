@@ -1509,6 +1509,26 @@ export const MemoryManager: React.FC<{
                                   Puede salir por: {sec.comoSeDescubre}
                                 </p>
                               )}
+                              {/*
+                                Lo que tiene que cumplirse para que este giro
+                                pueda destaparse. Va con su propio color porque
+                                no es una sugerencia: la aplicación lo comprueba
+                                en cada turno y le dice al Narrador si está
+                                abierto o cerrado.
+                              */}
+                              {sec.condicion && (
+                                <p className="text-[11px] text-amber-800 dark:text-amber-300 m-0 mt-1">
+                                  ⏳ No se abre hasta:{' '}
+                                  {[
+                                    sec.condicion.nivelMinimo ? `nivel ${sec.condicion.nivelMinimo}` : '',
+                                    sec.condicion.trasSecreto ? `que se destape «${sec.condicion.trasSecreto}»` : '',
+                                    sec.condicion.diaAbsMinimo ? `el día ${sec.condicion.diaAbsMinimo} de campaña` : '',
+                                    sec.condicion.nota || ''
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </p>
+                              )}
                             </>
                           ) : (
                             <p className="text-[11px] text-[var(--text-secondary)] italic m-0 mt-1">

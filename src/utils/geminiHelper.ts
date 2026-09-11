@@ -1718,6 +1718,45 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
    * prosa o perdiéndose del todo.
    */
   const secretos = project.memory?.gm_secrets || [];
+
+  /*
+   * ¿Está este giro ABIERTO o todavía cerrado?
+   *
+   * «Puede salir al alcanzar un hito de nivel» vivía en prosa, así que nadie lo
+   * comprobaba: el Narrador podía destapar hoy algo que solo tiene sentido tres
+   * niveles más adelante, o no destaparlo nunca por no acordarse. Esto lo mira
+   * contra el estado real de la campaña y se lo dice con un número delante.
+   *
+   * Cerrado NO es invisible: la siembra sigue, y de hecho es lo que hace que
+   * cuando por fin se abra parezca que estaba preparado desde el principio.
+   */
+  const nivelActual = Number(project.memory?.player_character?.level) || 1;
+  const diaDeHoyAbs =
+    calendarioValido(project.calendar) && project.currentDate
+      ? aDiaAbsoluto(project.calendar, project.currentDate)
+      : undefined;
+  const revelados = new Set(
+    secretos
+      .filter(x => x.revelado)
+      .map(x => (x.titulo || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim())
+  );
+
+  const queLeFalta = (sec: SecretoDeCampana): string[] => {
+    const c = sec.condicion;
+    if (!c) return [];
+    const faltan: string[] = [];
+    if (c.nivelMinimo && nivelActual < c.nivelMinimo) {
+      faltan.push(`llegar a nivel ${c.nivelMinimo} (va por el ${nivelActual})`);
+    }
+    if (c.trasSecreto) {
+      const clave = c.trasSecreto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      if (!revelados.has(clave)) faltan.push(`que antes se destape «${c.trasSecreto}»`);
+    }
+    if (c.diaAbsMinimo !== undefined && diaDeHoyAbs !== undefined && diaDeHoyAbs < c.diaAbsMinimo) {
+      faltan.push(`que pasen ${c.diaAbsMinimo - diaDeHoyAbs} días más`);
+    }
+    return faltan;
+  };
   const plan = project.memory?.plan_de_campana;
   const NOMBRE_DE_CAPA: Record<number, string> = {
     1: 'CAPA 1 — lo que PARECE que pasa',
@@ -1798,7 +1837,18 @@ ${lista
       sec.conecta?.length ? `- Engancha con: ${sec.conecta.slice(0, 5).join(' · ')}` : '',
       !sec.revelado && sec.sembrar ? `- 🌱 SIEMBRA ESTO YA: ${sec.sembrar.slice(0, 300)}` : '',
       !sec.revelado && sec.quienLoTrae ? `- 🚪 QUIÉN PUEDE TRAERLO A ESCENA: ${sec.quienLoTrae.slice(0, 300)}` : '',
-      !sec.revelado && sec.comoSeDescubre ? `- Por dónde puede salir: ${sec.comoSeDescubre.slice(0, 300)}` : ''
+      !sec.revelado && sec.comoSeDescubre ? `- Por dónde puede salir: ${sec.comoSeDescubre.slice(0, 300)}` : '',
+      (() => {
+        if (sec.revelado) return '';
+        const faltan = queLeFalta(sec);
+        if (faltan.length) {
+          return `- ⏳ **TODAVÍA CERRADO: falta ${faltan.join(' y ')}.** ⛔ NO lo destapes aún ni dejes que nadie lo insinúe. ✅ Pero SÍ sigue sembrándolo: cuando se abra tiene que parecer que estaba preparado desde el principio.${sec.condicion?.nota ? ` (${sec.condicion.nota})` : ''}`;
+        }
+        if (sec.condicion) {
+          return `- 🟢 **YA SE CUMPLE LO QUE HACÍA FALTA: este giro está ABIERTO.** Puede salir en cuanto la escena lo permita.${sec.condicion.nota ? ` (${sec.condicion.nota})` : ''}`;
+        }
+        return '';
+      })()
     ]
       .filter(Boolean)
       .join('\n')
@@ -4999,6 +5049,7 @@ export interface TramaTrazada {
     comoSeDescubre?: string;
     sembrar?: string;
     quienLoTrae?: string;
+    condicion?: SecretoDeCampana['condicion'];
   }[];
 }
 
@@ -5193,6 +5244,15 @@ CÓMO SE TRAMA UNA CEBOLLA:
 - **Capa 3 — quién está detrás y qué gana.** Un interés concreto de alguien concreto. No «el mal»: un nombre, un motivo y algo que ganar o perder.
 - **Capa 4 — el fondo del asunto.** Lo que hace que todo esto importara desde el principio, y que suele tocar al protagonista más de lo que parecía. Opcional: solo si la campaña lo aguanta.
 
+SOBRE "condicion" (OPCIONAL, y solo cuando de verdad haga falta):
+Un giro puede necesitar que algo se cumpla antes de poder destaparse. Si es el caso, dilo con números y la aplicación lo comprobará sola en cada turno, avisando al Narrador de si está abierto o cerrado:
+- \`nivelMinimo\`: cuando el giro dependa de una capacidad que el protagonista aún NO tiene. Si algo solo puede pasar cuando pueda invocar a su compañero animal, y eso llega a nivel 2, ese es el número. No lo pongas «por si acaso»: un giro que podría pasar hoy no lleva nivel.
+- \`trasSecreto\`: el TÍTULO EXACTO de otro secreto que tiene que destaparse antes. Es lo que hace que las capas salgan en orden en vez de de golpe.
+- \`diaAbsMinimo\`: solo si algo necesita que pase un tiempo real de campaña.
+- \`nota\`: la condición que no se puede medir —«cuando ya confíe en ella», «si llega a ver el mar del norte»—. La aplicación no la comprueba, pero el Narrador la lee.
+- **Omite "condicion" entera en los giros que puedan pasar en cualquier momento**, que serán la mayoría. Una campaña donde todo está cerrado detrás de un requisito no avanza.
+- ⚠️ Y ten claro esto: una condición NO impide sembrar. La siembra empieza el primer día igual; lo único que espera es la revelación.
+
 REGLAS DURAS:
 1. **Cada capa reinterpreta la anterior, no la desmiente.** Si al destapar la capa 2 la capa 1 se vuelve mentira, has hecho un truco barato. Los mismos hechos tienen que seguir en pie, leídos de otra forma.
 2. **Todo engancha con algo.** Cada secreto declara con qué otros conecta, por su título exacto. Un giro que no engancha con nada es un giro suelto y sobra.
@@ -5223,7 +5283,8 @@ Devuelve ÚNICAMENTE un JSON:
       "conecta": ["Título exacto de otro secreto"],
       "comoSeDescubre": "Acciones concretas que un jugador haría",
       "sembrar": "El detalle físico que se puede poner en escena hoy",
-      "quienLoTrae": "Nombre del personaje que puede meterlo en escena, su motivo propio y qué lo dispara"
+      "quienLoTrae": "Nombre del personaje que puede meterlo en escena, su motivo propio y qué lo dispara",
+      "condicion": { "nivelMinimo": 2, "trasSecreto": "Título exacto de otro secreto", "diaAbsMinimo": 0, "nota": "Lo que no se puede medir con un número" }
     }
   ]
 }
@@ -5258,7 +5319,21 @@ ${revisando ? 'Devuelve la trama COMPLETA, no solo lo que cambies: lo que siga e
       conecta: Array.isArray(x?.conecta) ? x.conecta.map((c: any) => String(c).trim()).filter(Boolean) : [],
       comoSeDescubre: x?.comoSeDescubre ? String(x.comoSeDescubre).trim() : undefined,
       sembrar: x?.sembrar ? String(x.sembrar).trim() : undefined,
-      quienLoTrae: x?.quienLoTrae ? String(x.quienLoTrae).trim() : undefined
+      quienLoTrae: x?.quienLoTrae ? String(x.quienLoTrae).trim() : undefined,
+      condicion: (() => {
+        const c = x?.condicion;
+        if (!c || typeof c !== 'object') return undefined;
+        const nivel = Number(c.nivelMinimo);
+        const dia = Number(c.diaAbsMinimo);
+        const limpia = {
+          // Nivel 1 no es una condición: es el estado de salida.
+          nivelMinimo: Number.isFinite(nivel) && nivel > 1 ? Math.min(20, Math.round(nivel)) : undefined,
+          trasSecreto: c.trasSecreto ? String(c.trasSecreto).trim().slice(0, 120) : undefined,
+          diaAbsMinimo: Number.isFinite(dia) && dia > 0 ? Math.round(dia) : undefined,
+          nota: c.nota ? String(c.nota).trim().slice(0, 200) : undefined
+        };
+        return Object.values(limpia).some(Boolean) ? limpia : undefined;
+      })()
     }))
     .filter(x => x.titulo.length > 2 && x.secreto.length > 10);
 
@@ -5307,7 +5382,9 @@ export function fusionarTrama(
       capa: nuevo.capa || p.capa,
       conecta: nuevo.conecta?.length ? nuevo.conecta : p.conecta,
       sembrar: nuevo.sembrar || p.sembrar,
-      quienLoTrae: nuevo.quienLoTrae || p.quienLoTrae
+      quienLoTrae: nuevo.quienLoTrae || p.quienLoTrae,
+      // Una condición puesta a mano por la jugadora manda sobre la del repaso.
+      condicion: p.condicion || nuevo.condicion
     };
   });
 
@@ -5322,6 +5399,7 @@ export function fusionarTrama(
       conecta: t.conecta,
       sembrar: t.sembrar,
       quienLoTrae: t.quienLoTrae,
+      condicion: t.condicion,
       origen: 'trama'
     });
   }

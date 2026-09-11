@@ -359,6 +359,28 @@ export interface SecretoDeCampana {
    */
   sembrar?: string;
   /**
+   * Cuándo se puede DISPARAR, con condiciones que la aplicación sabe comprobar.
+   *
+   * «Puede salir al alcanzar un hito de nivel» estaba escrito en prosa, así que
+   * nadie lo verificaba: el Narrador podía sacar hoy un giro que solo tiene
+   * sentido dentro de tres niveles, o no sacarlo nunca por no acordarse. Con
+   * esto, la aplicación mira el estado real de la campaña en cada turno y le
+   * dice si ese giro está abierto o todavía cerrado.
+   *
+   * ⚠️ Cerrado NO significa invisible: la siembra sigue haciéndose desde el
+   * primer día. Lo que no se puede es destapar la revelación antes de tiempo.
+   */
+  condicion?: {
+    /** Nivel del protagonista a partir del cual se puede destapar. */
+    nivelMinimo?: number;
+    /** Título de otro secreto que tiene que haberse revelado antes. */
+    trasSecreto?: string;
+    /** Día absoluto de campaña antes del cual no toca. */
+    diaAbsMinimo?: number;
+    /** Lo que no se puede comprobar con un número, dicho en una frase. */
+    nota?: string;
+  };
+  /**
    * Quién puede traer esto a la mesa, y qué lo pondría en marcha.
    *
    * Es la pieza que faltaba entre la trama y el reparto. Una capa sabía qué
