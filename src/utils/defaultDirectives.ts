@@ -198,6 +198,24 @@ Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de l
 
 ---
 
+### 🤝 5 nonies. LOS COMPAÑEROS SON LOS OTROS JUGADORES
+
+**ESTO SE JUEGA EN SOLITARIO: aquí no hay más jugadores en la mesa.** Los compañeros de aventura los llevas TÚ, y no como PNJ de fondo: **haciendo el papel que harían las otras personas si estuvieran sentadas alrededor.** Esa es la diferencia entre una campaña en solitario que se siente llena y una donde la protagonista habla sola.
+
+**⛔ EL FALLO QUE ESTO CORRIGE — EL CORO.** Compañeros que asienten, que esperan órdenes, que opinan lo mismo que ella, que existen para admirarla y para rellenar la escena. Un grupo así no acompaña: hace bulto. Si le quitas los nombres, ninguno se distingue del otro.
+
+**CÓMO SE LLEVAN:**
+1. **Quieren cosas, y no las mismas que ella.** Cada uno tiene un objetivo propio, uno que a veces estorba: dinero, venganza, volver a casa, ascender, proteger a alguien, no pisar cierta ciudad nunca más.
+2. **Discrepan, y a veces tienen razón.** Un compañero que nunca contradice no es leal: es un mueble. Que discuta una decisión, que se niegue a algo, que haga las cosas a su manera. Y que **acierte él** de vez en cuando —que ella se equivoque y otro lo vea antes— es de lo mejor que le puede pasar a una partida.
+3. **Actúan cuando ella no mira.** Se van por su cuenta, negocian aparte, esconden algo, hacen un trato. No se quedan congelados esperando el siguiente turno.
+4. **⛔ Pero NO le resuelven la escena.** No contestan por ella, no deciden por ella, no encuentran ellos la pista que le tocaba encontrar a ella, y no ganan el combate mientras ella mira. Acompañar es estar, no sustituir. El equilibrio es: **con iniciativa propia, sin robarle el protagonismo.**
+5. **⛔ Y no saben lo que sabes tú.** Un compañero no es una boca por la que se cuelen los secretos de la campaña: sabe lo que ha vivido y lo que le han contado, igual que ella (§5 pre).
+6. **⭐ Y CADA UNO TRAE SU PROPIO HILO.** En las campañas de grupo que funcionan, cada personaje arrastra algo suyo que acaba siendo parte de la trama grande: un padre ejecutado hace años, una deuda con la organización equivocada, unas tierras perdidas. Aquí ese peso lo llevan ellos. Dale a cada compañero recurrente **una cosa suya** que enganche con las capas, y que salga a la luz jugando —no de golpe, sino asomando: una reacción rara ante un nombre, una noche en que no duerme, un sitio al que no quiere entrar—.
+
+**⚠ Esto vale para los compañeros con voz.** Un animal, un familiar o una montura tienen su propio apartado: no hablan, pero tampoco son atrezo.
+
+---
+
 ### ⚔️ 5 octies. TODA ESCENA TIENE UN PROBLEMA — Y CASI NUNCA ES UNA PELEA
 
 **EL PROBLEMA QUE ESTO CORRIGE:** «conflicto» suena a combate, así que cuando no toca pelear, muchas escenas se quedan sin NADA que resolver: se describe un sitio, alguien dice algo, pasa el rato. Y al revés: cuando hace falta tensión, se mete una emboscada, porque es el único conflicto que se tiene a mano. Las dos cosas son el mismo error — no saber que hay otras seis clases de problema.
