@@ -2914,12 +2914,29 @@ export default function App() {
           ...(p.memory || {}),
           ...syncResult.memory
         });
+        /*
+         * Las dos lecturas de la mochila, juntas y sin pisarse.
+         *
+         * Las etiquetas [INVENTARIO:] de la crónica son exactas —dicen cuántas
+         * raciones quedan— pero solo existen si el Narrador las escribió. Lo
+         * que la IA saca leyendo el texto cubre justo lo contrario: una sesión
+         * entera jugada antes de que nada de esto existiera. Manda la etiqueta
+         * donde la hay, y lo leído rellena lo que falta.
+         */
+        const porEtiquetas = mochila.inventario;
+        const yaEstan = new Set(porEtiquetas.map(i => (i.name || '').trim().toLowerCase()));
+        const inventory = [
+          ...porEtiquetas,
+          ...(memoriaSincronizada.player_character?.inventory || []).filter(
+            i => !yaEstan.has((i.name || '').trim().toLowerCase())
+          )
+        ];
         return {
           memory: {
             ...memoriaSincronizada,
             player_character: {
               ...(memoriaSincronizada.player_character || { name: '' }),
-              inventory: mochila.inventario
+              inventory
             }
           },
           timeline: fusionarTimeline(p.timeline || [], syncResult.timeline || []).timeline,
@@ -2981,9 +2998,13 @@ export default function App() {
           `• ${syncResult.totalQuests} tramas y misiones.\n` +
           `• ${syncResult.totalLocations} lugares registrados.\n` +
           `• Evolución del protagonista y consecuencias programadas.\n` +
-          (mochila.inventario.length
-            ? `• ${mochila.inventario.length} ${mochila.inventario.length === 1 ? 'objeto' : 'objetos'} en la mochila, recuperados de lo que el Narrador fue apuntando (pestaña Inventario).\n`
-            : `• La mochila sigue vacía, y no es un fallo: en la crónica no hay ni una sola anotación de inventario que recuperar, porque el Narrador no llegó a escribir ninguna. Se irá llenando a partir del próximo botín — y lo que ya traía de casa se lo puedes pedir al GM en el Chat.\n`) +
+          (() => {
+            const enLaMochila =
+              (syncResult.memory?.player_character?.inventory?.length || 0) + mochila.inventario.length;
+            return enLaMochila
+              ? `• ${enLaMochila} ${enLaMochila === 1 ? 'objeto' : 'objetos'} en la mochila, sacados de lo que se ha jugado (pestaña Inventario).\n`
+              : `• La mochila sigue vacía: en la crónica no se ve que lleve nada encima. Si te falta algo que sí tiene, pídeselo al GM en el Chat.\n`;
+          })() +
           (Object.keys(mochila.netoDeMonedas).length
             ? `• 💰 De dinero, lo apuntado en la crónica suma ${Object.entries(mochila.netoDeMonedas)
                 .map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${({ pp: 'PP', gp: 'PO', ep: 'PE', sp: 'PA', cp: 'PC' } as any)[k] || k}`)

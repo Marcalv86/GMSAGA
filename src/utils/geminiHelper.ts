@@ -15,7 +15,7 @@ import {
   ScheduledThread,
   Message
 } from '../types';
-import type { CambioDeInventario } from '../types';
+import type { CambioDeInventario, InventoryItem } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import {
@@ -4315,6 +4315,12 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
     { "title": "Hito clave del protagonista", "description": "Qué ocurrió y su significado", "dateOrTime": "Fecha o momento" }
   ],
   "_nota_player_events": "⛔ NO es una segunda copia del diario. 'daily_events' lleva lo que PASÓ cada día; 'player_events' lleva solo los HITOS que cambian al protagonista y que se recordarán dentro de un año: un juramento, una pérdida, una cicatriz, subir de nivel, un pacto, una decisión que no tiene vuelta atrás, un vínculo que se rompe o se sella. Una escena cotidiana —una conversación, un registro, un trato, una inspección— va en 'daily_events' y NO se repite aquí. Si dudas, no lo pongas: repetir la misma escena en las dos listas la muestra DOS VECES en el diario de la jugadora, con dos títulos y dos horas distintas. Es preferible una lista de hitos corta y vacía que un diario duplicado.",
+  "inventory": [
+    { "name": "Objeto", "quantity": 1, "notas": "Qué es o para qué sirve, si hace falta", "deMision": false, "encargo": "", "origen": "" }
+  ],
+  "_nota_inventory": "LA MOCHILA DEL PROTAGONISTA, LEÍDA DE LO JUGADO. Repasa la crónica y devuelve lo que LLEVA ENCIMA AHORA MISMO, no todo lo que ha tocado: lo que le dieron y no ha entregado, lo que compró, lo que cogió, lo que traía y se menciona en escena. ⛔ Lo consumido, gastado, entregado, robado o perdido NO se pone. ⛔ Y no te inventes equipo estándar de aventurero que nadie ha nombrado: si no sale en el texto, no existe. Marca deMision:true y rellena 'encargo' SOLO si es una tarea con forma de objeto —una carta que entregar, algo que traducir, algo que hay que devolver— con lo que hay que hacer con él; 'origen' es de quién salió. Lo demás son sus cosas. Devuelve la lista vacía si en la crónica no se ve que lleve nada.",
+  "currencies": { "gp": 0, "sp": 0, "cp": 0, "ep": 0, "pp": 0 },
+  "_nota_currencies": "El dinero que le queda AHORA, si la crónica permite saberlo (le pagaron tanto, gastó tanto). Si no hay ni un dato de dinero en toda la crónica, devuelve el objeto con todo a 0 y NO lo toques: se conservará lo que ya constaba en su ficha.",
   "quests": [
     { "id": "id existente o nuevo", "title": "Título", "type": "Principal / Secundaria", "objective": "Objetivo", "progress": "Progreso", "status": "Activa / Completada" }
   ],
@@ -4474,12 +4480,59 @@ ${historyToAnalyze}`;
     ...parsedPcEvents.filter((ne: any) => !existingEvents.some(oe => oe.title.toLowerCase().trim() === ne.title.toLowerCase().trim()))
   ];
 
+  /*
+   * La mochila, leída de lo jugado igual que todo lo demás.
+   *
+   * Reproducir las etiquetas [INVENTARIO:] de la crónica es exacto, pero solo
+   * sirve si están escritas — y en una campaña anterior a que existiera el
+   * lector no hay ninguna. La sincronización ya reconstruye PNJs, lugares,
+   * tramas y el diario LEYENDO EL TEXTO; no había motivo para que el
+   * inventario fuera la excepción, y dejaba la mochila vacía después de una
+   * sesión entera de juego.
+   */
+  const inventarioLeido: InventoryItem[] = (Array.isArray(parsed.inventory) ? parsed.inventory : [])
+    .map((it: any) => {
+      const nombre = String(it?.name || '').trim();
+      if (!nombre) return null;
+      const encargo = String(it?.encargo || '').trim();
+      const cantidad = Math.max(1, Math.min(9999, Math.round(Number(it?.quantity)) || 1));
+      return {
+        id: `ia_inv_${hashCorto(`${nombre.toLowerCase()}|${encargo.toLowerCase()}`)}`,
+        name: nombre.slice(0, 120),
+        quantity: cantidad,
+        description: String(it?.notas || it?.description || '').trim().slice(0, 400) || undefined,
+        encargo: encargo.slice(0, 200) || undefined,
+        origen: String(it?.origen || '').trim().slice(0, 200) || undefined,
+        deMision: Boolean(it?.deMision) || Boolean(encargo) || undefined
+      } as InventoryItem;
+    })
+    .filter(Boolean) as InventoryItem[];
+
+  /*
+   * El dinero solo se toca si la crónica dice algo. Un objeto entero a cero es
+   * la forma que tiene el modelo de decir «no he visto ni una moneda», y
+   * aplicarlo dejaría sin blanca a quien empezó con la bolsa llena.
+   */
+  const monedasLeidas = parsed.currencies && typeof parsed.currencies === 'object' ? parsed.currencies : null;
+  const hayDineroEnLaCronica =
+    monedasLeidas && (['cp', 'sp', 'ep', 'gp', 'pp'] as const).some(k => Number(monedasLeidas[k]) > 0);
+
   const candidatePc: PlayerCharacter = {
     ...(prevPc || { name: '' }),
     name: prevPc?.name || '',
     title: prevPc?.title,
     summary: parsed.player_summary || prevPc?.summary || '',
     events: mergedEvents,
+    inventory: inventarioLeido,
+    currencies: hayDineroEnLaCronica
+      ? {
+          cp: Math.max(0, Math.round(Number(monedasLeidas.cp) || 0)),
+          sp: Math.max(0, Math.round(Number(monedasLeidas.sp) || 0)),
+          ep: Math.max(0, Math.round(Number(monedasLeidas.ep) || 0)),
+          gp: Math.max(0, Math.round(Number(monedasLeidas.gp) || 0)),
+          pp: Math.max(0, Math.round(Number(monedasLeidas.pp) || 0))
+        }
+      : prevPc?.currencies,
     portrait: prevPc?.portrait
   };
   const updatedPc = sanitizePlayerCharacter(candidatePc);
