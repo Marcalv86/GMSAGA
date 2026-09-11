@@ -15,7 +15,7 @@ import {
   ScheduledThread,
   Message
 } from '../types';
-import type { CambioDeInventario, InventoryItem } from '../types';
+import type { CambioDeInventario, InventoryItem, PlayerCurrencies } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import {
@@ -5759,6 +5759,23 @@ export interface IdentidadLeida {
   class?: string;
   languages?: string[];
   appearance?: string;
+  /*
+   * SU EQUIPO, QUE ES LA MITAD DE QUIÉN ES.
+   *
+   * Esto leía cinco campos y dejaba fuera lo que lleva encima, que es
+   * exactamente lo que convierte una ficha en un personaje jugable: su
+   * instrumento, su cuaderno, las herramientas de su oficio, sus reliquias,
+   * los objetos de su fe. La mochila solo se llenaba jugando, así que en una
+   * campaña recién empezada estaba vacía —y el bloque que el Narrador lee en
+   * cada turno no existía—. Con la ficha delante, el Narrador tenía que ir a
+   * buscarlo a cuarenta mil caracteres, y no iba.
+   *
+   * Se lee de la ficha una vez, al principio, y a partir de ahí vive en la
+   * mochila: viaja corto en cada turno y se actualiza jugando.
+   */
+  inventory?: InventoryItem[];
+  /** El dinero con el que empieza, si la ficha lo dice. */
+  currencies?: PlayerCurrencies;
 }
 
 /**
@@ -5811,13 +5828,21 @@ Estos cuatro datos viajan al Narrador en cada turno como hechos fijos, así que 
 - "languages": ARRAY con los idiomas que HABLA O ENTIENDE. Solo los que el documento le atribuya de verdad: no añadas el común «porque sí» si no consta, ni metas idiomas que solo se mencionan de pasada hablando de otros.
 - "appearance": los rasgos por los que se la reconoce al verla, en 2-4 frases. Céntrate en lo PERMANENTE y distintivo —color y forma de ojos, pelo, piel, marcas, tatuajes, cicatrices, estatura, porte— y deja fuera la ropa cambiante y el equipo. Si un rasgo depende de algo (la luz, el momento), dilo con su condición: «ojos que van de verde agua a magenta según la luz sea fría o cálida». USA LAS PALABRAS DEL DOCUMENTO, no sinónimos tuyos: si dice un color concreto, ese color va.
 
+- "inventory": ARRAY CON LO QUE LLEVA ENCIMA. ⭐ Este es el campo que más cambia la partida, porque sus cosas no son decoración de ficha: son material de escena. Un cuaderno se lee, se compara, se enseña y se roba; una herramienta se usa; un instrumento se toca y alguien lo oye; una reliquia la reconoce quien sabe lo que es.
+  - Saca **todo lo que el documento le atribuya**: armas, armadura, ropa señalada, instrumentos, herramientas de su oficio, libros, cuadernos, diarios, cartas, mapas, amuletos, objetos de culto, reliquias, componentes, provisiones con nombre propio y regalos.
+  - **Prioriza lo distintivo sobre lo genérico.** Entre «mochila» y «el cuaderno donde copia inscripciones», el segundo importa diez veces más: es lo que solo tiene ella. Lo corriente —cuerda, yesca, raciones— ponlo al final o agrúpalo.
+  - Cada objeto: \`{ "name": "...", "quantity": 1, "notas": "qué es y por qué importa, en una frase", "deMision": false, "origen": "de quién salió, si consta" }\`.
+  - Marca \`"deMision": true\` y rellena \`"encargo"\` SOLO si es una tarea con forma de objeto: una carta que entregar, algo que traducir, algo que hay que devolver.
+  - ⛔ No te inventes equipo estándar de aventurero que el documento no nombre. Si no está escrito, no existe.
+- "currencies": el dinero con el que empieza, si la ficha lo dice, como \`{ "gp": 0, "sp": 0, "cp": 0, "ep": 0, "pp": 0 }\`. Si no consta, omite el campo entero.
+
 ⛔ Si un dato NO consta en los documentos, omite el campo. No lo deduzcas del nombre, del lugar de origen ni de lo que te parezca probable: un dato inventado aquí se convierte en canon y contradice lo que la jugadora tenga escrito.
 
 DOCUMENTOS:
 ${texto}
 
 Responde ÚNICAMENTE con el JSON, sin nada más:
-{ "name": "...", "race": "...", "class": "...", "languages": ["..."], "appearance": "..." }`;
+{ "name": "...", "race": "...", "class": "...", "languages": ["..."], "appearance": "...", "inventory": [{ "name": "...", "quantity": 1, "notas": "...", "deMision": false, "encargo": "", "origen": "" }], "currencies": { "gp": 0, "sp": 0, "cp": 0, "ep": 0, "pp": 0 } }`;
 
   const modelo = getBackgroundTaskModel();
   const respuesta = await generateContentWithFailover({
@@ -5853,12 +5878,48 @@ Responde ÚNICAMENTE con el JSON, sin nada más:
   const generico = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj|hero[íi]na?|h[ée]roe)$/i;
   const nombre = txt(p?.name, 80);
 
+  /*
+   * Su equipo, con id estable.
+   *
+   * El id sale del nombre para que volver a leer la ficha no duplique la
+   * mochila: si ya está el cuaderno, se reconoce y se pisa en vez de aparecer
+   * dos veces.
+   */
+  const equipo: InventoryItem[] = (Array.isArray(p?.inventory) ? p.inventory : [])
+    .map((it: any) => {
+      const nombreObj = txt(it?.name, 120);
+      if (!nombreObj) return null;
+      const encargo = txt(it?.encargo, 200);
+      return {
+        id: `ficha_inv_${hashCorto(nombreObj.toLowerCase())}`,
+        name: nombreObj,
+        quantity: Math.max(1, Math.min(9999, Math.round(Number(it?.quantity)) || 1)),
+        description: txt(it?.notas ?? it?.description, 400),
+        encargo,
+        origen: txt(it?.origen, 200),
+        deMision: Boolean(it?.deMision) || Boolean(encargo) || undefined
+      } as InventoryItem;
+    })
+    .filter(Boolean)
+    .slice(0, 60) as InventoryItem[];
+
+  const bolsa = p?.currencies && typeof p.currencies === 'object' ? p.currencies : null;
+  const monedas: PlayerCurrencies | undefined = bolsa
+    ? (['cp', 'sp', 'ep', 'gp', 'pp'] as const).reduce((acc, k) => {
+        const n = Math.max(0, Math.round(Number(bolsa[k])) || 0);
+        if (n > 0) acc[k] = n;
+        return acc;
+      }, {} as PlayerCurrencies)
+    : undefined;
+
   return {
     name: nombre && !generico.test(nombre) ? nombre : undefined,
     race: txt(p?.race, 80),
     class: txt(p?.class, 80),
     languages: idiomas?.length ? idiomas : undefined,
-    appearance: txt(p?.appearance, 1200)
+    appearance: txt(p?.appearance, 1200),
+    inventory: equipo.length ? equipo : undefined,
+    currencies: monedas && Object.keys(monedas).length ? monedas : undefined
   };
 }
 
