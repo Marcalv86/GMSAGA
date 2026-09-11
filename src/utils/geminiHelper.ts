@@ -1823,9 +1823,26 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
 
   // Fichas específicas del protagonista que viajan íntegras (las fichas de PJ viajan SIEMPRE completas para evitar alucinaciones)
   const pc = project.memory?.player_character;
+
+  /*
+   * LAS FICHAS DE SUS COMPAÑEROS, EN SU PROPIO SITIO.
+   *
+   * `sheet_companion` existía como categoría y NO SE USABA EN NINGUNA PARTE al
+   * montar el turno. Una ficha de compañero ni era ficha del PJ ni tenía
+   * bloque propio: caía en el montón general de documentos, detrás de doscientos
+   * mil caracteres de compendio. Por eso la polilla lunar viajaba entera en
+   * cada turno y no salía NUNCA: estaba, pero enterrada.
+   *
+   * Y tampoco vale meterlas con las del protagonista: entonces sus rasgos se
+   * mezclan con los de ella, que es otra forma de estropearlo.
+   */
+  const companionFiles = files.filter(f => esTexto(f) && f.category === 'sheet_companion');
+  const companionIds = new Set(companionFiles.map(f => f.id));
+
   const pjSheetFiles = files.filter(
     f =>
       esTexto(f) &&
+      !companionIds.has(f.id) &&
       (f.category === 'sheet_pj' ||
         f.name.toLowerCase().includes('ficha') ||
         f.name.toLowerCase().includes('personaje') ||
@@ -1843,6 +1860,7 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
       esTexto(f) &&
       Boolean(f.onDemand) &&
       !pjSheetIds.has(f.id) &&
+      !companionIds.has(f.id) &&
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
       f.category !== 'index' &&
@@ -1853,7 +1871,7 @@ ${allPreviousHistory.length > 0 ? `RESUMEN DE SESIONES PREVIAS:\n${allPreviousHi
   // Documentos "Siempre presentes" (onDemand false o no marcado, u oráculos)
   // Las fichas del PJ se excluyen de aquí porque se formatean íntegras en pjSection
   const siemprePresentes = files.filter(
-    f => esTexto(f) && !deConsultaIds.has(f.id) && !pjSheetIds.has(f.id)
+    f => esTexto(f) && !deConsultaIds.has(f.id) && !pjSheetIds.has(f.id) && !companionIds.has(f.id)
   );
 
   const filesText = siemprePresentes.length > 0
@@ -1938,6 +1956,36 @@ ${rescatados.map(r => `--- [Fragmento de: ${r.fragmento.fileName}${r.fragmento.t
   }
 
   // Protagonist / Character Sheet Section
+  /*
+   * QUIÉN VA CON ELLA.
+   *
+   * Este bloque no existía. La compañera podía tener ficha propia, categoría
+   * propia y viajar entera en cada turno, y aun así no salir jamás: estaba
+   * dentro del montón de documentos, y ahí un bicho de seis mil caracteres no
+   * compite con un compendio de doscientos mil. Ahora tiene sitio propio,
+   * pegado al bloque del protagonista, que es donde se atiende.
+   */
+  const acompanantes = (project.memory?.companions || []).filter(c => (c?.name || '').trim());
+  const companionSection =
+    companionFiles.length || acompanantes.length
+      ? `
+### 🐾 QUIEN VA CON ELLA (COMPAÑEROS, FAMILIARES Y MONTURAS)
+**No son atrezo ni un recuerdo de la ficha: están AQUÍ, en la escena, salvo que la propia escena diga lo contrario** (se quedaron fuera, están heridos, los han separado). Si llevan sin aparecer varias escenas y nada lo explica, es que se te han olvidado, y eso la jugadora lo nota antes que nada.
+- Tienen conducta propia: reaccionan a lo que pasa, se inquietan, se acercan, desaparecen un rato y vuelven. No esperan a que alguien los nombre.
+- ⛔ Y NO SON DEL NARRADOR PARA DECIDIR POR ELLOS lo que le toca decidir a ella: si la compañera es suya, lo que hace en una escena tensa lo declara ella (§6 ante). Tú narras lo que el bicho hace por su cuenta, no lo que ella le ordena.
+${acompanantes.length ? `
+${acompanantes.map(c => `- **${c.name}**${c.companionType ? ` (${c.companionType})` : ''}${c.race || c.class ? ` — ${[c.race, c.class].filter(Boolean).join(' · ')}` : ''}${c.appearance ? `\n  Se la ve así: ${c.appearance.slice(0, 200)}` : ''}`).join('\n')}` : ''}
+${
+  companionFiles.length
+    ? `
+${companionFiles
+        .map(f => `=== FICHA DE COMPAÑERO: ${f.name} ===\n${f.content || ''}${f.analysis?.trim() ? `\n[Notas adjuntas]:\n${f.analysis.trim()}` : ''}`)
+        .join('\n\n')}`
+    : ''
+}
+`.trim()
+      : '';
+
   const pjSection = `
 ### 🌟 PROTAGONISTA / PERSONAJE JUGADOR (OC - PROTAGONISTA PRINCIPAL)
 [JERARQUÍA CANÓNICA SUPREMA]:
@@ -2254,6 +2302,7 @@ ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: l
   // cacheado, y de paso queda pegado a la escena, que es donde mejor se atiende.
   const bloqueVivo = `
 ${fragmentosConsultaText ? `${fragmentosConsultaText}\n\n` : ''}${pjSection}
+${companionSection ? `\n${companionSection}\n` : ''}
 
 ### CONOCIMIENTO DE LA CAMPAÑA (MEMORIA VIVA)
 ${memoryContext}
