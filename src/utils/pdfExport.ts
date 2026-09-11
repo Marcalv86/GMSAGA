@@ -27,6 +27,20 @@ function sanitizeTextForPdf(text: string): string {
 }
 
 /**
+ * ¿Es una instrucción de transición y no una acción del personaje?
+ *
+ * Los botones de salto de tiempo mandan su instrucción como un mensaje de la
+ * jugadora. El chat los oculta, pero el libro NO: salían impresos en mitad de
+ * la novela, en crudo y con la codificación rota —«Ø<ß [ A f e c t a c i ó n a
+ * l M u n d o ]»—. Son fontanería del juego, no crónica.
+ */
+export function esInstruccionDeTransicion(msg: Message): boolean {
+  if (msg.role !== 'user') return false;
+  const t = msg.content || '';
+  return t.startsWith('⏳ [Transición') || t.includes('[Transición de Escena');
+}
+
+/**
  * Limpia el contenido de un mensaje eliminando tiradas mecánicas y etiquetas
  * para dejar únicamente la prosa narrativa.
  */
@@ -198,9 +212,12 @@ export async function exportNovelToPDF(
     currentY += 10;
 
     // Mensajes del capítulo
-    const visibleMessages = shouldIncludePlayer
+    // La instrucción de transición se cae SIEMPRE, se impriman o no los turnos
+    // de la jugadora: es fontanería del juego, no crónica.
+    const visibleMessages = (shouldIncludePlayer
       ? chapter.messages
-      : chapter.messages.filter(m => m.role === 'model');
+      : chapter.messages.filter(m => m.role === 'model')
+    ).filter(m => !esInstruccionDeTransicion(m));
 
     if (visibleMessages.length === 0) {
       pdf.setFont('times', 'italic');
@@ -340,7 +357,9 @@ export function exportNovelToMarkdown(
       output += `\n--- CAPÍTULO ${idx + 1}: ${chapTitle.toUpperCase()} ---\n\n`;
     }
 
-    const msgs = shouldIncludePlayer ? chap.messages : chap.messages.filter(m => m.role === 'model');
+    const msgs = (shouldIncludePlayer ? chap.messages : chap.messages.filter(m => m.role === 'model')).filter(
+      m => !esInstruccionDeTransicion(m)
+    );
 
     msgs.forEach(m => {
       const isUser = m.role === 'user';
