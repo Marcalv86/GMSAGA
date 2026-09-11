@@ -105,7 +105,8 @@ import {
   fusionarTrama,
   isNarrativeIncomplete,
   novelizeUserMessage,
-  generarNoticiasSaltoTemporal
+  generarNoticiasSaltoTemporal,
+  anclarHistorialPorHud
 } from './utils/geminiHelper';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
@@ -2135,13 +2136,54 @@ export default function App() {
 
     // Sincronización quirúrgica del diario y cronología (timeline)
     await handleUpdateProjectField(p => {
-      if (!p.timeline || p.timeline.length === 0) return {};
-      const updatedTimeline = p.timeline
+      /*
+       * DÓNDE SE HA QUEDADO LA CAMPAÑA DESPUÉS DE REBOBINAR.
+       *
+       * El filtro de abajo sabía descartar lo que había apuntado el Narrador en
+       * vivo, porque esas entradas llevan su chatId y su msgIndex. Pero las que
+       * escribe «Sincronizar con IA» no llevan ninguna de las dos cosas —salen
+       * de leer el historial entero, no de un mensaje concreto—, así que la
+       * primera línea del filtro («si no es de este chat, se queda») las daba
+       * por buenas SIEMPRE. Resultado: se borraban las respuestas, se volvía
+       * atrás, y los acontecimientos de lo que ya no había pasado seguían ahí
+       * como si tal cosa; y la siguiente sincronización los veía en el diario y
+       * los conservaba, porque la fusión solo añade y nunca quita.
+       *
+       * Sin msgIndex al que agarrarse, el ancla es el reloj: la última cabecera
+       * de fecha que sobrevive marca hasta dónde llega la historia, y lo que
+       * esté fechado DESPUÉS ya no lo respalda ningún mensaje. Se usa el mismo
+       * lector de cabeceras que la sincronización, con todos los capítulos, para
+       * que el cambio de año se cuente igual que allí.
+       */
+      const cal = p.calendar;
+      let corte: { abs: number; minute: number } | null = null;
+      if (calendarioValido(cal)) {
+        const { anclas } = anclarHistorialPorHud(chs, cal, p.currentDate?.year || 1492);
+        const ultima = anclas[anclas.length - 1];
+        if (ultima && Number.isFinite(ultima.abs)) {
+          corte = { abs: ultima.abs, minute: ultima.minute ?? 1439 };
+        }
+      }
+
+      const despuesDelCorte = (entry: TimelineEntry) => {
+        if (!corte || !Number.isFinite(entry.absDay)) return false;
+        if (entry.absDay > corte.abs) return true;
+        return entry.absDay === corte.abs && (entry.minute ?? 0) > corte.minute;
+      };
+
+      const timelineFiltrado = (p.timeline || [])
         .filter(entry => {
-          if (entry.chatId !== currentChatId) return true;
+          if (entry.chatId !== currentChatId) {
+            // Sin ancla a un mensaje, manda el reloj: lo que quede fechado más
+            // allá de donde llega ahora la historia se cae con ella.
+            if (entry.chatId === undefined && entry.msgIndex === undefined) {
+              return !despuesDelCorte(entry);
+            }
+            return true;
+          }
           if (entry.msgIndex === undefined) {
             // Si no tiene msgIndex explícito, solo se descarta si borramos todos los mensajes del chat
-            return updatedMessages.length > 0;
+            return updatedMessages.length > 0 && !despuesDelCorte(entry);
           }
           if (deleteSubsequent) {
             return entry.msgIndex < index;
@@ -2157,7 +2199,22 @@ export default function App() {
           return entry;
         });
 
-      return { timeline: updatedTimeline };
+      /*
+       * Y el reloj vuelve con ella. Rebobinar por encima de un cambio de día
+       * dejaba el HUD marcando una fecha que ya no había ocurrido, y a partir
+       * de ahí todo lo que se fechara contra «hoy» nacía descolocado.
+       */
+      const cambios: Partial<Project> = { timeline: timelineFiltrado };
+      if (corte && calendarioValido(cal) && p.currentDate) {
+        const hoyAbs = aDiaAbsoluto(cal, p.currentDate);
+        const antesDeHoy =
+          corte.abs < hoyAbs || (corte.abs === hoyAbs && corte.minute < (p.currentDate.minute ?? 0));
+        if (antesDeHoy) {
+          cambios.currentDate = { ...desdeDiaAbsoluto(cal, corte.abs), minute: corte.minute };
+        }
+      }
+
+      return cambios;
     });
   };
 

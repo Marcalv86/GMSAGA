@@ -1182,8 +1182,19 @@ export const MemoryManager: React.FC<{
                                     }));
                                   }
                                 }}
-                                className="text-[var(--text-secondary)] hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                /*
+                                 * Visible en el móvil, que es donde se juega.
+                                 *
+                                 * Estaba en opacity-0 esperando un group-hover
+                                 * que en una pantalla táctil no llega nunca: el
+                                 * botón existía y no había forma de verlo ni de
+                                 * pulsarlo, así que un hito que sobraba no se
+                                 * podía quitar a mano. En pantalla grande sigue
+                                 * apareciendo al pasar por encima.
+                                 */
+                                className="text-[var(--text-secondary)] hover:text-red-500 p-1 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer shrink-0"
                                 title="Eliminar este hito"
+                                aria-label={`Eliminar el hito «${ev.title || 'sin título'}»`}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
