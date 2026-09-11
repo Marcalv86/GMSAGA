@@ -5177,6 +5177,7 @@ QUÉ HACES AL REVISAR:
 - **Lo que la partida ha dejado inservible, arréglalo.** Un giro que ya no puede pasar (el PNJ murió, el barco se hundió, el jugador se fue a otra ciudad) se reescribe para que siga siendo posible, o se sustituye por lo que ese mismo hueco pide ahora.
 - **Lo que la partida ha abierto, añádelo.** Si al jugar ha aparecido algo con más fuerza que lo previsto —una obsesión del jugador, un PNJ que se comió la escena, una pregunta que quedó en el aire— dale su capa y engánchalo con el resto.
 - **⛔ Lo YA DESCUBIERTO no se toca jamás.** Eso ya pasó, el protagonista lo sabe y es historia. Devuélvelo tal cual y construye encima.
+- **⛔⛔ Y NINGUNA CAPA PUEDE CONTRADECIR LO QUE YA SE JUGÓ.** Antes de devolver un secreto, compruébalo contra la crónica: si dice que alguien aparece con un objeto y en la partida ese objeto salió de otro sitio, o sitúa a un personaje donde la crónica dice que no estaba, la capa está rota. **Manda lo jugado**, porque la jugadora lo ha leído y se acuerda. Reescribe la capa para que encaje con lo que pasó, o explica las dos cosas a la vez (dos objetos parecidos, alguien que mintió sobre su procedencia) —pero nunca devuelvas una versión que la crónica desmiente, porque en cuanto la jugadora abra la pestaña de Giros la va a ver.
 - **Afina la siembra.** A la luz de lo jugado, ¿qué detalle concreto se puede ir poniendo ahora en escena para lo que aún falta?
 
 Y todo lo demás sigue igual: las capas, cómo encajan y por qué.`
