@@ -1913,6 +1913,15 @@ export const MemoryManager: React.FC<{
          * las está mirando, y volverán. Verlas aquí es lo que evita que se
          * olviden — a ella y al Narrador.
          */
+        const aprendido = memory.player_character?.aprendido || [];
+        const ETIQUETA_APRENDIZAJE: Record<string, string> = {
+          conjuro: 'conjuro',
+          rasgo: 'rasgo',
+          competencia: 'competencia',
+          mejora: 'mejora',
+          otro: 'otro'
+        };
+
         const requisados = todo.filter(i => i.enPoderDe);
         const enSusManos = todo.filter(i => !i.enPoderDe);
         const deMision = enSusManos.filter(i => i.deMision && !i.resuelto);
@@ -2107,6 +2116,58 @@ export const MemoryManager: React.FC<{
                 </div>
               )}
             </div>
+
+            {/*
+              Lo aprendido jugando: el hueco más silencioso que tenía la app.
+
+              La ficha se sube una vez y se queda congelada en el nivel de aquel
+              día. La aplicación llevaba el NÚMERO de nivel y nada más, así que
+              los conjuros, rasgos y competencias ganados subiendo no constaban
+              en ningún sitio: un personaje de nivel 5 jugando con la lista del
+              3 sin que nadie se entere.
+            */}
+            {aprendido.length > 0 && (
+              <div className="flex flex-col gap-2.5">
+                <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-sky-500/30">
+                  <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 text-sky-600" />
+                    Lo que ha aprendido jugando ({aprendido.length})
+                  </span>
+                  <p className="text-[11px] text-[var(--text-secondary)] opacity-80 m-0 mt-0.5 leading-relaxed">
+                    Conjuros, rasgos, competencias y mejoras ganados desde que subiste la ficha. Tu ficha se quedó
+                    congelada en el nivel que tuviera aquel día; esto es lo de después, y el Narrador lo tiene delante
+                    en cada turno.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {aprendido.map(a => (
+                    <div
+                      key={a.id}
+                      className="p-3.5 rounded-lg border bg-[var(--surface-soft)] border-sky-500/25 flex flex-col gap-1.5"
+                    >
+                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                        <span className="font-cinzel font-bold text-xs sm:text-sm break-words text-sky-700 dark:text-sky-300">
+                          {a.name}
+                        </span>
+                        <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                          {ETIQUETA_APRENDIZAJE[a.tipo] || 'otro'}
+                        </span>
+                        {a.nivel && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]">
+                            nivel {a.nivel}
+                          </span>
+                        )}
+                      </div>
+                      {a.notas && (
+                        <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
+                          {a.notas}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Lo que le han quitado: sigue siendo suyo, y alguien lo tiene */}
             {requisados.length > 0 && (

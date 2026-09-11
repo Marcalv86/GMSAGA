@@ -224,6 +224,29 @@ export interface CambioDeInventario {
   monedas: Partial<Record<'cp' | 'sp' | 'ep' | 'gp' | 'pp', number>>;
 }
 
+/** Qué clase de cosa se ha aprendido. */
+export type TipoDeAprendizaje = 'conjuro' | 'rasgo' | 'competencia' | 'mejora' | 'otro';
+
+/**
+ * Algo que el personaje ha ganado jugando y que la ficha subida no recoge.
+ *
+ * La ficha se sube una vez y se queda congelada en el nivel que tuviera ese
+ * día. La aplicación llevaba la cuenta del NÚMERO de nivel y de nada más, así
+ * que todo lo que se gana al subir —conjuros, espacios, rasgos de clase,
+ * competencias, mejoras de característica— no constaba en ningún sitio.
+ */
+export interface Aprendizaje {
+  id: string;
+  name: string;
+  tipo: TipoDeAprendizaje;
+  /** Detalle corto: escuela, nivel del conjuro, para qué sirve. */
+  notas?: string;
+  /** Nivel de personaje al que lo ganó, si se sabe. */
+  nivel?: string;
+  /** Día absoluto de campaña en que lo aprendió. */
+  diaAbs?: number;
+}
+
 export interface PlayerAttributes {
   str: number;
   dex: number;
@@ -351,6 +374,8 @@ export interface PlayerCharacter {
     slots?: Record<number, { total: number; used: number }>;
   };
   notes?: string;
+  /** Lo ganado jugando que la ficha subida no recoge (conjuros, rasgos, competencias). */
+  aprendido?: Aprendizaje[];
   sheetText?: string;
   portrait?: string;
 }

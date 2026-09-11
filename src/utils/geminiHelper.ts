@@ -15,7 +15,7 @@ import {
   ScheduledThread,
   Message
 } from '../types';
-import type { CambioDeInventario, InventoryItem, PlayerCurrencies } from '../types';
+import type { Aprendizaje, CambioDeInventario, InventoryItem, PlayerCurrencies } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import {
@@ -61,6 +61,7 @@ import {
   HiloLeido
 } from './campaignCalendar';
 import { cambioVacio, leerInventario } from './inventoryTag';
+import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
 import { leerOlvidos } from './ordenesDeMesa';
 import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
@@ -1913,6 +1914,46 @@ La aplicación no tiene ningún cambio de inventario registrado, y **eso no quie
 `.trim()
       : '';
 
+  /*
+   * LO QUE HA APRENDIDO, QUE LA FICHA NO RECOGE.
+   *
+   * La ficha se sube una vez y se queda en el nivel de aquel día. Sin este
+   * bloque, un personaje de nivel 5 juega con la lista de conjuros del 3 y
+   * nadie se entera, porque en ningún sitio consta que falte algo.
+   */
+  const aprendidoVivo = (project.memory?.player_character?.aprendido || []).slice(0, 40);
+  const NOMBRE_DE_TIPO: Record<string, string> = {
+    conjuro: 'Conjuros y trucos',
+    rasgo: 'Rasgos y dotes',
+    competencia: 'Competencias e idiomas',
+    mejora: 'Mejoras de característica',
+    otro: 'Otras cosas'
+  };
+  const bloqueAprendido = aprendidoVivo.length
+    ? `
+### 📘 LO QUE HA APRENDIDO JUGANDO (y su ficha NO recoge)
+Su ficha se subió una vez y está congelada en el nivel que tuviera aquel día. Esto es lo que ha ganado desde entonces, y **lo tiene y lo puede usar igual que lo que está escrito en la ficha**.
+${(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro'] as const)
+  .map(t => {
+    const suyos = aprendidoVivo.filter(a => (a.tipo || 'otro') === t);
+    if (!suyos.length) return '';
+    return `\n**${NOMBRE_DE_TIPO[t]}:**\n${suyos
+      .map(
+        a =>
+          `- **${a.name}**${a.notas ? ` — ${String(a.notas).slice(0, 140)}` : ''}${
+            a.nivel ? ` (al llegar a nivel ${a.nivel})` : ''
+          }`
+      )
+      .join('\n')}`;
+  })
+  .filter(Boolean)
+  .join('\n')}
+
+- ✅ Úsalo: si tiene un conjuro o un rasgo que resuelve la escena, **ella lo sabe y puede recurrir a él**. Que no esté en la ficha no lo hace menos suyo.
+- ⛔ Y esta lista tampoco es un censo: lo que está escrito en su ficha sigue siendo suyo aunque no aparezca aquí. Aquí solo va lo GANADO después.
+`.trim()
+    : '';
+
   const bloqueMochila = inventarioVivo.length
     ? `
 ### 🎒 SUS COSAS (material de escena, no una lista de la compra)
@@ -2116,7 +2157,7 @@ ${lista
     ? `
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
-${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMochila ? `${bloqueMochila}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMochila ? `${bloqueMochila}\n` : ''}${bloqueAprendido ? `${bloqueAprendido}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
 ${
   allPreviousHistory.length > 0
     ? `### 📖 EL PASADO DE ESTA AVENTURA (capítulos ya cerrados)
@@ -2391,7 +2432,8 @@ ${
       `- **Lo que está escrito aquí, existe y es verdad**: su trasfondo, su voz, su gente, sus manías, de dónde viene, qué sabe hacer y qué lleva encima. No hace falta que nada de esto esté además en la memoria para que cuente. ⛔ Y al revés es el error caro: **que algo no aparezca en los paneles que te manda la aplicación NO significa que no exista.** Los paneles llevan lo que ha cambiado y lo que hay que recordar de lo jugado; no son un censo de este documento.\n` +
       `- **⚠️ Y OJO CON LO QUE LA APLICACIÓN NO LLEVA: LA PARTE MECÁNICA DE LA FICHA ESTÁ CONGELADA EN EL NIVEL AL QUE SE SUBIÓ.** La aplicación lleva la cuenta de sus puntos de vida, su defensa, sus condiciones, su dinero, su inventario y su NÚMERO de nivel — pero **no lleva lo que se gana AL SUBIR**: conjuros nuevos, espacios de conjuro, rasgos de clase, competencias, mejoras de característica ni bonificador. Eso solo está escrito en esta ficha, tal como era el primer día.\n` +
       `  - ✅ Lo que SÍ figura escrito aquí, lo tiene y lo puede usar. Sin dudarlo.\n` +
-      `  - ⛔ Pero si el nivel que te manda la aplicación es MAYOR que el de esta ficha, **no rellenes tú el hueco**: no le inventes conjuros, rasgos ni mejoras que no estén escritos, ni se los niegues porque no aparezcan. Si una escena depende de si tiene algo de un nivel posterior, **pregúntaselo a la jugadora** con \`[Pregunta de Mesa: ...]\` y sigue con lo que te diga.\n` +
+      `  - ✅ Y lo ganado DESPUÉS te llega aparte, en el bloque «LO QUE HA APRENDIDO JUGANDO». Eso es tan suyo como lo escrito aquí: súmalo, no lo trates como una nota al margen.\n` +
+      `  - ⛔ Si el nivel que te manda la aplicación es MAYOR que el de esta ficha y hay un hueco que ninguno de los dos sitios cubre, **no lo rellenes tú**: no le inventes conjuros, rasgos ni mejoras, ni se los niegues porque no aparezcan. Si una escena depende de ello, **pregúntaselo a la jugadora** con \`[Pregunta de Mesa: ...]\`, sigue con lo que te diga y **apúntalo con \`[APRENDE: ...]\`** para no volver a preguntarlo.\n` +
       `- **Lo único que caduca es el recuento, y solo objeto por objeto.** La ficha es de donde empezó: desde entonces ha gastado dinero, ha consumido cosas, ha ganado otras, ha subido de nivel y puede que le hayan requisado equipo. Cuando la aplicación diga de UN OBJETO O DATO CONCRETO que está gastado, entregado, perdido, requisado o cambiado, manda la aplicación, porque eso es de hoy. Para todo lo demás —todo lo que la aplicación no menciona— manda la ficha.\n` +
       pjSheetFiles
         .map(
@@ -2637,6 +2679,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
      «orientacion» es OPCIONAL y se manda UNA VEZ, la primera, cuando sus documentos lo digan o el juego lo haya dejado claro: «hombres», «mujeres», «le da igual», «asexual», «casado y va en serio», «no le interesa nadie ahora mismo». Se queda guardado en su ficha y vuelve a ti en todos los turnos siguientes, así que **no hace falta repetirlo** y NO te lo inventes para rellenar: si no consta, lo dejas fuera, y sin que conste la atracción no sube (ver el protocolo de la atracción).
      ⚠️ Y un aviso sobre «atr»: la aplicación NO acepta puntuaciones de salida. Un personaje que aparece por primera vez entra con la atracción a 0 y sube como mucho un punto por día de trato, así que escribir «atr: 8» en un primer encuentro no consigue un 8: consigue un 0 o un 1. La química se juega, no se declara.
    - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, ~Z Nombre (en poder de: Quién | donde: Dónde), +Z PO, -W PO] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda, consuma o LE QUITEN objetos o dinero durante la escena. **«+» entra · «-» se acabó (consumido, gastado, entregado para siempre) · «~» SE LO HAN QUITADO pero sigue siendo suyo.** ⛔ El signo «~» es obligatorio cuando la requisan, la detienen, la registran, la roban o deja algo en prenda: esas cosas NO se borran de su ficha, cambian de manos, y hay que apuntar quién las tiene. Ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)]; si come 3: [INVENTARIO: -3 Buenas Bayas]; si gasta 15 de oro: [INVENTARIO: +Disfraz noble, -15 PO]; **si le requisan el equipaje al capturarla: [INVENTARIO: ~1 Violín (en poder de: la tripulación | donde: la bodega), ~1 Diario ilustrado (en poder de: la tripulación | donde: la bodega)]**; y cuando se lo devuelven o lo recupera: [INVENTARIO: +1 Violín, +1 Diario ilustrado]. Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
+   - [APRENDE: +Nombre (tipo, detalle opcional), +Otro (tipo)] — OBLIGATORIO en el turno en que el protagonista GANA una capacidad nueva: al subir de nivel, al aprender un conjuro, al recibir adiestramiento, al desbloquear un rasgo o al ganar una competencia o un idioma. **Este registro es el único sitio donde queda constancia**: su ficha se subió una vez y está congelada en el nivel que tuviera aquel día, así que lo que no se apunte aquí se pierde y dentro de tres niveles nadie sabrá que lo tiene. El tipo va dentro del paréntesis y es uno de: conjuro, rasgo, competencia, mejora. Ejemplos: [APRENDE: +Rayo de escarcha (conjuro, truco de evocación)]; [APRENDE: +Sentido salvaje (rasgo), +Competencia en Supervivencia (competencia)]; [APRENDE: +2 a Sabiduría (mejora, al subir a nivel 4)]; [APRENDE: +Infracomún (competencia, se lo enseña un compañero)]. ⛔ Y no lo uses para objetos —eso es [INVENTARIO:]— ni para apuntar lo que YA figura en su ficha: solo lo nuevo. Si en este turno no ha aprendido nada, OMITE la línea.
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
@@ -3598,6 +3641,8 @@ export interface TiempoReportado {
   momentoHud?: string;
   /** Progreso hacia el siguiente nivel, si el Narrador lo ha anotado. */
   avanceDeNivel?: AvanceDeNivel;
+  /** Conjuros, rasgos o competencias ganados en este turno. */
+  aprendido?: Aprendizaje[];
 }
 
 async function saveStreamedMessage(
@@ -3640,6 +3685,12 @@ async function saveStreamedMessage(
   // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
   const hudDeEsteTurno = leerFechaDeHud(fullText);
   const avanceDeNivel = leerAvanceDeNivel(cleanedText) || undefined;
+  /*
+   * Lo aprendido se marca con el nivel al que se ganó, y por eso se lee
+   * DESPUÉS del avance de nivel: cuando el mismo turno anuncia la subida, los
+   * conjuros y rasgos que vienen con ella son del nivel nuevo, no del viejo.
+   */
+  const aprendido = leerAprendizajes(cleanedText, avanceDeNivel?.nivelAlcanzado);
   cleanedText = limpiarEtiquetasDePnj(limpiarEtiquetasDeTiempo(cleanedText));
 
   if (definitivo && hilos.length > 0) {
@@ -3663,6 +3714,7 @@ async function saveStreamedMessage(
       lugares.length ||
       hudDeEsteTurno?.fechaTexto ||
       avanceDeNivel ||
+      !nadaAprendido(aprendido) ||
       !cambioVacio(inventario))
   ) {
     try {
@@ -3679,7 +3731,8 @@ async function saveStreamedMessage(
         lugares,
         fechaHud: hudDeEsteTurno?.fechaTexto,
         momentoHud: hudDeEsteTurno?.momento,
-        avanceDeNivel
+        avanceDeNivel,
+        aprendido
       });
     } catch (err) {
       logError('threads', 'Error al procesar el reporte de tiempo e hilos de la escena', err, {
@@ -4491,6 +4544,10 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
     { "name": "Objeto", "quantity": 1, "notas": "Qué es o para qué sirve, si hace falta", "deMision": false, "encargo": "", "origen": "", "enPoderDe": "", "dondeEsta": "" }
   ],
   "_nota_inventory": "LA MOCHILA DEL PROTAGONISTA, LEÍDA DE LO JUGADO. Repasa la crónica y devuelve TODO LO QUE SIGUE SIENDO SUYO, no solo lo que lleva puesto: lo que le dieron y no ha entregado, lo que compró, lo que cogió, lo que traía y se menciona en escena. ⛔ Lo consumido, lo gastado y lo entregado para siempre NO se pone. ⭐⭐ PERO LO QUE LE HAN QUITADO SÍ SE PONE, Y ES IMPORTANTE: si la capturaron, la registraron, la detuvieron o la robaron, sus cosas NO desaparecen —cambian de manos—. Devuélvelas con 'enPoderDe' (quién las tiene: la tripulación, el capitán, la aduana) y 'dondeEsta' si se sabe. Borrarlas es hacer desaparecer al personaje: sus documentos, sus herramientas y sus reliquias son lo que la define, y alguien las está mirando ahora mismo. ⛔ Y no te inventes equipo estándar de aventurero que nadie ha nombrado: si no sale en el texto, no existe. Marca deMision:true y rellena 'encargo' SOLO si es una tarea con forma de objeto —una carta que entregar, algo que traducir, algo que hay que devolver— con lo que hay que hacer con él; 'origen' es de quién salió. Lo demás son sus cosas. Devuelve la lista vacía si en la crónica no se ve que lleve nada.",
+  "learned": [
+    { "name": "Nombre", "tipo": "conjuro | rasgo | competencia | mejora | otro", "notas": "detalle corto", "nivel": "al que lo ganó, si se sabe" }
+  ],
+  "_nota_learned": "LO QUE HA APRENDIDO JUGANDO, leído de la crónica. Conjuros, trucos, rasgos de clase, dotes, competencias, idiomas y mejoras de característica que HA GANADO durante la campaña: al subir de nivel, con adiestramiento, por un don o porque alguien se lo enseñó. ⛔ NO pongas lo que ya figuraba en su ficha de partida: solo lo nuevo. ⛔ Y no pongas objetos, que van en 'inventory'. Esto importa porque su ficha se subió una vez y está congelada en el nivel de aquel día: lo que no se recoja aquí desaparece de la partida sin que nadie lo note. Devuelve la lista vacía si en la crónica no se ve que haya aprendido nada.",
   "currencies": { "gp": 0, "sp": 0, "cp": 0, "ep": 0, "pp": 0 },
   "_nota_currencies": "El dinero que le queda AHORA, si la crónica permite saberlo (le pagaron tanto, gastó tanto). Si no hay ni un dato de dinero en toda la crónica, devuelve el objeto con todo a 0 y NO lo toques: se conservará lo que ya constaba en su ficha.",
   "quests": [
@@ -4684,6 +4741,30 @@ ${historyToAnalyze}`;
     .filter(Boolean) as InventoryItem[];
 
   /*
+   * Lo aprendido, leído de la prosa.
+   *
+   * La etiqueta `[APRENDE:]` es exacta pero solo existe si el Narrador la
+   * escribió, y las sesiones jugadas antes de que existiera no la tienen. Esto
+   * las cubre: se recupera de lo que se contó, igual que la mochila.
+   */
+  const TIPOS_VALIDOS = new Set(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro']);
+  const aprendidoLeido: Aprendizaje[] = (Array.isArray(parsed.learned) ? parsed.learned : [])
+    .map((it: any) => {
+      const nombre = String(it?.name || '').trim();
+      if (!nombre) return null;
+      const tipo = String(it?.tipo || '').trim().toLowerCase();
+      return {
+        id: `ia_apr_${hashCorto(nombre.toLowerCase())}`,
+        name: nombre.slice(0, 140),
+        tipo: (TIPOS_VALIDOS.has(tipo) ? tipo : 'otro') as Aprendizaje['tipo'],
+        notas: String(it?.notas || '').trim().slice(0, 200) || undefined,
+        nivel: String(it?.nivel || '').trim().slice(0, 20) || undefined
+      } as Aprendizaje;
+    })
+    .filter(Boolean)
+    .slice(0, 80) as Aprendizaje[];
+
+  /*
    * El dinero solo se toca si la crónica dice algo. Un objeto entero a cero es
    * la forma que tiene el modelo de decir «no he visto ni una moneda», y
    * aplicarlo dejaría sin blanca a quien empezó con la bolsa llena.
@@ -4699,6 +4780,7 @@ ${historyToAnalyze}`;
     summary: parsed.player_summary || prevPc?.summary || '',
     events: mergedEvents,
     inventory: inventarioLeido,
+    aprendido: aprendidoLeido.length ? aprendidoLeido : prevPc?.aprendido,
     currencies: hayDineroEnLaCronica
       ? {
           cp: Math.max(0, Math.round(Number(monedasLeidas.cp) || 0)),
@@ -5232,6 +5314,22 @@ export function construirPromptOOC({
           .join('\n')
       : '(mochila vacía o sin registrar en panel)';
 
+  /*
+   * Y lo aprendido, que el Director tampoco veía.
+   *
+   * Si no se le enseña, no puede arreglarlo cuando ella le dice «me falta el
+   * conjuro que aprendí al subir a cuatro»: contestaría a ciegas.
+   */
+  const aprendidoActual =
+    pc?.aprendido && pc.aprendido.length > 0
+      ? pc.aprendido
+          .map(
+            a =>
+              `- ${a.name} [${a.tipo || 'otro'}]${a.nivel ? ` (nivel ${a.nivel})` : ''}${a.notas ? `: ${a.notas}` : ''}`
+          )
+          .join('\n')
+      : '(nada registrado: o no ha subido de nivel aún, o no se apuntó en su momento)';
+
   const NOMBRE_DE_MONEDA: Record<string, string> = { pp: 'PP', gp: 'PO', ep: 'PE', sp: 'PA', cp: 'PC' };
   const monedasActuales = pc?.currencies
     ? (['pp', 'gp', 'ep', 'sp', 'cp'] as const)
@@ -5251,6 +5349,7 @@ export function construirPromptOOC({
           : '',
         `- Dinero actual en panel: ${monedasActuales}`,
         `- Inventario actual registrado en panel — es lo que puedes corregir con [INVENTARIO: ...]:\n${inventarioActual}`,
+        `- Lo que ha aprendido jugando y su ficha NO recoge — lo corriges con [APRENDE: ...]:\n${aprendidoActual}`,
         pc.sheetText ? `\n--- FICHA BASE (TEXTO REGISTRADO EN MEMORIA) ---\n${pc.sheetText}` : ''
       ]
         .filter(Boolean)
@@ -5511,6 +5610,7 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[VÍNCULO: Nombre | ...]\` — corrige a un personaje QUE YA EXISTE: lo que aparenta, lo que calla, su orientación, su afinidad. Aquí no se fichan personajes nuevos; eso se hace jugando.
 - \`[INVENTARIO: +1 Objeto, -2 Otro, ~1 Objeto (en poder de: Quién | donde: Dónde), -15 PO]\` — corrige la mochila y el dinero. Sirve para meter lo que el personaje ya traía de casa y nunca se apuntó («mi violín no está en la lista»), y para quitar lo que sobra.
   - **\`~\` es «se lo han quitado»**, y es distinto de \`-\`. Si la requisaron, la detuvieron, la registraron o la robaron, sus cosas siguen siendo suyas y las tiene otro: van con \`~\` y con quién las tiene. Borrarlas con \`-\` hace desaparecer al personaje de la partida —sus documentos, sus herramientas y sus reliquias son lo que la define—. Cuando las recupere, \`+\` se las devuelve a las manos.
+- \`[APRENDE: +Nombre (tipo)]\` — apunta un conjuro, un rasgo, una competencia, un idioma o una mejora de característica que ella tenga y no conste. Tipos: conjuro, rasgo, competencia, mejora. Es LA vía para arreglar el hueco más silencioso que hay: su ficha se subió congelada en un nivel y todo lo que ha ganado subiendo desde entonces no está escrito en ninguna parte. Si te dice «al subir a nivel 4 cogí Bola de fuego y +2 a Sabiduría», lo apuntas y ya cuenta: \`[APRENDE: +Bola de fuego (conjuro), +2 a Sabiduría (mejora, nivel 4)]\`.
 
 **⚖️ PERO ESTO NO ES UN PANEL DE MANDOS: ERES EL DIRECTOR Y PUEDES DECIR QUE NO.**
 - ✅ **Corrige sin discutir** lo que es un error de registro: algo apuntado dos veces, una escena que se rehízo y quedó anotada, un nombre mal escrito, un objeto suyo que nunca se fichó, una barra que subió cuando no debía.
@@ -5580,6 +5680,8 @@ export interface RespuestaDeMesa {
   vinculos: VinculoLeido[];
   /** Correcciones sobre la mochila y el dinero. */
   inventario: CambioDeInventario;
+  /** Conjuros, rasgos o competencias que el Director apunta porque ella se lo pide. */
+  aprendido: Aprendizaje[];
   /**
    * Lo que costó de verdad la pregunta, en fichas de entrada.
    *
@@ -5742,12 +5844,14 @@ export async function preguntarAlDirectorOOC(
   const olvidos = leerOlvidos(bruto);
   const vinculos = leerVinculos(bruto);
   const inventario = leerInventario(bruto);
+  const aprendido = leerAprendizajes(bruto);
 
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
   const texto = stripStateTag(limpiarEtiquetasDeTiempo(limpiarEtiquetasDePnj(bruto)))
     .replace(MEMORIA_MESA_RE, '')
     .replace(/\[\s*OLVIDA\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*APRENDE\s*:[^\]]*\]/gi, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -5759,6 +5863,7 @@ export async function preguntarAlDirectorOOC(
     olvidos,
     vinculos,
     inventario,
+    aprendido,
     fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount
   };
 }

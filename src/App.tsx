@@ -111,8 +111,10 @@ import {
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
+import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarOlvidos } from './utils/ordenesDeMesa';
 import type { VinculoLeido } from './utils/campaignCalendar';
+import type { Aprendizaje } from './types';
 import type { CambioDeInventario } from './types';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie } from './utils/rollRequests';
@@ -949,7 +951,7 @@ export default function App() {
     if (
       !t ||
       (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length && !t.secretos.length && !t.viaje &&
-        !t.lugares?.length && cambioVacio(t.inventario))
+        !t.lugares?.length && cambioVacio(t.inventario) && nadaAprendido(t.aprendido || []))
     )
       return p.memory;
 
@@ -1258,17 +1260,37 @@ export default function App() {
      * queda en el bolsillo.
      */
     const pcPrevio = mem.player_character;
-    const player_character = cambioVacio(t.inventario)
-      ? pcPrevio
-      : {
-          ...(pcPrevio || { name: '' }),
-          inventory: aplicarInventario(
-            pcPrevio?.inventory,
-            t.inventario,
-            calendarioValido(p.calendar) ? diaActual : undefined
-          ),
-          currencies: aplicarMonedas(pcPrevio?.currencies, t.inventario.monedas)
-        };
+    const hayInventario = !cambioVacio(t.inventario);
+    const loAprendido = t.aprendido || [];
+    const player_character =
+      !hayInventario && nadaAprendido(loAprendido)
+        ? pcPrevio
+        : {
+            ...(pcPrevio || { name: '' }),
+            ...(hayInventario
+              ? {
+                  inventory: aplicarInventario(
+                    pcPrevio?.inventory,
+                    t.inventario,
+                    calendarioValido(p.calendar) ? diaActual : undefined
+                  ),
+                  currencies: aplicarMonedas(pcPrevio?.currencies, t.inventario.monedas)
+                }
+              : {}),
+            /*
+             * Y lo que ha aprendido, que es lo que la ficha subida nunca va a
+             * recoger: sube de nivel una vez y el archivo se queda como estaba.
+             */
+            ...(nadaAprendido(loAprendido)
+              ? {}
+              : {
+                  aprendido: aplicarAprendizajes(
+                    pcPrevio?.aprendido,
+                    loAprendido,
+                    calendarioValido(p.calendar) ? diaActual : undefined
+                  )
+                })
+          };
 
     return {
       ...mem,
@@ -1426,9 +1448,13 @@ export default function App() {
     olvidos: string[];
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
+    aprendido?: Aprendizaje[];
   }) => {
     const hayAlgo =
-      orden.olvidos.length || orden.vinculos.length || !cambioVacio(orden.inventario);
+      orden.olvidos.length ||
+      orden.vinculos.length ||
+      !cambioVacio(orden.inventario) ||
+      !nadaAprendido(orden.aprendido || []);
     if (!hayAlgo) return;
 
     await handleUpdateProjectField(p => {
@@ -1470,6 +1496,22 @@ export default function App() {
             ...(pc || { name: '' }),
             inventory: aplicarInventario(pc?.inventory, orden.inventario, marca || undefined),
             currencies: aplicarMonedas(pc?.currencies, orden.inventario.monedas)
+          }
+        };
+      }
+
+      /*
+       * Y lo que ella le diga que sabe y no consta. Es la única vía que hay
+       * para rellenar lo que se perdió antes de que esto existiera: «al subir
+       * a cuatro cogí Bola de fuego», y el Director lo apunta.
+       */
+      if (!nadaAprendido(orden.aprendido || [])) {
+        const pc = mem.player_character;
+        mem = {
+          ...mem,
+          player_character: {
+            ...(pc || { name: '' }),
+            aprendido: aplicarAprendizajes(pc?.aprendido, orden.aprendido || [], marca || undefined)
           }
         };
       }
@@ -2908,6 +2950,11 @@ export default function App() {
         mensajesDeLaCronica,
         currentProject.memory?.player_character?.inventory
       );
+      // Y lo aprendido se rehace igual, y por el mismo motivo: está escrito.
+      const escuela = reconstruirAprendido(
+        mensajesDeLaCronica,
+        currentProject.memory?.player_character?.aprendido
+      );
 
       await handleUpdateProjectField(p => {
         const memoriaSincronizada = sanitizeProjectMemory({
@@ -2936,7 +2983,16 @@ export default function App() {
             ...memoriaSincronizada,
             player_character: {
               ...(memoriaSincronizada.player_character || { name: '' }),
-              inventory
+              inventory,
+              /*
+               * Lo aprendido se FUNDE con lo que la IA haya leído de la prosa:
+               * la etiqueta es exacta pero solo existe si se escribió, y la
+               * lectura cubre las sesiones jugadas antes de que esto existiera.
+               */
+              aprendido: aplicarAprendizajes(
+                escuela.aprendido,
+                memoriaSincronizada.player_character?.aprendido || []
+              )
             }
           },
           timeline: fusionarTimeline(p.timeline || [], syncResult.timeline || []).timeline,

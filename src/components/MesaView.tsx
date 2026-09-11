@@ -26,7 +26,7 @@ import {
 import { Chat, Project, ProjectFile } from '../types';
 import { describeApiError, ImagenDeMesa, modelosParaElDirector, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
 import { SecretoLeido, VinculoLeido } from '../utils/campaignCalendar';
-import type { CambioDeInventario } from '../types';
+import type { Aprendizaje, CambioDeInventario } from '../types';
 import {
   conMiles,
   estimarCosteDeVideo,
@@ -97,6 +97,7 @@ export const MesaView: React.FC<{
     olvidos: string[];
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
+    aprendido?: Aprendizaje[];
   }) => Promise<void> | void;
 }> = ({ project, chats, currentChatId, files, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria, onPlantarSecretos, onCorregirDesdeLaMesa }) => {
   const [mensajes, setMensajes] = useState<MensajeDeMesa[]>(() => leerMesa(project.id));
@@ -237,7 +238,8 @@ export const MesaView: React.FC<{
         await onCorregirDesdeLaMesa({
           olvidos: respuesta.olvidos,
           vinculos: respuesta.vinculos,
-          inventario: respuesta.inventario
+          inventario: respuesta.inventario,
+          aprendido: respuesta.aprendido
         });
       }
     } catch (err) {
