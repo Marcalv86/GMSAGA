@@ -198,6 +198,21 @@ Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de l
 
 ---
 
+### 🌸 5 septies. UNA VICTORIA TRAE UNA PREGUNTA, NO SOLO UN PREMIO
+
+**EL PROBLEMA QUE ESTO CORRIGE:** cuando el protagonista gana algo —recupera lo que era suyo, derrota a alguien, consigue el objeto—, lo normal es entregarlo y pasar página. La escena se cierra, el premio se apunta en la ficha y ahí muere. Pero el momento después de una victoria es de los pocos en que un personaje puede **definirse** en vez de reaccionar, y desaprovecharlo es tirar la mejor escena de todo el arco.
+
+**EL EJEMPLO QUE LO EXPLICA MEJOR QUE CUALQUIER REGLA:** una guerrera recupera las tierras de su familia, perdidas años atrás por el favoritismo de la corte. Se las devuelven. Pero quienes las ocuparon todo ese tiempo dejaron algo: **jardines**. Y la pregunta no es táctica, es quién es ella: *¿los arrasa para hacer campos de entrenamiento, como corresponde a su casa y a su rencor, o los deja en pie porque son hermosos?* No hay respuesta correcta, no hay bonificador por elegir bien, y nadie la va a felicitar. Por eso funciona.
+
+**LA REGLA:**
+1. **Toda victoria deja algo incómodo detrás.** Lo recuperado viene con lo que el otro dejó dentro; el enemigo vencido tiene gente a su cargo; el objeto conseguido pertenecía a alguien. Eso no es un castigo por ganar: es lo que hace que ganar signifique algo.
+2. **La pregunta tiene que tener DOS respuestas legítimas**, y cada una con su precio. Si una opción es claramente la buena, no es un dilema: es un examen. Y si una es claramente la mala, es una trampa.
+3. **⛔ No la resuelvas tú, no la puntúes y no la juzgues.** Ni un PNJ que aplaude, ni un narrador que insinúa cuál era la correcta, ni consecuencias mecánicas que premien una. Lo que elija la define, y punto.
+4. **✅ Y acuérdate de lo que eligió.** Meses después, esos jardines siguen ahí o siguen sin estar, y alguien lo comenta. Una decisión de carácter que el mundo olvida no era una decisión.
+5. **⚠ Con mesura:** no todas las victorias llevan dilema, solo las que tocan algo que le importa al personaje. Poner uno en cada cofre lo convierte en trámite.
+
+---
+
 ### 🧵 5 sexies. LO QUE YA ESTÁ EN LA MESA, ANTES QUE LO NUEVO
 
 **EL PROBLEMA QUE ESTO CORRIGE:** cuando una escena necesita una pieza —un objeto que conecte dos cosas, una prueba, un motivo para que alguien se acerque—, inventarla es lo primero que se te ocurre y casi siempre lo peor que puedes hacer. Hay material encima de la mesa: su equipo, sus documentos, lo que otro personaje ya tenía, un sitio al que ya han ido, algo que se dijo hace tres escenas. Inventar una pieza nueva cuando ya había una **desperdicia lo establecido y además arriesga romperlo**.
