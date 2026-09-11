@@ -2024,8 +2024,21 @@ export const MemoryManager: React.FC<{
                 </p>
               </div>
               {propios.length === 0 ? (
-                <div className="text-[var(--text-secondary)] italic py-5 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs">
-                  Aquí aparece lo que gane, compre o le den jugando. Lo que trae de casa está en el texto de su ficha.
+                <div className="text-[var(--text-secondary)] py-5 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs flex flex-col gap-2">
+                  {/*
+                    Un vacío que explica por qué está vacío y qué hacer.
+                    La lista se llena sola con lo que el Narrador vaya apuntando
+                    en sus turnos, así que al estrenarla está vacía aunque la
+                    campaña lleve meses — y sin decirlo parece que no funciona.
+                  */}
+                  <span className="italic">
+                    Aquí aparece lo que gane, compre o le den <strong>jugando</strong>, según lo vaya apuntando el
+                    Narrador. Si la campaña es anterior a esta pantalla, estará vacía hasta el próximo botín.
+                  </span>
+                  <span className="not-italic font-cinzel text-[11px] text-[var(--accent)]">
+                    ¿Falta lo que ya traía de casa? Pídeselo al GM en el Chat: «mete en mi mochila el violín del Filí
+                    y mi diario, que ya los llevaba». Lo hace él.
+                  </span>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">

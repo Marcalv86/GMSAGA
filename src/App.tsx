@@ -2983,7 +2983,7 @@ export default function App() {
           `• Evolución del protagonista y consecuencias programadas.\n` +
           (mochila.inventario.length
             ? `• ${mochila.inventario.length} ${mochila.inventario.length === 1 ? 'objeto' : 'objetos'} en la mochila, recuperados de lo que el Narrador fue apuntando (pestaña Inventario).\n`
-            : `• La mochila sigue vacía: en la crónica no hay ni una anotación de inventario que recuperar.\n`) +
+            : `• La mochila sigue vacía, y no es un fallo: en la crónica no hay ni una sola anotación de inventario que recuperar, porque el Narrador no llegó a escribir ninguna. Se irá llenando a partir del próximo botín — y lo que ya traía de casa se lo puedes pedir al GM en el Chat.\n`) +
           (Object.keys(mochila.netoDeMonedas).length
             ? `• 💰 De dinero, lo apuntado en la crónica suma ${Object.entries(mochila.netoDeMonedas)
                 .map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${({ pp: 'PP', gp: 'PO', ep: 'PE', sp: 'PA', cp: 'PC' } as any)[k] || k}`)
