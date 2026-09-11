@@ -207,6 +207,21 @@ export const MemoryManager: React.FC<{
 
   // Character Events / Milestones state
   const [isAddingPcEvent, setIsAddingPcEvent] = useState(false);
+  /*
+   * Meter algo a mano en la mochila.
+   *
+   * La pestaña solo recogía lo que el Narrador fuera apuntando, así que lo que
+   * la protagonista trae de casa —su violín, su diario, sus runas— no había
+   * forma de ponerlo: vive en el texto de su ficha, que es un documento, no una
+   * lista. Y sin poder añadir, tampoco se podía corregir un nombre mal escrito
+   * ni reponer algo que se tiró por error.
+   */
+  const [anadiendoObjeto, setAnadiendoObjeto] = useState(false);
+  const [objNombre, setObjNombre] = useState('');
+  const [objCantidad, setObjCantidad] = useState(1);
+  const [objEncargo, setObjEncargo] = useState('');
+  const [objOrigen, setObjOrigen] = useState('');
+  const [objNotas, setObjNotas] = useState('');
   const [newPcEventTitle, setNewPcEventTitle] = useState('');
   const [newPcEventDesc, setNewPcEventDesc] = useState('');
   const [newPcEventDate, setNewPcEventDate] = useState('');
@@ -2054,6 +2069,63 @@ export const MemoryManager: React.FC<{
             }
           }));
         };
+        /*
+         * Lo que se mete a mano lleva id propio (no `inv_`), y eso importa: al
+         * reconstruir la mochila desde la crónica solo se rehace lo que salió
+         * de las etiquetas, así que su violín no desaparece al sincronizar.
+         */
+        const anadirObjeto = async () => {
+          const nombre = objNombre.trim();
+          if (!nombre) return;
+          const cantidad = Math.max(1, Math.min(9999, Math.round(objCantidad) || 1));
+          const encargo = objEncargo.trim();
+          const nuevo: InventoryItem = {
+            id: `manual_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+            name: nombre.slice(0, 120),
+            quantity: cantidad,
+            description: objNotas.trim() || undefined,
+            encargo: encargo || undefined,
+            origen: objOrigen.trim() || undefined,
+            deMision: encargo ? true : undefined
+          };
+          await onUpdateMemory(mem => ({
+            ...mem,
+            player_character: {
+              ...(mem.player_character || { name: '' }),
+              inventory: [...(mem.player_character?.inventory || []), nuevo]
+            }
+          }));
+          setObjNombre('');
+          setObjCantidad(1);
+          setObjEncargo('');
+          setObjOrigen('');
+          setObjNotas('');
+          setAnadiendoObjeto(false);
+        };
+
+        /*
+         * Y la bolsa, editable.
+         *
+         * Al reconstruir desde la crónica el dinero NO se toca a propósito —la
+         * etiqueta anota lo que entra y sale, no el saldo, y el punto de partida
+         * está en su ficha—, así que se le enseña el neto y se le dice que lo
+         * ajuste ella. Sin un sitio donde ajustarlo, eso era una promesa vacía.
+         */
+        const cambiarMoneda = async (clave: 'cp' | 'sp' | 'ep' | 'gp' | 'pp', valor: number) => {
+          const limpio = Math.max(0, Math.min(9_999_999, Math.round(valor) || 0));
+          await onUpdateMemory(mem => ({
+            ...mem,
+            player_character: {
+              ...(mem.player_character || { name: '' }),
+              currencies: {
+                cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
+                ...(mem.player_character?.currencies || {}),
+                [clave]: limpio
+              }
+            }
+          }));
+        };
+
         const quitar = async (id: string) => {
           await onUpdateMemory(mem => ({
             ...mem,
@@ -2149,9 +2221,12 @@ export const MemoryManager: React.FC<{
 
         return (
           <div className="flex flex-col gap-5">
-            {/* El monedero */}
+            {/* El monedero, editable */}
             <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] flex items-center justify-between gap-3 flex-wrap">
-              <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+              <span
+                className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5"
+                title="Lo que lleva encima. Al sincronizar NO se toca —la etiqueta del Narrador anota lo que entra y sale, no el saldo—, así que aquí se ajusta a mano."
+              >
                 <Coins className="w-3.5 h-3.5 text-[var(--accent)]" /> Bolsa
               </span>
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -2161,20 +2236,103 @@ export const MemoryManager: React.FC<{
                   ['ep', 'PE', 'text-cyan-600'],
                   ['sp', 'PA', 'text-zinc-500'],
                   ['cp', 'PC', 'text-orange-700']
-                ] as [keyof typeof monedas & string, string, string][])
-                  .filter(([k]) => (monedas?.[k] ?? 0) > 0)
-                  .map(([k, etiqueta, color]) => (
-                    <span
-                      key={k}
-                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
-                    >
-                      {monedas?.[k]} {etiqueta}
-                    </span>
-                  ))}
-                {!monedas || Object.values(monedas).every(v => !v) ? (
-                  <span className="text-[11px] font-lora italic text-[var(--text-secondary)]">Sin blanca.</span>
-                ) : null}
+                ] as ['cp' | 'sp' | 'ep' | 'gp' | 'pp', string, string][]).map(([k, etiqueta, color]) => (
+                  <label
+                    key={k}
+                    className={`flex items-center gap-1 text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
+                    title={`Monedas de ${etiqueta}. Puedes corregirlo a mano.`}
+                  >
+                    <input
+                      type="number"
+                      min={0}
+                      value={monedas?.[k] ?? 0}
+                      onChange={e => cambiarMoneda(k, Number(e.target.value))}
+                      className="w-12 bg-transparent text-right outline-none focus:text-[var(--accent)]"
+                      aria-label={`Monedas de ${etiqueta}`}
+                    />
+                    {etiqueta}
+                  </label>
+                ))}
               </div>
+            </div>
+
+            {/* Meter algo a mano */}
+            <div className="flex flex-col gap-2.5">
+              <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-[11px] text-[var(--text-secondary)] font-lora leading-relaxed m-0 max-w-xl">
+                  Esta lista recoge lo que ganas, compras o gastas <strong>jugando</strong>. Lo que tu personaje trae
+                  de casa vive en el texto de su ficha, así que si quieres verlo aquí —su violín, su diario, sus
+                  runas— méteselo tú una vez.
+                </span>
+                <button
+                  onClick={() => setAnadiendoObjeto(v => !v)}
+                  className="shrink-0 px-2.5 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded-md hover:bg-[var(--accent-hover)] transition-all flex items-center gap-1 cursor-pointer font-bold shadow-xs"
+                >
+                  <Plus className="w-3 h-3" /> {anadiendoObjeto ? 'Cancelar' : 'Añadir objeto'}
+                </button>
+              </div>
+
+              {anadiendoObjeto && (
+                <div className="bg-[var(--surface-soft)] border border-[var(--accent)]/40 p-4 rounded-lg flex flex-col gap-2.5 shadow-sm">
+                  <div className="flex gap-2 flex-wrap">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Qué es (ej: Violín del Filí, Diario de viaje, Poción de curación…)"
+                      value={objNombre}
+                      onChange={e => setObjNombre(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') anadirObjeto();
+                        if (e.key === 'Escape') setAnadiendoObjeto(false);
+                      }}
+                      className="flex-1 min-w-[180px] bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-cinzel font-semibold"
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      value={objCantidad}
+                      onChange={e => setObjCantidad(Number(e.target.value))}
+                      className="w-20 bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-mono"
+                      aria-label="Cantidad"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Notas (opcional): qué hace, cómo es, lo que quieras recordar"
+                    value={objNotas}
+                    onChange={e => setObjNotas(e.target.value)}
+                    className="w-full bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-lora"
+                  />
+                  <div className="flex gap-2 flex-wrap">
+                    <input
+                      type="text"
+                      placeholder="¿Es un encargo? Qué hay que hacer con él"
+                      value={objEncargo}
+                      onChange={e => setObjEncargo(e.target.value)}
+                      className="flex-1 min-w-[160px] bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-lora"
+                    />
+                    <input
+                      type="text"
+                      placeholder="De quién salió (opcional)"
+                      value={objOrigen}
+                      onChange={e => setObjOrigen(e.target.value)}
+                      className="flex-1 min-w-[140px] bg-[var(--surface)] border border-[var(--glass-border)] rounded-md px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-lora"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={anadirObjeto}
+                      disabled={!objNombre.trim()}
+                      className="px-3 py-1 text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Meterlo en la mochila
+                    </button>
+                    <span className="text-[10px] font-lora text-[var(--text-secondary)] opacity-80">
+                      Si rellenas «encargo», va al apartado de arriba en vez de a sus cosas.
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Objetos de misión */}
