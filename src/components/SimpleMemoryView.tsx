@@ -420,7 +420,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             onTriggerAIUpdate={onTriggerAIUpdate ? async () => { onTriggerAIUpdate(); } : undefined}
             isGenerating={isGenerating}
             hasChats={chats.length > 0}
-            secciones={['giros', 'bambalinas', 'relojes']}
+            secciones={['giros', 'bambalinas', 'relojes', 'facciones', 'preparado']}
           />
         </div>
       ) : memoryMode === 'character' ? (

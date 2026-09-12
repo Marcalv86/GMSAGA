@@ -111,10 +111,10 @@ import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
-import { aplicarBambalinas, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno } from './utils/cuadernoOculto';
+import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
 import { aplicarOlvidos } from './utils/ordenesDeMesa';
 import type { VinculoLeido } from './utils/campaignCalendar';
-import type { Aprendizaje, MovimientoOculto, RelojOculto } from './types';
+import type { Aprendizaje, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from './types';
 import type { CambioDeInventario } from './types';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie } from './utils/rollRequests';
@@ -953,7 +953,8 @@ export default function App() {
       !t ||
       (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length && !t.secretos.length && !t.viaje &&
         !t.lugares?.length && cambioVacio(t.inventario) && nadaAprendido(t.aprendido || []) &&
-        cuadernoQuieto(t.bambalinas || [], t.relojes || []))
+        cuadernoQuieto(t.bambalinas || [], t.relojes || []) &&
+        sinNovedadDeMesa(t.facciones || [], t.preparado || []))
     )
       return p.memory;
 
@@ -1314,6 +1315,10 @@ export default function App() {
       gm_relojes: (t.relojes || []).length
         ? aplicarRelojes(mem.gm_relojes, t.relojes || [], diaActual)
         : mem.gm_relojes,
+      gm_facciones: (t.facciones || []).length ? aplicarFacciones(mem.gm_facciones, t.facciones || []) : mem.gm_facciones,
+      gm_preparado: (t.preparado || []).length
+        ? aplicarPreparado(mem.gm_preparado, t.preparado || [], diaActual)
+        : mem.gm_preparado,
       player_character,
       viaje: viajeEnCurso
     };
@@ -1424,13 +1429,16 @@ export default function App() {
     aprendido?: Aprendizaje[];
     bambalinas?: MovimientoOculto[];
     relojes?: RelojOculto[];
+    facciones?: Faccion[];
+    preparado?: CartaPreparada[];
   }) => {
     const hayAlgo =
       orden.olvidos.length ||
       orden.vinculos.length ||
       !cambioVacio(orden.inventario) ||
       !nadaAprendido(orden.aprendido || []) ||
-      !cuadernoQuieto(orden.bambalinas || [], orden.relojes || []);
+      !cuadernoQuieto(orden.bambalinas || [], orden.relojes || []) ||
+      !sinNovedadDeMesa(orden.facciones || [], orden.preparado || []);
     if (!hayAlgo) return;
 
     await handleUpdateProjectField(p => {
@@ -1509,6 +1517,18 @@ export default function App() {
           gm_relojes: (orden.relojes || []).length
             ? aplicarRelojes(mem.gm_relojes, orden.relojes || [], marca || undefined)
             : mem.gm_relojes
+        };
+      }
+
+      if (!sinNovedadDeMesa(orden.facciones || [], orden.preparado || [])) {
+        mem = {
+          ...mem,
+          gm_facciones: (orden.facciones || []).length
+            ? aplicarFacciones(mem.gm_facciones, orden.facciones || [])
+            : mem.gm_facciones,
+          gm_preparado: (orden.preparado || []).length
+            ? aplicarPreparado(mem.gm_preparado, orden.preparado || [], marca || undefined)
+            : mem.gm_preparado
         };
       }
 
@@ -2954,6 +2974,10 @@ export default function App() {
         movimientos: currentProject.memory?.gm_bambalinas,
         relojes: currentProject.memory?.gm_relojes
       });
+      const mesa = reconstruirMesa(mensajesDeLaCronica, diaDeHoy, {
+        facciones: currentProject.memory?.gm_facciones,
+        preparado: currentProject.memory?.gm_preparado
+      });
 
       await handleUpdateProjectField(p => {
         const memoriaSincronizada = sanitizeProjectMemory({
@@ -2983,6 +3007,8 @@ export default function App() {
             ...memoriaSincronizada,
             gm_bambalinas: cuaderno.movimientos.length ? cuaderno.movimientos : memoriaSincronizada.gm_bambalinas,
             gm_relojes: cuaderno.relojes.length ? cuaderno.relojes : memoriaSincronizada.gm_relojes,
+            gm_facciones: mesa.facciones.length ? mesa.facciones : memoriaSincronizada.gm_facciones,
+            gm_preparado: mesa.preparado.length ? mesa.preparado : memoriaSincronizada.gm_preparado,
             player_character: {
               ...(memoriaSincronizada.player_character || { name: '' }),
               inventory,

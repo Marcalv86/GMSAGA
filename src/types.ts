@@ -459,6 +459,62 @@ export interface RelojOculto {
   cumplidoDiaAbs?: number;
 }
 
+/**
+ * Una facción: quién quiere qué, contra quién, y cómo van entre ellas.
+ *
+ * Esto vivía disperso entre las fichas de PNJ —cada uno con su lealtad escrita
+ * en un renglón— y no había dónde mirar para saber qué se traen dos bandos
+ * entre sí. Una facción no es la suma de su gente: tiene un objetivo propio que
+ * avanza aunque muera quien lo llevaba, y una postura hacia las demás que
+ * cambia con lo que pasa.
+ */
+export interface Faccion {
+  id: string;
+  name: string;
+  /** Qué es, en una frase: una banda de mercenarios, una casa noble, un culto. */
+  queEs?: string;
+  /** Qué persigue AHORA, que es lo que la hace moverse. */
+  objetivo?: string;
+  /** Con qué cuenta: gente, dinero, barcos, informadores, un favor que cobrar. */
+  recursos?: string;
+  /** Quién manda o da la cara. */
+  cabeza?: string;
+  /** Cómo se lleva con el protagonista. */
+  conElla?: 'aliada' | 'neutral' | 'recelosa' | 'enemiga' | 'no la conoce';
+  /** Cómo se lleva con las demás, por nombre. */
+  relaciones?: { faccion: string; postura: 'aliada' | 'neutral' | 'rival' | 'guerra'; nota?: string }[];
+  /** Lo que la jugadora NO sabe de ella. Va con candado. */
+  oculto?: string;
+  /** Si la protagonista sabe siquiera que existe. */
+  conocida?: boolean;
+  notas?: string;
+}
+
+/**
+ * Algo preparado para usar cuando toque.
+ *
+ * Es lo que un director apunta antes de sentarse a la mesa: una escena lista,
+ * un encuentro montado, una complicación guardada en la manga. Sin esto, todo
+ * lo que no estaba previsto se improvisa en caliente, que es cuando salen las
+ * cosas genéricas.
+ */
+export interface CartaPreparada {
+  id: string;
+  titulo: string;
+  /** Qué es: una escena, un encuentro, una complicación, una revelación, un PNJ. */
+  tipo?: 'escena' | 'encuentro' | 'complicacion' | 'revelacion' | 'pnj' | 'otro';
+  /** El contenido: qué pasa, quién sale, qué hace falta. */
+  detalle?: string;
+  /** Cuándo encaja: «cuando lleguen a puerto», «la próxima vez que descansen». */
+  cuando?: string;
+  /** De qué trama o giro cuelga. */
+  hilo?: string;
+  /** Ya se ha usado: se queda como registro, no se borra. */
+  usada?: boolean;
+  /** Día absoluto en que se usó. */
+  usadaDiaAbs?: number;
+}
+
 export interface SecretoDeCampana {
   id: string;
   /** De qué va, en pocas palabras. Es lo único que se ve sin destapar. */
@@ -623,6 +679,10 @@ export interface Memory {
   gm_bambalinas?: MovimientoOculto[];
   /** Los planes que corren por detrás, con su cuenta atrás. */
   gm_relojes?: RelojOculto[];
+  /** Quién quiere qué, contra quién. */
+  gm_facciones?: Faccion[];
+  /** Lo que está preparado para usar cuando toque. */
+  gm_preparado?: CartaPreparada[];
   /**
    * La forma de la historia, decidida de antemano.
    *

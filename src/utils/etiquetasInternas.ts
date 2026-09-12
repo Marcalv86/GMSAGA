@@ -35,7 +35,9 @@ export const ETIQUETAS_INTERNAS = [
   'OLVIDA',
   'APRENDE',
   'BAMBALINAS',
-  'RELOJ'
+  'RELOJ',
+  'FACCI[OÓ]N',
+  'PREPARADO'
 ] as const;
 
 /**
@@ -46,7 +48,7 @@ export const ETIQUETAS_INTERNAS = [
  * existe para poder comprobarlo aparte y para que quien toque esto mañana sepa
  * cuáles no se pueden fallar.
  */
-export const ETIQUETAS_SPOILER = ['SECRETO', 'REVELADO', 'BAMBALINAS', 'RELOJ', 'HILO'] as const;
+export const ETIQUETAS_SPOILER = ['SECRETO', 'REVELADO', 'BAMBALINAS', 'RELOJ', 'HILO', 'PREPARADO'] as const;
 
 const EXPRESIONES = ETIQUETAS_INTERNAS.map(t => new RegExp(`\\[\\s*${t}\\s*:[^\\]]*\\]`, 'gi'));
 

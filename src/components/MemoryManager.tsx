@@ -12,7 +12,7 @@ import {
   fechaLegible
 } from '../utils/campaignCalendar';
 import { extraerIdentidadDeDocumentos, fusionarTrama, tramarLaCampana } from '../utils/geminiHelper';
-import { relojesEnMarcha } from '../utils/cuadernoOculto';
+import { preparadoEnPie, relojesEnMarcha } from '../utils/cuadernoOculto';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
@@ -47,7 +47,9 @@ import {
   PackageX,
   Users,
   Footprints,
-  Timer
+  Timer,
+  Flag,
+  Layers
 } from 'lucide-react';
 
 export function getAtrInfo(val?: number) {
@@ -162,7 +164,9 @@ export type SeccionMemoria =
   | 'status'
   | 'giros'
   | 'bambalinas'
-  | 'relojes';
+  | 'relojes'
+  | 'facciones'
+  | 'preparado';
 
 export const MemoryManager: React.FC<{
   project: Project;
@@ -616,6 +620,22 @@ export const MemoryManager: React.FC<{
               icon: Timer,
               count: relojesEnMarcha(memory.gm_relojes).length
                 ? `(${relojesEnMarcha(memory.gm_relojes).length})`
+                : ''
+            },
+            {
+              id: 'facciones',
+              label: 'Facciones',
+              shortLabel: 'Facciones',
+              icon: Flag,
+              count: memory.gm_facciones?.length ? `(${memory.gm_facciones.length})` : ''
+            },
+            {
+              id: 'preparado',
+              label: 'Preparado',
+              shortLabel: 'Preparado',
+              icon: Layers,
+              count: preparadoEnPie(memory.gm_preparado).length
+                ? `(${preparadoEnPie(memory.gm_preparado).length})`
                 : ''
             }
           ]
@@ -1253,6 +1273,197 @@ export const MemoryManager: React.FC<{
       )}
 
       {/* Pestaña: Giros de la campaña (lo que el Narrador guarda bajo llave) */}
+      {activeTab === 'facciones' && (() => {
+        const facciones = memory.gm_facciones || [];
+        const COLOR: Record<string, string> = {
+          aliada: 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/25',
+          neutral: 'text-[var(--text-secondary)] bg-[var(--surface)] border-[var(--glass-border)]',
+          recelosa: 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/25',
+          enemiga: 'text-rose-700 dark:text-rose-300 bg-rose-500/10 border-rose-500/25',
+          'no la conoce': 'text-[var(--text-secondary)] bg-[var(--surface)] border-[var(--glass-border)]',
+          rival: 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/25',
+          guerra: 'text-rose-700 dark:text-rose-300 bg-rose-500/10 border-rose-500/25'
+        };
+        const EMOJI: Record<string, string> = {
+          aliada: '🤝', neutral: '➖', recelosa: '🤨', enemiga: '⚔️', 'no la conoce': '❔',
+          rival: '🥊', guerra: '🔥'
+        };
+        return (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-3 sm:p-4 flex flex-col gap-1.5">
+              <span className="text-sm font-cinzel font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-2">
+                🏴 Facciones
+              </span>
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                Quién quiere qué, contra quién. Una facción no es la suma de su gente:{' '}
+                <strong className="text-indigo-700 dark:text-indigo-300">su objetivo sigue vivo aunque muera quien lo llevaba</strong>. Dos bandos que se
+                odian generan escenas sin que nadie haga nada.
+              </p>
+            </div>
+            {facciones.length === 0 ? (
+              <div className="text-[var(--text-secondary)] italic py-6 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs flex flex-col gap-2">
+                <span>Aún no hay ninguna. El Narrador las ficha cuando aparece un grupo con intereses propios.</span>
+                <span className="not-italic font-cinzel text-[11px] text-indigo-700 dark:text-indigo-300">
+                  También se las puedes pedir al GM en el Chat: «ficha a los Zhentarim y di cómo se llevan con
+                  Bregan D'aerthe».
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {facciones.map(fa => (
+                  <div
+                    key={fa.id}
+                    className="p-3.5 rounded-xl border bg-[var(--surface-soft)] border-indigo-500/25 flex flex-col gap-1.5 hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                      <span className="font-cinzel font-bold text-xs sm:text-sm break-words text-indigo-700 dark:text-indigo-300">
+                        {fa.name}
+                      </span>
+                      {fa.conElla && (
+                        <span className={`text-[10px] font-cinzel px-1.5 py-0.5 rounded border ${COLOR[fa.conElla]}`}>
+                          {EMOJI[fa.conElla]} {fa.conElla}
+                        </span>
+                      )}
+                      {fa.conocida === false && (
+                        <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]">
+                          🔒 ni sabes que existe
+                        </span>
+                      )}
+                    </div>
+                    {fa.queEs && (
+                      <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">{fa.queEs}</p>
+                    )}
+                    {fa.objetivo && (
+                      <p className="text-xs font-lora text-[var(--text-primary)] m-0 leading-relaxed">
+                        <strong className="font-cinzel text-[11px] text-indigo-700 dark:text-indigo-300">Va a por:</strong>{' '}
+                        {fa.objetivo}
+                      </p>
+                    )}
+                    {fa.recursos && (
+                      <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
+                        💪 {fa.recursos}
+                      </p>
+                    )}
+                    {fa.cabeza && (
+                      <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
+                        👑 {fa.cabeza}
+                      </p>
+                    )}
+                    {fa.relaciones?.length ? (
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        {fa.relaciones.map(r => (
+                          <span
+                            key={r.faccion}
+                            className={`text-[10px] font-cinzel px-1.5 py-0.5 rounded border ${COLOR[r.postura]}`}
+                          >
+                            {EMOJI[r.postura]} {r.faccion}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {fa.oculto && (
+                      <p className="text-[11px] font-lora text-rose-700 dark:text-rose-300 m-0 leading-relaxed pt-0.5 border-t border-[var(--user-border)] mt-0.5">
+                        🔒 <strong className="font-cinzel text-[11px]">Lo que no sabes:</strong> {fa.oculto}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {activeTab === 'preparado' && (() => {
+        const todas = memory.gm_preparado || [];
+        const enPie = todas.filter(c => !c.usada);
+        const usadas = todas.filter(c => c.usada);
+        const EMOJI_TIPO: Record<string, string> = {
+          escena: '🎬', encuentro: '⚔️', complicacion: '🌩️', revelacion: '💡', pnj: '🎭', otro: '🎴'
+        };
+        const Carta: React.FC<{ c: (typeof todas)[number]; hecha?: boolean }> = ({ c, hecha }) => (
+          <div
+            className={`p-3.5 rounded-xl border flex items-start gap-3 transition-all ${
+              hecha
+                ? 'bg-[var(--surface-soft)] border-[var(--user-border)] opacity-65'
+                : 'bg-[var(--surface-soft)] border-teal-500/30 hover:shadow-md'
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`text-3xl leading-none shrink-0 self-stretch flex items-center pr-3 border-r border-[var(--user-border)] ${
+                hecha ? 'opacity-40 grayscale' : ''
+              }`}
+            >
+              {EMOJI_TIPO[c.tipo || 'otro']}
+            </span>
+            <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+              <span
+                className={`font-cinzel font-bold text-xs sm:text-sm break-words ${
+                  hecha ? 'text-[var(--text-secondary)] line-through' : 'text-teal-700 dark:text-teal-300'
+                }`}
+              >
+                {c.titulo}
+              </span>
+              {c.cuando && (
+                <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
+                  ⏳ Encaja {c.cuando}
+                </p>
+              )}
+              {c.detalle && (
+                <p className="text-[11px] font-lora text-[var(--text-primary)] m-0 leading-relaxed whitespace-pre-wrap">
+                  {c.detalle}
+                </p>
+              )}
+              {c.hilo && (
+                <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 self-start">
+                  🧵 {c.hilo}
+                </span>
+              )}
+            </div>
+          </div>
+        );
+        return (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-teal-500/30 bg-teal-500/5 p-3 sm:p-4 flex flex-col gap-1.5">
+              <span className="text-sm font-cinzel font-bold text-teal-700 dark:text-teal-300 flex items-center gap-2">
+                🎴 Preparado
+              </span>
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                Lo que el Narrador tiene listo para cuando toque: una escena montada, un encuentro, una complicación
+                guardada en la manga.{' '}
+                <strong className="text-teal-700 dark:text-teal-300">Es lo que evita improvisar en caliente</strong>, que es cuando salen las cosas
+                genéricas.
+              </p>
+            </div>
+            {enPie.length === 0 && usadas.length === 0 ? (
+              <div className="text-[var(--text-secondary)] italic py-6 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs">
+                Nada guardado todavía. Se llena cuando al Narrador se le ocurre algo bueno que en ese momento no
+                encaja, en vez de forzarlo o perderlo.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {enPie.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {enPie.map(c => <Carta key={c.id} c={c} />)}
+                  </div>
+                )}
+                {usadas.length > 0 && (
+                  <div className="flex flex-col gap-2.5">
+                    <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
+                      Ya jugadas ({usadas.length})
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {usadas.map(c => <Carta key={c.id} c={c} hecha />)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {activeTab === 'bambalinas' && (() => {
         /*
           LO QUE PASA MIENTRAS ELLA NO MIRA.

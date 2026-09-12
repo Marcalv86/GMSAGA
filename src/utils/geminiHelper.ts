@@ -15,7 +15,7 @@ import {
   ScheduledThread,
   Message
 } from '../types';
-import type { Aprendizaje, CambioDeInventario, InventoryItem, MovimientoOculto, PlayerCurrencies, RelojOculto } from '../types';
+import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, InventoryItem, MovimientoOculto, PlayerCurrencies, RelojOculto } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import {
@@ -62,7 +62,7 @@ import {
 } from './campaignCalendar';
 import { cambioVacio, leerInventario } from './inventoryTag';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
-import { cuadernoQuieto, leerBambalinas, leerRelojes, relojesEnMarcha } from './cuadernoOculto';
+import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa } from './cuadernoOculto';
 import { leerOlvidos } from './ordenesDeMesa';
 import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
@@ -2020,8 +2020,50 @@ ${(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro'] as const)
     // Se enseñan en orden de calendario, que es como se lee un cuaderno.
     return dentro.sort((a, b) => a.diaAbs - b.diaAbs);
   })();
+  /*
+   * LAS FACCIONES Y LO QUE HAY PREPARADO.
+   *
+   * Las facciones vivían desperdigadas en un renglón de cada ficha de PNJ, así
+   * que no había dónde mirar qué se traen dos bandos entre sí — y una facción
+   * no es la suma de su gente: su objetivo sigue vivo aunque muera quien lo
+   * llevaba. Y lo preparado es lo que un director apunta antes de sentarse:
+   * sin ello, todo lo imprevisto se improvisa en caliente, que es cuando sale
+   * lo genérico.
+   */
+  const faccionesVivas = (project.memory?.gm_facciones || []).slice(0, 8);
+  const bloqueFacciones = faccionesVivas.length
+    ? `\n**Quién quiere qué (facciones):**\n${faccionesVivas
+        .map(
+          fa =>
+            `- **${fa.name}**${fa.queEs ? ` — ${fa.queEs}` : ''}${fa.cabeza ? ` · la lleva ${fa.cabeza}` : ''}${
+              fa.objetivo ? `\n  · Va a por: ${fa.objetivo}` : ''
+            }${fa.recursos ? `\n  · Cuenta con: ${fa.recursos}` : ''}${
+              fa.conElla ? `\n  · Con la protagonista: ${fa.conElla}` : ''
+            }${
+              fa.relaciones?.length
+                ? `\n  · Con las demás: ${fa.relaciones.map(r => `${r.faccion} (${r.postura})`).join(', ')}`
+                : ''
+            }${fa.oculto ? `\n  · 🔒 Lo que ella NO sabe: ${fa.oculto}` : ''}${
+              fa.conocida === false ? '\n  · ⚠️ Ella ni sabe que existe: no la nombres.' : ''
+            }`
+        )
+        .join('\n')}`
+    : '';
+
+  const preparadoVivo = preparadoEnPie(project.memory?.gm_preparado).slice(0, 8);
+  const bloquePreparado = preparadoVivo.length
+    ? `\n**Lo que tienes preparado y aún no has usado:**\n${preparadoVivo
+        .map(
+          c =>
+            `- **${c.titulo}**${c.tipo && c.tipo !== 'otro' ? ` [${c.tipo}]` : ''}${
+              c.cuando ? ` — encaja ${c.cuando}` : ''
+            }${c.detalle ? `\n  · ${String(c.detalle).slice(0, 300)}` : ''}${c.hilo ? ` [hilo: ${c.hilo}]` : ''}`
+        )
+        .join('\n')}\n⭐ Si una de estas encaja en la escena de hoy, **úsala**: está preparada justo para no tener que improvisar. Y al usarla, apúntalo con \`[PREPARADO: su título | usada: sí]\` para que no te vuelva cada turno.`
+    : '';
+
   const bloqueCuaderno =
-    movimientosRecientes.length || relojesVivos.length
+    movimientosRecientes.length || relojesVivos.length || faccionesVivas.length || preparadoVivo.length
       ? `
 ### 🕯️ TU CUADERNO: LO QUE PASA MIENTRAS ELLA NO MIRA (⛔ ELLA NO SABE NADA DE ESTO)
 Esto es tuyo, no suyo. **⛔ No lo narres, no lo insinúes y no dejes que ningún personaje se lo cuente sin que haya una razón jugada para ello.** Sirve para que el mundo tenga memoria propia.
@@ -2052,6 +2094,8 @@ ${
                 .join('\n')}`
             : ''
         }
+
+${bloqueFacciones}${bloquePreparado}
 
 **QUÉ HACER CON ESTO EN ESTE TURNO:**
 1. **SOLO si ha pasado un día o más** —un descanso largo, una noche, un salto, una jornada de viaje—, la gente con algo entre manos HA HECHO ALGO. Apúntalo con \`[BAMBALINAS: ...]\`, uno por cada quien se haya movido, aunque no aparezca en escena.
@@ -2799,6 +2843,8 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
    - [APRENDE: +Nombre (tipo, detalle opcional), +Otro (tipo)] — OBLIGATORIO en el turno en que el protagonista GANA una capacidad nueva: al subir de nivel, al aprender un conjuro, al recibir adiestramiento, al desbloquear un rasgo o al ganar una competencia o un idioma. **Este registro es el único sitio donde queda constancia**: su ficha se subió una vez y está congelada en el nivel que tuviera aquel día, así que lo que no se apunte aquí se pierde y dentro de tres niveles nadie sabrá que lo tiene. El tipo va dentro del paréntesis y es uno de: conjuro, rasgo, competencia, mejora. Ejemplos: [APRENDE: +Rayo de escarcha (conjuro, truco de evocación)]; [APRENDE: +Sentido salvaje (rasgo), +Competencia en Supervivencia (competencia)]; [APRENDE: +2 a Sabiduría (mejora, al subir a nivel 4)]; [APRENDE: +Infracomún (competencia, se lo enseña un compañero)]. ⛔ Y no lo uses para objetos —eso es [INVENTARIO:]— ni para apuntar lo que YA figura en su ficha: solo lo nuevo. Si en este turno no ha aprendido nada, OMITE la línea.
    - [BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama cuelga] — TU CUADERNO, que ella NO lee. Se emite cuando ha pasado tiempo (un descanso largo, un salto, un viaje) y alguien con algo entre manos se ha movido **aunque no aparezca en escena**. Uno por cada quien se mueva. Ejemplo: [BAMBALINAS: Braelin | hizo: pregunta por el violín en los muelles | donde: el puerto | con: un marinero que hace la ruta de las islas | resultado: sabe qué es el instrumento y de dónde viene | hilo: el origen del violín]. ⛔ Esto NO se narra ni se insinúa: es memoria del mundo, no información para la jugadora. ⭐ Y lo que se registra aquí es lo que luego permite que alguien vuelva con algo de verdad en vez de volver con las manos vacías.
    - [RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve] — la cuenta atrás de lo que corre por detrás. «van: 3/6» fija los dos números; sobre un reloj que ya existe basta «van: +1» para avanzarlo, o «van: 4» para fijarlo. Ejemplo: [RELOJ: Bregan D'aerthe ata cabos sobre ella | van: +1 | al llenarse: mandan a alguien a buscarla en persona | de: Bregan D'aerthe]. Úsalo para las amenazas, las búsquedas, las investigaciones ajenas y los plazos. ⛔ Tampoco se narra.
+   - [FACCIÓN: Nombre | es: qué es | quiere: su objetivo ahora | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra facción (rival); Tercera (guerra) | oculto: lo que ella no sabe | conocida: no] — la ficha de un bando. Emítela la primera vez que un grupo con intereses propios aparece o se menciona, y cuando su objetivo o su postura CAMBIEN. Una facción no es la suma de su gente: su objetivo sigue vivo aunque muera quien lo llevaba. ⛔ No la uses para grupos de paso ni para una pareja de matones: solo para lo que va a estar ahí toda la campaña.
+   - [PREPARADO: Título | tipo: escena/encuentro/complicacion/revelacion/pnj | detalle: qué pasa | cuando: en qué momento encaja | hilo: de qué cuelga] — guarda algo listo para usar más adelante, que es lo que hace un director antes de sentarse. Emítelo cuando se te ocurra algo bueno que AHORA no toca: así no se pierde y no acabas improvisándolo en caliente. Y cuando lo uses, ciérralo con [PREPARADO: el mismo título | usada: sí]. ⛔ Nada de esto se narra: es tu material.
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
@@ -3766,6 +3812,10 @@ export interface TiempoReportado {
   bambalinas?: MovimientoOculto[];
   /** Los planes que corren por detrás, con su cuenta. */
   relojes?: RelojOculto[];
+  /** Fichas de facción creadas o actualizadas. */
+  facciones?: Faccion[];
+  /** Material preparado para usar más adelante. */
+  preparado?: CartaPreparada[];
 }
 
 async function saveStreamedMessage(
@@ -3820,6 +3870,8 @@ async function saveStreamedMessage(
    */
   const bambalinas = leerBambalinas(cleanedText, 0);
   const relojes = leerRelojes(cleanedText);
+  const facciones = leerFacciones(cleanedText);
+  const preparado = leerPreparado(cleanedText);
   cleanedText = limpiarEtiquetasDePnj(limpiarEtiquetasDeTiempo(cleanedText));
 
   if (definitivo && hilos.length > 0) {
@@ -3845,6 +3897,7 @@ async function saveStreamedMessage(
       avanceDeNivel ||
       !nadaAprendido(aprendido) ||
       !cuadernoQuieto(bambalinas, relojes) ||
+      !sinNovedadDeMesa(facciones, preparado) ||
       !cambioVacio(inventario))
   ) {
     try {
@@ -3864,7 +3917,9 @@ async function saveStreamedMessage(
         avanceDeNivel,
         aprendido,
         bambalinas,
-        relojes
+        relojes,
+        facciones,
+        preparado
       });
     } catch (err) {
       logError('threads', 'Error al procesar el reporte de tiempo e hilos de la escena', err, {
@@ -5494,6 +5549,27 @@ export function construirPromptOOC({
           .join('\n')}`
       );
     }
+    const facs = (project.memory?.gm_facciones || []).slice(0, 10);
+    if (facs.length) {
+      partes.push(
+        `Facciones:\n${facs
+          .map(
+            fa =>
+              `- ${fa.name}${fa.queEs ? ` (${fa.queEs})` : ''}${fa.objetivo ? ` — quiere: ${fa.objetivo}` : ''}${
+                fa.conElla ? ` · con ella: ${fa.conElla}` : ''
+              }${fa.oculto ? ` · 🔒 oculto: ${fa.oculto}` : ''}`
+          )
+          .join('\n')}`
+      );
+    }
+    const prep = (project.memory?.gm_preparado || []).filter(c => !c.usada).slice(0, 10);
+    if (prep.length) {
+      partes.push(
+        `Preparado y sin usar:\n${prep
+          .map(c => `- ${c.titulo}${c.tipo && c.tipo !== 'otro' ? ` [${c.tipo}]` : ''}${c.cuando ? ` — ${c.cuando}` : ''}`)
+          .join('\n')}`
+      );
+    }
     return partes.length ? partes.join('\n\n') : '(el cuaderno está vacío todavía)';
   })();
 
@@ -5781,6 +5857,8 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[APRENDE: +Nombre (tipo)]\` — apunta un conjuro, un rasgo, una competencia, un idioma o una mejora de característica que ella tenga y no conste. Tipos: conjuro, rasgo, competencia, mejora. Es LA vía para arreglar el hueco más silencioso que hay: su ficha se subió congelada en un nivel y todo lo que ha ganado subiendo desde entonces no está escrito en ninguna parte. Si te dice «al subir a nivel 4 cogí Bola de fuego y +2 a Sabiduría», lo apuntas y ya cuenta: \`[APRENDE: +Bola de fuego (conjuro), +2 a Sabiduría (mejora, nivel 4)]\`.
 - \`[BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama]\` — apunta en tu cuaderno algo que ha pasado fuera de cámara. Sirve para cuando ella te pregunta «¿qué ha estado haciendo X estos días?» y hay que dejarlo escrito, o para corregir un apunte que se quedó corto. Queda fechado en el día de campaña actual.
 - \`[RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve]\` — crea o mueve un plan que corre por detrás. «van: +1» lo avanza, «van: 4» lo fija.
+- \`[FACCIÓN: Nombre | es: qué es | quiere: su objetivo | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra (rival) | oculto: lo que ella no sabe]\` — la ficha de un bando. Sirve para apuntar uno nuevo cuando ella te lo cuenta y para corregir una postura que ha cambiado jugando.
+- \`[PREPARADO: Título | tipo: escena/encuentro/complicacion/revelacion/pnj | detalle: qué pasa | cuando: cuándo encaja]\` — guarda algo listo para más adelante. Si ella te propone una idea para el futuro, esto es donde va para que no se pierda. Se cierra con \`[PREPARADO: el mismo título | usada: sí]\`.
   - ⛔ Estas dos son TUYAS y ella no las ve en la ficción: aquí, hablando contigo fuera de personaje, sí puede preguntarte por ellas y pedirte que cambies algo — es su campaña—. Pero **no las narres ni las sueltes por tu cuenta**: si te pregunta «¿qué trama Fulano?», puedes decidir contestarle con evasivas de buen GM en vez de destriparle la trama, y eso es mejor mesa que responder con la lista.
 
 **⚖️ PERO ESTO NO ES UN PANEL DE MANDOS: ERES EL DIRECTOR Y PUEDES DECIR QUE NO.**
@@ -5857,6 +5935,10 @@ export interface RespuestaDeMesa {
   bambalinas: MovimientoOculto[];
   /** Relojes creados o movidos desde la mesa. */
   relojes: RelojOculto[];
+  /** Fichas de facción creadas o corregidas desde la mesa. */
+  facciones: Faccion[];
+  /** Material preparado desde la mesa. */
+  preparado: CartaPreparada[];
   /**
    * Lo que costó de verdad la pregunta, en fichas de entrada.
    *
@@ -6022,6 +6104,8 @@ export async function preguntarAlDirectorOOC(
   const aprendido = leerAprendizajes(bruto);
   const bambalinas = leerBambalinas(bruto, 0);
   const relojes = leerRelojes(bruto);
+  const facciones = leerFacciones(bruto);
+  const preparado = leerPreparado(bruto);
 
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
   const texto = stripStateTag(limpiarEtiquetasDeTiempo(limpiarEtiquetasDePnj(bruto)))
@@ -6031,6 +6115,8 @@ export async function preguntarAlDirectorOOC(
     .replace(/\[\s*APRENDE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*BAMBALINAS\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*RELOJ\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*FACCI[OÓ]N\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*PREPARADO\s*:[^\]]*\]/gi, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -6045,6 +6131,8 @@ export async function preguntarAlDirectorOOC(
     aprendido,
     bambalinas,
     relojes,
+    facciones,
+    preparado,
     fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount
   };
 }
