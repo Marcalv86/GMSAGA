@@ -2733,6 +2733,57 @@ export default function App() {
     // Invalidar caché de tokens medidos para reflejar el nuevo peso de la biblioteca
     setChatTokenLoads({});
     await saveFilesToDB(currentPId, updated);
+
+    /*
+     * MARCAR DE CONSULTA ES EL MOMENTO EN QUE LAS ETIQUETAS HACEN FALTA.
+     *
+     * Mientras un documento viaja entero está delante del Narrador y no hay
+     * nada que buscar. En cuanto pasa a la biblioteca, que lo encuentre o no
+     * depende de que las palabras exactas de la escena estén escritas dentro —y
+     * ahí es donde falla: el buscador no sabe que Jarlaxle es drow, así que la
+     * cantera de Menzoberranzan no sube en una conversación con él y el
+     * Narrador sale del paso con vaguedades que no se notan leyendo.
+     *
+     * Dejarlo como un segundo paso manual es garantizar que se olvide justo en
+     * los documentos que más lo necesitan, así que se dispara aquí. En segundo
+     * plano y sin bloquear: el interruptor ya ha hecho su trabajo, y si el
+     * etiquetado falla, el documento queda igualmente de consulta.
+     *
+     * Solo al MARCAR, nunca al desmarcar, y solo si no las tiene ya: volver a
+     * pagarlas cada vez que se toca el interruptor no aporta nada.
+     */
+    if (!onDemand || !currentProject || !target) return;
+    if (target.isImage || target.isAudio || target.etiquetasBusqueda) return;
+    if (extractingFileIds.includes(fileId)) return;
+
+    setExtractingFileIds(prev => [...prev, fileId]);
+    setTopProgress({
+      active: true,
+      label: `"${target.name}" pasa a la biblioteca: leyéndolo para saber por qué buscarlo...`,
+      type: 'general'
+    });
+    try {
+      const etiquetas = await generarEtiquetasDeBusqueda(target, elencoDeLaCampana(currentProject));
+      const frescos = await loadFilesFromDB(currentPId);
+      const conEtiquetas = frescos.map(f =>
+        f.id === fileId ? { ...f, etiquetasBusqueda: etiquetas } : f
+      );
+      setCurrentFiles(conEtiquetas);
+      await saveFilesToDB(currentPId, conEtiquetas);
+    } catch (err) {
+      /*
+       * Se avisa en el registro y se calla en pantalla: esto no lo ha pedido
+       * nadie explícitamente, así que interrumpir con un modal por algo que se
+       * puede rehacer con un botón sería peor que dejarlo estar. El botón de
+       * Archivos se queda en ámbar, que ya dice lo que hay.
+       */
+      logError('general', 'No se han podido etiquetar al marcar de consulta', err, {
+        details: { archivo: target.name }
+      });
+    } finally {
+      setExtractingFileIds(prev => prev.filter(id => id !== fileId));
+      setTopProgress({ active: false, label: '', type: 'general' });
+    }
   };
 
   /**
