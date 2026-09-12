@@ -532,7 +532,8 @@ export default function App() {
                 !p.instructions.includes('Principio de Progresión en Bambalinas') ||
                 !p.instructions.includes('⭐ 00. CARGA DE CONTEXTO') ||
                 !p.instructions.includes('Arraigo en el Mundo e Interconexión de Faerûn') ||
-                !p.instructions.includes('8.2 Protocolo de Transición de Escena')))
+                !p.instructions.includes('8.2 Protocolo de Transición de Escena') ||
+                !p.instructions.includes('13c. Prohibición de Metarol')))
           ) {
             modified = true;
             if (!p.instructions) {
