@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Copy, Loader, Radio, Trash2, TriangleAlert, XCircle } from 'lucide-react';
+import { BookMarked, Check, ChevronDown, ChevronRight, Copy, Loader, Radio, Trash2, TriangleAlert, XCircle } from 'lucide-react';
 import { versionEnUso } from '../utils/versionCheck';
 import {
   LlamadaRegistrada,
@@ -11,7 +11,8 @@ import {
   limpiarLlamadas,
   llamadasComoTexto,
   resumenDeLlamadas,
-  suscribirseALlamadas
+  suscribirseALlamadas,
+  usoDeDocumentos
 } from '../utils/callLog';
 
 const n = (v?: number) => (v === undefined ? '—' : v.toLocaleString('es-ES'));
@@ -68,6 +69,8 @@ export const CallLogPanel: React.FC = () => {
   }, [llamadas, filtro]);
 
   const r = useMemo(() => resumenDeLlamadas(llamadas), [llamadas]);
+  const uso = useMemo(() => usoDeDocumentos(llamadas), [llamadas]);
+  const [bibliotecaAbierta, setBibliotecaAbierta] = useState(false);
 
   const copiar = async () => {
     try {
@@ -106,6 +109,74 @@ export const CallLogPanel: React.FC = () => {
             </div>
           ))}
         </div>
+
+        {/*
+          LA BIBLIOTECA, VISTA A LO LARGO DE LA CAMPAÑA.
+          El desglose de cada turno dice qué entró en ESE turno, y esa no es la
+          pregunta. La pregunta es si la biblioteca responde al sitio: en el mar
+          debería subir el módulo náutico y al llegar a la ciudad el de la
+          ciudad. Un documento con el contador a cero después de veinte turnos
+          no es un documento que sobre: es casi siempre uno que la búsqueda no
+          sabe encontrar. Y esa avería no se ve turno a turno, porque la escena
+          sale bien igual: el Narrador rellena el hueco y no se nota lo que no
+          llegó.
+        */}
+        {uso.length > 0 && (
+          <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] overflow-hidden">
+            <button
+              onClick={() => setBibliotecaAbierta(v => !v)}
+              className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-cinzel text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+            >
+              {bibliotecaAbierta ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              <BookMarked className="w-3 h-3" />
+              <span>Uso de la biblioteca</span>
+              {(() => {
+                const mudos = uso.filter(u => u.conFragmentos === 0 && u.sinUsar > 0).length;
+                return mudos > 0 ? (
+                  <span className="ml-auto text-amber-800 dark:text-amber-300 font-bold">
+                    {mudos} sin usar nunca
+                  </span>
+                ) : null;
+              })()}
+            </button>
+            {bibliotecaAbierta && (
+              <div className="px-2 pb-2 space-y-0.5">
+                {uso.map(u => (
+                  <div key={u.nombre} className="flex items-center gap-2 text-[10px]">
+                    <span
+                      className={`flex-1 truncate ${
+                        u.conFragmentos === 0 && u.sinUsar > 0
+                          ? 'text-amber-800 dark:text-amber-300'
+                          : 'text-[var(--text-secondary)]'
+                      }`}
+                      title={u.nombre}
+                    >
+                      {u.nombre}
+                    </span>
+                    {u.enteros > 0 && (
+                      <span className="text-[var(--text-secondary)] shrink-0" title={`Viajó entero en ${u.enteros} turnos`}>
+                        📄{u.enteros}
+                      </span>
+                    )}
+                    <span
+                      className={`shrink-0 font-mono ${u.conFragmentos > 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-800 dark:text-amber-300'}`}
+                      title={
+                        u.conFragmentos > 0
+                          ? `Aportó fragmentos en ${u.conFragmentos} turnos. El último, hace ${u.turnosDesdeElUltimo} turnos narrados.`
+                          : 'Nunca ha aportado nada. Si la campaña ha pasado por donde este documento cuenta, la búsqueda no lo está encontrando.'
+                      }
+                    >
+                      📖{u.conFragmentos}
+                      {u.conFragmentos > 0 && u.turnosDesdeElUltimo !== undefined
+                        ? ` · hace ${u.turnosDesdeElUltimo}`
+                        : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-1.5">
           {([

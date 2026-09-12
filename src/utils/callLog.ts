@@ -374,3 +374,66 @@ export function ultimoCacheMedido(): { fichas: number; porcentaje: number; model
   }
   return undefined;
 }
+
+export interface UsoDeDocumento {
+  nombre: string;
+  /** Turnos en los que aportó fragmentos a la escena. */
+  conFragmentos: number;
+  /** Turnos en los que estaba disponible de consulta y no aportó nada. */
+  sinUsar: number;
+  /** Turnos en los que viajó con su texto completo. */
+  enteros: number;
+  /** Cuántos turnos narrados hace que aportó algo. `undefined` = nunca lo hizo. */
+  turnosDesdeElUltimo?: number;
+}
+
+/**
+ * Qué documentos trabajan y cuáles llevan toda la campaña de brazos cruzados.
+ *
+ * El desglose por turno contesta «qué entró AHORA», y esa no es la pregunta
+ * que importa. La que importa es si la biblioteca responde al sitio: en el mar
+ * debería subir el módulo náutico, y al llegar a la ciudad el de la ciudad. Un
+ * documento que jamás aparece no es necesariamente un documento que sobre —es,
+ * casi siempre, uno que la búsqueda no sabe encontrar—, y esa avería es
+ * invisible turno a turno porque la escena sale bien igualmente: el Narrador
+ * rellena el hueco y nadie nota lo que no llegó.
+ *
+ * Solo se miran los turnos narrados. Las llamadas de fondo no llevan
+ * documentos de consulta y contarlas desplazaría la cuenta hacia abajo.
+ */
+export function usoDeDocumentos(llamadas: LlamadaRegistrada[]): UsoDeDocumento[] {
+  const turnos = llamadas.filter(l => /^Turno narrado/i.test(l.proposito || '') && l.documentos);
+  const mapa = new Map<string, UsoDeDocumento>();
+
+  const dame = (nombre: string): UsoDeDocumento => {
+    let u = mapa.get(nombre);
+    if (!u) {
+      u = { nombre, conFragmentos: 0, sinUsar: 0, enteros: 0 };
+      mapa.set(nombre, u);
+    }
+    return u;
+  };
+
+  turnos.forEach((l, i) => {
+    const d = l.documentos!;
+    // Cuántos turnos narrados quedan por detrás de este, para fechar el último uso.
+    const desdeElFinal = turnos.length - 1 - i;
+    (d.enteros || []).forEach(n => dame(n).enteros++);
+    (d.sinUsar || []).forEach(n => dame(n).sinUsar++);
+    (d.fragmentos || []).forEach(n => {
+      const u = dame(n);
+      u.conFragmentos++;
+      u.turnosDesdeElUltimo = desdeElFinal;
+    });
+  });
+
+  /*
+   * Los mudos primero. Una lista ordenada por uso enseña arriba lo que ya
+   * funciona, que es justo lo que no hay que mirar: el que nunca aparece es el
+   * que tiene algo que contar, y es el que se queda enterrado al final.
+   */
+  return [...mapa.values()].sort((a, b) => {
+    if (a.conFragmentos !== b.conFragmentos) return a.conFragmentos - b.conFragmentos;
+    return b.sinUsar - a.sinUsar;
+  });
+}
