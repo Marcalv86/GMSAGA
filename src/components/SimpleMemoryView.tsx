@@ -305,8 +305,8 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
             }`}
           
-            title="Memoria del Personaje y Entidades: su ficha, la mochila, el diario, los PNJs, los lugares y las tramas."
-            aria-label="Memoria del Personaje y Entidades"
+            title="Tu cuaderno: tu ficha, la mochila, el diario, los PNJs, los lugares y las tramas. Es lo que apuntarías tú en una libreta — solo que se actualiza solo, jugando."
+            aria-label="Tu cuaderno"
           >
             <User className="w-5 h-5" />
             </button>
@@ -341,8 +341,8 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
             }`}
           
-            title="Memoria Persistente de Proyecto: el texto de memoria general de la campaña."
-            aria-label="Memoria Persistente de Proyecto"
+            title="Memoria del proyecto: el texto de memoria general de la campaña, en Markdown."
+            aria-label="Memoria del proyecto"
           >
             <ScrollText className="w-5 h-5" />
             </button>
@@ -425,6 +425,26 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
         </div>
       ) : memoryMode === 'character' ? (
         <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+          {/*
+            El nombre importa, y es suyo: esto es la libreta de la jugadora.
+
+            Se llamaba «Memoria del Personaje & Entidades», que suena a base de
+            datos, y en realidad es exactamente lo que uno apunta en una mesa de
+            verdad —su ficha, lo que lleva, con quién se cruzó, dónde estuvo, qué
+            le deben— solo que se rellena sola jugando. Dicho así, y enfrente del
+            Cuaderno del GM, el reparto se entiende sin explicarlo.
+          */}
+          <div className="px-3 sm:px-6 pt-3">
+            <div className="rounded-lg border border-[var(--user-border)] bg-[var(--surface-soft)] px-3 py-2 flex items-start gap-2">
+              <span className="text-base leading-none mt-0.5">📖</span>
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                <strong className="text-[var(--accent)] font-cinzel">Tu cuaderno.</strong> Lo que apuntarías tú en una
+                libreta: tu ficha, lo que llevas, con quién te has cruzado, dónde has estado y qué tienes entre manos.
+                La diferencia es que <strong className="text-[var(--text-primary)]">se rellena solo jugando</strong>, y
+                si algo está mal se le dice al GM en el Chat y lo corrige él.
+              </p>
+            </div>
+          </div>
           <MemoryManager
             project={project}
             files={files}

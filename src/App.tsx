@@ -2957,7 +2957,20 @@ export default function App() {
       // Sincronización simultánea estilo Claude Projects:
       // 1. Memoria de entidades, crónica, PNJs, lugares, tramas, inventario y diario
       // 2. Memoria persistente general del proyecto en Markdown (Purpose & context, Current state, Tools)
-      const [syncResult, claudeProjectMem] = await Promise.all([
+      /*
+       * SINCRONIZAR ES SINCRONIZAR TODO, Y LA FICHA TAMBIÉN ES TODO.
+       *
+       * La lectura de la ficha subida vivía en su propio botón, en otra
+       * pestaña, y había que acordarse. Pero es el mismo gesto —poner la
+       * campaña al día— y nadie separa mentalmente «sincronizar la memoria» de
+       * «leer mi ficha»: si le doy a sincronizar todo, espero que mire todo.
+       *
+       * Va en paralelo con las otras dos y en el modelo de tareas de fondo, así
+       * que no alarga la espera ni toca la cuota de los modelos buenos. Y si
+       * falla, la sincronización sigue: leer la ficha es un extra, no un
+       * requisito.
+       */
+      const [syncResult, claudeProjectMem, fichaLeida] = await Promise.all([
         syncFullCampaignFromChats(currentProject, currentChats, currentFiles),
         generateClaudeProjectMemory({
           project: currentProject,
@@ -2965,6 +2978,10 @@ export default function App() {
           files: currentFiles
         }).catch(err => {
           logWarn('memory_sync', 'No se pudo generar la memoria persistente del proyecto en formato Claude', describeApiError(err));
+          return null;
+        }),
+        extraerIdentidadDeDocumentos({ project: currentProject, files: currentFiles }).catch(err => {
+          logWarn('memory_sync', 'No se pudo leer la ficha del protagonista al sincronizar', describeApiError(err));
           return null;
         })
       ]);
@@ -3072,19 +3089,46 @@ export default function App() {
             gm_relojes: cuaderno.relojes.length ? cuaderno.relojes : memoriaSincronizada.gm_relojes,
             gm_facciones: mesa.facciones.length ? mesa.facciones : memoriaSincronizada.gm_facciones,
             gm_preparado: mesa.preparado.length ? mesa.preparado : memoriaSincronizada.gm_preparado,
-            player_character: {
-              ...(memoriaSincronizada.player_character || { name: '' }),
-              inventory,
+            player_character: (() => {
+              const base = memoriaSincronizada.player_character || { name: '' };
               /*
-               * Lo aprendido se FUNDE con lo que la IA haya leído de la prosa:
-               * la etiqueta es exacta pero solo existe si se escribió, y la
-               * lectura cubre las sesiones jugadas antes de que esto existiera.
+               * Lo leído de la ficha RELLENA HUECOS, no reescribe.
+               *
+               * La ficha es de donde empezó y la partida es de hoy: lo que ya
+               * consta jugando manda. Así que la identidad solo entra donde
+               * falta, el equipo se funde sin duplicar ni resucitar lo gastado,
+               * y el dinero solo si la bolsa estaba a cero.
                */
-              aprendido: aplicarAprendizajes(
-                escuela.aprendido,
-                memoriaSincronizada.player_character?.aprendido || []
-              )
-            }
+              const clave = (n: string) =>
+                n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+              const nombreDeRelleno = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
+              const sinNombre = !(base.name || '').trim() || nombreDeRelleno.test((base.name || '').trim());
+              const conocidos = new Set(inventory.map(i => clave(i.name || '')));
+              const delDocumento = (fichaLeida?.inventory || []).filter(i => !conocidos.has(clave(i.name || '')));
+              return {
+                ...base,
+                ...(fichaLeida?.name && sinNombre ? { name: fichaLeida.name } : {}),
+                ...(fichaLeida?.race && !base.race ? { race: fichaLeida.race } : {}),
+                ...(fichaLeida?.class && !base.class ? { class: fichaLeida.class } : {}),
+                ...(fichaLeida?.languages?.length && !base.languages?.length
+                  ? { languages: fichaLeida.languages }
+                  : {}),
+                ...(fichaLeida?.appearance && !base.appearance ? { appearance: fichaLeida.appearance } : {}),
+                ...(fichaLeida?.currencies && !Object.values(base.currencies || {}).some(v => v)
+                  ? { currencies: fichaLeida.currencies }
+                  : {}),
+                inventory: delDocumento.length ? [...inventory, ...delDocumento] : inventory,
+                /*
+                 * Lo aprendido se FUNDE con lo que la IA haya leído de la prosa:
+                 * la etiqueta es exacta pero solo existe si se escribió, y la
+                 * lectura cubre las sesiones jugadas antes de que esto existiera.
+                 */
+                aprendido: aplicarAprendizajes(
+                  escuela.aprendido,
+                  memoriaSincronizada.player_character?.aprendido || []
+                )
+              };
+            })()
           },
           timeline: fusionarTimeline(p.timeline || [], syncResult.timeline || []).timeline,
           currentDate: syncResult.currentDate || p.currentDate,

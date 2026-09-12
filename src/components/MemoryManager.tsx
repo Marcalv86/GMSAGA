@@ -11,7 +11,7 @@ import {
   fechaInicial,
   fechaLegible
 } from '../utils/campaignCalendar';
-import { extraerIdentidadDeDocumentos, fusionarTrama, tramarLaCampana } from '../utils/geminiHelper';
+import { fusionarTrama, tramarLaCampana } from '../utils/geminiHelper';
 import { preparadoEnPie, relojesEnMarcha } from '../utils/cuadernoOculto';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
@@ -308,7 +308,6 @@ export const MemoryManager: React.FC<{
   /** Giros que la jugadora ha decidido leerse. No se guarda: se destapa y ya. */
   const [secretosDestapados, setSecretosDestapados] = useState<Set<string>>(new Set());
   const [tramando, setTramando] = useState(false);
-  const [leyendoFicha, setLeyendoFicha] = useState(false);
   const [verPremisa, setVerPremisa] = useState(false);
 
   // Confirmation state
@@ -778,8 +777,8 @@ export const MemoryManager: React.FC<{
                       <p className="mt-1 text-[11px] leading-snug text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/40 rounded-lg px-2 py-1.5 m-0">
                         ⚠️ <strong>Tu personaje no tiene nombre en la ficha.</strong> El Narrador lo llama
                         «Protagonista» en cada turno, y sin nombre la aplicación no puede reconocerlo, así que acaba
-                        creándole tarjeta de PNJ. Pulsa <strong>«Rellenar leyendo mi ficha subida»</strong> aquí abajo,
-                        o escríbelo a mano.
+                        creándole tarjeta de PNJ. Dale a <strong>«Sincronizar Memoria Completa con IA»</strong>, que lee tu ficha
+                        subida y lo rellena, o escríbelo a mano aquí.
                       </p>
                     ) : null}
                   </div>
@@ -815,86 +814,14 @@ export const MemoryManager: React.FC<{
                   fijos. Copiar a mano lo que ya está escrito es trabajo que
                   debería hacer la aplicación.
                 */}
-                <button
-                  onClick={async () => {
-                    if (leyendoFicha) return;
-                    setLeyendoFicha(true);
-                    try {
-                      const id = await extraerIdentidadDeDocumentos({ project, files });
-                      const encontrado = [
-                        id.name ? `Nombre: ${id.name}` : '',
-                        id.race ? `Raza: ${id.race}` : '',
-                        id.class ? `Clase: ${id.class}` : '',
-                        id.languages?.length ? `Idiomas: ${id.languages.join(', ')}` : '',
-                        id.appearance ? `Rasgos: ${id.appearance.slice(0, 240)}${id.appearance.length > 240 ? '…' : ''}` : '',
-                        id.inventory?.length
-                          ? `Lleva encima (${id.inventory.length}): ${id.inventory.map(i => i.name).join(', ').slice(0, 400)}`
-                          : '',
-                        id.currencies && Object.keys(id.currencies).length
-                          ? `Dinero: ${Object.entries(id.currencies).map(([k, v]) => `${v} ${k.toUpperCase()}`).join(', ')}`
-                          : ''
-                      ].filter(Boolean);
-
-                      if (encontrado.length === 0) {
-                        window.alert('No he encontrado el nombre, la raza, la clase, los idiomas, la descripción física ni el equipo en tus documentos. Comprueba que la ficha del personaje esté subida en Archivos.');
-                        return;
-                      }
-                      // Se enseña ANTES de escribir: son datos que el Narrador
-                      // da por ciertos, y pisarlos sin avisar sería peor que no
-                      // ofrecer el botón.
-                      if (!window.confirm(`Esto es lo que he leído de tus documentos:\n\n${encontrado.join('\n\n')}\n\n¿Lo guardo en la ficha? Los datos de identidad se sustituyen; el equipo se AÑADE a la mochila sin tocar lo que ya hubiera, y el dinero solo se pone si la bolsa estaba a cero.`)) return;
-
-                      await onUpdateMemory(mem => ({
-                        ...mem,
-                        player_character: {
-                          ...(mem.player_character || { name: 'Protagonista' }),
-                          ...(id.name ? { name: id.name } : {}),
-                          ...(id.race ? { race: id.race } : {}),
-                          ...(id.class ? { class: id.class } : {}),
-                          ...(id.languages ? { languages: id.languages } : {}),
-                          ...(id.appearance ? { appearance: id.appearance } : {}),
-                          /*
-                           * La mochila se FUNDE, no se pisa.
-                           *
-                           * Lo que ha ganado, perdido o le han requisado jugando
-                           * es de hoy; la ficha es del primer día. Leerla otra
-                           * vez tiene que añadir lo que faltaba —el cuaderno,
-                           * las herramientas, el instrumento que nunca se
-                           * apuntaron— sin resucitar lo que ya gastó ni borrar
-                           * de quién es ahora lo que le quitaron.
-                           */
-                          ...(id.inventory?.length
-                            ? {
-                                inventory: (() => {
-                                  const yaEstaba = mem.player_character?.inventory || [];
-                                  const clave = (n: string) =>
-                                    n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-                                  const conocidos = new Set(yaEstaba.map(i => clave(i.name || '')));
-                                  return [...yaEstaba, ...id.inventory!.filter(i => !conocidos.has(clave(i.name || '')))];
-                                })()
-                              }
-                            : {}),
-                          // El dinero solo se pone si no había ninguno: el saldo lo lleva el juego.
-                          ...(id.currencies &&
-                          Object.keys(id.currencies).length &&
-                          !Object.values(mem.player_character?.currencies || {}).some(v => v)
-                            ? { currencies: id.currencies }
-                            : {})
-                        }
-                      }));
-                    } catch (err: any) {
-                      window.alert(err?.message || 'No se ha podido leer la ficha. Inténtalo de nuevo.');
-                    } finally {
-                      setLeyendoFicha(false);
-                    }
-                  }}
-                  disabled={leyendoFicha}
-                  className="mt-2.5 w-full min-h-[40px] px-3 rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] text-xs font-cinzel font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60"
-                  title="Lee el nombre, la raza, la clase, los idiomas, los rasgos físicos Y EL EQUIPO de la ficha que tienes subida en Archivos, para no tener que copiarlos a mano. El equipo se añade a la mochila, que es lo que el Narrador lee en cada turno."
-                >
-                  <Sparkles className={`w-3.5 h-3.5 ${leyendoFicha ? 'animate-spin' : ''}`} />
-                  {leyendoFicha ? 'Leyendo tu ficha…' : 'Rellenar leyendo mi ficha subida'}
-                </button>
+                {/*
+                  Aquí había un botón de «rellenar leyendo mi ficha subida», y
+                  se ha quitado a propósito: lo hace «Sincronizar Memoria
+                  Completa con IA», que es el mismo gesto —poner la campaña al
+                  día— y el que una acaba pulsando. Tener dos botones para eso
+                  obligaba a acordarse del segundo, y nadie separa mentalmente
+                  «sincronizar la memoria» de «leer mi ficha».
+                */}
 
                 {/*
                   Los rasgos físicos, que no se podían escribir en ningún sitio.
@@ -2624,9 +2551,9 @@ export const MemoryManager: React.FC<{
                     Narrador. Si la campaña es anterior a esta pantalla, estará vacía hasta el próximo botín.
                   </span>
                   <span className="not-italic font-cinzel text-[11px] text-[var(--accent)]">
-                    ¿Empiezas campaña? En la pestaña <strong>Personaje</strong>, el botón «Rellenar leyendo mi ficha
-                    subida» saca de tu ficha lo que llevas encima y lo mete aquí de una vez. Es lo que el Narrador lee
-                    en cada turno, así que conviene hacerlo antes de la primera escena.
+                    ¿Empiezas campaña? Dale a <strong>Sincronizar Memoria Completa con IA</strong>: lee tu ficha subida
+                    y mete aquí lo que llevas encima. Es lo que el Narrador consulta en cada turno, así que conviene
+                    hacerlo antes de la primera escena.
                   </span>
                   <span className="not-italic font-lora text-[11px] text-[var(--text-secondary)]">
                     Y si falta algo suelto, pídeselo al GM en el Chat: «mete en mi mochila el violín del Filí y mi
