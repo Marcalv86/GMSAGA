@@ -487,6 +487,8 @@ export interface Faccion {
   oculto?: string;
   /** Si la protagonista sabe siquiera que existe. */
   conocida?: boolean;
+  /** Leída de los documentos al arrancar, no descubierta jugando. */
+  sugerida?: boolean;
   notas?: string;
 }
 
@@ -511,6 +513,14 @@ export interface CartaPreparada {
   hilo?: string;
   /** Ya se ha usado: se queda como registro, no se borra. */
   usada?: boolean;
+  /**
+   * La propuso la aplicación al arrancar leyendo los documentos, no salió jugando.
+   *
+   * Se marca a propósito: en dos semanas hay que poder distinguir lo que el
+   * Narrador guardó porque se le ocurrió en una escena de lo que se sugirió
+   * solo el primer día a partir de un compendio.
+   */
+  sugerida?: boolean;
   /** Día absoluto en que se usó. */
   usadaDiaAbs?: number;
 }

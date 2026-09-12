@@ -1329,6 +1329,20 @@ export const MemoryManager: React.FC<{
                           🔒 ni sabes que existe
                         </span>
                       )}
+                      {/*
+                        Lo que salió de leer los documentos al arrancar se marca.
+                        En dos semanas hay que poder distinguir lo que el Narrador
+                        apuntó porque pasó en una escena de lo que propuso la
+                        aplicación el primer día a partir de un compendio.
+                      */}
+                      {fa.sugerida && (
+                        <span
+                          className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]"
+                          title="La leyó la aplicación de tus documentos al empezar. No ha salido jugando todavía."
+                        >
+                          📄 de tus documentos
+                        </span>
+                      )}
                     </div>
                     {fa.queEs && (
                       <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">{fa.queEs}</p>
@@ -1405,6 +1419,14 @@ export const MemoryManager: React.FC<{
               >
                 {c.titulo}
               </span>
+              {c.sugerida && (
+                <span
+                  className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)] self-start"
+                  title="La propuso la aplicación al empezar, leyendo tus documentos. No salió jugando."
+                >
+                  📄 sugerida al empezar
+                </span>
+              )}
               {c.cuando && (
                 <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
                   ⏳ Encaja {c.cuando}

@@ -5860,6 +5860,7 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[FACCIÓN: Nombre | es: qué es | quiere: su objetivo | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra (rival) | oculto: lo que ella no sabe]\` — la ficha de un bando. Sirve para apuntar uno nuevo cuando ella te lo cuenta y para corregir una postura que ha cambiado jugando.
 - \`[PREPARADO: Título | tipo: escena/encuentro/complicacion/revelacion/pnj | detalle: qué pasa | cuando: cuándo encaja]\` — guarda algo listo para más adelante. Si ella te propone una idea para el futuro, esto es donde va para que no se pierda. Se cierra con \`[PREPARADO: el mismo título | usada: sí]\`.
   - ⛔ Estas dos son TUYAS y ella no las ve en la ficción: aquí, hablando contigo fuera de personaje, sí puede preguntarte por ellas y pedirte que cambies algo — es su campaña—. Pero **no las narres ni las sueltes por tu cuenta**: si te pregunta «¿qué trama Fulano?», puedes decidir contestarle con evasivas de buen GM en vez de destriparle la trama, y eso es mejor mesa que responder con la lista.
+  - ⭐⭐ **Y recuerda que el cuaderno es una hipótesis, no un guion.** Lo que hay escrito ahí es lo que pasaría si nadie interviniera, y ella está interviniendo. Si en la partida ha muerto quien tenías para toda la campaña, si ha resuelto en dos turnos algo previsto para diez o si se ha ido por donde no esperabas, **gana lo jugado**: cierra lo que ha dejado de tener sentido, abre lo que lo sustituye y no retuerzas nada para salvar lo que estaba escrito. Si te pide un cambio que tumba algo que tenías planeado, ese es tu trabajo, no un problema: dile qué se lleva por delante si hace falta, y hazlo.
 
 **⚖️ PERO ESTO NO ES UN PANEL DE MANDOS: ERES EL DIRECTOR Y PUEDES DECIR QUE NO.**
 - ✅ **Corrige sin discutir** lo que es un error de registro: algo apuntado dos veces, una escena que se rehízo y quedó anotada, un nombre mal escrito, un objeto suyo que nunca se fichó, una barra que subió cuando no debía.
@@ -6335,6 +6336,139 @@ Responde ÚNICAMENTE con el JSON, sin nada más:
     inventory: equipo.length ? equipo : undefined,
     currencies: monedas && Object.keys(monedas).length ? monedas : undefined
   };
+}
+
+/**
+ * Lee de los documentos quién quiere qué, y deja un par de ideas preparadas.
+ *
+ * Los compendios traen las facciones escritas —quién manda, qué persigue, con
+ * quién está a matar— y hasta ahora eso solo llegaba al Narrador enterrado en
+ * doscientos mil caracteres de lore. Sacarlo a ficha propia es LEER, no
+ * inventar: es el mismo trabajo que leer la ficha del protagonista.
+ *
+ * ⛔ Lo que NO se genera aquí son relojes. Un reloj es un plan EN MARCHA, y el
+ * día cero no hay nada en marcha: cualquiera que se generase sería una cuenta
+ * atrás inventada sobre algo que no ha pasado, con consecuencias reales cuando
+ * se llenara. Esos se ganan jugando.
+ *
+ * Y lo preparado sale marcado como sugerido, para poder distinguir en dos
+ * semanas lo que guardó el Narrador porque se le ocurrió jugando de lo que
+ * propuso la aplicación el primer día.
+ */
+export async function leerElTableroDeDocumentos({
+  project,
+  files
+}: {
+  project: Project;
+  files: ProjectFile[];
+}): Promise<{ facciones: Faccion[]; preparado: CartaPreparada[] }> {
+  const fuentes = files
+    .filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200)
+    .slice(0, 8);
+  if (!fuentes.length) return { facciones: [], preparado: [] };
+
+  const texto = fuentes
+    .map(f => `=== ${f.name} ===\n${(f.content || '').slice(0, 24000)}`)
+    .join('\n\n')
+    .slice(0, 120000);
+
+  const pc = project.memory?.player_character;
+  const prompt = `Eres el director de esta campaña y estás preparando la mesa ANTES de la primera escena. De los documentos de abajo, saca dos cosas y devuélvelas en JSON.
+
+${pc?.name ? `La protagonista se llama ${pc.name}${pc.race ? `, ${pc.race}` : ''}${pc.class ? `, ${pc.class}` : ''}.\n` : ''}
+1. "facciones": los BANDOS CON INTERESES PROPIOS que aparecen en los documentos. Bandas, casas, órdenes, cultos, compañías, gremios, gobiernos.
+   - Esto es LEER, no inventar: solo lo que esté en los documentos. Si un dato no consta, omite el campo; no lo deduzcas.
+   - Por cada uno: "name"; "queEs" (en una frase); "objetivo" (qué persigue, si el documento lo dice); "recursos" (con qué cuenta); "cabeza" (quién manda); "conElla" (uno de: aliada, neutral, recelosa, enemiga, no la conoce — si no hay base para decidirlo, pon "no la conoce"); "relaciones" (array de {faccion, postura} con postura entre aliada/neutral/rival/guerra, solo cuando el documento diga cómo se llevan); "oculto" (lo que la protagonista NO puede saber todavía, si el documento lo distingue); "conocida" (false si ella no tiene por qué saber que existe).
+   - ⛔ Solo las que van a estar ahí toda la campaña. Una pareja de matones, una patrulla o un grupo de paso NO son facciones. Máximo 6.
+
+2. "preparado": entre 2 y 4 cosas listas para usar en las primeras sesiones, construidas CON LO QUE HAY en los documentos —no con material nuevo—.
+   - Por cada una: "titulo"; "tipo" (escena, encuentro, complicacion, revelacion o pnj); "detalle" (qué pasa, en dos o tres frases); "cuando" (en qué momento encajaría).
+   - Que sean concretas y jugables, no ideas vagas: quién aparece, qué quiere y qué pone en juego.
+   - ⛔ NO inventes revelaciones sobre el pasado de la protagonista ni le atribuyas objetos, parientes o secretos que sus documentos no digan.
+
+⛔ Si los documentos no dan para algo, devuelve la lista vacía. Es preferible una lista corta y cierta que una larga inventada: cualquier cosa que te inventes aquí se convierte en canon y contradirá lo que la jugadora tenga escrito.
+
+DOCUMENTOS:
+${texto}
+
+Responde ÚNICAMENTE con el JSON:
+{ "facciones": [{ "name": "...", "queEs": "...", "objetivo": "...", "recursos": "...", "cabeza": "...", "conElla": "...", "relaciones": [{"faccion":"...","postura":"..."}], "oculto": "...", "conocida": true }], "preparado": [{ "titulo": "...", "tipo": "...", "detalle": "...", "cuando": "..." }] }`;
+
+  const modelo = getBackgroundTaskModel();
+  const respuesta = await generateContentWithFailover({
+    proposito: 'Leer el tablero de la campaña',
+    primaryModel: modelo,
+    contents: prompt,
+    config: {
+      temperature: 0.3,
+      responseMimeType: 'application/json',
+      ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    } as any
+  });
+
+  let p: any = {};
+  try {
+    p = JSON.parse((respuesta.text || '{}').replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim());
+  } catch {
+    return { facciones: [], preparado: [] };
+  }
+
+  const txt = (v: any, max: number) => {
+    const t = typeof v === 'string' ? v.trim() : '';
+    return !t || /^(n\/?a|desconocid[oa]|no consta|ningun[oa]?)$/i.test(t) ? undefined : t.slice(0, max);
+  };
+  const POSTURAS = ['aliada', 'neutral', 'recelosa', 'enemiga', 'no la conoce'];
+  const ENTRE = ['aliada', 'neutral', 'rival', 'guerra'];
+  const TIPOS = ['escena', 'encuentro', 'complicacion', 'revelacion', 'pnj'];
+
+  const facciones: Faccion[] = (Array.isArray(p?.facciones) ? p.facciones : [])
+    .map((fa: any) => {
+      const name = txt(fa?.name, 120);
+      if (!name) return null;
+      const postura = String(fa?.conElla || '').trim().toLowerCase();
+      return {
+        id: `fac_ia_${hashCorto(name.toLowerCase())}`,
+        name,
+        queEs: txt(fa?.queEs, 200),
+        objetivo: txt(fa?.objetivo, 300),
+        recursos: txt(fa?.recursos, 300),
+        cabeza: txt(fa?.cabeza, 120),
+        conElla: (POSTURAS.includes(postura) ? postura : 'no la conoce') as Faccion['conElla'],
+        relaciones: (Array.isArray(fa?.relaciones) ? fa.relaciones : [])
+          .map((r: any) => {
+            const nombre = txt(r?.faccion, 100);
+            if (!nombre) return null;
+            const pos = String(r?.postura || '').trim().toLowerCase();
+            return { faccion: nombre, postura: (ENTRE.includes(pos) ? pos : 'rival') as 'aliada' | 'neutral' | 'rival' | 'guerra' };
+          })
+          .filter(Boolean)
+          .slice(0, 6),
+        oculto: txt(fa?.oculto, 500),
+        conocida: fa?.conocida !== false,
+        sugerida: true
+      } as Faccion;
+    })
+    .filter(Boolean)
+    .slice(0, 6) as Faccion[];
+
+  const preparado: CartaPreparada[] = (Array.isArray(p?.preparado) ? p.preparado : [])
+    .map((c: any) => {
+      const titulo = txt(c?.titulo, 160);
+      if (!titulo) return null;
+      const tipo = String(c?.tipo || '').trim().toLowerCase();
+      return {
+        id: `prep_ia_${hashCorto(titulo.toLowerCase())}`,
+        titulo,
+        tipo: (TIPOS.includes(tipo) ? tipo : 'otro') as CartaPreparada['tipo'],
+        detalle: txt(c?.detalle, 600),
+        cuando: txt(c?.cuando, 200),
+        sugerida: true
+      } as CartaPreparada;
+    })
+    .filter(Boolean)
+    .slice(0, 4) as CartaPreparada[];
+
+  return { facciones, preparado };
 }
 
 export async function tramarLaCampana({

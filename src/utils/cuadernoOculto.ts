@@ -395,6 +395,8 @@ export function aplicarFacciones(previo: Faccion[] | undefined, leidas: Faccion[
       conElla: f.conElla || a.conElla,
       oculto: f.oculto || a.oculto,
       conocida: f.conocida ?? a.conocida,
+      // En cuanto el Narrador la toca jugando deja de ser una sugerencia.
+      sugerida: f.sugerida && a.sugerida,
       relaciones: f.relaciones?.length ? f.relaciones : a.relaciones
     };
   }
@@ -422,6 +424,7 @@ export function aplicarPreparado(
       cuando: c.cuando || a.cuando,
       hilo: c.hilo || a.hilo,
       usada: c.usada || a.usada,
+      sugerida: c.sugerida && a.sugerida,
       usadaDiaAbs: c.usada && !a.usada ? diaAbs : a.usadaDiaAbs
     };
   }

@@ -99,6 +99,7 @@ import {
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
   tramarLaCampana,
+  leerElTableroDeDocumentos,
   extraerIdentidadDeDocumentos,
   extraerMecanicasDeDocumento,
   fusionarTrama,
@@ -1985,10 +1986,38 @@ export default function App() {
                 chats: effectiveChats,
                 modo: sinTrama ? 'trazar' : 'revisar'
               });
+              /*
+               * Y el tablero: quién quiere qué, leído de los documentos.
+               *
+               * Va aquí y no en su propio disparador porque es el mismo momento
+               * —la campaña arranca y hay material que nadie ha mirado— y así
+               * comparte el mismo freno de veinte minutos. Solo la primera vez:
+               * en cuanto hay facciones, esto no vuelve a correr, que después
+               * las descubre jugando y no leyendo.
+               *
+               * ⛔ No genera relojes a propósito: un reloj es un plan EN MARCHA,
+               * y el día cero no hay nada en marcha.
+               */
+              let tablero: { facciones: any[]; preparado: any[] } = { facciones: [], preparado: [] };
+              if (!(currentProject.memory?.gm_facciones || []).length) {
+                try {
+                  tablero = await leerElTableroDeDocumentos({ project: currentProject, files: currentFiles });
+                } catch (err) {
+                  logWarn('memory_sync', 'No se pudo leer el tablero de la campaña', String(err), {
+                    projectName: currentProject.name
+                  });
+                }
+              }
               await handleUpdateProjectField(p => ({
                 memory: {
                   ...(p.memory || {}),
                   gm_secrets: fusionarTrama(p.memory?.gm_secrets || [], trama),
+                  gm_facciones: tablero.facciones.length
+                    ? aplicarFacciones(p.memory?.gm_facciones, tablero.facciones)
+                    : p.memory?.gm_facciones,
+                  gm_preparado: tablero.preparado.length
+                    ? aplicarPreparado(p.memory?.gm_preparado, tablero.preparado)
+                    : p.memory?.gm_preparado,
                   plan_de_campana: {
                     premisa: trama.premisa || p.memory?.plan_de_campana?.premisa || '',
                     destino: trama.destino || p.memory?.plan_de_campana?.destino,
