@@ -219,3 +219,36 @@ export function diasSinMoverse(movs: MovimientoOculto[] | undefined, quien: stri
   if (!suyos.length) return Infinity;
   return hoyAbs - Math.max(...suyos.map(m => m.diaAbs));
 }
+
+/**
+ * Rehace el cuaderno leyendo todo el historial de golpe.
+ *
+ * Igual que la mochila y lo aprendido: las etiquetas están escritas en los
+ * turnos, así que recuperarlas no cuesta una llamada a la IA. Sirve para una
+ * campaña anterior a esta pantalla y para cuando algo se pierde por el camino.
+ *
+ * ⚠ El día NO se puede deducir del texto, así que los apuntes recuperados se
+ * marcan con el día que se les pase (el de hoy) salvo que ya lo trajeran. Es el
+ * precio de recuperarlos: se sabe QUÉ pasó, no exactamente cuándo.
+ */
+export function reconstruirCuaderno(
+  mensajes: { role: string; content: string }[],
+  diaAbs: number,
+  previo?: { movimientos?: MovimientoOculto[]; relojes?: RelojOculto[] }
+): { movimientos: MovimientoOculto[]; relojes: RelojOculto[]; vistos: number } {
+  let movimientos: MovimientoOculto[] = [...(previo?.movimientos || [])];
+  let relojes: RelojOculto[] = [...(previo?.relojes || [])];
+  let vistos = 0;
+
+  for (const m of mensajes) {
+    if (!m || m.role === 'user' || !m.content) continue;
+    const movs = leerBambalinas(m.content, diaAbs);
+    const rel = leerRelojes(m.content);
+    if (!movs.length && !rel.length) continue;
+    vistos += movs.length + rel.length;
+    if (movs.length) movimientos = aplicarBambalinas(movimientos, movs);
+    if (rel.length) relojes = aplicarRelojes(relojes, rel, diaAbs);
+  }
+
+  return { movimientos, relojes, vistos };
+}

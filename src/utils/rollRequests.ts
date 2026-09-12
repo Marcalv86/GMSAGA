@@ -1,3 +1,4 @@
+import { quitarEtiquetasInternas } from './etiquetasInternas';
 /**
  * Peticiones de tirada del Narrador.
  *
@@ -62,16 +63,7 @@ export function stripRollRequests(text: string): string {
  */
 export function stripStateTag(text: string): string {
   if (!text) return '';
-  return text
-    .replace(/\[\s*ESTADO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*TIEMPO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*AGENDA\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*HILO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*PRESENTES\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*V[IÍ]NCULO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*AFINIDAD\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*CHAPTER\s*:[^\]]*\]/gi, '')
+  return quitarEtiquetasInternas(text)
     .replace(/\[\s*Pregunta\s+de\s+Mesa\s*:[^\]]*\]/gi, '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')

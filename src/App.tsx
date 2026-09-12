@@ -111,10 +111,10 @@ import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
-import { aplicarBambalinas, aplicarRelojes, cuadernoQuieto } from './utils/cuadernoOculto';
+import { aplicarBambalinas, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno } from './utils/cuadernoOculto';
 import { aplicarOlvidos } from './utils/ordenesDeMesa';
 import type { VinculoLeido } from './utils/campaignCalendar';
-import type { Aprendizaje } from './types';
+import type { Aprendizaje, MovimientoOculto, RelojOculto } from './types';
 import type { CambioDeInventario } from './types';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
 import { RollRequest, rollDie } from './utils/rollRequests';
@@ -1422,12 +1422,15 @@ export default function App() {
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
     aprendido?: Aprendizaje[];
+    bambalinas?: MovimientoOculto[];
+    relojes?: RelojOculto[];
   }) => {
     const hayAlgo =
       orden.olvidos.length ||
       orden.vinculos.length ||
       !cambioVacio(orden.inventario) ||
-      !nadaAprendido(orden.aprendido || []);
+      !nadaAprendido(orden.aprendido || []) ||
+      !cuadernoQuieto(orden.bambalinas || [], orden.relojes || []);
     if (!hayAlgo) return;
 
     await handleUpdateProjectField(p => {
@@ -1486,6 +1489,26 @@ export default function App() {
             ...(pc || { name: '' }),
             aprendido: aplicarAprendizajes(pc?.aprendido, orden.aprendido || [], marca || undefined)
           }
+        };
+      }
+
+      /*
+       * Y su propio cuaderno, que también se corrige hablando: «apunta que
+       * Braelin volvió con las manos vacías», «ese reloj va por la mitad».
+       */
+      if (!cuadernoQuieto(orden.bambalinas || [], orden.relojes || [])) {
+        const movs = (orden.bambalinas || []).map(m => ({
+          ...m,
+          diaAbs: marca,
+          id: m.id.replace(/^bmb_0_/, `bmb_${marca}_`),
+          fecha: calendarioValido(p.calendar) && p.currentDate ? fechaLegible(p.calendar!, p.currentDate) : undefined
+        }));
+        mem = {
+          ...mem,
+          gm_bambalinas: movs.length ? aplicarBambalinas(mem.gm_bambalinas, movs) : mem.gm_bambalinas,
+          gm_relojes: (orden.relojes || []).length
+            ? aplicarRelojes(mem.gm_relojes, orden.relojes || [], marca || undefined)
+            : mem.gm_relojes
         };
       }
 
@@ -2915,6 +2938,22 @@ export default function App() {
         mensajesDeLaCronica,
         currentProject.memory?.player_character?.aprendido
       );
+      /*
+       * Y el cuaderno del Director, que tampoco se releía.
+       *
+       * «Sincronizar con IA» rehacía la memoria del personaje y la crónica y
+       * dejaba fuera lo que el Narrador había ido apuntando a espaldas de la
+       * protagonista. Las etiquetas están en los turnos: recuperarlas no cuesta
+       * ni una llamada más.
+       */
+      const diaDeHoy =
+        calendarioValido(currentProject.calendar) && currentProject.currentDate
+          ? aDiaAbsoluto(currentProject.calendar!, currentProject.currentDate)
+          : 0;
+      const cuaderno = reconstruirCuaderno(mensajesDeLaCronica, diaDeHoy, {
+        movimientos: currentProject.memory?.gm_bambalinas,
+        relojes: currentProject.memory?.gm_relojes
+      });
 
       await handleUpdateProjectField(p => {
         const memoriaSincronizada = sanitizeProjectMemory({
@@ -2942,6 +2981,8 @@ export default function App() {
         return {
           memory: {
             ...memoriaSincronizada,
+            gm_bambalinas: cuaderno.movimientos.length ? cuaderno.movimientos : memoriaSincronizada.gm_bambalinas,
+            gm_relojes: cuaderno.relojes.length ? cuaderno.relojes : memoriaSincronizada.gm_relojes,
             player_character: {
               ...(memoriaSincronizada.player_character || { name: '' }),
               inventory,

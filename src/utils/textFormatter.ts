@@ -1,3 +1,4 @@
+import { quitarEtiquetasInternas } from './etiquetasInternas';
 /**
  * Utilidad para embellecer y dar formato editorial a la prosa narrativa.
  * Convierte textos densos o bloques sin saltos de línea en párrafos limpios,
@@ -21,16 +22,7 @@ export function stripInternalTagsAndHeaders(raw: string | undefined | null): str
     .replace(/^[ \t]*📍[^\n\r]+(?:\r?\n[ \t]*(?:🌤|👥|🩸|⚡)[^\n\r]+)*/gim, '');
 
   // 2. Eliminar etiquetas de sincronización entre corchetes [TAG: ...]
-  text = text
-    .replace(/\[\s*ESTADO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*TIEMPO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*AGENDA\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*HILO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*PRESENTES\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*V[IÍ]NCULO\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*AFINIDAD\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*CHAPTER\s*:[^\]]*\]/gi, '')
+  text = quitarEtiquetasInternas(text)
     .replace(/\[\s*Pregunta\s+de\s+Mesa\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*Nota\s+de\s+Mesa\s*:[^\]]*\]/gi, '')
     .replace(/^[ \t]*<[ \t]*¿?Qué\s+haces\??[ \t]*>[ \t]*$/gim, '');

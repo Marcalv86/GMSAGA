@@ -5462,6 +5462,41 @@ export function construirPromptOOC({
           .join('\n')
       : '(nada registrado: o no ha subido de nivel aún, o no se apuntó en su momento)';
 
+  /*
+   * El cuaderno, que el Director tampoco veía.
+   *
+   * Es el mismo ente que el Narrador con el sombrero quitado: si ella le
+   * pregunta «¿qué ha estado haciendo Braelin estos días?» o le pide corregir
+   * un reloj, tiene que poder mirarlo y tocarlo. Sin esto contestaba a ciegas.
+   */
+  const cuadernoActual = (() => {
+    const movs = (project.memory?.gm_bambalinas || []).slice(-14);
+    const relojes = (project.memory?.gm_relojes || []).slice(-12);
+    const partes: string[] = [];
+    if (movs.length) {
+      partes.push(
+        `Fuera de cámara (lo más reciente):\n${movs
+          .map(
+            m =>
+              `- Día ${m.diaAbs}${m.fecha ? ` (${m.fecha})` : ''} · ${m.quien}: ${m.que}${
+                m.donde ? ` — en ${m.donde}` : ''
+              }${m.conQuien ? `, con ${m.conQuien}` : ''}${m.resultado ? `. → ${m.resultado}` : ''}${
+                m.loSupo ? ' [ella YA lo sabe]' : ' [ella NO lo sabe]'
+              }`
+          )
+          .join('\n')}`
+      );
+    }
+    if (relojes.length) {
+      partes.push(
+        `Relojes:\n${relojes
+          .map(r => `- ${r.nombre}: ${r.llenos}/${r.segmentos}${r.deQuien ? ` — lo mueve ${r.deQuien}` : ''}${r.alLlenarse ? `. Al llenarse: ${r.alLlenarse}` : ''}`)
+          .join('\n')}`
+      );
+    }
+    return partes.length ? partes.join('\n\n') : '(el cuaderno está vacío todavía)';
+  })();
+
   const NOMBRE_DE_MONEDA: Record<string, string> = { pp: 'PP', gp: 'PO', ep: 'PE', sp: 'PA', cp: 'PC' };
   const monedasActuales = pc?.currencies
     ? (['pp', 'gp', 'ep', 'sp', 'cp'] as const)
@@ -5482,6 +5517,7 @@ export function construirPromptOOC({
         `- Dinero actual en panel: ${monedasActuales}`,
         `- Inventario actual registrado en panel — es lo que puedes corregir con [INVENTARIO: ...]:\n${inventarioActual}`,
         `- Lo que ha aprendido jugando y su ficha NO recoge — lo corriges con [APRENDE: ...]:\n${aprendidoActual}`,
+        `\n--- TU CUADERNO (lo que ella no sabe) — lo corriges con [BAMBALINAS: ...] y [RELOJ: ...] ---\n${cuadernoActual}`,
         pc.sheetText ? `\n--- FICHA BASE (TEXTO REGISTRADO EN MEMORIA) ---\n${pc.sheetText}` : ''
       ]
         .filter(Boolean)
@@ -5743,6 +5779,9 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[INVENTARIO: +1 Objeto, -2 Otro, ~1 Objeto (en poder de: Quién | donde: Dónde), -15 PO]\` — corrige la mochila y el dinero. Sirve para meter lo que el personaje ya traía de casa y nunca se apuntó («mi violín no está en la lista»), y para quitar lo que sobra.
   - **\`~\` es «se lo han quitado»**, y es distinto de \`-\`. Si la requisaron, la detuvieron, la registraron o la robaron, sus cosas siguen siendo suyas y las tiene otro: van con \`~\` y con quién las tiene. Borrarlas con \`-\` hace desaparecer al personaje de la partida —sus documentos, sus herramientas y sus reliquias son lo que la define—. Cuando las recupere, \`+\` se las devuelve a las manos.
 - \`[APRENDE: +Nombre (tipo)]\` — apunta un conjuro, un rasgo, una competencia, un idioma o una mejora de característica que ella tenga y no conste. Tipos: conjuro, rasgo, competencia, mejora. Es LA vía para arreglar el hueco más silencioso que hay: su ficha se subió congelada en un nivel y todo lo que ha ganado subiendo desde entonces no está escrito en ninguna parte. Si te dice «al subir a nivel 4 cogí Bola de fuego y +2 a Sabiduría», lo apuntas y ya cuenta: \`[APRENDE: +Bola de fuego (conjuro), +2 a Sabiduría (mejora, nivel 4)]\`.
+- \`[BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama]\` — apunta en tu cuaderno algo que ha pasado fuera de cámara. Sirve para cuando ella te pregunta «¿qué ha estado haciendo X estos días?» y hay que dejarlo escrito, o para corregir un apunte que se quedó corto. Queda fechado en el día de campaña actual.
+- \`[RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve]\` — crea o mueve un plan que corre por detrás. «van: +1» lo avanza, «van: 4» lo fija.
+  - ⛔ Estas dos son TUYAS y ella no las ve en la ficción: aquí, hablando contigo fuera de personaje, sí puede preguntarte por ellas y pedirte que cambies algo — es su campaña—. Pero **no las narres ni las sueltes por tu cuenta**: si te pregunta «¿qué trama Fulano?», puedes decidir contestarle con evasivas de buen GM en vez de destriparle la trama, y eso es mejor mesa que responder con la lista.
 
 **⚖️ PERO ESTO NO ES UN PANEL DE MANDOS: ERES EL DIRECTOR Y PUEDES DECIR QUE NO.**
 - ✅ **Corrige sin discutir** lo que es un error de registro: algo apuntado dos veces, una escena que se rehízo y quedó anotada, un nombre mal escrito, un objeto suyo que nunca se fichó, una barra que subió cuando no debía.
@@ -5814,6 +5853,10 @@ export interface RespuestaDeMesa {
   inventario: CambioDeInventario;
   /** Conjuros, rasgos o competencias que el Director apunta porque ella se lo pide. */
   aprendido: Aprendizaje[];
+  /** Apuntes en su cuaderno: lo que ha pasado fuera de cámara. */
+  bambalinas: MovimientoOculto[];
+  /** Relojes creados o movidos desde la mesa. */
+  relojes: RelojOculto[];
   /**
    * Lo que costó de verdad la pregunta, en fichas de entrada.
    *
@@ -5977,6 +6020,8 @@ export async function preguntarAlDirectorOOC(
   const vinculos = leerVinculos(bruto);
   const inventario = leerInventario(bruto);
   const aprendido = leerAprendizajes(bruto);
+  const bambalinas = leerBambalinas(bruto, 0);
+  const relojes = leerRelojes(bruto);
 
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
   const texto = stripStateTag(limpiarEtiquetasDeTiempo(limpiarEtiquetasDePnj(bruto)))
@@ -5984,6 +6029,8 @@ export async function preguntarAlDirectorOOC(
     .replace(/\[\s*OLVIDA\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*APRENDE\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*BAMBALINAS\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*RELOJ\s*:[^\]]*\]/gi, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -5996,6 +6043,8 @@ export async function preguntarAlDirectorOOC(
     vinculos,
     inventario,
     aprendido,
+    bambalinas,
+    relojes,
     fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount
   };
 }

@@ -16,7 +16,8 @@ import {
   Sliders,
   FileText,
   User,
-  VenetianMask
+  VenetianMask,
+  Lock as LockIcon
 } from 'lucide-react';
 import { MemoryManager } from './MemoryManager';
 import {
@@ -64,7 +65,23 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
     }
   });
 
+  /*
+   * EL CUADERNO DEL DIRECTOR ENTRA SIEMPRE CERRADO.
+   *
+   * Aquí dentro está lo que todavía no se ha ganado jugando: los giros sin
+   * destapar, lo que la gente hace a espaldas de la protagonista y los planes
+   * que están a punto de caerle encima. Abrir la pestaña por costumbre —o
+   * buscando otra cosa— y llevarte medio capítulo por delante de un vistazo
+   * es un accidente que solo puede pasar una vez por giro.
+   *
+   * Así que se destapa a propósito, y **se vuelve a cerrar al salir**: no es
+   * un interruptor que se queda encendido, es una decisión que se toma cada
+   * vez que entras.
+   */
+  const [cuadernoAbierto, setCuadernoAbierto] = useState(false);
+
   const handleSwitchMode = (mode: 'character' | 'gm' | 'project') => {
+    if (mode !== 'gm') setCuadernoAbierto(false);
     setMemoryMode(mode);
     try {
       localStorage.setItem('preferred_memory_view_mode', mode);
@@ -346,9 +363,45 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
         )}
       </div>
 
-      {memoryMode === 'gm' ? (
+      {memoryMode === 'gm' && !cuadernoAbierto ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6 text-center">
+          <div className="w-16 h-16 rounded-2xl border-2 border-[var(--accent)]/40 bg-[var(--accent)]/5 flex items-center justify-center">
+            <LockIcon className="w-7 h-7 text-[var(--accent)]" />
+          </div>
+          <div className="flex flex-col gap-2 max-w-sm">
+            <h3 className="font-cinzel font-bold text-base sm:text-lg text-[var(--accent)] m-0">
+              Cuaderno del GM — cerrado
+            </h3>
+            <p className="text-xs sm:text-sm text-[var(--text-secondary)] m-0 leading-relaxed">
+              Aquí dentro está lo que <strong className="text-[var(--text-primary)]">todavía no se ha ganado jugando</strong>: los giros sin
+              destapar, lo que la gente hace a tus espaldas y los planes que están a punto de caerte encima.
+            </p>
+            <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed opacity-80">
+              Es tu campaña y puedes mirarlo cuando quieras — pero un spoiler solo se puede tragar una vez, así que se
+              abre a propósito y se vuelve a cerrar en cuanto sales de aquí.
+            </p>
+          </div>
+          <button
+            onClick={() => setCuadernoAbierto(true)}
+            className="min-h-[44px] px-5 rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] text-xs font-cinzel font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <LockIcon className="w-4 h-4" />
+            Abrirlo de todas formas
+          </button>
+        </div>
+      ) : memoryMode === 'gm' ? (
         <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-          <div className="px-3 sm:px-6 pt-3">
+          <div className="px-3 sm:px-6 pt-3 flex flex-col gap-2">
+            <button
+              onClick={() => setCuadernoAbierto(false)}
+              className="self-end min-h-[36px] px-3 rounded-lg border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Vuelve a tapar el cuaderno. Se cierra solo al cambiar de pestaña."
+            >
+              <LockIcon className="w-3.5 h-3.5" />
+              Cerrar el cuaderno
+            </button>
+          </div>
+          <div className="px-3 sm:px-6 pt-1">
             <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 flex items-start gap-2">
               <span className="text-base leading-none mt-0.5">🕯️</span>
               <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
