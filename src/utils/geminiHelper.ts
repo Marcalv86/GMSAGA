@@ -63,7 +63,7 @@ import {
 import { cambioVacio, leerInventario } from './inventoryTag';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
 import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa } from './cuadernoOculto';
-import { leerOlvidos } from './ordenesDeMesa';
+import { leerEtiquetados, leerOlvidos, OrdenDeEtiquetado } from './ordenesDeMesa';
 import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 import { logError, logWarn, logInfo } from './logger';
@@ -5943,6 +5943,11 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama]\` — apunta en tu cuaderno algo que ha pasado fuera de cámara. Sirve para cuando ella te pregunta «¿qué ha estado haciendo X estos días?» y hay que dejarlo escrito, o para corregir un apunte que se quedó corto. Queda fechado en el día de campaña actual.
 - \`[RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve]\` — crea o mueve un plan que corre por detrás. «van: +1» lo avanza, «van: 4» lo fija.
 - \`[FACCIÓN: Nombre | es: qué es | quiere: su objetivo | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra (rival) | oculto: lo que ella no sabe]\` — la ficha de un bando. Sirve para apuntar uno nuevo cuando ella te lo cuenta y para corregir una postura que ha cambiado jugando.
+- \`[ETIQUETA: nombre del archivo | términos, separados, por, comas]\` — dile al buscador por qué términos debe encontrar un documento de la biblioteca. **Esto arregla el fallo más silencioso que hay**: el buscador casa palabras, no significados, así que no sabe que Jarlaxle es drow y en una conversación con él la cantera de Menzoberranzan no sube. Tú sí lo sabes.
+  - El nombre del archivo vale con un trozo reconocible: «Bregan D'aerthe» encuentra «COMPENDIO Mundo Bregan Daerthe (Jax, PNJs, Jarlaxle, Luskan).md».
+  - **Funciona en los dos sentidos, y el segundo es el que más se usa.** Si te dicen «encontrarás información de Jarlaxle en Bregan D'aerthe, Menzoberranzan y Waterdeep», emites UNA etiqueta por cada documento: \`[ETIQUETA: Bregan D'aerthe | Jarlaxle]\` \`[ETIQUETA: Menzoberranzan | Jarlaxle]\` \`[ETIQUETA: Waterdeep | Jarlaxle]\`.
+  - Los términos SE SUMAN a los que ya tenga: nunca se pierde lo anterior.
+  - ⭐ Y no esperes a que te lo pidan con estas palabras. Si en la conversación sale que un documento cubre algo que no está escrito dentro —un personaje, una facción, un sitio—, etiquétalo y dilo.
 - \`[PREPARADO: Título | tipo: escena/encuentro/complicacion/revelacion/pnj | detalle: qué pasa | cuando: cuándo encaja]\` — guarda algo listo para más adelante. Si ella te propone una idea para el futuro, esto es donde va para que no se pierda. Se cierra con \`[PREPARADO: el mismo título | usada: sí]\`.
   - ⛔ Estas dos son TUYAS y ella no las ve en la ficción: aquí, hablando contigo fuera de personaje, sí puede preguntarte por ellas y pedirte que cambies algo — es su campaña—. Pero **no las narres ni las sueltes por tu cuenta**: si te pregunta «¿qué trama Fulano?», puedes decidir contestarle con evasivas de buen GM en vez de destriparle la trama, y eso es mejor mesa que responder con la lista.
   - ⭐⭐ **Y recuerda que el cuaderno es una hipótesis, no un guion.** Lo que hay escrito ahí es lo que pasaría si nadie interviniera, y ella está interviniendo. Si en la partida ha muerto quien tenías para toda la campaña, si ha resuelto en dos turnos algo previsto para diez o si se ha ido por donde no esperabas, **gana lo jugado**: cierra lo que ha dejado de tener sentido, abre lo que lo sustituye y no retuerzas nada para salvar lo que estaba escrito. Si te pide un cambio que tumba algo que tenías planeado, ese es tu trabajo, no un problema: dile qué se lleva por delante si hace falta, y hazlo.
@@ -5955,7 +5960,7 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 
 QUÉ NO HACES AQUÍ:
 - ⛔ NO narras, NO haces avanzar la historia y NO decides acciones del personaje. Si te piden jugar algo, recuérdales que eso va en la pestaña de Jugar.
-- ⛔ NO emites etiquetas de avance de partida ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:], [PRESENTES:]…): aquí no pasa el tiempo ni se registra crónica. Las únicas que puedes usar son las de arriba: \`[MEMORIA:]\`, \`[SECRETO:]\`, \`[OLVIDA:]\`, \`[VÍNCULO:]\` e \`[INVENTARIO:]\`.
+- ⛔ NO emites etiquetas de avance de partida ([TIEMPO:], [AGENDA:], [ESTADO:], [AVANCE:], [PRESENTES:]…): aquí no pasa el tiempo ni se registra crónica. Las únicas que puedes usar son las de arriba: \`[MEMORIA:]\`, \`[SECRETO:]\`, \`[OLVIDA:]\`, \`[VÍNCULO:]\`, \`[INVENTARIO:]\` y \`[ETIQUETA:]\`.
 - ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
 - Si no sabes algo porque no consta en los documentos ni en lo que tienes delante, dilo. No lo inventes.
 ${buscarEnLaWeb ? `
@@ -6011,6 +6016,16 @@ export interface RespuestaDeMesa {
   secretos: SecretoLeido[];
   /** Lo que le ha pedido olvidar: notas, entradas del diario, hitos o fichas. */
   olvidos: string[];
+  /**
+   * Términos con los que el buscador debe encontrar un documento.
+   *
+   * El etiquetador automático lee el archivo y deduce por qué buscarlo, pero
+   * hay puentes que solo sabe tender quien conoce la biblioteca: que la cantera
+   * de Menzoberranzan explica a Jarlaxle es obvio para el Director y no tiene
+   * por qué serlo para un modelo que solo ha visto ese archivo. Aquí se le dice
+   * hablando, en cualquiera de los dos sentidos.
+   */
+  etiquetados: OrdenDeEtiquetado[];
   /** Correcciones sobre personajes: afinidad, orientación, lo que aparenta y lo que calla. */
   vinculos: VinculoLeido[];
   /** Correcciones sobre la mochila y el dinero. */
@@ -6192,6 +6207,7 @@ export async function preguntarAlDirectorOOC(
   const relojes = leerRelojes(bruto);
   const facciones = leerFacciones(bruto);
   const preparado = leerPreparado(bruto);
+  const etiquetados = leerEtiquetados(bruto);
 
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
   const texto = stripStateTag(limpiarEtiquetasDeTiempo(limpiarEtiquetasDePnj(bruto)))
@@ -6203,6 +6219,7 @@ export async function preguntarAlDirectorOOC(
     .replace(/\[\s*RELOJ\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*FACCI[OÓ]N\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*PREPARADO\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*ETIQUETA\s*:[^\]]*\]/gi, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -6212,6 +6229,7 @@ export async function preguntarAlDirectorOOC(
     memorias,
     secretos,
     olvidos,
+    etiquetados,
     vinculos,
     inventario,
     aprendido,

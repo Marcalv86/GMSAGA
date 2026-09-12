@@ -5,6 +5,7 @@ import { MensajeDeMesa, TOPE_MENSAJES, leerMesa, guardarMesa, borrarMesa, leerMo
 // buscaba antes de que el almacén se mudara a utils/mesaStorage.
 export type { MensajeDeMesa };
 export { leerMesa, guardarMesa, borrarMesa };
+import { OrdenDeEtiquetado } from '../utils/ordenesDeMesa';
 import ReactMarkdown from 'react-markdown';
 import {
   BookmarkPlus,
@@ -95,6 +96,7 @@ export const MesaView: React.FC<{
   /** Lo que el Director corrige cuando se lo piden: borrar, tocar un PNJ, la mochila. */
   onCorregirDesdeLaMesa?: (orden: {
     olvidos: string[];
+    etiquetados?: OrdenDeEtiquetado[];
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
     aprendido?: Aprendizaje[];
@@ -241,6 +243,7 @@ export const MesaView: React.FC<{
       if (onCorregirDesdeLaMesa) {
         await onCorregirDesdeLaMesa({
           olvidos: respuesta.olvidos,
+          etiquetados: respuesta.etiquetados,
           vinculos: respuesta.vinculos,
           inventario: respuesta.inventario,
           aprendido: respuesta.aprendido,

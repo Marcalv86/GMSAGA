@@ -52,6 +52,7 @@ import { ImportCampaignModal } from './components/ImportCampaignModal';
 import { Logger } from './components/Logger';
 import { logError, logInfo, logWarn } from './utils/logger';
 import { presionDelMinuto } from './utils/callLog';
+import { aplicarEtiquetados, OrdenDeEtiquetado } from './utils/ordenesDeMesa';
 import { sanitizeProjectMemory } from './utils/sanitizers';
 import { ExtractedCampaignResult } from './utils/campaignImporter';
 import { writeCampaignToDisk } from './utils/diskBackup';
@@ -1429,6 +1430,7 @@ export default function App() {
    */
   const corregirDesdeLaMesa = async (orden: {
     olvidos: string[];
+    etiquetados?: OrdenDeEtiquetado[];
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
     aprendido?: Aprendizaje[];
@@ -1437,6 +1439,19 @@ export default function App() {
     facciones?: Faccion[];
     preparado?: CartaPreparada[];
   }) => {
+    /*
+     * Las etiquetas de búsqueda viven en los archivos, no en el proyecto, así
+     * que se aplican aparte y antes: `handleUpdateProjectField` no los toca.
+     */
+    if (orden.etiquetados?.length && currentPId) {
+      const frescos = await loadFilesFromDB(currentPId);
+      const { archivos, aplicado } = aplicarEtiquetados(frescos, orden.etiquetados);
+      if (aplicado.length) {
+        setCurrentFiles(archivos);
+        await saveFilesToDB(currentPId, archivos);
+      }
+    }
+
     const hayAlgo =
       orden.olvidos.length ||
       orden.vinculos.length ||

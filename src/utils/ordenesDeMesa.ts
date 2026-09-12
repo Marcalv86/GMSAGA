@@ -144,3 +144,97 @@ export function resumirOlvidos(q: LoOlvidado): string[] {
   if (q.personajes.length) partes.push(`la ficha de ${q.personajes.join(', ')}`);
   return partes;
 }
+
+/* ------------------------------------------------- etiquetas de búsqueda */
+
+/**
+ * `[ETIQUETA: nombre del archivo | términos, separados, por, comas]`
+ *
+ * El etiquetador automático lee el documento y deduce por qué buscarlo, pero
+ * hay puentes que solo sabe tender quien conoce la biblioteca: que la cantera
+ * de Menzoberranzan explica a Jarlaxle es evidente para el Director de la mesa
+ * y no tiene por qué serlo para un modelo que solo ha visto ese archivo.
+ *
+ * Con esto se le dice hablando: «encontrarás información de Jarlaxle en Bregan
+ * D'aerthe, Menzoberranzan y Waterdeep», y él emite una etiqueta por cada
+ * documento. Es la misma operación en los dos sentidos —de documento a
+ * términos, o de término a documentos— porque al final es la misma tabla.
+ */
+const ETIQUETA_RE = /\[\s*ETIQUETA\s*:\s*([^|\]]+)\|\s*([^\]]+)\]/gi;
+
+export interface OrdenDeEtiquetado {
+  /** Lo que dijo el Director: un trozo reconocible del nombre, no el nombre exacto. */
+  archivo: string;
+  terminos: string[];
+}
+
+export function leerEtiquetados(texto: string): OrdenDeEtiquetado[] {
+  if (!texto || !/ETIQUETA/i.test(texto)) return [];
+  ETIQUETA_RE.lastIndex = 0;
+  const out: OrdenDeEtiquetado[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = ETIQUETA_RE.exec(texto)) !== null) {
+    const archivo = m[1].trim().replace(/\s+/g, ' ');
+    const terminos = m[2]
+      .split(',')
+      .map(t => t.trim())
+      .filter(t => t.length >= 3 && t.length <= 60);
+    // Un nombre de archivo demasiado corto casaría con media biblioteca.
+    if (normalizar(archivo).length >= 4 && terminos.length) {
+      out.push({ archivo, terminos });
+    }
+  }
+  return out;
+}
+
+export interface EtiquetadoAplicado {
+  archivo: string;
+  anadidos: string[];
+}
+
+/**
+ * Cuela las etiquetas nuevas en los archivos que toque.
+ *
+ * SE SUMAN, NUNCA SE SUSTITUYEN. Lo que hay puesto puede venir del etiquetador
+ * automático o de otra conversación, y perderlo por añadir un nombre sería el
+ * peor intercambio posible: se arregla un puente y se tiran veinte.
+ *
+ * El nombre del archivo se busca por coincidencia laxa a propósito: en el chat
+ * se dice «Bregan D'aerthe», no «COMPENDIO Mundo Bregan Daerthe (Jax, PNJs,
+ * Jarlaxle, Luskan).md». Si una orden casa con varios archivos se aplica a
+ * todos, que es lo que se ha pedido cuando se nombra una colección.
+ */
+export function aplicarEtiquetados<T extends { name: string; etiquetasBusqueda?: string }>(
+  archivos: T[],
+  ordenes: OrdenDeEtiquetado[]
+): { archivos: T[]; aplicado: EtiquetadoAplicado[] } {
+  if (!ordenes.length) return { archivos, aplicado: [] };
+
+  const aplicado: EtiquetadoAplicado[] = [];
+  const salida = archivos.map(f => {
+    const pedidos = ordenes.filter(o => coincide(f.name, o.archivo));
+    if (!pedidos.length) return f;
+
+    const yaPuestas = (f.etiquetasBusqueda || '')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+    const vistos = new Set(yaPuestas.map(normalizar));
+    const anadidos: string[] = [];
+
+    for (const o of pedidos) {
+      for (const t of o.terminos) {
+        const n = normalizar(t);
+        if (!n || vistos.has(n)) continue;
+        vistos.add(n);
+        anadidos.push(t);
+      }
+    }
+
+    if (!anadidos.length) return f;
+    aplicado.push({ archivo: f.name, anadidos });
+    return { ...f, etiquetasBusqueda: [...yaPuestas, ...anadidos].join(', ') };
+  });
+
+  return { archivos: salida, aplicado };
+}
