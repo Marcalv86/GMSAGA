@@ -10,10 +10,15 @@ import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from
 import { formatNarrativeText } from '../utils/textFormatter';
 import { parseMessageSegments, RollBadgeCard } from './RollBadge';
 import { parseSceneHUD, SceneHUDCard } from './SceneHUDCard';
+import { Moon, Sun, Sunrise, Sunset } from 'lucide-react';
 import {
   CALENDARIO_FANTASTICO,
   aDiaAbsoluto,
-  diasJugadosEnElCapitulo
+  calendarioValido,
+  diasJugadosEnElCapitulo,
+  fechaCompacta,
+  fechaCompleta,
+  horaLegible
 } from '../utils/campaignCalendar';
 import {
   PROBABILIDADES,
@@ -1134,6 +1139,42 @@ export const ChatView: React.FC<{
               </button>
             )}
           </div>
+
+          {/*
+            QUÉ HORA ES EN LA FICCIÓN, MIENTRAS SE JUEGA.
+            La aplicación lleva la cuenta al minuto —la mueve la etiqueta
+            [TIEMPO:] en cada turno— pero solo se veía entrando al Diario o al
+            Calendario, o sea nunca: cuando importa saber si anochece es
+            mientras se decide qué hacer, no revisando pantallas después.
+            `fechaCompacta` estaba escrita para esto desde el principio, con su
+            comentario diciendo «versión corta para la cabecera», y no se había
+            enchufado en ningún sitio.
+            El icono cambia con la franja para que se lea de un vistazo sin
+            tener que interpretar un número.
+          */}
+          {calendarioValido(project?.calendar) && project?.currentDate && (() => {
+            /*
+             * El icono sale de la hora, no del nombre de la franja.
+             * Casarlo por texto se rompía con «al anochecer», que contiene
+             * «noche» y salía con la luna cuando todavía es el crepúsculo.
+             * Los cortes son los mismos que usa `franjaDelDia`.
+             */
+            const hora = Math.floor((project.currentDate.minute || 0) / 60);
+            const Icono = hora < 5 ? Moon : hora < 7 ? Sunrise : hora < 19 ? Sun : hora < 21 ? Sunset : Moon;
+            return (
+              <>
+                <span className="border-r border-[var(--glass-border)] h-4 inline shrink-0" />
+                <span
+                  className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-cinzel text-[var(--text-secondary)] shrink-0 tabular-nums"
+                  title={`En la ficción: ${fechaCompleta(project.calendar!, project.currentDate)}`}
+                >
+                  <Icono className="w-3.5 h-3.5 opacity-80" />
+                  <span className="hidden sm:inline">{fechaCompacta(project.calendar!, project.currentDate)}</span>
+                  <span className="sm:hidden">{horaLegible(project.currentDate.minute)}</span>
+                </span>
+              </>
+            );
+          })()}
 
           <span className="border-r border-[var(--glass-border)] h-4 hidden sm:inline shrink-0" />
 
