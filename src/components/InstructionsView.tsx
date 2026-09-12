@@ -876,6 +876,28 @@ export const InstructionsView: React.FC<{
                 Directivas del Master (Lore & Conducta)
               </span>
             </div>
+            {/*
+              ESCRIBIR AQUÍ APAGA LAS DIRECTIVAS POR DEFECTO, Y NO SE VEÍA.
+              `buildTurnPayload` hace o lo uno o lo otro: en cuanto este cuadro
+              pasa de diez caracteres, DEFAULT_DM_INSTRUCTIONS deja de viajar
+              entera. Son ciento cuarenta reglas, y entre ellas van cosas que
+              parecen del motor y no del sabor de la campaña —cómo se anuncian
+              las jornadas de un viaje, por ejemplo—. Nadie lo deduce escribiendo
+              en un cuadro de texto, y el síntoma aparece semanas después como
+              «el Narrador se ha saltado una regla» cuando en realidad nunca la
+              tuvo. Los protocolos del motor sí viajan siempre, así que el aviso
+              acota exactamente lo que se pierde.
+            */}
+            {instructions.trim().length > 10 && (
+              <div className="mb-2 text-[11px] leading-relaxed rounded-lg border border-amber-700/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 px-2.5 py-2">
+                ⚠️ <strong>Estas directivas SUSTITUYEN a las de por defecto</strong>, no se suman a ellas. Mientras
+                haya texto aquí, las 142 reglas de conducta que trae la aplicación no viajan en el turno.
+                <br />
+                Los <strong>protocolos del motor</strong> (etiquetas, HUD, dados, calendario) sí van siempre, así
+                que la interfaz no se rompe. Lo que se pierde son las pautas de narración: ritmo, tratamiento de
+                los PNJs, manejo del tiempo y los viajes. Si quieres alguna, cópiala aquí.
+              </div>
+            )}
             <textarea
               value={instructions}
               onChange={e => {
