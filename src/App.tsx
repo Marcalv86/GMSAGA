@@ -2850,6 +2850,15 @@ export default function App() {
    * lo hace funcionar: sin él devuelve etiquetas correctas pero que no tienden
    * el puente hasta los nombres por los que se busca de verdad.
    */
+  /** Las etiquetas escritas o corregidas a mano desde el modal de Archivos. */
+  const handleGuardarEtiquetas = async (fileId: string, etiquetas: string) => {
+    if (!currentPId) return;
+    const frescos = await loadFilesFromDB(currentPId);
+    const updated = frescos.map(f => (f.id === fileId ? { ...f, etiquetasBusqueda: etiquetas } : f));
+    setCurrentFiles(updated);
+    await saveFilesToDB(currentPId, updated);
+  };
+
   const handleGenerarEtiquetas = async (file: ProjectFile) => {
     if (!currentPId || !currentProject) return;
     if (extractingFileIds.includes(file.id)) return;
@@ -2869,14 +2878,14 @@ export default function App() {
       setCurrentFiles(updated);
       await saveFilesToDB(currentPId, updated);
 
-      const cuantas = etiquetas.split(',').filter(t => t.trim()).length;
-      setAlertConfig({
-        isOpen: true,
-        title: 'Etiquetas generadas',
-        message:
-          `"${file.name}" ya tiene ${cuantas} términos de búsqueda.\n\n${etiquetas}\n\n` +
-          `A partir de ahora el buscador puede encontrarlo por cualquiera de ellos, aunque la escena no use las palabras exactas que hay escritas dentro. Míralo en el registro de llamadas: si antes salía siempre en «sin usar», debería empezar a aportar fragmentos.`
-      });
+      /*
+       * Ya no se abre un aviso con la lista dentro.
+       *
+       * Era la ÚNICA vez que se podían leer, y eso está mal por los dos lados:
+       * interrumpe cuando no hace falta, y deja sin sitio donde volver a
+       * mirarlas. Ahora el botón de Archivos dice cuántas hay y abre un cuadro
+       * donde se ven, se editan y se rehacen las veces que haga falta.
+       */
     } catch (err) {
       logError('general', 'No se han podido generar las etiquetas de búsqueda', err, {
         details: { archivo: file.name }
@@ -4445,6 +4454,7 @@ export default function App() {
               onDistillOracle={handleDistillOracle}
               onExtractMechanics={handleExtractMechanics}
               onGenerarEtiquetas={handleGenerarEtiquetas}
+              onGuardarEtiquetas={handleGuardarEtiquetas}
               onAutoClassifyAll={handleAutoClassifyAll}
               onExtractNpc={handleExtractNpc}
               onCreateNpcFromImage={handleCreateNpcFromImage}

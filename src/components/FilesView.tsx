@@ -45,6 +45,7 @@ export const FilesView: React.FC<{
   onDistillOracle?: (file: ProjectFile) => Promise<void>;
   onExtractMechanics?: (file: ProjectFile) => Promise<void>;
   onGenerarEtiquetas?: (file: ProjectFile) => Promise<void>;
+  onGuardarEtiquetas?: (fileId: string, etiquetas: string) => Promise<void>;
   onAutoClassifyAll?: () => Promise<void>;
   onExtractNpc?: (file: ProjectFile) => Promise<void>;
   onCreateNpcFromImage?: (file: ProjectFile) => Promise<void>;
@@ -65,6 +66,7 @@ export const FilesView: React.FC<{
   onDistillOracle,
   onExtractMechanics,
   onGenerarEtiquetas,
+  onGuardarEtiquetas,
   onAutoClassifyAll,
   onExtractNpc,
   onCreateNpcFromImage,
@@ -206,6 +208,26 @@ export const FilesView: React.FC<{
       const droppedFiles = Array.from(e.dataTransfer.files);
       onUpload(droppedFiles);
     }
+  };
+
+  /*
+   * LAS ETIQUETAS TIENEN QUE PODER VERSE, Y NO SOLO UNA VEZ.
+   *
+   * Vivían en un aviso que sale al generarlas y en el `title` del botón. Lo
+   * primero se ve una vez y lo segundo no existe en un móvil: un `title` es un
+   * tooltip de ratón y esto se juega con el dedo. O sea que en la práctica se
+   * generaban a ciegas y no había forma de volver a mirarlas.
+   *
+   * Aquí se ven, se editan a mano y se regeneran. Editarlas importa tanto como
+   * verlas: quien montó la biblioteca sabe cosas que no están escritas en los
+   * documentos, y ese es justo el hueco que las etiquetas existen para tapar.
+   */
+  const [archivoDeEtiquetas, setArchivoDeEtiquetas] = useState<ProjectFile | null>(null);
+  const [borradorEtiquetas, setBorradorEtiquetas] = useState('');
+
+  const abrirEtiquetas = (file: ProjectFile) => {
+    setArchivoDeEtiquetas(file);
+    setBorradorEtiquetas(file.etiquetasBusqueda || '');
   };
 
   const handleOpenAnalysisModal = (file: ProjectFile) => {
@@ -464,6 +486,19 @@ export const FilesView: React.FC<{
                 n.portrait === f.content ||
                 (n.name.length > 2 && f.name.toLowerCase().includes(n.name.toLowerCase()))
             );
+            /*
+             * Hay DOS motivos para que salga la chapa morada y solo uno era un
+             * vínculo de verdad.
+             *
+             * El bueno: esta imagen es el retrato de ese PNJ. El otro: el
+             * nombre del fichero contiene su nombre, que es lo que pasa con
+             * «COMPENDIO Mundo Bregan Daerthe (Jax, PNJs, Jarlaxle, Luskan)» —
+             * doscientos mil caracteres de texto que no son el retrato de
+             * nadie—. Los dos enseñaban «Vinculado como retrato al PNJ», así
+             * que la chapa afirmaba algo falso en el segundo caso y dejaba
+             * pensando que había una vinculación que no existe.
+             */
+            const esRetratoDelNpc = Boolean(linkedNpc && linkedNpc.portrait === f.content);
             const linkedLoc = project.memory?.locations?.find(
               l =>
                 l.portrait === f.content ||
@@ -600,7 +635,11 @@ export const FilesView: React.FC<{
                       {linkedNpc && (
                         <span
                           className="text-[10px] bg-purple-100 text-purple-900 border border-purple-300 px-1.5 py-0.2 rounded font-cinzel font-bold"
-                          title={`Vinculado como retrato al PNJ: ${linkedNpc.name}`}
+                          title={
+                            esRetratoDelNpc
+                              ? `Vinculado como retrato al PNJ: ${linkedNpc.name}`
+                              : `El nombre de este archivo contiene a ${linkedNpc.name}, un PNJ de la campaña. Es solo una coincidencia de nombre, no una vinculación: el archivo no es su retrato ni su ficha.\n\n⚠️ Y tiene un efecto real en la búsqueda: el nombre del fichero se indexa con TODOS sus fragmentos, así que este documento puntúa por «${linkedNpc.name}» en cada uno de ellos y compite con ventaja contra los demás.`
+                          }
                         >
                           {linkedNpc.name}
                         </span>
@@ -815,7 +854,7 @@ export const FilesView: React.FC<{
                         */}
                         {!f.isImage && !f.isAudio && f.onDemand && onGenerarEtiquetas && (
                           <button
-                            onClick={() => onGenerarEtiquetas(f)}
+                            onClick={() => (f.etiquetasBusqueda ? abrirEtiquetas(f) : onGenerarEtiquetas(f))}
                             disabled={extractingFileIds.includes(f.id)}
                             className={`px-2 py-1 rounded text-[10px] md:text-[11px] font-cinzel font-bold transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-1.5 border ${
                               f.etiquetasBusqueda
@@ -824,7 +863,7 @@ export const FilesView: React.FC<{
                             }`}
                             title={
                               f.etiquetasBusqueda
-                                ? `Términos con los que el buscador encuentra este documento (pulsa para regenerarlos):\n\n${f.etiquetasBusqueda}`
+                                ? 'Ver y editar los términos con los que el buscador encuentra este documento.'
                                 : 'Sin etiquetas. El buscador solo lo encontrará si la escena usa las palabras exactas que hay escritas dentro. Púlsalo para que la IA lo lea una vez y escriba por qué términos debería salir, incluyendo a qué personajes de tu campaña les sirve aunque no los nombre.'
                             }
                           >
@@ -836,7 +875,9 @@ export const FilesView: React.FC<{
                             ) : (
                               <>
                                 <Tags className="w-3.5 h-3.5" />
-                                {f.etiquetasBusqueda ? 'Etiquetas ✓' : 'Sin etiquetas'}
+                                {f.etiquetasBusqueda
+                                  ? `${f.etiquetasBusqueda.split(',').filter(t => t.trim()).length} etiquetas`
+                                  : 'Sin etiquetas'}
                               </>
                             )}
                           </button>
@@ -1059,6 +1100,92 @@ export const FilesView: React.FC<{
       )}
 
       {/* Analysis View / Edit Modal */}
+      {archivoDeEtiquetas && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--bg-color)] p-5 rounded-lg shadow-2xl border border-[var(--glass-border)] w-[580px] max-w-full font-lora flex flex-col max-h-[90vh]">
+            <h4 className="font-cinzel text-lg text-[var(--accent)] mb-1 font-bold flex items-center gap-2">
+              <Tags className="w-4 h-4" /> Etiquetas de búsqueda
+            </h4>
+            <p className="text-xs text-[var(--text-secondary)] mb-1 truncate" title={archivoDeEtiquetas.name}>
+              {archivoDeEtiquetas.name}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)] mb-3 leading-relaxed">
+              Los términos por los que el buscador encuentra este documento. El buscador casa palabras,
+              no significados: si sabes que este texto le sirve a alguien cuyo nombre no aparece dentro,
+              añádelo aquí y lo encontrará. Separa por comas.
+            </p>
+
+            {/*
+              Las etiquetas se enseñan también como píldoras, no solo como
+              texto suelto. Ochenta términos separados por comas en una línea
+              son ilegibles, y lo que se viene a hacer aquí es echarles un ojo
+              para ver si falta alguno.
+            */}
+            {borradorEtiquetas.trim() && (
+              <div className="flex flex-wrap gap-1 mb-3 max-h-28 overflow-y-auto">
+                {borradorEtiquetas
+                  .split(',')
+                  .map(t => t.trim())
+                  .filter(Boolean)
+                  .map((t, i) => (
+                    <span
+                      key={`${t}-${i}`}
+                      className="text-[10px] bg-[var(--surface)] border border-[var(--user-border)] px-1.5 py-0.5 rounded font-sans"
+                    >
+                      {t}
+                    </span>
+                  ))}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto mb-3">
+              <textarea
+                value={borradorEtiquetas}
+                onChange={e => setBorradorEtiquetas(e.target.value)}
+                placeholder="drow, Menzoberranzan, Lolth, matriarcado, Jarlaxle, Braelin…"
+                className="w-full h-40 bg-[var(--surface)] border border-[var(--user-border)] p-3 rounded-lg text-sm font-lora outline-none focus:border-[var(--accent)] leading-relaxed shadow-inner"
+              />
+            </div>
+
+            <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-[var(--glass-border)]">
+              {onGenerarEtiquetas && (
+                <button
+                  onClick={() => {
+                    const f = archivoDeEtiquetas;
+                    setArchivoDeEtiquetas(null);
+                    void onGenerarEtiquetas(f);
+                  }}
+                  disabled={extractingFileIds.includes(archivoDeEtiquetas.id)}
+                  className="text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                  title="Volver a leer el documento y rehacer las etiquetas desde cero. Se pierde lo escrito a mano."
+                >
+                  <Tags className="w-3.5 h-3.5" /> Regenerar
+                </button>
+              )}
+              <div className="flex gap-2 ml-auto">
+                <button
+                  onClick={() => setArchivoDeEtiquetas(null)}
+                  className="px-3 py-1.5 rounded text-xs font-cinzel border border-[var(--user-border)] hover:bg-[var(--surface)] cursor-pointer"
+                >
+                  Cerrar
+                </button>
+                {onGuardarEtiquetas && (
+                  <button
+                    onClick={async () => {
+                      await onGuardarEtiquetas(archivoDeEtiquetas.id, borradorEtiquetas.trim());
+                      setArchivoDeEtiquetas(null);
+                    }}
+                    className="px-3 py-1.5 rounded text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] cursor-pointer"
+                  >
+                    Guardar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isEditingModalOpen && selectedAnalysisFile && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--bg-color)] p-6 rounded-lg shadow-2xl border border-[var(--glass-border)] w-[580px] max-w-full font-lora flex flex-col max-h-[90vh]">
