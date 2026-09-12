@@ -10,7 +10,7 @@ import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from
 import { formatNarrativeText } from '../utils/textFormatter';
 import { parseMessageSegments, RollBadgeCard } from './RollBadge';
 import { parseSceneHUD, SceneHUDCard } from './SceneHUDCard';
-import { Moon, Sun, Sunrise, Sunset } from 'lucide-react';
+import { ChevronDown, ChevronUp, Moon, Sun, Sunrise, Sunset } from 'lucide-react';
 import {
   CALENDARIO_FANTASTICO,
   aDiaAbsoluto,
@@ -18,6 +18,9 @@ import {
   diasJugadosEnElCapitulo,
   fechaCompacta,
   fechaCompleta,
+  fechaLegible,
+  franjaDelDia,
+  estacionDelDia,
   horaLegible
 } from '../utils/campaignCalendar';
 import {
@@ -787,6 +790,20 @@ export const ChatView: React.FC<{
    * Se recalcula solo cuando cambia el número de mensajes: leer los HUD de un
    * capítulo entero en cada tecla pulsada sería absurdo.
    */
+  /*
+   * El botón de jornadas pasa a abrirse.
+   *
+   * Enseñaba una cifra —«1 jornada»— y todo lo demás vivía en un `title`, que
+   * en un móvil no existe: es un tooltip de ratón y esto se juega con el dedo.
+   * Así que el dato que más se mira mientras se decide qué hacer —qué hora es,
+   * qué día, qué tiempo hace— estaba a dos pantallas de distancia, en el
+   * Calendario o en el Diario.
+   *
+   * Aquí, pegado al campo de escribir y al lado del botón de saltar el tiempo,
+   * que es justo lo que se decide al mirarlo.
+   */
+  const [tiempoAbierto, setTiempoAbierto] = useState(false);
+
   const jornadas = useMemo(
     () => diasJugadosEnElCapitulo((chat?.messages || []).map(m => m.content)),
     [chat?.messages?.length, chat?.id]
@@ -1409,26 +1426,111 @@ export const ChatView: React.FC<{
               cerrar el capítulo—, que es justo lo que se decide al mirarlo.
             */}
             {jornadas.dias > 0 ? (
-              <span
-                className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 min-h-[32px] text-[11px] font-cinzel transition-colors ${
-                  jornadas.dias >= 4
-                    ? 'border-amber-700/50 bg-amber-500/10 text-amber-950 dark:text-amber-100 font-bold'
-                    : 'border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)]'
-                }`}
-                title={
-                  `Jornadas jugadas en este capítulo: ${jornadas.dias}` +
-                  (jornadas.primera && jornadas.ultima && jornadas.dias > 1
-                    ? ` (de ${jornadas.primera} a ${jornadas.ultima})`
-                    : jornadas.primera
-                    ? ` (${jornadas.primera})`
-                    : '') +
-                  '. Cuenta días con escena, no tiempo transcurrido: un salto temporal suma uno, no los que salta. ' +
-                  'Cuantas menos jornadas por capítulo, mejor sale el calendario.'
-                }
-              >
-                <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-                {jornadas.dias} {jornadas.dias === 1 ? 'jornada' : 'jornadas'}
-              </span>
+              <div className="relative shrink-0">
+                <button
+                  onClick={() => setTiempoAbierto(v => !v)}
+                  className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 min-h-[32px] text-[11px] font-cinzel transition-colors cursor-pointer active:scale-95 ${
+                    jornadas.dias >= 4
+                      ? 'border-amber-700/50 bg-amber-500/10 text-amber-950 dark:text-amber-100 font-bold'
+                      : 'border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)]'
+                  }`}
+                  title="Ver la fecha, la hora y el tiempo que hace en la ficción"
+                >
+                  <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+                  {jornadas.dias} {jornadas.dias === 1 ? 'jornada' : 'jornadas'}
+                  {tiempoAbierto ? (
+                    <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
+                  ) : (
+                    <ChevronUp className="w-3 h-3 shrink-0 opacity-60" />
+                  )}
+                </button>
+
+                {tiempoAbierto && (() => {
+                  const cal = project?.calendar;
+                  const fecha = project?.currentDate;
+                  /*
+                   * El clima sale del diario, que es donde el Narrador lo
+                   * apunta con [AGENDA:]. Se coge la última entrada que lo
+                   * traiga, no la última a secas: muchas no llevan clima y
+                   * dejarían el hueco en blanco teniendo el dato una línea más
+                   * arriba.
+                   */
+                  const conClima = [...(project?.timeline || [])]
+                    .sort((a, b) => (a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay))
+                    .filter(e => e.clima || e.lugar);
+                  const ultima = conClima[conClima.length - 1];
+                  const hayCalendario = calendarioValido(cal) && Boolean(fecha);
+                  const est = hayCalendario ? estacionDelDia(cal!, fecha!.dayOfYear) : null;
+
+                  return (
+                    <>
+                      {/* Un velo transparente para poder cerrar tocando fuera,
+                          que en móvil es lo que se intenta por instinto. */}
+                      <div className="fixed inset-0 z-40" onClick={() => setTiempoAbierto(false)} />
+                      <div className="absolute bottom-full left-0 mb-2 z-50 w-[260px] max-w-[80vw] rounded-xl border border-[var(--user-border)] bg-[var(--bg-color)] shadow-2xl p-3 space-y-2 font-lora">
+                        {hayCalendario ? (
+                          <>
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="font-cinzel text-[11px] text-[var(--text-secondary)]">Hora</span>
+                              <span className="font-mono text-base font-bold text-[var(--accent)] tabular-nums">
+                                {horaLegible(fecha!.minute)}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-[var(--text-secondary)] text-right -mt-1.5">
+                              {franjaDelDia(fecha!.minute)}
+                            </div>
+                            <div className="border-t border-[var(--glass-border)] pt-2 flex items-baseline justify-between gap-2">
+                              <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">Día</span>
+                              <span className="text-[11px] text-right text-[var(--text-primary)]">
+                                {fechaLegible(cal!, fecha!)}
+                              </span>
+                            </div>
+                            {est && (
+                              <div className="flex items-baseline justify-between gap-2">
+                                <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">Estación</span>
+                                <span className="text-[11px] text-[var(--text-primary)]">
+                                  {est.icono} {est.nombre}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
+                            Esta campaña no lleva calendario, así que no hay fecha ni hora que enseñar.
+                            Se configura en los ajustes del proyecto.
+                          </p>
+                        )}
+
+                        <div className="border-t border-[var(--glass-border)] pt-2 flex items-baseline justify-between gap-2">
+                          <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">Tiempo</span>
+                          <span className="text-[11px] text-right text-[var(--text-primary)]">
+                            {ultima?.clima || <span className="text-[var(--text-secondary)] italic">sin registrar</span>}
+                          </span>
+                        </div>
+                        {ultima?.lugar && (
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">Lugar</span>
+                            <span className="text-[11px] text-right text-[var(--text-primary)] truncate" title={ultima.lugar}>
+                              {ultima.lugar}
+                            </span>
+                          </div>
+                        )}
+
+                        <p className="text-[10px] text-[var(--text-secondary)] m-0 pt-2 border-t border-[var(--glass-border)] leading-snug">
+                          <strong>{jornadas.dias}</strong> {jornadas.dias === 1 ? 'jornada jugada' : 'jornadas jugadas'} en este
+                          capítulo
+                          {jornadas.primera && jornadas.ultima && jornadas.dias > 1
+                            ? ` (de ${jornadas.primera} a ${jornadas.ultima})`
+                            : jornadas.primera
+                            ? ` (${jornadas.primera})`
+                            : ''}
+                          . Cuenta días con escena, no tiempo transcurrido: un salto suma uno, no los que salta.
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
             ) : (
               <span />
             )}
