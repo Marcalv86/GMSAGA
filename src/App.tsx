@@ -51,6 +51,7 @@ import { LocalStorageModal } from './components/LocalStorageModal';
 import { ImportCampaignModal } from './components/ImportCampaignModal';
 import { Logger } from './components/Logger';
 import { logError, logInfo, logWarn } from './utils/logger';
+import { presionDelMinuto } from './utils/callLog';
 import { sanitizeProjectMemory } from './utils/sanitizers';
 import { ExtractedCampaignResult } from './utils/campaignImporter';
 import { writeCampaignToDisk } from './utils/diskBackup';
@@ -96,6 +97,7 @@ import {
   syncFullCampaignFromChats,
   fusionarTimeline,
   AVISO_TOKENS_POR_MINUTO,
+  getStoredApiKeys,
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
   tramarLaCampana,
@@ -3671,7 +3673,23 @@ export default function App() {
       })
     : null;
   const estimatedCurrentTokens = cargaEstimada?.tokens || 0;
-  const effectiveChatTokens = currentChatTokenCount > 0 ? currentChatTokenCount : estimatedCurrentTokens;
+  const tokensDelTurno = currentChatTokenCount > 0 ? currentChatTokenCount : estimatedCurrentTokens;
+  /*
+   * EL AVISO SE DISPARA POR LA CUOTA DEL MINUTO, NO POR EL TAMAÑO DEL TURNO.
+   *
+   * El tope de Google es una ventana móvil de sesenta segundos sobre todo lo
+   * que se le pide, así que un turno mediano puede provocar un 429 si vienen
+   * otros dos detrás, y uno grande puede pasar sin problema tras un rato de
+   * calma. Comparando solo el tamaño del envío, este aviso salía cuando no
+   * tocaba y callaba cuando tocaba.
+   *
+   * Sale del mismo cálculo que la barra lateral —lo gastado en el último
+   * minuto en la clave más libre, más este turno— para que las dos no vuelvan
+   * a contar cosas distintas de lo mismo, que ya pasó una vez.
+   */
+  const effectiveChatTokens =
+    tokensDelTurno +
+    presionDelMinuto(getStoredModel(), Math.max(1, getStoredApiKeys().length)).menor;
   const isCurrentChatNearTokenLimit = effectiveChatTokens >= AVISO_TOKENS_POR_MINUTO;
 
   return (

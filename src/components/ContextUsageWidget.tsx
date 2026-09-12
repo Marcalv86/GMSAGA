@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, ProjectFile, Chat } from '../types';
 import {
@@ -15,7 +15,7 @@ import {
   techoDeEnvio
 } from '../utils/geminiHelper';
 import { peticionesDeHoy } from '../utils/usageStats';
-import { ultimoCacheMedido } from '../utils/callLog';
+import { presionDelMinuto, ultimoCacheMedido } from '../utils/callLog';
 
 import {
   BookOpen,
@@ -51,6 +51,19 @@ export const ContextUsageWidget: React.FC<{
   const [midiendo, setMidiendo] = useState(false);
   const [errorMedida, setErrorMedida] = useState('');
   const [busqueda, setBusqueda] = useState(() => getStoredBusquedaLocal());
+
+  /*
+   * La ventana del minuto se vacía sola, y la pantalla tiene que enterarse.
+   *
+   * Lo gastado hace 61 segundos deja de contar, pero sin un latido que fuerce
+   * el repintado la barra se quedaba clavada en rojo hasta que algo más la
+   * tocara. Una barra que no baja cuando la cuota SÍ baja enseña a ignorarla.
+   */
+  const [, setLatido] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setLatido(v => v + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
 
   const medirDeVerdad = async () => {
     if (!project || !currentChatId) return;
@@ -167,9 +180,33 @@ export const ContextUsageWidget: React.FC<{
   const medidaDelTurno = medida?.total || tokensMedidos || 0;
   const tokensMostrados = medidaDelTurno > 0 ? medidaDelTurno : estimatedTokens;
   const esEstimacion = medidaDelTurno === 0;
-  const percentage = Math.min(100, (tokensMostrados / MAX_TOKENS) * 100);
-  const pasadaDeCuota = tokensMostrados >= TOPE_TOKENS_POR_MINUTO;
-  const cercaDeCuota = !pasadaDeCuota && tokensMostrados >= AVISO_TOKENS_POR_MINUTO;
+
+  /*
+   * LA BARRA MIDE LO QUE DE VERDAD PROVOCA EL 429.
+   *
+   * Antes comparaba el tamaño de UN turno contra las 250.000 fichas por
+   * minuto, y eso no es el límite de Google: el límite es una ventana móvil de
+   * sesenta segundos sobre todo lo que se le pide. Tres turnos seguidos de
+   * 90.000 fichas salían al 36% cada uno —verde, todo en orden— y el tercero
+   * se comía el 429, porque entre los tres sumaban 270.000 en menos de un
+   * minuto. La barra decía que sobraba sitio justo cuando no lo había.
+   *
+   * Ahora enseña dónde va a quedar la cuota DESPUÉS de mandar este turno: lo
+   * ya gastado en el último minuto más lo que se va a enviar. Y se mide sobre
+   * la clave más descargada, porque la aplicación rota al saturarse y el envío
+   * acaba ahí; con varias claves solo se bloquea de verdad cuando no queda
+   * ninguna con sitio.
+   *
+   * El tamaño del turno no se pierde: sigue escrito debajo en fichas. Lo que
+   * cambia es qué mide la barra, que era lo que engañaba.
+   */
+  const presion = presionDelMinuto(modeloDeNarracion, numeroDeClaves);
+  const proyectado = presion.menor + tokensMostrados;
+  const percentage = Math.min(100, (proyectado / MAX_TOKENS) * 100);
+  const pasadaDeCuota = proyectado >= TOPE_TOKENS_POR_MINUTO;
+  const cercaDeCuota = !pasadaDeCuota && proyectado >= AVISO_TOKENS_POR_MINUTO;
+  /** Cuántas claves admitirían este envío ahora mismo sin pasarse del minuto. */
+  const clavesConSitio = presion.porClave.filter(c => c + tokensMostrados < MAX_TOKENS).length;
 
   return (
     <>
@@ -208,6 +245,32 @@ export const ContextUsageWidget: React.FC<{
               {esEstimacion ? '~' : ''}
               {compact(tokensMostrados)} / {compact(MAX_TOKENS)} tokens
             </span>
+            {/*
+              Lo gastado en el minuto, que es la otra mitad de la barra. Sin
+              esto, un turno pequeño con la barra en rojo no se entiende: el
+              bulto no está en lo que vas a mandar, está en lo que acabas de
+              mandar y todavía cuenta.
+            */}
+            {presion.menor > 0 && (
+              <span
+                className="text-[var(--text-secondary)]"
+                title={`En los últimos 60 s ya se han gastado ${presion.menor.toLocaleString('es-ES')} fichas en la clave más libre (${presion.llamadas} llamadas a ${modeloDeNarracion}). Esta barra suma eso al turno que vas a enviar, porque el límite de Google es por minuto, no por envío. Se vacía solo conforme pasa el minuto.`}
+              >
+                · +{compact(presion.menor)} del minuto
+              </span>
+            )}
+            {numeroDeClaves > 1 && clavesConSitio < numeroDeClaves && (
+              <span
+                className={`font-bold ${clavesConSitio === 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-800 dark:text-amber-300'}`}
+                title={
+                  clavesConSitio === 0
+                    ? 'Ninguna de tus claves tiene sitio para este envío en el minuto que corre. El turno va a dar 429 en todas y la aplicación se quedará esperando. Deja pasar un minuto.'
+                    : `Solo ${clavesConSitio} de tus ${numeroDeClaves} claves admiten este envío ahora mismo. La aplicación rotará hasta encontrar una con sitio, pero cada 429 por el camino cuesta tiempo.`
+                }
+              >
+                🔑 {clavesConSitio}/{numeroDeClaves}
+              </span>
+            )}
             {cacheMedido && cacheMedido.porcentaje > 0 && (
               <span
                 className="text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 px-1 py-0.5 rounded text-[9px] font-sans"

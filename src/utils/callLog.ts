@@ -437,3 +437,61 @@ export function usoDeDocumentos(llamadas: LlamadaRegistrada[]): UsoDeDocumento[]
     return b.sinUsar - a.sinUsar;
   });
 }
+
+export interface PresionDelMinuto {
+  /** Fichas gastadas en los últimos 60 s, clave por clave (índice 0 = clave 1). */
+  porClave: number[];
+  /** Lo que lleva la clave MÁS DESCARGADA: es donde va a caer el próximo turno. */
+  menor: number;
+  /** Lo que lleva la más cargada, para saber si queda margen de verdad o solo en una. */
+  mayor: number;
+  /** Llamadas contadas. Cero significa «un minuto entero sin pedir nada». */
+  llamadas: number;
+}
+
+/**
+ * Cuánta cuota por minuto queda gastada AHORA MISMO.
+ *
+ * La barra de tokens comparaba el tamaño de UN turno contra las 250.000 fichas
+ * del minuto, y son cosas distintas: el límite de Google es una ventana móvil
+ * de sesenta segundos sobre TODO lo que se le pide, no un tope por envío. Con
+ * esa cuenta, tres turnos seguidos de 90.000 fichas salían al 36% cada uno
+ * —verde, tranquilo— y el tercero se comía un 429, porque entre los tres
+ * sumaban 270.000 en menos de un minuto.
+ *
+ * Aquí se suma lo gastado de verdad en los últimos sesenta segundos, y se
+ * reparte por clave, porque cada clave es un proyecto de Google distinto y
+ * lleva su propio contador. Solo cuenta el mismo modelo: los límites son por
+ * modelo, así que lo que gasten las tareas de fondo en Flash Lite no le quita
+ * nada al que narra.
+ *
+ * Lo que importa para saber si el turno va a pasar no es la media ni la suma,
+ * es el MENOR: la aplicación rota claves al saturarse, así que el envío acaba
+ * en la más libre. Solo se bloquea de verdad cuando no queda ninguna con sitio.
+ */
+export function presionDelMinuto(modelo: string, totalClaves: number): PresionDelMinuto {
+  const claves = Math.max(1, totalClaves);
+  const porClave = new Array<number>(claves).fill(0);
+  const desde = Date.now() - 60_000;
+  let llamadas = 0;
+
+  for (const l of getLlamadas()) {
+    if (l.modelo !== modelo) continue;
+    const t = Date.parse(l.inicio);
+    if (!Number.isFinite(t) || t < desde) continue;
+    // Una llamada fallida también consumió cuota: Google la contó al recibirla,
+    // y no descontarla es justo lo que hace que un 429 parezca inexplicable.
+    const fichas = l.fichasEntrada ?? fichasAproximadas(l.caracteresEnviados) ?? 0;
+    if (!fichas) continue;
+    const i = Math.min(claves - 1, Math.max(0, (l.claveN || 1) - 1));
+    porClave[i] += fichas;
+    llamadas++;
+  }
+
+  return {
+    porClave,
+    menor: Math.min(...porClave),
+    mayor: Math.max(...porClave),
+    llamadas
+  };
+}
