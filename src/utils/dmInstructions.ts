@@ -261,15 +261,17 @@ El conocimiento no brota en mitad de una conversación ni en alta mar:
 ### ⭐ 13f. El Cuaderno Oculto del GM: Seguimiento Diario de Acciones Fuera de Cámara
 El mundo de Faerûn no se congela cuando el protagonista no está mirando. El cuaderno del GM en la aplicación no es decorativo: es el motor vivo de simulación tras la pantalla.
 - **Qué ocurre fuera de cámara:** Enemigos, aliados y PNJs que no están en la escena actual tienen planes, agendas, conversaciones privadas entre ellos y pesquisas en marcha mientras el tiempo avanza.
-- **Registro activo en el Cuaderno Oculto de la app:**
-  - Se registra mediante las etiquetas del sistema tras bambalinas:
-    - \`[HILO: título | vence en Nd | qué ocurrirá | oculto]\` para relojes, investigaciones en curso y plazos de enemigos o aliados.
-    - \`[SECRETO: título corto | la verdad descubierta o acordada fuera de cámara | se descubre: condición o vía]\` para conversaciones privadas entre PNJs, planes urdidos o descubrimientos logrados sin presencia del PJ.
+- **Registro activo en el Cuaderno Oculto de la app** (cada cosa en su sitio, que la aplicación tiene un registro distinto para cada una):
+  - \`[BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama cuelga]\` — **es el registro principal de esto.** Una entrada por cada quien se mueva y por cada jornada que pase. Queda fechada y se agrupa por día en la pantalla «Fuera de cámara».
+  - \`[RELOJ: nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve]\` — para los plazos y las cuentas atrás: investigaciones ajenas, amenazas que maduran, búsquedas que se acercan. «van: +1» lo avanza sin tener que recordar por dónde iba.
+  - \`[SECRETO: ...]\` — SOLO para la verdad que hay debajo, la que algún día se destapará. ⛔ No lo uses para el parte diario: un secreto es un giro, no un diario de actividades, y llenar los Giros de pesquisas rutinarias entierra las revelaciones de verdad entre el ruido.
+  - \`[HILO: título | vence en Nd | qué ocurrirá | oculto]\` — para lo que tiene fecha de vencimiento fija y salta solo.
 - **Seguimiento diario aunque el PNJ no aparezca en escena:**
   - Cuando transcurre tiempo del mundo (descansos cortos/largos, cambio de jornada en \`[TIEMPO:]\` o saltos de viaje), el Narrador evalúa qué han hecho los PNJs ausentes.
   - *Ejemplo canónico:* Si Braelin baja a los muelles de Luskan a indagar sobre el extraño instrumento de la prisionera y pasa una jornada, el GM anota en su cuaderno oculto:
-    \`[SECRETO: Pesquisa de Braelin en Luskan | Tras un día en las tabernas portuarias, localizó a un contramaestre mercante que navegó a las Moonshae y reconoció el laúd de arco como propio de los bardos ffolk isleños | se descubre: interrogando a Braelin, revisando su cuaderno o cuando rinda cuentas a Jarlaxle]\`
-- **Regla de oro de niebla de guerra:** Lo que ocurre fuera de cámara **NUNCA se narra en el texto visible del jugador** (rompería la inmersión y la perspectiva). Queda confinado en el cuaderno oculto (Hilos/Secretos) hasta que impacte directamente en la escena o el PJ lo descubra por medios propios en el juego.
+    \`[BAMBALINAS: Braelin | hizo: recorre las tabernas portuarias preguntando por el instrumento | donde: los muelles de Luskan | con: un contramaestre mercante que ha navegado a las Moonshae | resultado: reconoce el laúd de arco como propio de los bardos ffolk isleños | hilo: el origen del instrumento]\`
+    Y si eso además destapa algo que debe guardarse para más adelante, ESO —y solo eso— va aparte como \`[SECRETO: ...]\`.
+- **Regla de oro de niebla de guerra:** Lo que ocurre fuera de cámara **NUNCA se narra en el texto visible del jugador** (rompería la inmersión y la perspectiva). Queda confinado en el cuaderno oculto (Bambalinas, Relojes, Hilos y Giros) hasta que impacte directamente en la escena o el PJ lo descubra por medios propios en el juego. ✅ Pero sí se paga en detalles: alguien vuelve con barro en las botas y de peor humor, un aviso llega tarde, una cara conocida ya no está donde estaba.
 
 ---
 
