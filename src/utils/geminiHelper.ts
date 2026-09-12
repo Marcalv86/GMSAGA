@@ -1968,10 +1968,58 @@ ${(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro'] as const)
     calendarioValido(project.calendar) && project.currentDate
       ? aDiaAbsoluto(project.calendar!, project.currentDate)
       : 0;
-  const movimientosRecientes = (project.memory?.gm_bambalinas || [])
-    .filter(m => !hoyAbsCuaderno || m.diaAbs >= hoyAbsCuaderno - 14)
-    .slice(-18);
-  const relojesVivos = relojesEnMarcha(project.memory?.gm_relojes).slice(0, 10);
+  /*
+   * QUÉ ENTRA EN EL CUADERNO QUE VIAJA, Y QUÉ NO.
+   *
+   * Esto mandaba «los dieciocho más recientes de los últimos catorce días»:
+   * puro orden de llegada, sin mirar si servían. Un recado ya resuelto y del
+   * que ella se enteró hace una semana ocupaba el mismo sitio que el plan que
+   * está a punto de estallarle encima. Con el cuaderno lleno, eso son dos mil
+   * tokens por turno de noticias viejas, y —peor— la pieza que importa
+   * enterrada entre diecisiete que no.
+   *
+   * Ahora se elige por lo que puede pasar HOY: lo que ella todavía no sabe,
+   * lo que cuelga de un reloj que sigue corriendo o de una trama abierta, y
+   * lo de ayer mismo. Y se corta por presupuesto de caracteres, no por número.
+   */
+  const PRESUPUESTO_CUADERNO = 3500;
+  const relojesVivos = relojesEnMarcha(project.memory?.gm_relojes).slice(0, 8);
+  const hilosCalientes = new Set(
+    [
+      ...relojesVivos.map(r => r.nombre),
+      ...(project.memory?.quests || []).filter(q => q.status !== 'Completada').map(q => q.title)
+    ]
+      .filter(Boolean)
+      .map(t => String(t).toLowerCase())
+  );
+  const tocaUnHiloVivo = (m: MovimientoOculto) => {
+    const h = (m.hilo || '').toLowerCase();
+    if (!h) return false;
+    for (const vivo of hilosCalientes) if (vivo.includes(h) || h.includes(vivo)) return true;
+    return false;
+  };
+  const movimientosRecientes = (() => {
+    const todos = project.memory?.gm_bambalinas || [];
+    const candidatos = todos.filter(m => {
+      if (hoyAbsCuaderno && m.diaAbs < hoyAbsCuaderno - 21) return false;
+      // Lo que ella ya sabe deja de ser material del Narrador en cuanto se enfría.
+      if (m.loSupo && hoyAbsCuaderno && m.diaAbs < hoyAbsCuaderno - 2) return false;
+      return true;
+    });
+    const peso = (m: MovimientoOculto) =>
+      (m.loSupo ? 0 : 3) + (tocaUnHiloVivo(m) ? 2 : 0) + (hoyAbsCuaderno && m.diaAbs >= hoyAbsCuaderno - 2 ? 2 : 0);
+    const ordenados = [...candidatos].sort((a, b) => peso(b) - peso(a) || b.diaAbs - a.diaAbs);
+    const dentro: MovimientoOculto[] = [];
+    let gastado = 0;
+    for (const m of ordenados) {
+      const coste = 90 + (m.que || '').length + (m.resultado || '').length;
+      if (gastado + coste > PRESUPUESTO_CUADERNO && dentro.length >= 3) break;
+      dentro.push(m);
+      gastado += coste;
+    }
+    // Se enseñan en orden de calendario, que es como se lee un cuaderno.
+    return dentro.sort((a, b) => a.diaAbs - b.diaAbs);
+  })();
   const bloqueCuaderno =
     movimientosRecientes.length || relojesVivos.length
       ? `
@@ -2006,8 +2054,11 @@ ${
         }
 
 **QUÉ HACER CON ESTO EN ESTE TURNO:**
-1. **Si ha pasado un día o más, la gente con algo entre manos HA HECHO ALGO.** Apúntalo con \`[BAMBALINAS: ...]\`, uno por cada quien se haya movido, aunque no aparezca en escena. Un personaje al que se le encargó averiguar algo no está en pausa: pregunta, viaja, se topa con una pared o encuentra a quien sabe.
-2. **Mueve los relojes que toque** con \`[RELOJ: ...]\`. Un plan que solo avanza cuando ella lo toca no es un plan, es un decorado.
+1. **SOLO si ha pasado un día o más** —un descanso largo, una noche, un salto, una jornada de viaje—, la gente con algo entre manos HA HECHO ALGO. Apúntalo con \`[BAMBALINAS: ...]\`, uno por cada quien se haya movido, aunque no aparezca en escena.
+   - ⛔ **Dentro de una escena continua, en combate o en turnos de minutos, NO escribes nada aquí.** No ha pasado un día: nadie de fuera ha hecho nada nuevo.
+   - ⛔ **Y solo los que tienen algo entre manos**, no el reparto entero. Máximo tres por jornada, y lo normal es uno o dos.
+   - ⛔ **Nada de «sigue buscando».** Si no ha cambiado nada, no se apunta: que alguien lleve tres días sin mover ficha es un dato bueno, y cuando se mueva, se notará.
+2. **Mueve los relojes que algo haya empujado** con \`[RELOJ: ...]\` — no por calendario: un plan puede pasar días parado porque a su dueño le surgió otra cosa. Pero un plan que solo avanza cuando ella lo toca no es un plan, es un decorado.
 3. **✅ Y que se note por fuera.** Lo de aquí no se cuenta, pero **sí se ve**: alguien vuelve con barro en las botas, un aviso llega tarde, una puerta que estaba abierta ya no lo está. El cuaderno se paga en detalles, no en explicaciones.
 `.trim()
       : '';

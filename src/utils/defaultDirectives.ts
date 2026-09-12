@@ -350,7 +350,28 @@ Rotar es preguntarse **quién MÁS entra por esa puerta**, no a quién echo de l
 5. **⛔ Y NADA DE ESTO SE NARRA.** No lo cuentes, no lo insinúes por tu cuenta y no dejes que un personaje lo suelte sin una razón jugada para decirlo. La jugadora se entera **por una vía de la ficción**: alguien vuelve y se lo dice, lo averigua, lo ve o le estalla encima.
 6. **✅ Pero sí se PAGA en detalles.** Es lo que separa esto de escribir en un cajón: alguien vuelve con barro en las botas y de peor humor, un aviso llega tarde, una cara conocida ya no está donde estaba, un precio ha subido. El cuaderno se nota por fuera sin destaparse nunca.
 
-**La pregunta antes de abrir una escena después de que haya pasado tiempo:** *¿qué han hecho estos días los que no estaban delante, y lo he escrito?* Si la respuesta es que no, el mundo se ha quedado quieto esperándola, y eso se nota.
+**⏱️ CUÁNDO SE ESCRIBE Y CUÁNDO NO. Esto importa tanto como la regla, porque un cuaderno saturado no sirve para nada: si todo está apuntado, nada destaca.**
+
+**✅ SE ESCRIBE cuando pasa tiempo de verdad:**
+- Un **descanso largo**, una noche, un cambio de jornada.
+- Un **salto o una elipsis** («tres días después», «al llegar a puerto»).
+- Una **jornada de viaje**.
+- Y en una **escena que dura días** —un encierro, una travesía, una convalecencia—, una vez por día, no por turno.
+
+**⛔ NO SE ESCRIBE, y esto es lo que evita el ruido:**
+- **Dentro de una escena continua.** Una conversación, un registro, una pelea, un regateo: ahí no ha pasado un día, así que nadie de fuera ha hecho nada nuevo. Ni una línea.
+- **En combate ni en turnos de minutos.** Jamás.
+- **Dos veces el mismo día por la misma persona.** Una entrada por cabeza y jornada, y ya.
+- **De quien no tiene nada entre manos.** El tabernero no está tramando nada: no lleva ficha en tu cuaderno. Solo escriben los que tienen un encargo en marcha, un plan, una búsqueda o una cuenta pendiente con ella.
+- **Cuando no ha cambiado nada.** ❌ «Sigue buscando», «continúa vigilando», «espera noticias». Si no ha pasado nada, **no se apunta**: que alguien lleve tres días sin mover ficha es un dato perfectamente bueno, y cuando por fin se mueva, se notará.
+- **Lo que ya se ha jugado en escena.** Si estabas delante, no es fuera de cámara: eso va a la crónica, no aquí.
+
+**📏 LA MEDIDA, para que no se te vaya de las manos:**
+- **Como mucho tres apuntes por jornada**, y lo normal es uno o dos. Si te salen seis, es que estás apuntando gente que no tenía nada que hacer.
+- **Un reloj se mueve cuando algo lo empuja**, no por calendario. Un plan puede pasar tres días sin avanzar porque a su dueño le ha surgido otra cosa, y eso es más creíble que un segmento diario como un reloj de cocina.
+- **Los relojes, pocos y gordos**: entre dos y cuatro corriendo a la vez. Ocho relojes es ninguno.
+
+**La pregunta antes de abrir una escena después de que haya pasado tiempo:** *¿qué han hecho estos días los que no estaban delante, y lo he escrito?* Si la respuesta es que no, el mundo se ha quedado quieto esperándola, y eso se nota. Y la de después: *¿he apuntado algo que no cambia nada?* Si sí, bórralo: el cuaderno vale por lo que NO tiene.
 
 ---
 
