@@ -93,28 +93,10 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     desc: 'Modelo insignia con razonamiento adaptativo, narración fluida y detección precisa de mecánicas de rol.'
   },
   {
-    id: 'gemini-3.1-pro-preview',
-    name: 'Gemini 3.1 Pro Preview',
-    badge: 'Pro · Razonamiento Complejo',
-    desc: 'Modelo Pro de máxima capacidad para razonamiento profundo, intrigas intrincadas y consistencia narrativa avanzada.'
-  },
-  {
-    id: 'gemini-3.6-flash',
-    name: 'Gemini 3.6 Flash',
-    badge: 'Eficiente · Alta Estabilidad',
-    desc: 'Versión ágil y contrastada de Flash para turnos consistentes y excelente gestión de contexto.'
-  },
-  {
     id: 'gemini-3.5-flash',
     name: 'Gemini 3.5 Flash',
     badge: 'Equilibrado · Máxima Eficiencia',
     desc: 'Modelo equilibrado de la familia Gemini 3 para escala masiva, razonamiento multimodal rápido y excelente ratio velocidad/calidad.'
-  },
-  {
-    id: 'gemini-3.5-flash-lite',
-    name: 'Gemini 3.5 Flash Lite',
-    badge: 'Ultra Rápido · Mínima Cuota',
-    desc: 'La opción más rápida y ligera de Google, ideal para sesiones muy ágiles con mínima latencia y mínimo consumo de tokens.'
   }
 ];
 
@@ -166,27 +148,7 @@ export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
   {
     id: 'gemini-3.5-flash-lite',
     name: 'Gemini 3.5 Flash Lite',
-    desc: 'Ultra rápido y consumo mínimo de cuota (Ideal para resúmenes y memoria persistente)'
-  },
-  {
-    id: 'gemini-3.5-flash',
-    name: 'Gemini 3.5 Flash',
-    desc: 'Equilibrado y eficiente para análisis y resúmenes de sesión'
-  },
-  {
-    id: 'gemini-3.8-flash',
-    name: 'Gemini 3.8 Flash',
-    desc: 'Última generación ultra rápida'
-  },
-  {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
-    desc: 'Híbrido de razonamiento'
-  },
-  {
-    id: 'gemini-3.6-flash',
-    name: 'Gemini 3.6 Flash',
-    desc: 'Eficiente y equilibrado'
+    desc: 'Ultra rápido y consumo mínimo de cuota (Ideal para tareas agénticas, resúmenes y memoria persistente)'
   }
 ];
 
