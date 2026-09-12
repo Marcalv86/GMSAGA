@@ -2587,7 +2587,13 @@ export default function App() {
     const nombreDeReserva = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
     const faltaNombre = !(pc?.name || '').trim() || nombreDeReserva.test((pc?.name || '').trim());
     const faltaAlgo =
-      faltaNombre || !pc?.race || !pc?.class || !pc?.languages?.length || !pc?.appearance;
+      faltaNombre ||
+      !pc?.race ||
+      !pc?.class ||
+      !pc?.languages?.length ||
+      !pc?.appearance ||
+      // La mochila vacía también es «falta algo»: es lo que el Narrador lee cada turno.
+      !pc?.inventory?.length;
     if (!faltaAlgo) return;
 
     try {
@@ -2606,6 +2612,34 @@ export default function App() {
           puestos.push(`idiomas: ${id.languages.join(', ')}`);
         }
         if (id.appearance && !actual?.appearance) { nuevo.appearance = id.appearance; puestos.push('rasgos físicos'); }
+        /*
+         * Y SU EQUIPO, QUE SE QUEDABA FUERA.
+         *
+         * La lectura automática rellenaba los cinco datos de identidad y tiraba
+         * el inventario y el dinero que la misma llamada ya devolvía. Resultado:
+         * marcar la ficha en Archivos daba nombre, raza, clase, idiomas y
+         * rasgos... y la mochila seguía vacía, que es justo el fallo por el que
+         * el Narrador no usaba nunca sus cosas.
+         *
+         * Se FUNDE, no se pisa: entra lo que falta y no resucita lo gastado ni
+         * borra de quién es ahora lo que le hayan requisado.
+         */
+        if (id.inventory?.length) {
+          const yaEstaba = actual?.inventory || [];
+          const clave = (n: string) =>
+            n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+          const conocidos = new Set(yaEstaba.map(i => clave(i.name || '')));
+          const entran = id.inventory.filter(i => !conocidos.has(clave(i.name || '')));
+          if (entran.length) {
+            nuevo.inventory = [...yaEstaba, ...entran];
+            puestos.push(`${entran.length} cosas en la mochila`);
+          }
+        }
+        // El dinero solo si la bolsa estaba a cero: el saldo lo lleva el juego.
+        if (id.currencies && !Object.values(actual?.currencies || {}).some(v => v)) {
+          nuevo.currencies = id.currencies;
+          puestos.push('el dinero de partida');
+        }
         return { ...mem, player_character: nuevo };
       });
       if (puestos.length) {
