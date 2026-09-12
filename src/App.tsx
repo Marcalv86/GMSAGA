@@ -104,6 +104,8 @@ import {
   leerElTableroDeDocumentos,
   extraerIdentidadDeDocumentos,
   extraerMecanicasDeDocumento,
+  generarEtiquetasDeBusqueda,
+  elencoDeLaCampana,
   fusionarTrama,
   isNarrativeIncomplete,
   novelizeUserMessage,
@@ -2768,6 +2770,62 @@ export default function App() {
    * subsistema pueda subir en la búsqueda cuando la escena lo pida sin tener
    * que arrastrar consigo trescientas páginas que hablan de otra ciudad.
    */
+  /**
+   * Que la IA lea un documento de consulta y diga por qué se le busca.
+   *
+   * El buscador local es BM25 y casa palabras, no significados: en una
+   * conversación con Jarlaxle la cantera de cultura drow sacaba cero
+   * fragmentos, porque su nombre no está escrito dentro. El Narrador, sin
+   * ella, no fallaba: se quedaba en vaguedades, que no se nota leyendo.
+   *
+   * Esto se paga una vez por documento, en el modelo de fondo —que tiene cuota
+   * propia y no gasta turnos de partida— y lo cobra la búsqueda en todos los
+   * turnos siguientes. Se le pasa el elenco de la campaña, que es la pieza que
+   * lo hace funcionar: sin él devuelve etiquetas correctas pero que no tienden
+   * el puente hasta los nombres por los que se busca de verdad.
+   */
+  const handleGenerarEtiquetas = async (file: ProjectFile) => {
+    if (!currentPId || !currentProject) return;
+    if (extractingFileIds.includes(file.id)) return;
+
+    setExtractingFileIds(prev => [...prev, file.id]);
+    setTopProgress({
+      active: true,
+      label: `Leyendo "${file.name}" para saber por qué términos buscarlo...`,
+      type: 'general'
+    });
+    try {
+      const etiquetas = await generarEtiquetasDeBusqueda(file, elencoDeLaCampana(currentProject));
+      const refreshedFiles = await loadFilesFromDB(currentPId);
+      const updated = refreshedFiles.map(f =>
+        f.id === file.id ? { ...f, etiquetasBusqueda: etiquetas } : f
+      );
+      setCurrentFiles(updated);
+      await saveFilesToDB(currentPId, updated);
+
+      const cuantas = etiquetas.split(',').filter(t => t.trim()).length;
+      setAlertConfig({
+        isOpen: true,
+        title: 'Etiquetas generadas',
+        message:
+          `"${file.name}" ya tiene ${cuantas} términos de búsqueda.\n\n${etiquetas}\n\n` +
+          `A partir de ahora el buscador puede encontrarlo por cualquiera de ellos, aunque la escena no use las palabras exactas que hay escritas dentro. Míralo en el registro de llamadas: si antes salía siempre en «sin usar», debería empezar a aportar fragmentos.`
+      });
+    } catch (err) {
+      logError('general', 'No se han podido generar las etiquetas de búsqueda', err, {
+        details: { archivo: file.name }
+      });
+      setAlertConfig({
+        isOpen: true,
+        title: 'No se han podido generar las etiquetas',
+        message: describeApiError(err)
+      });
+    } finally {
+      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
+      setTopProgress({ active: false, label: '', type: 'general' });
+    }
+  };
+
   const handleExtractMechanics = async (file: ProjectFile) => {
     if (!currentPId) return;
     if (extractingFileIds.includes(file.id)) return;
@@ -4320,6 +4378,7 @@ export default function App() {
               onToggleOnDemand={handleToggleOnDemand}
               onDistillOracle={handleDistillOracle}
               onExtractMechanics={handleExtractMechanics}
+              onGenerarEtiquetas={handleGenerarEtiquetas}
               onAutoClassifyAll={handleAutoClassifyAll}
               onExtractNpc={handleExtractNpc}
               onCreateNpcFromImage={handleCreateNpcFromImage}

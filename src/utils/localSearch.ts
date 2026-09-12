@@ -291,9 +291,24 @@ function crearFragmento(file: ProjectFile, titulo: string, texto: string): Fragm
    * estuvieran literalmente en el párrafo. Con el nombre y la etiqueta dentro,
    * todos los fragmentos de ese archivo saben de dónde vienen y para qué son.
    */
+  /*
+   * Las etiquetas de la IA entran DOS veces, y es a propósito.
+   *
+   * Son la única parte del índice que sabe cosas que el texto no dice —que
+   * este documento sobre Menzoberranzan le sirve a Jarlaxle, por ejemplo— y
+   * compiten contra fragmentos enteros de prosa donde el término buscado
+   * aparece muchas veces. Con una sola aparición se quedaban por debajo del
+   * ruido. Es el mismo truco que ya se usa con las cosas de la protagonista en
+   * `consultaDelTurno`, y por el mismo motivo.
+   *
+   * Dos y no más: si pesaran demasiado, un documento bien etiquetado saldría
+   * en todas las escenas y volveríamos al acaparamiento que arregló el reparto
+   * por documento.
+   */
+  const etiquetas = (file.etiquetasBusqueda || '').trim();
   const procedencia = `${file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')} ${
     PALABRAS_DE_CATEGORIA[file.category as NonNullable<ProjectFile['category']>] || ''
-  }`;
+  } ${etiquetas} ${etiquetas}`;
   const tokens = tokenizar(`${procedencia} ${titulo} ${texto}`);
   const frecuencias = new Map<string, number>();
   for (const t of tokens) frecuencias.set(t, (frecuencias.get(t) || 0) + 1);
@@ -321,7 +336,17 @@ const cache = new Map<string, Indice>();
 
 /** Cambia si cambia cualquier archivo, y solo entonces se reindexa. */
 function claveDe(files: ProjectFile[]): string {
-  return files.map(f => `${f.id}:${(f.content || '').length}`).join('|');
+  /*
+   * Las etiquetas entran en la clave, o el índice se queda viejo.
+   *
+   * Esto miraba solo el id y el largo del contenido, que es lo único que
+   * cambiaba entonces. Con las etiquetas de la IA ya no basta: generarlas no
+   * toca el texto del archivo, así que la clave salía idéntica, se servía el
+   * índice cacheado de antes y las etiquetas recién hechas no existían para la
+   * búsqueda. Un fallo silencioso de los buenos: todo parece funcionar y no
+   * hace nada.
+   */
+  return files.map(f => `${f.id}:${(f.content || '').length}:${(f.etiquetasBusqueda || '').length}`).join('|');
 }
 
 export function construirIndice(files: ProjectFile[]): Indice {

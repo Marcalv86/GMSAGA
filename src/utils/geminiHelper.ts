@@ -9109,6 +9109,118 @@ ${parciales.map((p, i) => `=== LISTA ${i + 1} ===\n${p}`).join('\n\n')}`,
   return salida;
 }
 
+/**
+ * Las etiquetas con las que el buscador local encontrará este documento.
+ *
+ * EL PUENTE QUE LE FALTA A BM25.
+ *
+ * El buscador casa palabras, no significados: no sabe que Jarlaxle es drow.
+ * Medido en la campaña, en una conversación con él la cantera de cultura drow
+ * sacaba CERO fragmentos —su nombre no está escrito dentro— y el Narrador
+ * salía del paso con vaguedades («la pompa de las mujeres de allá abajo»), que
+ * es un agujero tapado con un gesto y no se nota leyendo.
+ *
+ * Aquí la IA lee el documento UNA vez y escribe por qué términos debería
+ * encontrarse. El trabajo semántico se paga una sola vez, en frío y contra el
+ * modelo de fondo (que tiene cuota propia), y lo cobra la búsqueda barata en
+ * todos los turnos siguientes. Nada de esto entra en el camino caliente: en el
+ * turno sigue decidiendo BM25, determinista y depurable.
+ *
+ * ⭐ Y LO QUE DE VERDAD LO HACE FUNCIONAR ES EL ELENCO.
+ *
+ * Sin él, la cantera de cultura drow devuelve «drow, Menzoberranzan, Lolth,
+ * matriarcado» —todo correcto— y seguiría sin salir con Jarlaxle, porque la
+ * consulta de cada turno se arma con los nombres de los PNJs vivos. Pasándole
+ * quién habita la campaña, la IA puede decir «este documento informa sobre
+ * Jarlaxle y Braelin» aunque el texto no los nombre jamás. Ese salto es el
+ * único que BM25 no puede dar solo, y es justo el que se le pide.
+ */
+export async function generarEtiquetasDeBusqueda(
+  file: ProjectFile,
+  elenco: string[] = []
+): Promise<string> {
+  const texto = (file.content || '').trim();
+  if (!texto) throw new Error('Ese archivo no tiene texto del que sacar etiquetas.');
+
+  const modelo = getBackgroundTaskModel();
+  const config = {
+    temperature: 0,
+    ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+  } as any;
+
+  /*
+   * Con el principio y el final basta, y sale mucho más barato que trocear.
+   * Para etiquetar no hace falta leerse el tomo entero: la cabecera dice de
+   * qué va y el final suele llevar apéndices y listas de nombres. Un manual de
+   * doscientos mil caracteres se resuelve en una llamada en vez de en doce.
+   */
+  const MUESTRA = 45000;
+  const muestra =
+    texto.length <= MUESTRA * 2
+      ? texto
+      : `${texto.slice(0, MUESTRA)}\n\n[...]\n\n${texto.slice(-MUESTRA)}`;
+
+  const bloqueElenco = elenco.length
+    ? `\nQUIÉN Y QUÉ HABITA ESTA CAMPAÑA (lo importante de todo esto):
+${elenco.slice(0, 60).join(', ')}
+
+De esa lista, incluye como etiqueta a TODO EL QUE ESTE DOCUMENTO AYUDE A INTERPRETAR, **aunque el documento no lo mencione ni una vez**. Un texto sobre la cultura de un pueblo etiqueta a los personajes de ese pueblo; uno sobre una ciudad etiqueta a quien vive o manda en ella; uno sobre una orden o banda etiqueta a sus miembros. Este es el motivo por el que existe esta tarea: el buscador ya encuentra las palabras que están escritas, lo que no puede es deducir a quién le sirven.\n`
+    : '';
+
+  const response = await generateContentWithFailover({
+    primaryModel: modelo,
+    contents: `Eres el documentalista de una mesa de rol. Te doy un documento de la biblioteca de una campaña y tienes que decir POR QUÉ TÉRMINOS habría que encontrarlo cuando la escena lo necesite.
+
+QUÉ ESCRIBIR:
+- Los nombres propios que contiene: lugares, pueblos, facciones, dioses, personajes, objetos, criaturas.
+- Los conceptos que trata: de qué habla este documento y no otro.
+- Las palabras con las que alguien buscaría esto sin saber cómo se titula: si va de navegación, «barco, cubierta, tormenta, puerto, motín»; si va de una ciudad, sus barrios y sus gremios.
+- Sinónimos y variantes de lo anterior, que quien juega no escribe siempre igual.
+${bloqueElenco}
+QUÉ NO ESCRIBIR:
+- Palabras genéricas de rol que valen para cualquier documento: aventura, campaña, personaje, jugador, dados, nivel, partida, reglas, director. Ensucian el índice y no distinguen nada.
+- Frases. Esto son términos sueltos, no descripciones.
+
+FORMATO: una sola línea de términos separados por comas. Entre cuarenta y ochenta. Nada más: sin encabezado, sin explicación, sin comentar lo que has hecho. Conserva el idioma del documento.
+
+DOCUMENTO (${file.name}):
+${muestra}`,
+    config
+  });
+
+  const salida = (response.text || '')
+    .replace(/^[^:\n]{0,60}:\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!salida) throw new Error('El modelo no ha devuelto ninguna etiqueta.');
+  return salida;
+}
+
+/**
+ * Quién y qué habita la campaña, en una lista plana para el etiquetador.
+ *
+ * Son los mismos nombres con los que se arma la consulta de cada turno, y esa
+ * simetría es el punto: si la consulta va a buscar por «Jarlaxle», las
+ * etiquetas tienen que poder contener «Jarlaxle».
+ */
+export function elencoDeLaCampana(project: Project): string[] {
+  const m = project.memory;
+  return Array.from(
+    new Set(
+      [
+        m?.player_character?.name,
+        ...(m?.companions || []).map(c => c?.name),
+        ...(m?.npcs || []).map(n => n?.name),
+        ...(m?.locations || []).map(l => l?.name),
+        ...(project.threads || []).map(t => t?.title)
+      ]
+        .filter(Boolean)
+        .map(n => String(n).trim())
+        .filter(n => n.length > 2)
+    )
+  );
+}
+
 export interface NoticiaSaltoTemporalGenerada {
   diaOffset: number; // día 1, día 2... dentro del salto
   tipo: 'noticia' | 'rumor' | 'inconsciencia' | 'acontecimiento';

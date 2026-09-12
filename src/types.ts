@@ -875,6 +875,20 @@ export interface ProjectFile {
    * Por defecto (undefined) el archivo va entero, como hasta ahora.
    */
   onDemand?: boolean;
+  /**
+   * Términos de búsqueda que la IA saca leyendo el documento, una sola vez.
+   *
+   * El buscador local es BM25: casa palabras, no significados. No sabe que
+   * Jarlaxle es drow, así que en una conversación con él la cantera de cultura
+   * drow no subía —su nombre no está escrita en ella— y el Narrador se
+   * quedaba en vaguedades. Estas etiquetas son el puente: se generan en
+   * segundo plano dándole a la IA el elenco de la campaña, y ella escribe los
+   * nombres que el documento informa aunque no los mencione.
+   *
+   * Se indexan con cada fragmento, así que el trabajo semántico se paga una
+   * vez y lo cobra la búsqueda barata en todos los turnos siguientes.
+   */
+  etiquetasBusqueda?: string;
 }
 
 export interface Chat {

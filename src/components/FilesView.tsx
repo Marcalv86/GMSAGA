@@ -5,6 +5,7 @@ import { recuperar } from '../utils/localSearch';
 
 import {
   BookOpen,
+  Tags,
   Brain,
   Download,
   Drama,
@@ -43,6 +44,7 @@ export const FilesView: React.FC<{
   /** Deja de una hoja de oráculo solo las tablas y las reglas. */
   onDistillOracle?: (file: ProjectFile) => Promise<void>;
   onExtractMechanics?: (file: ProjectFile) => Promise<void>;
+  onGenerarEtiquetas?: (file: ProjectFile) => Promise<void>;
   onAutoClassifyAll?: () => Promise<void>;
   onExtractNpc?: (file: ProjectFile) => Promise<void>;
   onCreateNpcFromImage?: (file: ProjectFile) => Promise<void>;
@@ -62,6 +64,7 @@ export const FilesView: React.FC<{
   onToggleOnDemand,
   onDistillOracle,
   onExtractMechanics,
+  onGenerarEtiquetas,
   onAutoClassifyAll,
   onExtractNpc,
   onCreateNpcFromImage,
@@ -799,6 +802,45 @@ export const FilesView: React.FC<{
                               )}
                             </button>
                           )}
+                        {/*
+                          ETIQUETAS DE BÚSQUEDA, LO QUE HACE ENCONTRABLE UN
+                          DOCUMENTO DE CONSULTA.
+
+                          Solo tiene sentido en los de consulta: los que viajan
+                          enteros ya están delante del Narrador y no hace falta
+                          buscarlos. Y se avisa en ámbar cuando faltan, porque
+                          un documento de consulta sin etiquetas depende de que
+                          las palabras exactas estén escritas dentro, que es
+                          justo lo que falla con «Jarlaxle» y la cultura drow.
+                        */}
+                        {!f.isImage && !f.isAudio && f.onDemand && onGenerarEtiquetas && (
+                          <button
+                            onClick={() => onGenerarEtiquetas(f)}
+                            disabled={extractingFileIds.includes(f.id)}
+                            className={`px-2 py-1 rounded text-[10px] md:text-[11px] font-cinzel font-bold transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-1.5 border ${
+                              f.etiquetasBusqueda
+                                ? 'bg-[var(--surface)] border-[var(--user-border)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                                : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                            }`}
+                            title={
+                              f.etiquetasBusqueda
+                                ? `Términos con los que el buscador encuentra este documento (pulsa para regenerarlos):\n\n${f.etiquetasBusqueda}`
+                                : 'Sin etiquetas. El buscador solo lo encontrará si la escena usa las palabras exactas que hay escritas dentro. Púlsalo para que la IA lo lea una vez y escriba por qué términos debería salir, incluyendo a qué personajes de tu campaña les sirve aunque no los nombre.'
+                            }
+                          >
+                            {extractingFileIds.includes(f.id) ? (
+                              <>
+                                <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                <span>Leyendo…</span>
+                              </>
+                            ) : (
+                              <>
+                                <Tags className="w-3.5 h-3.5" />
+                                {f.etiquetasBusqueda ? 'Etiquetas ✓' : 'Sin etiquetas'}
+                              </>
+                            )}
+                          </button>
+                        )}
                         {currentCat === 'oracle' && onDistillOracle && (
                           <button
                             onClick={() => onDistillOracle(f)}
