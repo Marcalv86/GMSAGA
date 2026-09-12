@@ -12,6 +12,7 @@ import {
   fechaLegible
 } from '../utils/campaignCalendar';
 import { extraerIdentidadDeDocumentos, fusionarTrama, tramarLaCampana } from '../utils/geminiHelper';
+import { relojesEnMarcha } from '../utils/cuadernoOculto';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
@@ -44,7 +45,9 @@ import {
   Coins,
   PackageCheck,
   PackageX,
-  Users
+  Users,
+  Footprints,
+  Timer
 } from 'lucide-react';
 
 export function getAtrInfo(val?: number) {
@@ -157,7 +160,9 @@ export type SeccionMemoria =
   | 'quests'
   | 'story'
   | 'status'
-  | 'giros';
+  | 'giros'
+  | 'bambalinas'
+  | 'relojes';
 
 export const MemoryManager: React.FC<{
   project: Project;
@@ -190,7 +195,7 @@ export const MemoryManager: React.FC<{
    */
   const seccionesVisibles: SeccionMemoria[] = secciones?.length
     ? secciones
-    : ['character', 'inventario', 'diary', 'npcs', 'locs', 'quests', 'story', 'status', 'giros'];
+    : ['character', 'inventario', 'diary', 'npcs', 'locs', 'quests', 'story', 'status'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
 
@@ -596,6 +601,22 @@ export const MemoryManager: React.FC<{
               shortLabel: 'Giros',
               icon: Lock,
               count: memory.gm_secrets?.length ? `(${memory.gm_secrets.filter(x => !x.revelado).length})` : ''
+            },
+            {
+              id: 'bambalinas',
+              label: 'Fuera de cámara',
+              shortLabel: 'Bambalinas',
+              icon: Footprints,
+              count: memory.gm_bambalinas?.length ? `(${memory.gm_bambalinas.length})` : ''
+            },
+            {
+              id: 'relojes',
+              label: 'Relojes',
+              shortLabel: 'Relojes',
+              icon: Timer,
+              count: relojesEnMarcha(memory.gm_relojes).length
+                ? `(${relojesEnMarcha(memory.gm_relojes).length})`
+                : ''
             }
           ]
             .filter(tab => seccionesVisibles.includes(tab.id as SeccionMemoria))
@@ -1232,6 +1253,209 @@ export const MemoryManager: React.FC<{
       )}
 
       {/* Pestaña: Giros de la campaña (lo que el Narrador guarda bajo llave) */}
+      {activeTab === 'bambalinas' && (() => {
+        /*
+          LO QUE PASA MIENTRAS ELLA NO MIRA.
+
+          El cuaderno del Director guardaba los giros —lo que se va a revelar—
+          y nada más. Pero un mundo vivo no es una lista de sorpresas en un
+          cajón: es gente con planes que avanza mientras la protagonista duerme
+          en otra ciudad. Esto es el registro diario de eso, y el Narrador lo
+          recibe en cada turno para no tener que improvisar qué ha hecho nadie.
+        */
+        const movs = [...(memory.gm_bambalinas || [])].sort((a, b) => b.diaAbs - a.diaAbs);
+        const porDia = new Map<number, typeof movs>();
+        for (const m of movs) {
+          if (!porDia.has(m.diaAbs)) porDia.set(m.diaAbs, []);
+          porDia.get(m.diaAbs)!.push(m);
+        }
+        return (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-3 sm:p-4 flex flex-col gap-1.5">
+              <span className="text-sm font-cinzel font-bold text-violet-700 dark:text-violet-300 flex items-center gap-2">
+                🕯️ Fuera de cámara
+              </span>
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                Lo que han hecho los demás mientras tu personaje no estaba delante: a dónde fueron, con quién
+                hablaron y qué sacaron. Lo escribe el Narrador según pasan los días, y lo tiene delante en cada
+                turno. <strong className="text-violet-700 dark:text-violet-300">Tu personaje no sabe nada de esto</strong> hasta que se entere jugando.
+              </p>
+            </div>
+
+            {movs.length === 0 ? (
+              <div className="text-[var(--text-secondary)] italic py-6 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs flex flex-col gap-2">
+                <span>
+                  Todavía no hay nada apuntado. Se llena cuando pasa tiempo en la partida —un descanso largo, un
+                  viaje, un salto— y alguien con algo entre manos se mueve.
+                </span>
+                <span className="not-italic font-cinzel text-[11px] text-violet-700 dark:text-violet-300">
+                  ¿Quieres saber qué ha hecho alguien estos días? Pregúntaselo al GM en el Chat: «¿qué ha estado
+                  haciendo Braelin desde que se fue?». Lo escribe él y queda aquí.
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {[...porDia.entries()].map(([dia, delDia]) => (
+                  <div key={dia} className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-cinzel font-bold px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/25">
+                        📅 {delDia[0].fecha || `Día ${dia}`}
+                      </span>
+                      <span className="h-px flex-1 bg-[var(--user-border)]" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {delDia.map(m => (
+                        <div
+                          key={m.id}
+                          className="p-3.5 rounded-lg border bg-[var(--surface-soft)] border-violet-500/25 flex flex-col gap-1.5"
+                        >
+                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            <span className="font-cinzel font-bold text-xs sm:text-sm break-words text-violet-700 dark:text-violet-300">
+                              🎭 {m.quien}
+                            </span>
+                            <span
+                              className={`text-[10px] font-cinzel px-1.5 py-0.5 rounded border ${
+                                m.loSupo
+                                  ? 'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20'
+                                  : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--glass-border)]'
+                              }`}
+                            >
+                              {m.loSupo ? '✅ ya lo sabes' : '🔒 no lo sabes'}
+                            </span>
+                          </div>
+                          <p className="text-xs font-lora text-[var(--text-primary)] m-0 leading-relaxed">{m.que}</p>
+                          {(m.donde || m.conQuien) && (
+                            <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
+                              {m.donde ? `📍 ${m.donde}` : ''}
+                              {m.donde && m.conQuien ? ' · ' : ''}
+                              {m.conQuien ? `🗣️ con ${m.conQuien}` : ''}
+                            </p>
+                          )}
+                          {m.resultado && (
+                            <p className="text-[11px] font-lora text-[var(--text-primary)] m-0 leading-relaxed">
+                              <strong className="font-cinzel text-[11px] text-violet-700 dark:text-violet-300">
+                                → Saca:
+                              </strong>{' '}
+                              {m.resultado}
+                            </p>
+                          )}
+                          {m.hilo && (
+                            <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 self-start">
+                              🧵 {m.hilo}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {activeTab === 'relojes' && (() => {
+        /*
+          Los relojes: lo que corre por detrás.
+
+          Lo que convierte una amenaza en amenaza es que avance sola. Un
+          enemigo que solo actúa cuando la protagonista le da pie no es un
+          enemigo, es un decorado que reacciona.
+        */
+        const todos = memory.gm_relojes || [];
+        const enMarcha = todos.filter(r => r.llenos < r.segmentos);
+        const cumplidos = todos.filter(r => r.llenos >= r.segmentos);
+        const Reloj: React.FC<{ r: (typeof todos)[number]; hecho?: boolean }> = ({ r, hecho }) => (
+          <div
+            className={`p-3.5 rounded-lg border flex flex-col gap-2 ${
+              hecho
+                ? 'bg-[var(--surface-soft)] border-[var(--user-border)] opacity-70'
+                : r.llenos >= r.segmentos - 1
+                ? 'bg-rose-500/5 border-rose-500/40'
+                : 'bg-[var(--surface-soft)] border-amber-500/30'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+              <span
+                className={`font-cinzel font-bold text-xs sm:text-sm break-words ${
+                  hecho ? 'text-[var(--text-secondary)] line-through' : 'text-[var(--accent)]'
+                }`}
+              >
+                {hecho ? '💥' : r.llenos >= r.segmentos - 1 ? '⏰' : '⏳'} {r.nombre}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-mono text-sm tracking-widest text-amber-600 dark:text-amber-400">
+                {'●'.repeat(Math.min(r.llenos, r.segmentos))}
+                <span className="text-[var(--text-secondary)] opacity-50">
+                  {'○'.repeat(Math.max(0, r.segmentos - r.llenos))}
+                </span>
+              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]">
+                {r.llenos}/{r.segmentos}
+              </span>
+              {r.loIntuye && (
+                <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                  👁️ lo intuyes
+                </span>
+              )}
+            </div>
+            {r.deQuien && (
+              <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
+                🎭 Lo mueve: {r.deQuien}
+              </p>
+            )}
+            {r.alLlenarse && (
+              <p className="text-[11px] font-lora text-[var(--text-primary)] m-0 leading-relaxed">
+                <strong className="font-cinzel text-[11px] text-[var(--accent)]">Al llenarse:</strong> {r.alLlenarse}
+              </p>
+            )}
+          </div>
+        );
+        return (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 sm:p-4 flex flex-col gap-1.5">
+              <span className="text-sm font-cinzel font-bold text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                ⏳ Relojes
+              </span>
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                Los planes que corren por detrás. Avanzan aunque tu personaje no esté delante, y cuando se llenan,
+                pasa lo que tenga que pasar. <strong className="text-amber-700 dark:text-amber-300">Tampoco los ves en la ficción</strong> salvo que algo te lo dé a entender.
+              </p>
+            </div>
+            {enMarcha.length === 0 && cumplidos.length === 0 ? (
+              <div className="text-[var(--text-secondary)] italic py-6 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs">
+                Sin relojes en marcha. Aparecen cuando alguien empieza a tramar algo con un plazo: una búsqueda, una
+                amenaza, una investigación ajena.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {enMarcha.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {enMarcha.map(r => (
+                      <Reloj key={r.id} r={r} />
+                    ))}
+                  </div>
+                )}
+                {cumplidos.length > 0 && (
+                  <div className="flex flex-col gap-2.5">
+                    <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold">
+                      Ya se llenaron ({cumplidos.length})
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {cumplidos.map(r => (
+                        <Reloj key={r.id} r={r} hecho />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {activeTab === 'giros' && (
         <div className="flex flex-col gap-3">
           {/*
@@ -1913,6 +2137,56 @@ export const MemoryManager: React.FC<{
          * las está mirando, y volverán. Verlas aquí es lo que evita que se
          * olviden — a ella y al Narrador.
          */
+        /*
+          UN EMOJI POR OBJETO, ADIVINADO DEL NOMBRE.
+          Sin pedirle nada a la IA ni un campo más que rellenar: se mira lo que
+          pone y se escoge. Si no cuadra nada, un fardo genérico y ya.
+        */
+        /*
+          Los plurales, que es donde fallaba: `\bvara\b` no caza «Varas» ni
+          `\bpocion\b` caza «Pociones», porque el límite de palabra cae dentro.
+          Se cierra cada raíz con un plural opcional en vez de a mano.
+        */
+        const ICONOS: [string[], string][] = [
+          [['violin', 'viol[ií]n', 'lira', 'arpa', 'la[uú]d', 'flauta', 'tambor', 'instrumento', 'c[ií]tara'], '🎻'],
+          [['diario', 'cuaderno', 'libreta', 'bit[aá]cora', 'libro', 'tomo', 'grimorio', 'c[oó]dice'], '📓'],
+          [['carta', 'misiva', 'nota', 'mensaje', 'sobre', 'pergamino', 'rollo', 'manuscrito', 'documento'], '📜'],
+          [['mapa', 'plano', 'derrotero', 'carta de navegaci[oó]n'], '🗺️'],
+          [['espada', 'sable', 'estoque', 'hoja', 'acero', 'cimitarra', 'mandoble'], '⚔️'],
+          [['daga', 'pu[ñn]al', 'cuchillo', 'estilete', 'navaja'], '🗡️'],
+          [['arco', 'ballesta', 'flecha', 'virote', 'carcaj'], '🏹'],
+          [['escudo', 'broquel', 'rodela'], '🛡️'],
+          [['armadura', 'coraza', 'cota', 'peto', 'casco', 'yelmo'], '🥋'],
+          [['capa', 'manto', 'piwafwi', 'tabardo', 'ropa', 'vestido', 't[uú]nica', 'bota', 'guante'], '🧥'],
+          [['poci[oó]n', 'elixir', 'brebaje', 'ampolla', 'vial', 'frasco', 'ant[ií]?doto'], '🧪'],
+          [['hierba', 'planta', 'flor', 'semilla', 'ra[ií]z', 'baya', 'hongo', 'seta', 'mu[eé]rdago'], '🌿'],
+          [['anillo', 'sortija', 'colgante', 'amuleto', 'medall[oó]n', 'joya', 'gema', 'collar', 'broche', 'pendiente', 'talism[aá]n'], '💍'],
+          [['llave', 'ganz[uú]a', 'cerradura'], '🗝️'],
+          [['moneda', 'monedero', 'oro', 'plata', 'tesoro', 'bolsa de monedas'], '💰'],
+          [['vara', 'bast[oó]n', 'cetro', 'b[aá]culo', 'runa', '[oó]gham', 'ogham', 'talla'], '🪄'],
+          [['vela', 'farol', 'l[aá]mpara', 'antorcha', 'linterna'], '🕯️'],
+          [['comida', 'raci[oó]n', 'pan', 'queso', 'carne', 'provisi[oó]n', 'v[ií]ver'], '🍞'],
+          [['agua', 'odre', 'cantimplora', 'vino', 'cerveza', 'licor', 'petaca'], '🍶'],
+          [['cuerda', 'soga', 'garfio', 'saco', 'mochila', 'zurr[oó]n', 'morral', 'petate'], '🎒'],
+          [['m[aá]scara', 'disfraz', 'antifaz', 'peluca'], '🎭'],
+          [['espejo', 'cristal', 'lente', 'catalejo', 'orbe', 'esfera'], '🔮'],
+          [['hueso', 'cr[aá]neo', 'calavera', 'reliquia', 'urna'], '💀'],
+          [['concha', 'caracola', 'perla', 'coral', 'red', 'ancla', 'remo'], '🐚'],
+          [['pluma', 'tinta', 'tintero', 'papel', 'c[aá]lamo'], '🪶'],
+          [['sello', 'lacre', 'insignia', 'emblema', 'estandarte', 'bandera'], '🏅'],
+          [['pipa', 'tabaco', 'incienso', 'perfume', 'aceite'], '🫗'],
+          [['piel', 'pelaje', 'cuero', 'foca', 'lobo', 'garra', 'colmillo'], '🐾']
+        ];
+        const PATRONES: [RegExp, string][] = ICONOS.map(([raices, emoji]) => [
+          new RegExp(`\\b(?:${raices.join('|')})(?:e?s)?\\b`, 'i'),
+          emoji
+        ]);
+        const iconoDe = (item: InventoryItem): string => {
+          const donde = `${item.name || ''} ${item.description || ''}`;
+          for (const [patron, emoji] of PATRONES) if (patron.test(donde)) return emoji;
+          return item.deMision ? '📌' : '📦';
+        };
+
         const aprendido = memory.player_character?.aprendido || [];
         const ETIQUETA_APRENDIZAJE: Record<string, string> = {
           conjuro: 'conjuro',
@@ -1930,7 +2204,7 @@ export const MemoryManager: React.FC<{
 
         const Tarjeta: React.FC<{ item: InventoryItem; tono: 'mision' | 'propio' | 'hecho' | 'requisado' }> = ({ item, tono }) => (
           <div
-            className={`p-3.5 rounded-lg border flex flex-col gap-1.5 group transition-colors ${
+            className={`p-3.5 rounded-xl border flex items-start gap-3 group transition-all hover:shadow-md ${
               tono === 'mision'
                 ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60'
                 : tono === 'requisado'
@@ -1940,6 +2214,20 @@ export const MemoryManager: React.FC<{
                 : 'bg-[var(--surface-soft)] border-[var(--user-border)] hover:border-[var(--accent)]/40'
             }`}
           >
+            {/*
+              El emoji manda en su propia columna, como en el boceto: grande, a
+              la izquierda y separado por una línea, para que la tarjeta se lea
+              de un vistazo sin tener que leerla.
+            */}
+            <span
+              aria-hidden
+              className={`text-3xl sm:text-4xl leading-none shrink-0 self-stretch flex items-center pr-3 border-r ${
+                tono === 'hecho' ? 'opacity-40 grayscale border-[var(--user-border)]' : 'border-[var(--user-border)]'
+              }`}
+            >
+              {iconoDe(item)}
+            </span>
+            <div className="flex flex-col gap-1.5 min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                 <span className={`font-cinzel font-bold text-xs sm:text-sm break-words ${tono === 'hecho' ? 'text-[var(--text-secondary)] line-through' : 'text-[var(--accent)]'}`}>
@@ -2005,6 +2293,7 @@ export const MemoryManager: React.FC<{
                 </span>
               </div>
             )}
+            </div>
           </div>
         );
 
@@ -2027,18 +2316,19 @@ export const MemoryManager: React.FC<{
               </span>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {([
-                  ['pp', 'PP', 'text-slate-500'],
-                  ['gp', 'PO', 'text-amber-600'],
-                  ['ep', 'PE', 'text-cyan-600'],
-                  ['sp', 'PA', 'text-zinc-500'],
-                  ['cp', 'PC', 'text-orange-700']
-                ] as ['cp' | 'sp' | 'ep' | 'gp' | 'pp', string, string][])
+                  ['pp', 'PP', 'text-slate-500', '⚪'],
+                  ['gp', 'PO', 'text-amber-600', '🟡'],
+                  ['ep', 'PE', 'text-cyan-600', '🔵'],
+                  ['sp', 'PA', 'text-zinc-500', '⚫'],
+                  ['cp', 'PC', 'text-orange-700', '🟤']
+                ] as ['cp' | 'sp' | 'ep' | 'gp' | 'pp', string, string, string][])
                   .filter(([k]) => (monedas?.[k] ?? 0) > 0)
-                  .map(([k, etiqueta, color]) => (
+                  .map(([k, etiqueta, color, ficha]) => (
                     <span
                       key={k}
-                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
+                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
                     >
+                      <span aria-hidden className="mr-0.5">{ficha}</span>
                       {monedas?.[k]} {etiqueta}
                     </span>
                   ))}

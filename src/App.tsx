@@ -111,6 +111,7 @@ import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
+import { aplicarBambalinas, aplicarRelojes, cuadernoQuieto } from './utils/cuadernoOculto';
 import { aplicarOlvidos } from './utils/ordenesDeMesa';
 import type { VinculoLeido } from './utils/campaignCalendar';
 import type { Aprendizaje } from './types';
@@ -951,7 +952,8 @@ export default function App() {
     if (
       !t ||
       (!t.presentes.length && !t.vinculos.length && !t.revelaciones.length && !t.secretos.length && !t.viaje &&
-        !t.lugares?.length && cambioVacio(t.inventario) && nadaAprendido(t.aprendido || []))
+        !t.lugares?.length && cambioVacio(t.inventario) && nadaAprendido(t.aprendido || []) &&
+        cuadernoQuieto(t.bambalinas || [], t.relojes || []))
     )
       return p.memory;
 
@@ -1292,11 +1294,26 @@ export default function App() {
                 })
           };
 
+    /*
+     * El cuaderno del Director. El día lo pone aquí la aplicación, que es
+     * quien lleva el calendario: el lector de la etiqueta no lo sabe.
+     */
+    const movimientos = (t.bambalinas || []).map(m => ({
+      ...m,
+      diaAbs: diaActual,
+      id: m.id.replace(/^bmb_0_/, `bmb_${diaActual}_`),
+      fecha: calendarioValido(p.calendar) && p.currentDate ? fechaLegible(p.calendar!, p.currentDate) : undefined
+    }));
+
     return {
       ...mem,
       npcs: npcsDeduplicados,
       locations: lugaresDeLaCampana,
       gm_secrets: secretosDeCampana,
+      gm_bambalinas: movimientos.length ? aplicarBambalinas(mem.gm_bambalinas, movimientos) : mem.gm_bambalinas,
+      gm_relojes: (t.relojes || []).length
+        ? aplicarRelojes(mem.gm_relojes, t.relojes || [], diaActual)
+        : mem.gm_relojes,
       player_character,
       viaje: viajeEnCurso
     };

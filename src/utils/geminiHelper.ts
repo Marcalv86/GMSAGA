@@ -15,7 +15,7 @@ import {
   ScheduledThread,
   Message
 } from '../types';
-import type { Aprendizaje, CambioDeInventario, InventoryItem, PlayerCurrencies } from '../types';
+import type { Aprendizaje, CambioDeInventario, InventoryItem, MovimientoOculto, PlayerCurrencies, RelojOculto } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import {
@@ -62,6 +62,7 @@ import {
 } from './campaignCalendar';
 import { cambioVacio, leerInventario } from './inventoryTag';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
+import { cuadernoQuieto, leerBambalinas, leerRelojes, relojesEnMarcha } from './cuadernoOculto';
 import { leerOlvidos } from './ordenesDeMesa';
 import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
@@ -1954,6 +1955,63 @@ ${(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro'] as const)
 `.trim()
     : '';
 
+  /*
+   * EL CUADERNO DEL DIRECTOR, QUE NO ESTÁ DE ADORNO.
+   *
+   * Sin esto, un aliado al que se le encarga averiguar algo se va y desaparece
+   * del mapa hasta que vuelve a entrar en escena; entonces el Narrador
+   * improvisa qué ha hecho esos cuatro días y, como no lo apuntó nadie, la
+   * respuesta suele ser «nada». Aquí le llega lo que de verdad ha pasado
+   * mientras ella no miraba, y lo que está a punto de pasar.
+   */
+  const hoyAbsCuaderno =
+    calendarioValido(project.calendar) && project.currentDate
+      ? aDiaAbsoluto(project.calendar!, project.currentDate)
+      : 0;
+  const movimientosRecientes = (project.memory?.gm_bambalinas || [])
+    .filter(m => !hoyAbsCuaderno || m.diaAbs >= hoyAbsCuaderno - 14)
+    .slice(-18);
+  const relojesVivos = relojesEnMarcha(project.memory?.gm_relojes).slice(0, 10);
+  const bloqueCuaderno =
+    movimientosRecientes.length || relojesVivos.length
+      ? `
+### 🕯️ TU CUADERNO: LO QUE PASA MIENTRAS ELLA NO MIRA (⛔ ELLA NO SABE NADA DE ESTO)
+Esto es tuyo, no suyo. **⛔ No lo narres, no lo insinúes y no dejes que ningún personaje se lo cuente sin que haya una razón jugada para ello.** Sirve para que el mundo tenga memoria propia.
+${
+  movimientosRecientes.length
+    ? `\n**Lo que ha hecho cada cual estos días:**\n${movimientosRecientes
+        .map(
+          m =>
+            `- **Día ${m.diaAbs}${m.fecha ? ` (${m.fecha})` : ''} · ${m.quien}:** ${m.que}${
+              m.donde ? ` — en ${m.donde}` : ''
+            }${m.conQuien ? `, con ${m.conQuien}` : ''}${m.resultado ? `. → ${m.resultado}` : ''}${
+              m.hilo ? ` [hilo: ${m.hilo}]` : ''
+            }${m.loSupo ? ' ✅ (ella YA se enteró de esto)' : ' 🔒 (ella NO lo sabe)'}`
+        )
+        .join('\n')}`
+    : ''
+}${
+          relojesVivos.length
+            ? `\n\n**Relojes en marcha — esto avanza esté ella delante o no:**\n${relojesVivos
+                .map(
+                  r =>
+                    `- **${r.nombre}**: ${'●'.repeat(Math.min(r.llenos, r.segmentos))}${'○'.repeat(
+                      Math.max(0, r.segmentos - r.llenos)
+                    )} (${r.llenos}/${r.segmentos})${r.deQuien ? ` — lo mueve ${r.deQuien}` : ''}${
+                      r.alLlenarse ? `. Al llenarse: ${r.alLlenarse}` : ''
+                    }${r.loIntuye ? ' · ella intuye que algo se cuece' : ''}`
+                )
+                .join('\n')}`
+            : ''
+        }
+
+**QUÉ HACER CON ESTO EN ESTE TURNO:**
+1. **Si ha pasado un día o más, la gente con algo entre manos HA HECHO ALGO.** Apúntalo con \`[BAMBALINAS: ...]\`, uno por cada quien se haya movido, aunque no aparezca en escena. Un personaje al que se le encargó averiguar algo no está en pausa: pregunta, viaja, se topa con una pared o encuentra a quien sabe.
+2. **Mueve los relojes que toque** con \`[RELOJ: ...]\`. Un plan que solo avanza cuando ella lo toca no es un plan, es un decorado.
+3. **✅ Y que se note por fuera.** Lo de aquí no se cuenta, pero **sí se ve**: alguien vuelve con barro en las botas, un aviso llega tarde, una puerta que estaba abierta ya no lo está. El cuaderno se paga en detalles, no en explicaciones.
+`.trim()
+      : '';
+
   const bloqueMochila = inventarioVivo.length
     ? `
 ### 🎒 SUS COSAS (material de escena, no una lista de la compra)
@@ -2157,7 +2215,7 @@ ${lista
     ? `
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
-${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMochila ? `${bloqueMochila}\n` : ''}${bloqueAprendido ? `${bloqueAprendido}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMochila ? `${bloqueMochila}\n` : ''}${bloqueAprendido ? `${bloqueAprendido}\n` : ''}${bloqueCuaderno ? `${bloqueCuaderno}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
 ${
   allPreviousHistory.length > 0
     ? `### 📖 EL PASADO DE ESTA AVENTURA (capítulos ya cerrados)
@@ -2688,6 +2746,8 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
      ⚠️ Y un aviso sobre «atr»: la aplicación NO acepta puntuaciones de salida. Un personaje que aparece por primera vez entra con la atracción a 0 y sube como mucho un punto por día de trato, así que escribir «atr: 8» en un primer encuentro no consigue un 8: consigue un 0 o un 1. La química se juega, no se declara.
    - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, ~Z Nombre (en poder de: Quién | donde: Dónde), +Z PO, -W PO] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda, consuma o LE QUITEN objetos o dinero durante la escena. **«+» entra · «-» se acabó (consumido, gastado, entregado para siempre) · «~» SE LO HAN QUITADO pero sigue siendo suyo.** ⛔ El signo «~» es obligatorio cuando la requisan, la detienen, la registran, la roban o deja algo en prenda: esas cosas NO se borran de su ficha, cambian de manos, y hay que apuntar quién las tiene. Ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)]; si come 3: [INVENTARIO: -3 Buenas Bayas]; si gasta 15 de oro: [INVENTARIO: +Disfraz noble, -15 PO]; **si le requisan el equipaje al capturarla: [INVENTARIO: ~1 Violín (en poder de: la tripulación | donde: la bodega), ~1 Diario ilustrado (en poder de: la tripulación | donde: la bodega)]**; y cuando se lo devuelven o lo recupera: [INVENTARIO: +1 Violín, +1 Diario ilustrado]. Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
    - [APRENDE: +Nombre (tipo, detalle opcional), +Otro (tipo)] — OBLIGATORIO en el turno en que el protagonista GANA una capacidad nueva: al subir de nivel, al aprender un conjuro, al recibir adiestramiento, al desbloquear un rasgo o al ganar una competencia o un idioma. **Este registro es el único sitio donde queda constancia**: su ficha se subió una vez y está congelada en el nivel que tuviera aquel día, así que lo que no se apunte aquí se pierde y dentro de tres niveles nadie sabrá que lo tiene. El tipo va dentro del paréntesis y es uno de: conjuro, rasgo, competencia, mejora. Ejemplos: [APRENDE: +Rayo de escarcha (conjuro, truco de evocación)]; [APRENDE: +Sentido salvaje (rasgo), +Competencia en Supervivencia (competencia)]; [APRENDE: +2 a Sabiduría (mejora, al subir a nivel 4)]; [APRENDE: +Infracomún (competencia, se lo enseña un compañero)]. ⛔ Y no lo uses para objetos —eso es [INVENTARIO:]— ni para apuntar lo que YA figura en su ficha: solo lo nuevo. Si en este turno no ha aprendido nada, OMITE la línea.
+   - [BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama cuelga] — TU CUADERNO, que ella NO lee. Se emite cuando ha pasado tiempo (un descanso largo, un salto, un viaje) y alguien con algo entre manos se ha movido **aunque no aparezca en escena**. Uno por cada quien se mueva. Ejemplo: [BAMBALINAS: Braelin | hizo: pregunta por el violín en los muelles | donde: el puerto | con: un marinero que hace la ruta de las islas | resultado: sabe qué es el instrumento y de dónde viene | hilo: el origen del violín]. ⛔ Esto NO se narra ni se insinúa: es memoria del mundo, no información para la jugadora. ⭐ Y lo que se registra aquí es lo que luego permite que alguien vuelva con algo de verdad en vez de volver con las manos vacías.
+   - [RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve] — la cuenta atrás de lo que corre por detrás. «van: 3/6» fija los dos números; sobre un reloj que ya existe basta «van: +1» para avanzarlo, o «van: 4» para fijarlo. Ejemplo: [RELOJ: Bregan D'aerthe ata cabos sobre ella | van: +1 | al llenarse: mandan a alguien a buscarla en persona | de: Bregan D'aerthe]. Úsalo para las amenazas, las búsquedas, las investigaciones ajenas y los plazos. ⛔ Tampoco se narra.
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
@@ -3651,6 +3711,10 @@ export interface TiempoReportado {
   avanceDeNivel?: AvanceDeNivel;
   /** Conjuros, rasgos o competencias ganados en este turno. */
   aprendido?: Aprendizaje[];
+  /** Lo que ha pasado fuera de cámara, para el cuaderno del Director. */
+  bambalinas?: MovimientoOculto[];
+  /** Los planes que corren por detrás, con su cuenta. */
+  relojes?: RelojOculto[];
 }
 
 async function saveStreamedMessage(
@@ -3699,6 +3763,12 @@ async function saveStreamedMessage(
    * conjuros y rasgos que vienen con ella son del nivel nuevo, no del viejo.
    */
   const aprendido = leerAprendizajes(cleanedText, avanceDeNivel?.nivelAlcanzado);
+  /*
+   * El cuaderno del Director. El día se pone luego, en la aplicación, que es
+   * quien sabe en qué día de campaña estamos: aquí solo se lee el contenido.
+   */
+  const bambalinas = leerBambalinas(cleanedText, 0);
+  const relojes = leerRelojes(cleanedText);
   cleanedText = limpiarEtiquetasDePnj(limpiarEtiquetasDeTiempo(cleanedText));
 
   if (definitivo && hilos.length > 0) {
@@ -3723,6 +3793,7 @@ async function saveStreamedMessage(
       hudDeEsteTurno?.fechaTexto ||
       avanceDeNivel ||
       !nadaAprendido(aprendido) ||
+      !cuadernoQuieto(bambalinas, relojes) ||
       !cambioVacio(inventario))
   ) {
     try {
@@ -3740,7 +3811,9 @@ async function saveStreamedMessage(
         fechaHud: hudDeEsteTurno?.fechaTexto,
         momentoHud: hudDeEsteTurno?.momento,
         avanceDeNivel,
-        aprendido
+        aprendido,
+        bambalinas,
+        relojes
       });
     } catch (err) {
       logError('threads', 'Error al procesar el reporte de tiempo e hilos de la escena', err, {

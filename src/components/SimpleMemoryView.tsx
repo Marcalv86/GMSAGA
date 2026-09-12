@@ -15,7 +15,8 @@ import {
   Copy,
   Sliders,
   FileText,
-  User
+  User,
+  Lock as LockIcon
 } from 'lucide-react';
 import { MemoryManager } from './MemoryManager';
 import {
@@ -55,7 +56,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   const [memorySubView, setMemorySubView] = useState<'view' | 'edit' | 'manage_edits'>('view');
   
   // Top-level memory mode: 'character' (Protagonista & Entidades) vs 'project' (Memoria Persistente de Proyecto)
-  const [memoryMode, setMemoryMode] = useState<'character' | 'project'>(() => {
+  const [memoryMode, setMemoryMode] = useState<'character' | 'gm' | 'project'>(() => {
     try {
       return (localStorage.getItem('preferred_memory_view_mode') as any) || 'character';
     } catch {
@@ -63,7 +64,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
     }
   });
 
-  const handleSwitchMode = (mode: 'character' | 'project') => {
+  const handleSwitchMode = (mode: 'character' | 'gm' | 'project') => {
     setMemoryMode(mode);
     try {
       localStorage.setItem('preferred_memory_view_mode', mode);
@@ -282,6 +283,28 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             <User className="w-3.5 h-3.5" />
             <span>Memoria del Personaje & Entidades</span>
           </button>
+          {/*
+            EL CUADERNO DEL DIRECTOR, EN SU PROPIO SITIO.
+
+            Los giros vivían entre las fichas del personaje, que es donde menos
+            pintan: no son suyos, son del otro lado de la pantalla. Aquí van con
+            lo que les corresponde —lo que pasa fuera de cámara y los relojes—,
+            y queda claro de un vistazo que todo esto es material del Narrador y
+            no cosas que su personaje sepa.
+          */}
+          <button
+            id="tab-btn-gm-memory"
+            onClick={() => handleSwitchMode('gm')}
+            className={`px-3 py-1.5 rounded-md text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              memoryMode === 'gm'
+                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
+            }`}
+            title="Lo que sabe el Narrador y tu personaje no: los giros que aún no han salido, lo que hace la gente fuera de cámara y los planes que corren por detrás."
+          >
+            <LockIcon className="w-3.5 h-3.5" />
+            <span>Cuaderno del GM</span>
+          </button>
           <button
             id="tab-btn-project-memory"
             onClick={() => handleSwitchMode('project')}
@@ -311,7 +334,31 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
         )}
       </div>
 
-      {memoryMode === 'character' ? (
+      {memoryMode === 'gm' ? (
+        <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+          <div className="px-3 sm:px-6 pt-3">
+            <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 flex items-start gap-2">
+              <span className="text-base leading-none mt-0.5">🕯️</span>
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                <strong className="text-[var(--accent)] font-cinzel">Esto es el otro lado de la pantalla.</strong>{' '}
+                Lo que el Narrador sabe y tu personaje no: los giros que aún no han salido, lo que hace la gente
+                cuando no estás delante y los planes que corren por detrás. Míralo si quieres —es tu campaña—, pero
+                aquí es donde vive lo que todavía no se ha ganado jugando.
+              </p>
+            </div>
+          </div>
+          <MemoryManager
+            project={project}
+            files={files}
+            onUpdateMemory={onUpdateMemory}
+            onUpdateProject={onUpdateProject}
+            onTriggerAIUpdate={onTriggerAIUpdate ? async () => { onTriggerAIUpdate(); } : undefined}
+            isGenerating={isGenerating}
+            hasChats={chats.length > 0}
+            secciones={['giros', 'bambalinas', 'relojes']}
+          />
+        </div>
+      ) : memoryMode === 'character' ? (
         <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
           <MemoryManager
             project={project}

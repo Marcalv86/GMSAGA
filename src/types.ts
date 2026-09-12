@@ -397,6 +397,68 @@ export interface ProjectMemoryEdit {
  * que alguien la descubra. Sin sitio donde vivir, se quedaba en la cabeza de la
  * jugadora, se contaba de pasada en la prosa, o se perdía.
  */
+/**
+ * Algo que ha pasado FUERA DE CÁMARA y que ella todavía no sabe.
+ *
+ * El cuaderno del Director existía a medias: guardaba los giros —lo que se va
+ * a revelar— pero no lo que la gente HACE mientras tanto. Y un mundo vivo no
+ * es una lista de sorpresas guardadas, es gente con planes que avanza aunque
+ * la protagonista esté durmiendo en otra ciudad.
+ *
+ * Sin esto, un aliado al que se le encarga averiguar algo desaparece del mapa
+ * hasta que vuelve a entrar en escena, y entonces el Narrador improvisa qué ha
+ * estado haciendo esos cuatro días. Con esto, lo hizo de verdad: fue, habló con
+ * alguien, sacó algo o se topó con una pared, y todo eso quedó escrito el día
+ * en que ocurrió.
+ */
+export interface MovimientoOculto {
+  id: string;
+  /** Día absoluto de campaña en que ocurrió. */
+  diaAbs: number;
+  /** La fecha legible, para la pantalla. */
+  fecha?: string;
+  /** Quién lo hizo: un PNJ, una facción, un grupo. */
+  quien: string;
+  /** Qué hizo, en una o dos frases. */
+  que: string;
+  /** Dónde, si importa. */
+  donde?: string;
+  /** Con quién habló o a quién se enfrentó. */
+  conQuien?: string;
+  /** Qué sacó en claro, o con qué se topó. */
+  resultado?: string;
+  /** De qué trama o giro cuelga esto. */
+  hilo?: string;
+  /** Si la protagonista ya se ha enterado, y por qué vía. */
+  loSupo?: { diaAbs?: number; como?: string };
+}
+
+/**
+ * Un reloj: cuánto le queda a un plan que corre por detrás.
+ *
+ * Lo que convierte una amenaza en una amenaza de verdad es que avance sola. Un
+ * enemigo que solo actúa cuando la protagonista le da pie no es un enemigo, es
+ * un decorado que reacciona. Aquí se lleva la cuenta en segmentos, y cuando se
+ * llena, pasa lo que tenga que pasar, esté ella delante o no.
+ */
+export interface RelojOculto {
+  id: string;
+  /** De qué va: «Bregan D'aerthe localiza el violín». */
+  nombre: string;
+  /** De cuántos segmentos es. */
+  segmentos: number;
+  /** Cuántos van llenos. */
+  llenos: number;
+  /** Qué ocurre cuando se llena del todo. */
+  alLlenarse: string;
+  /** Quién lo mueve. */
+  deQuien?: string;
+  /** Si ella puede intuir que algo se está cociendo. */
+  loIntuye?: boolean;
+  /** Día absoluto en que se llenó, si ya se llenó. */
+  cumplidoDiaAbs?: number;
+}
+
 export interface SecretoDeCampana {
   id: string;
   /** De qué va, en pocas palabras. Es lo único que se ve sin destapar. */
@@ -557,6 +619,10 @@ export interface Memory {
   };
   no_son_pnj?: string[];
   gm_secrets?: SecretoDeCampana[];
+  /** Lo que pasa fuera de cámara, día a día, aunque nadie lo vea. */
+  gm_bambalinas?: MovimientoOculto[];
+  /** Los planes que corren por detrás, con su cuenta atrás. */
+  gm_relojes?: RelojOculto[];
   /**
    * La forma de la historia, decidida de antemano.
    *
