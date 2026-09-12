@@ -325,9 +325,14 @@ export const MemoryManager: React.FC<{
     try {
       const tablero = await leerElTableroDeDocumentos({ project, files });
       if (!tablero.facciones.length && !tablero.preparado.length) {
-        window.alert(
-          'No he sacado nada en claro de tus documentos. Comprueba que los compendios y el material de la campaña estén subidos en Archivos.'
-        );
+        setConfirmModal({
+          isOpen: true,
+          title: 'Lectura de Documentos',
+          message: 'No he sacado nada en claro de tus documentos. Comprueba que los compendios y el material de la campaña estén subidos en Archivos.',
+          confirmText: 'Entendido',
+          cancelText: '',
+          onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        });
         return;
       }
       const antesFac = (project.memory?.gm_facciones || []).length;
@@ -339,14 +344,26 @@ export const MemoryManager: React.FC<{
       }));
       const nuevasFac = Math.max(0, aplicarFacciones(project.memory?.gm_facciones, tablero.facciones).length - antesFac);
       const nuevasPrep = Math.max(0, aplicarPreparado(project.memory?.gm_preparado, tablero.preparado).length - antesPrep);
-      window.alert(
-        `Tablero leído.\n\n` +
+      setConfirmModal({
+        isOpen: true,
+        title: 'Tablero Leído con Éxito',
+        message:
           `· Facciones: ${tablero.facciones.length} leídas${nuevasFac ? `, ${nuevasFac} nuevas` : ' (ya las tenías todas)'}\n` +
           `· Preparado: ${tablero.preparado.length} ideas${nuevasPrep ? `, ${nuevasPrep} nuevas` : ' (ya las tenías todas)'}\n\n` +
-          `Lo nuevo va marcado como «de tus documentos». Lo que ya tenías conserva lo que ganó jugando.`
-      );
+          `Lo nuevo va marcado como «de tus documentos». Lo que ya tenías conserva lo que ganó jugando.`,
+        confirmText: 'Aceptar',
+        cancelText: '',
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      });
     } catch (err: any) {
-      window.alert(err?.message || 'No se ha podido leer el tablero. Inténtalo de nuevo.');
+      setConfirmModal({
+        isOpen: true,
+        title: 'Error al Leer Tablero',
+        message: err?.message || 'No se ha podido leer el tablero. Inténtalo de nuevo.',
+        confirmText: 'Cerrar',
+        cancelText: '',
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      });
     } finally {
       setLeyendoTablero(false);
     }
@@ -355,16 +372,20 @@ export const MemoryManager: React.FC<{
   const [tramando, setTramando] = useState(false);
   const [verPremisa, setVerPremisa] = useState(false);
 
-  // Confirmation state
+  // Dialog & Modal states
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
     message: string;
+    confirmText?: string;
+    cancelText?: string;
     onConfirm: () => void;
   }>({
     isOpen: false,
     title: '',
     message: '',
+    confirmText: 'Confirmar',
+    cancelText: 'Cancelar',
     onConfirm: () => {}
   });
 
@@ -423,17 +444,28 @@ export const MemoryManager: React.FC<{
       typeof n.con === 'number';
     const sobran = todos.filter(n => !conocido(n));
     if (sobran.length === 0) {
-      window.alert('No hay ninguna ficha de gente sin conocer: todas las de la lista han salido en la partida o tienen algo tuyo.');
+      setConfirmModal({
+        isOpen: true,
+        title: 'Elenco al Día',
+        message: 'No hay ninguna ficha de gente sin conocer: todas las de la lista han salido en la partida o tienen algo tuyo.',
+        confirmText: 'Entendido',
+        cancelText: '',
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      });
       return;
     }
     const muestra = sobran.slice(0, 8).map(n => n.name).join(', ');
-    if (
-      !window.confirm(
-        `Se van a quitar ${sobran.length} fichas de personajes que NO han salido nunca en la partida, no tienen retrato y no tienen afinidad:\n\n${muestra}${sobran.length > 8 ? `, y ${sobran.length - 8} más` : ''}\n\nSeguirán existiendo en tus documentos, y se ficharán solos cuando aparezcan en escena. ¿Los quito?`
-      )
-    )
-      return;
-    await onUpdateMemory(mem => ({ ...mem, npcs: (mem.npcs || []).filter(conocido) }));
+    setConfirmModal({
+      isOpen: true,
+      title: 'Limpiar Elenco No Conocido',
+      message: `Se van a quitar ${sobran.length} fichas de personajes que NO han salido nunca en la partida, no tienen retrato y no tienen afinidad:\n\n${muestra}${sobran.length > 8 ? `, y ${sobran.length - 8} más` : ''}\n\nSeguirán existiendo en tus documentos, y se ficharán solos cuando aparezcan en escena. ¿Deseas quitarlos de la memoria activa?`,
+      confirmText: 'Sí, quitar fichas',
+      cancelText: 'Cancelar',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await onUpdateMemory(mem => ({ ...mem, npcs: (mem.npcs || []).filter(conocido) }));
+      }
+    });
   };
 
   const cambiarIdentidad = async (campo: 'race' | 'class' | 'languages' | 'appearance', valor: string) => {
@@ -1711,67 +1743,46 @@ export const MemoryManager: React.FC<{
                     )}
                   </span>
                   <div className="flex flex-wrap items-center gap-1.5">
-                  <button
-                    onClick={async () => {
-                      if (tramando) return;
-                      const ideas = (window.prompt(
-                        secretos.length
-                          ? '¿Alguna idea que quieras que la IA incorpore al trazar la historia? (opcional)\n\nLo ya plantado se respeta y se coloca en la capa que le toque.'
-                          : '¿Alguna idea de por dónde quieres que vaya la historia? (opcional)\n\nLa IA trazará las capas: lo que parece que pasa, lo que pasa de verdad, quién está detrás y por qué.'
-                      ) ?? null);
-                      if (ideas === null) return;
-                      setTramando(true);
-                      try {
-                        const trama = await tramarLaCampana({
-                          project,
-                          files,
-                          chats: project.chats || [],
-                          ideas: ideas.trim() || undefined,
-                          modo: memory.plan_de_campana?.premisa ? 'revisar' : 'trazar'
-                        });
-                        await onUpdateMemory(mem => ({
-                          ...mem,
-                          // La misma fusión que usa el repaso automático: lo ya
-                          // descubierto y lo que plantaste tú no se tocan.
-                          gm_secrets: fusionarTrama(mem.gm_secrets || [], trama),
-                          plan_de_campana: {
-                            premisa: trama.premisa || mem.plan_de_campana?.premisa || '',
-                            destino: trama.destino || mem.plan_de_campana?.destino,
-                            trazadoEl: new Date().toISOString()
-                          }
-                        }));
-                      } catch (err: any) {
-                        window.alert(err?.message || 'No se pudo trazar la historia. Inténtalo de nuevo.');
-                      } finally {
-                        setTramando(false);
-                      }
-                    }}
-                    disabled={tramando}
-                    className="min-h-[36px] px-2.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 shadow-xs"
-                    title="Esto se hace solo al empezar la campaña y en cada repaso de memoria. Aquí puedes forzarlo ahora, y sobre todo darle ideas de por dónde quieres que vaya."
-                  >
-                    <Sparkles className={`w-3.5 h-3.5 ${tramando ? 'animate-spin' : ''}`} />
-                    {tramando ? 'Tramando…' : 'Darle ideas y repasar ahora'}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const titulo = (window.prompt('Título corto del giro (ej. «Los dueños del barco»)') || '').trim();
-                      if (!titulo) return;
-                      const secreto = (window.prompt('¿Cuál es la verdad? Esto NO se narrará hasta que se descubra jugando.') || '').trim();
-                      if (!secreto) return;
-                      const comoSeDescubre = (window.prompt('¿Por dónde puede salir? (opcional)') || '').trim();
-                      await onUpdateMemory(mem => ({
-                        ...mem,
-                        gm_secrets: [
-                          ...(mem.gm_secrets || []),
-                          { id: `sec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, titulo, secreto, comoSeDescubre: comoSeDescubre || undefined, origen: 'jugadora' as const }
-                        ]
-                      }));
-                    }}
-                    className="min-h-[36px] px-2.5 rounded-lg border border-rose-500/50 text-rose-700 dark:text-rose-300 hover:bg-rose-600 hover:text-white text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Plantar un giro
-                  </button>
+                    <button
+                      onClick={async () => {
+                        if (tramando) return;
+                        setTramando(true);
+                        try {
+                          const trama = await tramarLaCampana({
+                            project,
+                            files,
+                            chats: project.chats || [],
+                            modo: memory.plan_de_campana?.premisa ? 'revisar' : 'trazar'
+                          });
+                          await onUpdateMemory(mem => ({
+                            ...mem,
+                            gm_secrets: fusionarTrama(mem.gm_secrets || [], trama),
+                            plan_de_campana: {
+                              premisa: trama.premisa || mem.plan_de_campana?.premisa || '',
+                              destino: trama.destino || mem.plan_de_campana?.destino,
+                              trazadoEl: new Date().toISOString()
+                            }
+                          }));
+                        } catch (err: any) {
+                          setConfirmModal({
+                            isOpen: true,
+                            title: 'Error al Trazar Historia',
+                            message: err?.message || 'No se pudo trazar la historia. Inténtalo de nuevo.',
+                            confirmText: 'Aceptar',
+                            cancelText: '',
+                            onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+                          });
+                        } finally {
+                          setTramando(false);
+                        }
+                      }}
+                      disabled={tramando}
+                      className="min-h-[36px] px-3 rounded-lg bg-rose-600 text-white hover:bg-rose-700 text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 shadow-xs"
+                      title="Esto se hace solo al empezar la campaña y en cada repaso de memoria. Aquí puedes forzar el análisis de la IA a partir de tus documentos y lo jugado."
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${tramando ? 'animate-spin' : ''}`} />
+                      {tramando ? 'Tramando…' : 'Repasar trama con IA'}
+                    </button>
                   </div>
                 </div>
 
@@ -1780,7 +1791,7 @@ export const MemoryManager: React.FC<{
                   detrás, y <strong>quién puede traer cada pieza a una escena y qué lo dispara</strong>. <strong>La traza la IA sola</strong> al empezar la campaña y la repasa en cada revisión de
                   memoria, a la luz de lo que hayas jugado. Le llega al Narrador con candado en cada turno: siembra las
                   pistas y hace que todo cuadre, pero tiene prohibido contarlo. Cuando algo salga jugando, se marca
-                  solo. Tú puedes darle ideas aquí o hablando con el GM en su pestaña.
+                  solo. Cualquier giro, sospecha o cambio que quieras proponer se habla directamente con el GM en OOC en el chat.
                 </p>
 
                 {memory.plan_de_campana?.premisa && (
@@ -1806,7 +1817,7 @@ export const MemoryManager: React.FC<{
                 {secretos.length === 0 ? (
                   <p className="text-[11px] text-[var(--text-secondary)] italic m-0">
                     Todavía nada. La IA la trazará sola en cuanto empieces a jugar la campaña, leyendo tus documentos.
-                    Si quieres adelantarlo o decirle por dónde tirar, dale a <strong>Darle ideas y repasar ahora</strong>.
+                    Si quieres adelantarlo, dale a <strong>Repasar trama con IA</strong>, o coméntaselo al GM en OOC en el chat.
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
@@ -2909,24 +2920,32 @@ export const MemoryManager: React.FC<{
         />
       )}
 
-      {/* Generic Confirmation Modal */}
+      {/* Generic Confirmation / Notification Modal */}
       {confirmModal.isOpen && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--bg-color)] p-6 rounded-lg shadow-2xl border border-[var(--glass-border)] w-[400px] max-w-full font-lora">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-2xs">
+          <div className="bg-[var(--bg-color)] p-6 rounded-lg shadow-2xl border border-[var(--glass-border)] w-[440px] max-w-full font-lora animate-in fade-in zoom-in-95 duration-150">
             <h4 className="font-cinzel text-lg text-[var(--accent)] font-bold mb-2">{confirmModal.title}</h4>
-            <p className="text-sm text-[var(--text-primary)] mb-5 leading-relaxed">{confirmModal.message}</p>
+            <p className="text-sm text-[var(--text-primary)] mb-5 leading-relaxed whitespace-pre-wrap">{confirmModal.message}</p>
             <div className="flex justify-end gap-2">
+              {confirmModal.cancelText !== '' && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                  className="px-3.5 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] cursor-pointer"
+                >
+                  {confirmModal.cancelText || 'Cancelar'}
+                </button>
+              )}
               <button
-                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="px-3.5 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded hover:bg-[var(--surface)] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
+                type="button"
                 onClick={confirmModal.onConfirm}
-                className="px-3.5 py-1.5 text-xs font-cinzel bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer"
+                className={`px-3.5 py-1.5 text-xs font-cinzel rounded font-bold cursor-pointer transition-colors ${
+                  confirmModal.cancelText !== ''
+                    ? 'bg-red-700 hover:bg-red-800 text-white'
+                    : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)]'
+                }`}
               >
-                Confirmar
+                {confirmModal.confirmText || 'Confirmar'}
               </button>
             </div>
           </div>

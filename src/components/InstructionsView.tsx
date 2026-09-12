@@ -19,6 +19,7 @@ import {
 
 import {
   Activity,
+  AlertCircle,
   Check,
   ChevronDown,
   ChevronUp,
@@ -75,6 +76,7 @@ export const InstructionsView: React.FC<{
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
   const [analyzingMessage, setAnalyzingMessage] = useState('');
   const [styleSuccessNotice, setStyleSuccessNotice] = useState<string | null>(null);
+  const [styleErrorNotice, setStyleErrorNotice] = useState<string | null>(null);
   const styleFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -299,9 +301,11 @@ export const InstructionsView: React.FC<{
       setStyle(analyzedDirective);
       await saveChanges(undefined, undefined, analyzedDirective);
       setStyleSuccessNotice(`Estilo extraído con éxito desde "${file.name}" y guardado en Directivas.`);
+      setTimeout(() => setStyleSuccessNotice(null), 5000);
     } catch (err: any) {
       console.error('Error analyzing style document:', err);
-      alert(`No se pudo aprender el estilo: ${describeApiError(err)}`);
+      setStyleErrorNotice(`No se pudo aprender el estilo: ${describeApiError(err)}`);
+      setTimeout(() => setStyleErrorNotice(null), 6000);
     } finally {
       setIsAnalyzingStyle(false);
       setAnalyzingMessage('');
@@ -940,6 +944,38 @@ export const InstructionsView: React.FC<{
               <div className="mb-2 p-2 bg-amber-50/80 border border-amber-300 rounded text-xs text-amber-900 font-cinzel flex items-center gap-2 animate-pulse">
                 <div className="w-3.5 h-3.5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
                 <span className="truncate">{analyzingMessage || 'Analizando estilo literario...'}</span>
+              </div>
+            )}
+
+            {styleSuccessNotice && (
+              <div className="mb-2 p-2 bg-emerald-50 border border-emerald-300 rounded text-xs text-emerald-900 font-cinzel flex items-center justify-between gap-2 shadow-2xs">
+                <div className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>{styleSuccessNotice}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStyleSuccessNotice(null)}
+                  className="text-emerald-700 hover:text-emerald-950 p-0.5 rounded cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {styleErrorNotice && (
+              <div className="mb-2 p-2 bg-rose-50 border border-rose-300 rounded text-xs text-rose-900 font-cinzel flex items-center justify-between gap-2 shadow-2xs">
+                <div className="flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>{styleErrorNotice}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStyleErrorNotice(null)}
+                  className="text-rose-700 hover:text-rose-950 p-0.5 rounded cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               </div>
             )}
 

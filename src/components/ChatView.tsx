@@ -846,9 +846,12 @@ export const ChatView: React.FC<{
 
   // Reconocimiento y Dictado por Voz en tiempo real
   const [isListening, setIsListening] = useState(false);
+  const [speechNotice, setSpeechNotice] = useState<string | null>(null);
+  const speechBaseTextRef = useRef<string>('');
   const recognitionRef = useRef<any>(null);
 
   const toggleSpeechRecognition = () => {
+    setSpeechNotice(null);
     if (isListening) {
       if (recognitionRef.current) {
         try {
@@ -864,7 +867,7 @@ export const ChatView: React.FC<{
       (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).webkitSpeechRecognition;
 
     if (!SpeechRec) {
-      alert('Tu navegador no soporta reconocimiento de voz nativo en esta ventana. Por favor prueba con Google Chrome, Edge o Safari.');
+      setSpeechNotice('Tu navegador no soporta reconocimiento de voz nativo en esta ventana. Prueba con Google Chrome, Edge o Safari.');
       return;
     }
 
@@ -874,6 +877,7 @@ export const ChatView: React.FC<{
       rec.interimResults = true;
       rec.lang = 'es-ES';
 
+      speechBaseTextRef.current = inputText;
       let accumulated = '';
 
       rec.onstart = () => {
@@ -889,19 +893,17 @@ export const ChatView: React.FC<{
             interim += event.results[i][0].transcript;
           }
         }
-        setInputText(prev => {
-          const base = prev.trim();
-          const spoken = (accumulated || interim).trim();
-          if (!base) return spoken;
-          if (base.endsWith(spoken)) return base;
-          return `${base} ${spoken}`;
-        });
+        const spoken = (accumulated + interim).trim();
+        const base = speechBaseTextRef.current.trim();
+        setInputText(base ? `${base} ${spoken}` : spoken);
       };
 
       rec.onerror = (event: any) => {
         console.warn('Speech recognition error/warning:', event.error);
         if (event.error === 'not-allowed') {
-          alert('Permiso de micrófono denegado. Permite el acceso al micrófono en el navegador para dictar tus acciones de rol.');
+          setSpeechNotice('Permiso de micrófono denegado. Permite el acceso al micrófono en el navegador para dictar tus acciones de rol.');
+        } else if (event.error !== 'no-speech') {
+          setSpeechNotice(`Aviso de dictado: ${event.error}`);
         }
         setIsListening(false);
       };
@@ -1704,6 +1706,23 @@ export const ChatView: React.FC<{
 
         {/* Input Field & Attachments */}
         <div className="max-w-[900px] mx-auto relative">
+          {speechNotice && (
+            <div className="mb-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between gap-2 shadow-xs animate-in fade-in duration-150">
+              <div className="flex items-center gap-2">
+                <Mic className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>{speechNotice}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSpeechNotice(null)}
+                className="p-1 rounded hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 transition-colors cursor-pointer"
+                title="Cerrar aviso"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Ventana rápida flotante de emojis */}
           <EmojiPickerPopover
             isOpen={isEmojiPickerOpen}

@@ -93,6 +93,12 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     desc: 'Modelo insignia con razonamiento adaptativo, narración fluida y detección precisa de mecánicas de rol.'
   },
   {
+    id: 'gemini-3.1-pro-preview',
+    name: 'Gemini 3.1 Pro Preview',
+    badge: 'Pro · Razonamiento Complejo',
+    desc: 'Modelo Pro de máxima capacidad para razonamiento profundo, intrigas intrincadas y consistencia narrativa avanzada.'
+  },
+  {
     id: 'gemini-3.6-flash',
     name: 'Gemini 3.6 Flash',
     badge: 'Eficiente · Alta Estabilidad',
@@ -141,8 +147,6 @@ export function isModelDeprecated(modelId: string): boolean {
   return (
     m.includes('1.5') ||
     m.includes('2.0') ||
-    m.includes('2.5') ||
-    m.includes('3.1') ||
     m === 'gemini-pro' ||
     m === 'gemini-flash' ||
     m.includes('thinking-exp') ||

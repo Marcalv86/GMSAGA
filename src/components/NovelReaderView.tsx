@@ -6,6 +6,7 @@ import { formatNarrativeText } from '../utils/textFormatter';
 import { exportNovelToPDF, exportNovelToMarkdown } from '../utils/pdfExport';
 import { novelizeUserMessage, batchNovelizeMessages } from '../utils/geminiHelper';
 import {
+  AlertCircle,
   Swords,
   Shield,
   FileDown,
@@ -139,6 +140,7 @@ export const NovelReaderView: React.FC<NovelReaderViewProps> = ({
 
   const [exportProgress, setExportProgress] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<'pdf' | 'md' | null>(null);
+  const [novelError, setNovelError] = useState<string | null>(null);
 
   const toggleOriginal = (key: string) => {
     setExpandedOriginals(prev => ({ ...prev, [key]: !prev[key] }));
@@ -173,7 +175,8 @@ export const NovelReaderView: React.FC<NovelReaderViewProps> = ({
       }
     } catch (err: any) {
       console.error('Error al novelar mensaje:', err);
-      alert('No se pudo generar la prosa novelada: ' + (err?.message || 'Error de conexión'));
+      setNovelError('No se pudo generar la prosa novelada: ' + (err?.message || 'Error de conexión'));
+      setTimeout(() => setNovelError(null), 5000);
     } finally {
       setNovelizingIdx(null);
     }
@@ -270,7 +273,8 @@ export const NovelReaderView: React.FC<NovelReaderViewProps> = ({
       setTimeout(() => setExportSuccess(null), 3000);
     } catch (err: any) {
       console.error('Error exporting Markdown:', err);
-      alert('Error al exportar el texto: ' + (err?.message || 'Error desconocido'));
+      setNovelError('Error al exportar el texto: ' + (err?.message || 'Error desconocido'));
+      setTimeout(() => setNovelError(null), 5000);
     }
   };
 
@@ -530,6 +534,22 @@ export const NovelReaderView: React.FC<NovelReaderViewProps> = ({
         <div className="bg-amber-900/90 text-amber-100 px-4 py-2 text-xs font-cinzel flex items-center justify-center gap-2 shadow-md border-b border-amber-700/60 z-20">
           <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
           <span>{exportProgress}</span>
+        </div>
+      )}
+
+      {/* Novel Action Error Notification */}
+      {novelError && (
+        <div className="bg-red-950/90 text-red-200 px-4 py-2 text-xs font-cinzel flex items-center justify-between gap-2 shadow-md border-b border-red-800/60 z-20">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+            <span>{novelError}</span>
+          </div>
+          <button
+            onClick={() => setNovelError(null)}
+            className="text-red-300 hover:text-white p-0.5 rounded cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 

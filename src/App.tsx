@@ -1807,6 +1807,7 @@ export default function App() {
       });
 
       // Novelización en segundo plano de la respuesta tras concluir con éxito la generación
+      // Se espacia 3.5 segundos tras el turno para dejar margen de cuota (RPM/TPM) en la API gratuita.
       if (currentProject && currentChatId && userPrompt && !userPrompt.startsWith('[Continúa') && !userPrompt.startsWith('⏳ [')) {
         const targetChatId = currentChatId;
         const targetProj = currentProject;
@@ -1849,7 +1850,7 @@ export default function App() {
           } catch {
             // Silencioso en segundo plano
           }
-        }, 1000);
+        }, 3500);
       }
     } catch (error: any) {
       console.error('Error generating AI story:', error);
@@ -1957,7 +1958,7 @@ export default function App() {
             } catch (err) {
               console.warn('Auto-background memory synthesis skipped:', err);
             }
-          }, 1500);
+          }, 3000);
         }
 
         /*
@@ -2042,7 +2043,7 @@ export default function App() {
                 { projectName: currentProject.name }
               );
             }
-          }, 1500);
+          }, 7000);
         }
       }
 
@@ -2958,33 +2959,46 @@ export default function App() {
       // 1. Memoria de entidades, crónica, PNJs, lugares, tramas, inventario y diario
       // 2. Memoria persistente general del proyecto en Markdown (Purpose & context, Current state, Tools)
       /*
-       * SINCRONIZAR ES SINCRONIZAR TODO, Y LA FICHA TAMBIÉN ES TODO.
-       *
-       * La lectura de la ficha subida vivía en su propio botón, en otra
-       * pestaña, y había que acordarse. Pero es el mismo gesto —poner la
-       * campaña al día— y nadie separa mentalmente «sincronizar la memoria» de
-       * «leer mi ficha»: si le doy a sincronizar todo, espero que mire todo.
-       *
-       * Va en paralelo con las otras dos y en el modelo de tareas de fondo, así
-       * que no alarga la espera ni toca la cuota de los modelos buenos. Y si
-       * falla, la sincronización sigue: leer la ficha es un extra, no un
-       * requisito.
+       * Sincronización secuencial escalonada para proteger la cuota gratuita (RPM/TPM).
+       * En lugar de lanzar todo en paralelo con Promise.all saturando el límite de peticiones/minuto,
+       * se ejecuta paso a paso con actualización visual del estado.
        */
-      const [syncResult, claudeProjectMem, fichaLeida] = await Promise.all([
-        syncFullCampaignFromChats(currentProject, currentChats, currentFiles),
-        generateClaudeProjectMemory({
-          project: currentProject,
-          chats: currentChats,
-          files: currentFiles
-        }).catch(err => {
-          logWarn('memory_sync', 'No se pudo generar la memoria persistente del proyecto en formato Claude', describeApiError(err));
-          return null;
-        }),
-        extraerIdentidadDeDocumentos({ project: currentProject, files: currentFiles }).catch(err => {
-          logWarn('memory_sync', 'No se pudo leer la ficha del protagonista al sincronizar', describeApiError(err));
-          return null;
-        })
-      ]);
+      setTopProgress({
+        active: true,
+        label: 'Sincronizando entidades, crónica y cronología (paso 1/4)...',
+        type: 'sync'
+      });
+      const syncResult = await syncFullCampaignFromChats(currentProject, currentChats, currentFiles);
+
+      // Breve pausa para no saturar tokens por minuto
+      await new Promise(r => setTimeout(r, 1200));
+
+      setTopProgress({
+        active: true,
+        label: 'Sintetizando memoria general del proyecto (paso 2/4)...',
+        type: 'sync'
+      });
+      const claudeProjectMem = await generateClaudeProjectMemory({
+        project: currentProject,
+        chats: currentChats,
+        files: currentFiles
+      }).catch(err => {
+        logWarn('memory_sync', 'No se pudo generar la memoria persistente del proyecto en formato Claude', describeApiError(err));
+        return null;
+      });
+
+      // Breve pausa para no saturar tokens por minuto
+      await new Promise(r => setTimeout(r, 1200));
+
+      setTopProgress({
+        active: true,
+        label: 'Verificando ficha e identidad en documentos (paso 3/4)...',
+        type: 'sync'
+      });
+      const fichaLeida = await extraerIdentidadDeDocumentos({ project: currentProject, files: currentFiles }).catch(err => {
+        logWarn('memory_sync', 'No se pudo leer la ficha del protagonista al sincronizar', describeApiError(err));
+        return null;
+      });
 
       /*
        * La sincronización RELLENA HUECOS; no reescribe el diario.
@@ -3149,6 +3163,12 @@ export default function App() {
        */
       let girosTrazados = 0;
       try {
+        setTopProgress({
+          active: true,
+          label: 'Tramando historia y giros de la campaña (paso 4/4)...',
+          type: 'sync'
+        });
+        await new Promise(r => setTimeout(r, 1200));
         const proyectoAlDia = getLocalProjects().find(p => p.id === currentProject.id) || currentProject;
         const sinTrama = !proyectoAlDia.memory?.plan_de_campana?.premisa;
         const trama = await tramarLaCampana({
