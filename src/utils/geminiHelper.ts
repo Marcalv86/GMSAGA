@@ -67,7 +67,7 @@ import { leerOlvidos } from './ordenesDeMesa';
 import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 import { logError, logWarn, logInfo } from './logger';
-import { abrirLlamada, cerrarLlamada } from './callLog';
+import { abrirLlamada, cerrarLlamada, presionDelMinuto } from './callLog';
 import { sanitizePlayerCharacter } from './sanitizers';
 import { recuperar, consultaDelTurno } from './localSearch';
 
@@ -715,11 +715,11 @@ export function setStoredApiKeys(keys: string[]): void {
   }
 }
 
-export type KeyRotationMode = 'round_robin' | 'failover_only';
+export type KeyRotationMode = 'round_robin' | 'failover_only' | 'inteligente';
 
 export function getStoredKeyRotationMode(): KeyRotationMode {
   const local = localStorage.getItem('gemini_key_rotation_mode');
-  if (local && (local === 'round_robin' || local === 'failover_only')) {
+  if (local && (local === 'round_robin' || local === 'failover_only' || local === 'inteligente')) {
     return local as KeyRotationMode;
   }
   return 'round_robin'; // Rotación activa round-robin por defecto para maximizar cuota de peticiones por minuto
@@ -1017,6 +1017,74 @@ export function getRotatedApiKeys(): {
     return {
       keys: allKeys,
       activeOriginalIndex: 0,
+      totalKeys: allKeys.length
+    };
+  }
+
+  /*
+   * MODO INTELIGENTE: quedarse quieto mientras se pueda, moverse antes de chocar.
+   *
+   * Los otros dos modos son ciegos y cada uno falla por un lado. El round-robin
+   * rota pase lo que pase, así que te puede entregar justo la clave que acaba
+   * de tragarse un turno de doscientas mil fichas mientras otras cuatro están
+   * en blanco. Y el failover solo se entera de que una clave está saturada
+   * DESPUÉS de comerse el 429, que se paga en tiempo y en un reintento.
+   *
+   * Hay además una tensión que ninguno de los dos resuelve: el caché implícito
+   * de Google es POR PROYECTO, y cada clave es un proyecto distinto. Rotar en
+   * cada turno garantiza que ninguna caché llegue a calentarse nunca, y eso se
+   * paga en segundos de espera en cada turno.
+   *
+   * Así que este modo hace las dos cosas a la vez: se queda pegado a la clave
+   * que viene usando —para que su caché se caliente y el turno arranque
+   * antes— y solo se mueve cuando a esa clave ya no le cabe el envío dentro
+   * del minuto que corre. Cuando toca moverse, no va a la siguiente de la
+   * lista: va a la MÁS DESCARGADA, que es la que más posibilidades tiene de
+   * aceptar el turno a la primera.
+   *
+   * El dato sale del registro de llamadas, que apunta fichas y clave de cada
+   * petición, así que esto no cuesta ni una llamada de más.
+   */
+  if (mode === 'inteligente') {
+    const modelo = getStoredModel();
+    const { limite } = techoDeEnvio(modelo);
+    const presion = presionDelMinuto(modelo, allKeys.length);
+    const gastado = (i: number) => presion.porClave[i] || 0;
+
+    /*
+     * Cuánto margen se exige para considerar que una clave «tiene sitio».
+     * No basta con que le quepa un byte: si se queda al borde, el turno
+     * siguiente choca igual y se ha perdido el caché por nada.
+     */
+    const margenMinimo = limite * 0.25;
+    const pegajosa = allKeys[globalRoundRobinIndex % allKeys.length];
+    const iPegajosa = allKeys.indexOf(pegajosa);
+
+    let elegida = iPegajosa;
+    if (iPegajosa < 0 || limite - gastado(iPegajosa) < margenMinimo) {
+      // A la que viene usándose ya no le cabe: se salta a la más libre.
+      let mejor = 0;
+      for (let i = 1; i < allKeys.length; i++) {
+        if (gastado(i) < gastado(mejor)) mejor = i;
+      }
+      elegida = mejor;
+      globalRoundRobinIndex = mejor;
+      try {
+        localStorage.setItem('gemini_rr_index', String(mejor));
+      } catch {}
+    }
+
+    // Detrás de la elegida van las demás ordenadas de más libre a más cargada,
+    // para que si aun así falla, el respaldo caiga en el mejor sitio posible.
+    const resto = allKeys
+      .map((k, i) => ({ k, i }))
+      .filter(x => x.i !== elegida)
+      .sort((a, b) => gastado(a.i) - gastado(b.i))
+      .map(x => x.k);
+
+    return {
+      keys: [allKeys[elegida], ...resto],
+      activeOriginalIndex: elegida,
       totalKeys: allKeys.length
     };
   }

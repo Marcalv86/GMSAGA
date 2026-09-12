@@ -1379,18 +1379,25 @@ export const ApiKeyModal: React.FC<{
 
                   {[
                     {
-                      id: 'round_robin',
-                      title: '⚡ Rotación Activa Turno a Turno (Round-Robin) — Recomendado',
-                      badge: 'Reparto Equitativo',
+                      id: 'inteligente',
+                      title: '🧠 Reparto según la cuota real — Recomendado',
+                      badge: 'Mide antes de repartir',
                       badgeColor: 'bg-emerald-700',
-                      desc: 'Distribuye equitativamente cada turno de narración y cada sincronización en segundo plano entre las claves del pool (1ª, 2ª, 3ª...). Evita límites de peticiones por minuto (RPM) y multiplica la cuota de la IA.'
+                      desc: 'Se queda en la misma clave mientras le quepa el envío dentro del minuto, y solo cambia cuando de verdad se le acaba el sitio. Entonces no salta a la siguiente de la lista: salta a la MÁS DESCARGADA. Repetir clave hace que la caché de Google se caliente (es por proyecto, y cada clave es un proyecto), así que los turnos arrancan antes; y mirar el gasto real del último minuto evita los 429 en vez de reaccionar a ellos.'
+                    },
+                    {
+                      id: 'round_robin',
+                      title: '⚡ Rotación Activa Turno a Turno (Round-Robin)',
+                      badge: 'Reparto Ciego',
+                      badgeColor: 'bg-stone-600',
+                      desc: 'Distribuye cada turno y cada tarea de fondo entre las claves por orden (1ª, 2ª, 3ª...), sin mirar cuánto lleva gastado cada una. Reparte bien la carga, pero como cambia de clave en cada turno ninguna caché llega a calentarse nunca, y puede entregarte justo la clave que acaba de tragarse un envío enorme.'
                     },
                     {
                       id: 'failover_only',
                       title: '🛡️ Respaldo por Saturación (Failover únicamente)',
                       badge: 'Pasivo',
                       badgeColor: 'bg-stone-600',
-                      desc: 'Usa siempre la primera clave y solo salta a la siguiente si la actual agota su cuota o devuelve error 429 (Resource Exhausted).'
+                      desc: 'Usa siempre la primera clave y solo salta a la siguiente si la actual agota su cuota o devuelve error 429 (Resource Exhausted). Mantiene la caché caliente, pero se entera de que una clave está saturada DESPUÉS de comerse el error, y eso se paga en espera y en un reintento.'
                     }
                   ].map(mode => {
                     const isSelected = keyRotationMode === mode.id;
