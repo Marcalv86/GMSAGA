@@ -3955,8 +3955,10 @@ export default function App() {
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
               { id: 'chat', label: 'Crónica', icon: Swords },
-              { id: 'files', label: 'Archivos', icon: Paperclip },
-              { id: 'memory', label: 'Memoria', icon: ScrollText }
+              // Memoria en medio y Archivos al final: se entra a la memoria
+              // cien veces más que a los archivos, y el pulgar llega antes.
+              { id: 'memory', label: 'Memoria', icon: ScrollText },
+              { id: 'files', label: 'Archivos', icon: Paperclip }
             ].map(tab => {
               const TabIcon = tab.icon;
               const isCurrentActive =

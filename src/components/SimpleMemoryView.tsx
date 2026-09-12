@@ -16,7 +16,7 @@ import {
   Sliders,
   FileText,
   User,
-  Lock as LockIcon
+  VenetianMask
 } from 'lucide-react';
 import { MemoryManager } from './MemoryManager';
 import {
@@ -270,19 +270,29 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
     <div id="simple-memory-container" className="flex-1 flex flex-col h-full bg-[var(--bg-color)] overflow-hidden">
       {/* Top memory mode toggle bar con botón único de sincronización unificada */}
       <div id="memory-mode-toggle-bar" className="px-3 sm:px-6 py-2.5 bg-[var(--surface)] border-b border-[var(--glass-border)] flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-1.5 p-1 bg-[color-mix(in_srgb,var(--surface-soft)_80%,transparent)] rounded-lg border border-[var(--glass-border)]">
+        {/*
+          Tres iconos, no tres frases.
+
+          «Memoria del Personaje & Entidades» partido en tres líneas dentro de
+          un botón se come media pantalla en un móvil y encima queda feo. El
+          nombre completo sigue estando en el title y en el aria-label, y
+          debajo de cada pantalla hay una línea que explica qué es.
+        */}
+        <div className="flex items-center gap-1 p-1 bg-[color-mix(in_srgb,var(--surface-soft)_80%,transparent)] rounded-lg border border-[var(--glass-border)]">
           <button
             id="tab-btn-character-memory"
             onClick={() => handleSwitchMode('character')}
-            className={`px-3 py-1.5 rounded-md text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`w-11 h-10 rounded-md flex items-center justify-center transition-all cursor-pointer ${
               memoryMode === 'character'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
             }`}
+          
+            title="Memoria del Personaje y Entidades: su ficha, la mochila, el diario, los PNJs, los lugares y las tramas."
+            aria-label="Memoria del Personaje y Entidades"
           >
-            <User className="w-3.5 h-3.5" />
-            <span>Memoria del Personaje & Entidades</span>
-          </button>
+            <User className="w-5 h-5" />
+            </button>
           {/*
             EL CUADERNO DEL DIRECTOR, EN SU PROPIO SITIO.
 
@@ -295,28 +305,30 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           <button
             id="tab-btn-gm-memory"
             onClick={() => handleSwitchMode('gm')}
-            className={`px-3 py-1.5 rounded-md text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`w-11 h-10 rounded-md flex items-center justify-center transition-all cursor-pointer ${
               memoryMode === 'gm'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
             }`}
-            title="Lo que sabe el Narrador y tu personaje no: los giros que aún no han salido, lo que hace la gente fuera de cámara y los planes que corren por detrás."
+            title="Cuaderno del GM: los giros que aún no han salido, lo que hace la gente fuera de cámara y los relojes que corren por detrás."
+            aria-label="Cuaderno del GM"
           >
-            <LockIcon className="w-3.5 h-3.5" />
-            <span>Cuaderno del GM</span>
-          </button>
+            <VenetianMask className="w-5 h-5" />
+            </button>
           <button
             id="tab-btn-project-memory"
             onClick={() => handleSwitchMode('project')}
-            className={`px-3 py-1.5 rounded-md text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`w-11 h-10 rounded-md flex items-center justify-center transition-all cursor-pointer ${
               memoryMode === 'project'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
             }`}
+          
+            title="Memoria Persistente de Proyecto: el texto de memoria general de la campaña."
+            aria-label="Memoria Persistente de Proyecto"
           >
-            <ScrollText className="w-3.5 h-3.5" />
-            <span>Memoria Persistente de Proyecto</span>
-          </button>
+            <ScrollText className="w-5 h-5" />
+            </button>
         </div>
 
         {/* Botón único para sincronizar simultáneamente memoria persistente y entidades */}
