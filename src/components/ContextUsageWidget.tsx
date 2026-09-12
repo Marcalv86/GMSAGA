@@ -15,6 +15,7 @@ import {
   techoDeEnvio
 } from '../utils/geminiHelper';
 import { peticionesDeHoy } from '../utils/usageStats';
+import { ultimoCacheMedido } from '../utils/callLog';
 
 import {
   BookOpen,
@@ -107,7 +108,19 @@ export const ContextUsageWidget: React.FC<{
         ? `${Math.round(n / 1000).toLocaleString('es-ES')} mil`
         : n.toLocaleString('es-ES');
 
-  const estimatedTokens = carga.isContextCached ? carga.uncachedTokens : carga.tokens;
+  const estimatedTokens = carga.tokens;
+
+  /*
+   * El caché, medido en vez de supuesto.
+   *
+   * Lo que se enseñaba antes no era una medida: era «tus archivos pesan
+   * mucho, así que estarán cacheados». Se encendía igual con el prefijo roto
+   * y cero tokens servidos de caché. Ahora sale del `cachedContentTokenCount`
+   * del último turno narrado, que es el único sitio donde eso consta, y si
+   * todavía no hay ningún turno medido no se enseña nada, en lugar de afirmar
+   * lo que no se sabe.
+   */
+  const cacheMedido = ultimoCacheMedido();
 
   /*
    * CONTRA QUÉ SE MIDE ESTA BARRA.
@@ -195,9 +208,12 @@ export const ContextUsageWidget: React.FC<{
               {esEstimacion ? '~' : ''}
               {compact(tokensMostrados)} / {compact(MAX_TOKENS)} tokens
             </span>
-            {carga.isContextCached && (
-              <span className="text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 px-1 py-0.5 rounded text-[9px] font-sans" title="Context Caching activo: el lore estático (>32k tokens) está cacheado en el servidor y no consume el límite TPM activo por turno">
-                ⚡ Caché Activa
+            {cacheMedido && cacheMedido.porcentaje > 0 && (
+              <span
+                className="text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 px-1 py-0.5 rounded text-[9px] font-sans"
+                title={`En el último turno narrado, Google sirvió de caché ${cacheMedido.fichas.toLocaleString('es-ES')} fichas (${cacheMedido.porcentaje}% de la entrada) en ${cacheMedido.modelo}. Eso abarata el turno, pero OJO: las fichas servidas de caché cuentan enteras para el límite por minuto, así que esta barra no las descuenta.`}
+              >
+                ⚡ {cacheMedido.porcentaje}% de caché
               </span>
             )}
           </span>

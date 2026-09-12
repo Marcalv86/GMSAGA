@@ -1274,9 +1274,6 @@ export interface CargaDelTurno {
   total: number;
   /** La misma cifra en tokens, estimada. */
   tokens: number;
-  /** Tokens activos que consumen el techo TPM por minuto (descontando lore en caché si supera 32k caracteres). */
-  uncachedTokens: number;
-  isContextCached: boolean;
   // Contexto para explicarlo en la interfaz
   ventanaHistorial: string;
   mensajesQueViajan: number;
@@ -1429,12 +1426,23 @@ export function estimarCargaDelTurno({
     // Un turno que no se puede armar no debe romper una barra de progreso.
   }
 
-  const CONTEXT_CACHING_THRESHOLD = 32768;
-  const isContextCached = archivos >= CONTEXT_CACHING_THRESHOLD;
-  const uncachedChars = isContextCached
-    ? andamiaje + directivas + memoria + capituloActual + capitulosPrevios + fragmentosRescatados
-    : total;
-  const uncachedTokens = Math.round(uncachedChars / CARACTERES_POR_TOKEN);
+  /*
+   * AQUÍ NO SE DESCUENTA NADA POR EL CACHÉ, Y ES DELIBERADO.
+   *
+   * Antes se restaba el lore del cómputo cuando pesaba más de 32.768
+   * caracteres, dando por supuesto que al estar cacheado no gastaba cuota.
+   * Son dos errores encadenados. El de bulto: los tokens servidos de caché
+   * CUENTAN ENTEROS para el límite por minuto. Google los factura más baratos
+   * —esa es toda la ventaja del caché— pero el contador de cuota no distingue
+   * entre un token cacheado y uno recién leído, porque el caché es un prefijo
+   * del envío, no una sustitución del envío. El otro: aquel umbral comparaba
+   * CARACTERES contra una cifra de tokens, y encima era el mínimo de la época
+   * de Gemini 1.5, que ya no rige.
+   *
+   * El resultado era la peor avería posible en una barra de cuota: decía que
+   * quedaba margen justo en los turnos en los que no quedaba, que son los que
+   * acaban en 429. Una barra que miente por lo alto es peor que no tenerla.
+   */
 
   return {
     andamiaje,
@@ -1448,8 +1456,6 @@ export function estimarCargaDelTurno({
     otros: Math.max(0, total - declarado),
     total,
     tokens: Math.round(total / CARACTERES_POR_TOKEN),
-    uncachedTokens,
-    isContextCached,
     ventanaHistorial,
     mensajesQueViajan: viajan.length,
     mensajesRecortados: mensajesDelCapitulo.length - viajan.length,
@@ -2510,10 +2516,7 @@ ${acompanantes.length ? `
 ${acompanantes.map(c => `- **${c.name}**${c.companionType ? ` (${c.companionType})` : ''}${c.race || c.class ? ` — ${[c.race, c.class].filter(Boolean).join(' · ')}` : ''}${c.appearance ? `\n  Se la ve así: ${c.appearance.slice(0, 200)}` : ''}`).join('\n')}` : ''}
 ${
   companionFiles.length
-    ? `
-${companionFiles
-        .map(f => `=== FICHA DE COMPAÑERO: ${f.name} ===\n${f.content || ''}${f.analysis?.trim() ? `\n[Notas adjuntas]:\n${f.analysis.trim()}` : ''}`)
-        .join('\n\n')}`
+    ? `\n(Sus fichas completas van más arriba, en FICHAS Y DOCUMENTOS PERMANENTES DE LA MESA.)`
     : ''
 }
 `.trim()
@@ -2557,6 +2560,29 @@ ${pc.sheetText && !sheetTextDuplicado ? `\n--- RESUMEN DE HOJA DE PERSONAJE ---\
 
 ${
   pjSheetFiles.length > 0
+    ? `Su ficha y sus documentos completos van más arriba, en FICHAS Y DOCUMENTOS PERMANENTES DE LA MESA.`
+    : ''
+}
+`.trim();
+
+  /*
+   * LAS FICHAS, QUE NO CAMBIAN, AL LADO DE LO QUE NO CAMBIA.
+   *
+   * El texto íntegro de la ficha del protagonista y de las de sus compañeros
+   * viajaba dentro del bloque vivo, pegado a los PG y a las monedas. Y son
+   * cosas de naturaleza opuesta: la ficha es un documento congelado que no se
+   * toca en meses, y los PG cambian cada vez que alguien recibe un golpe.
+   * Mezclarlos dejaba decenas de miles de tokens permanentemente FUERA del
+   * prefijo que Google puede cachear, reprocesándose enteros en cada turno
+   * porque en el anterior se habían gastado tres monedas de plata.
+   *
+   * Ahora el documento va arriba, con la base de conocimiento, y abajo se
+   * queda lo único que de verdad se mueve: el recuento. El puntero que queda
+   * en el bloque vivo es a propósito, para que el Narrador sepa que la ficha
+   * existe y dónde tiene que ir a leerla.
+   */
+  const fichasPermanentes = [
+  pjSheetFiles.length > 0
     ? `DOCUMENTOS, DIARIO, RUNAS Y TRASFONDO PERSONAL DEL PROTAGONISTA (TEXTO ÍNTEGRO):\n` +
       `📌 Estos documentos son PARTE VIVA del protagonista: sus escritos, sus runas de adivinación, su diario íntimo, sus reliquias y su equipo. Están presentes y activos en la campaña, no son lore abstracto.\n` +
       `⚠️ **ESTA FICHA ES LA FUENTE. LA MEMORIA DE LA APLICACIÓN ES UN REFUERZO ENCIMA, NO UN SUSTITUTO.**\n` +
@@ -2578,9 +2604,21 @@ ${
             }`
         )
         .join('\n\n')
-    : ''
-}
-`.trim();
+    : '',
+    companionFiles.length > 0
+      ? `FICHAS COMPLETAS DE SUS COMPAÑEROS, FAMILIARES Y MONTURAS (TEXTO ÍNTEGRO):\n` +
+        companionFiles
+          .map(
+            f =>
+              `=== FICHA DE COMPAÑERO: ${f.name} ===\n${f.content || ''}${
+                f.analysis?.trim() ? `\n[Notas adjuntas]:\n${f.analysis.trim()}` : ''
+              }`
+          )
+          .join('\n\n')
+      : ''
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 
   const activeInstructions =
     project.instructions && project.instructions.trim().length > 10
@@ -2721,6 +2759,7 @@ ${activeStyle}
 Los siguientes archivos forman parte del canon íntegro del mundo y debes utilizarlos como fuente de verdad sobre PNJs, lugares, eventos pasados, reglas, oráculos y ambientación:
 ${filesText || 'No hay documentos de texto adicionales siempre presentes.'}
 ${deConsultaCatalogo}
+${fichasPermanentes ? `\n\n### 📜 FICHAS Y DOCUMENTOS PERMANENTES DE LA MESA\n${fichasPermanentes}` : ''}
 
 ### RESERVA DE DADOS DEL DIRECTOR DE JUEGO (USO TRAS LA PANTALLA DEL NARRADOR)
 Al final de la entrada del turno se adjunta la reserva de dados reales tirados para tus acciones ocultas de PNJ, daño, tablas aleatorias y tiradas enfrentadas. Son de uso exclusivo para el Narrador (NUNCA para las acciones del protagonista). Úsalos en orden y descarta los que no gastes.

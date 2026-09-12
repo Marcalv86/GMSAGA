@@ -343,3 +343,34 @@ export function llamadasComoTexto(llamadas: LlamadaRegistrada[]): string {
 
   return cab + filas.join('\n\n');
 }
+
+/**
+ * Lo que Google cacheó DE VERDAD en el último turno narrado.
+ *
+ * El badge de «caché activa» se encendía mirando el tamaño de los archivos:
+ * si el lore pesaba, se daba por hecho que estaba cacheado. Eso no es una
+ * medida, es un deseo. Podía estar encendido con cero tokens cacheados y con
+ * el prefijo roto desde hacía veinte turnos, y nadie se enteraba.
+ *
+ * Esto lee lo único que lo sabe: el `cachedContentTokenCount` que devuelve la
+ * propia API. Si no hay ninguna llamada narrada con el dato, devuelve
+ * `undefined`, y quien pregunte deberá decir «todavía no se sabe» en lugar de
+ * inventarse un sí.
+ */
+export function ultimoCacheMedido(): { fichas: number; porcentaje: number; modelo: string } | undefined {
+  const llamadas = getLlamadas();
+  for (let i = llamadas.length - 1; i >= 0; i--) {
+    const l = llamadas[i];
+    // Solo cuentan los turnos narrados: las llamadas de fondo van a otro
+    // modelo, con otro prompt, y su caché no dice nada del turno de juego.
+    if (!/^Turno narrado/i.test(l.proposito || '')) continue;
+    if (!l.fichasEntrada) continue;
+    const fichas = l.fichasEnCache || 0;
+    return {
+      fichas,
+      porcentaje: Math.round((fichas / l.fichasEntrada) * 100),
+      modelo: l.modelo
+    };
+  }
+  return undefined;
+}
