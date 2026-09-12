@@ -11,8 +11,8 @@ import {
   fechaInicial,
   fechaLegible
 } from '../utils/campaignCalendar';
-import { fusionarTrama, tramarLaCampana } from '../utils/geminiHelper';
-import { preparadoEnPie, relojesEnMarcha } from '../utils/cuadernoOculto';
+import { fusionarTrama, leerElTableroDeDocumentos, tramarLaCampana } from '../utils/geminiHelper';
+import { aplicarFacciones, aplicarPreparado, preparadoEnPie, relojesEnMarcha } from '../utils/cuadernoOculto';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
@@ -307,6 +307,51 @@ export const MemoryManager: React.FC<{
   const [vinculosDestapados, setVinculosDestapados] = useState<Set<string>>(new Set());
   /** Giros que la jugadora ha decidido leerse. No se guarda: se destapa y ya. */
   const [secretosDestapados, setSecretosDestapados] = useState<Set<string>>(new Set());
+  /*
+   * LEER EL TABLERO OTRA VEZ, PARA CAMPAÑAS QUE EMPEZARON ANTES.
+   *
+   * La lectura de facciones y de material preparado corre sola al arrancar una
+   * campaña, y solo entonces. Una partida con meses encima no la tuvo nunca y
+   * no la va a tener: se quedaría sin ellas para siempre salvo pidiéndoselas al
+   * Director una por una.
+   *
+   * Y funde en vez de pisar, que es lo que lo hace repetible: lo que ya tiene
+   * la campaña conserva lo que ganó jugando, y solo entra lo que falta.
+   */
+  const [leyendoTablero, setLeyendoTablero] = useState(false);
+  const leerElTablero = async () => {
+    if (leyendoTablero) return;
+    setLeyendoTablero(true);
+    try {
+      const tablero = await leerElTableroDeDocumentos({ project, files });
+      if (!tablero.facciones.length && !tablero.preparado.length) {
+        window.alert(
+          'No he sacado nada en claro de tus documentos. Comprueba que los compendios y el material de la campaña estén subidos en Archivos.'
+        );
+        return;
+      }
+      const antesFac = (project.memory?.gm_facciones || []).length;
+      const antesPrep = (project.memory?.gm_preparado || []).length;
+      await onUpdateMemory(mem => ({
+        ...mem,
+        gm_facciones: aplicarFacciones(mem.gm_facciones, tablero.facciones),
+        gm_preparado: aplicarPreparado(mem.gm_preparado, tablero.preparado)
+      }));
+      const nuevasFac = Math.max(0, aplicarFacciones(project.memory?.gm_facciones, tablero.facciones).length - antesFac);
+      const nuevasPrep = Math.max(0, aplicarPreparado(project.memory?.gm_preparado, tablero.preparado).length - antesPrep);
+      window.alert(
+        `Tablero leído.\n\n` +
+          `· Facciones: ${tablero.facciones.length} leídas${nuevasFac ? `, ${nuevasFac} nuevas` : ' (ya las tenías todas)'}\n` +
+          `· Preparado: ${tablero.preparado.length} ideas${nuevasPrep ? `, ${nuevasPrep} nuevas` : ' (ya las tenías todas)'}\n\n` +
+          `Lo nuevo va marcado como «de tus documentos». Lo que ya tenías conserva lo que ganó jugando.`
+      );
+    } catch (err: any) {
+      window.alert(err?.message || 'No se ha podido leer el tablero. Inténtalo de nuevo.');
+    } finally {
+      setLeyendoTablero(false);
+    }
+  };
+
   const [tramando, setTramando] = useState(false);
   const [verPremisa, setVerPremisa] = useState(false);
 
@@ -1226,11 +1271,33 @@ export const MemoryManager: React.FC<{
                 <strong className="text-indigo-700 dark:text-indigo-300">su objetivo sigue vivo aunque muera quien lo llevaba</strong>. Dos bandos que se
                 odian generan escenas sin que nadie haga nada.
               </p>
+              {/*
+                Un solo botón para las dos pestañas: llena facciones Y preparado,
+                porque es una sola lectura. Ponerlo también en «Preparado» sería
+                repetir el error de tener dos botones para la misma función.
+              */}
+              <button
+                onClick={leerElTablero}
+                disabled={leyendoTablero}
+                className="mt-1.5 self-start min-h-[40px] px-3.5 rounded-lg border border-indigo-500/50 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500 hover:text-white text-xs font-cinzel font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60"
+                title="Relee tus compendios y documentos y saca de ahí las facciones y un par de ideas preparadas. Funde con lo que ya tengas: no pisa nada de lo que hayas ganado jugando. Útil sobre todo si tu campaña empezó antes de que existiera esta pantalla."
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${leyendoTablero ? 'animate-spin' : ''}`} />
+                {leyendoTablero ? 'Leyendo tus documentos…' : 'Leer el tablero de mis documentos'}
+              </button>
+              <p className="text-[10px] text-[var(--text-secondary)] opacity-75 m-0 leading-relaxed">
+                Llena esta pestaña y la de <strong>Preparado</strong>. Se puede repetir: lo que ya tienes conserva lo
+                que ganó jugando y solo entra lo que falta.
+              </p>
             </div>
             {facciones.length === 0 ? (
               <div className="text-[var(--text-secondary)] italic py-6 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs flex flex-col gap-2">
                 <span>Aún no hay ninguna. El Narrador las ficha cuando aparece un grupo con intereses propios.</span>
                 <span className="not-italic font-cinzel text-[11px] text-indigo-700 dark:text-indigo-300">
+                  ¿Tu campaña empezó antes que esta pantalla? Dale a <strong>«Leer el tablero de mis documentos»</strong>{' '}
+                  aquí arriba y las saca de tus compendios.
+                </span>
+                <span className="not-italic font-lora text-[11px] text-[var(--text-secondary)]">
                   También se las puedes pedir al GM en el Chat: «ficha a los Zhentarim y di cómo se llevan con
                   Bregan D'aerthe».
                 </span>
@@ -1388,7 +1455,9 @@ export const MemoryManager: React.FC<{
             {enPie.length === 0 && usadas.length === 0 ? (
               <div className="text-[var(--text-secondary)] italic py-6 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs">
                 Nada guardado todavía. Se llena cuando al Narrador se le ocurre algo bueno que en ese momento no
-                encaja, en vez de forzarlo o perderlo.
+                encaja, en vez de forzarlo o perderlo. Y si tu campaña empezó antes que esta pantalla, el botón{' '}
+                <strong>«Leer el tablero de mis documentos»</strong> de la pestaña <strong>Facciones</strong> también
+                deja aquí un par de ideas sacadas de tus compendios.
               </div>
             ) : (
               <div className="flex flex-col gap-4">

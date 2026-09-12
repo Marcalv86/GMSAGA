@@ -386,18 +386,39 @@ export function aplicarFacciones(previo: Faccion[] | undefined, leidas: Faccion[
       continue;
     }
     const a = fuera[i];
+    /*
+     * LO LEÍDO DE UN DOCUMENTO NO PISA LO QUE SE GANÓ JUGANDO.
+     *
+     * Una ficha sacada de los compendios (`sugerida`) solo puede RELLENAR
+     * huecos. El caso que lo obliga: el lector siempre rellena la postura, y
+     * cuando el documento no dice cómo se llevan pone «no la conoce» — así que
+     * releer el tablero en una campaña avanzada convertía a una facción
+     * declarada ENEMIGA en una que ni sabe que existe. Justo lo contrario de
+     * «gana lo jugado».
+     *
+     * Lo que llega de una etiqueta emitida en partida sí manda: eso ES jugado.
+     */
+    const soloRellena = Boolean(f.sugerida);
+    const prefiere = <T,>(nuevo: T | undefined, viejo: T | undefined): T | undefined =>
+      soloRellena ? viejo ?? nuevo : nuevo ?? viejo;
     fuera[i] = {
       ...a,
-      queEs: f.queEs || a.queEs,
-      objetivo: f.objetivo || a.objetivo,
-      recursos: f.recursos || a.recursos,
-      cabeza: f.cabeza || a.cabeza,
-      conElla: f.conElla || a.conElla,
-      oculto: f.oculto || a.oculto,
-      conocida: f.conocida ?? a.conocida,
+      queEs: prefiere(f.queEs, a.queEs),
+      objetivo: prefiere(f.objetivo, a.objetivo),
+      recursos: prefiere(f.recursos, a.recursos),
+      cabeza: prefiere(f.cabeza, a.cabeza),
+      conElla: prefiere(f.conElla, a.conElla),
+      oculto: prefiere(f.oculto, a.oculto),
+      conocida: soloRellena ? a.conocida ?? f.conocida : f.conocida ?? a.conocida,
       // En cuanto el Narrador la toca jugando deja de ser una sugerencia.
       sugerida: f.sugerida && a.sugerida,
-      relaciones: f.relaciones?.length ? f.relaciones : a.relaciones
+      relaciones: soloRellena
+        ? a.relaciones?.length
+          ? a.relaciones
+          : f.relaciones
+        : f.relaciones?.length
+        ? f.relaciones
+        : a.relaciones
     };
   }
   return fuera.slice(-30);
@@ -417,12 +438,18 @@ export function aplicarPreparado(
       continue;
     }
     const a = fuera[i];
+    // Lo mismo aquí: una idea releída de un documento no reescribe la que el
+    // Narrador afinó en una escena, solo completa lo que le falte.
+    const soloRellena = Boolean(c.sugerida);
+    const elige = <T,>(nuevo: T | undefined, viejo: T | undefined): T | undefined =>
+      soloRellena ? viejo ?? nuevo : nuevo ?? viejo;
     fuera[i] = {
       ...a,
-      tipo: c.tipo && c.tipo !== 'otro' ? c.tipo : a.tipo,
-      detalle: c.detalle || a.detalle,
-      cuando: c.cuando || a.cuando,
-      hilo: c.hilo || a.hilo,
+      tipo: c.tipo && c.tipo !== 'otro' && !soloRellena ? c.tipo : a.tipo || c.tipo,
+      detalle: elige(c.detalle, a.detalle),
+      cuando: elige(c.cuando, a.cuando),
+      hilo: elige(c.hilo, a.hilo),
+      // Que algo esté usado no se deshace releyendo un documento.
       usada: c.usada || a.usada,
       sugerida: c.sugerida && a.sugerida,
       usadaDiaAbs: c.usada && !a.usada ? diaAbs : a.usadaDiaAbs
