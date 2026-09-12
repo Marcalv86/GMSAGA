@@ -255,6 +255,47 @@ export const CallLogPanel: React.FC = () => {
                   )}
                 </div>
 
+                {/*
+                  QUÉ DOCUMENTOS VIAJARON, Y CÓMO.
+                  Esto se registraba desde hacía tiempo, pero solo salía en la
+                  exportación de texto: en pantalla no había manera de verlo, y
+                  es justo el dato que decide si un documento de consulta está
+                  aportando algo o se está quedando fuera de todos los turnos.
+                  Sin esto, ajustar qué se marca de consulta es a ciegas.
+                */}
+                {(() => {
+                  const d = l.documentos;
+                  if (!d || (!d.enteros?.length && !d.fragmentos?.length && !d.sinUsar?.length)) return null;
+                  return (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+                      {d.enteros?.length ? (
+                        <span
+                          className="text-[var(--text-secondary)]"
+                          title={`Viajaron con su texto completo:\n${d.enteros.join('\n')}`}
+                        >
+                          📄 enteros {d.enteros.length}
+                        </span>
+                      ) : null}
+                      {d.fragmentos?.length ? (
+                        <span
+                          className="text-sky-700 dark:text-sky-300"
+                          title={`De consulta, con fragmentos rescatados para esta escena:\n${d.fragmentos.join('\n')}`}
+                        >
+                          📖 fragmentos {d.fragmentos.length}
+                        </span>
+                      ) : null}
+                      {d.sinUsar?.length ? (
+                        <span
+                          className="text-amber-800 dark:text-amber-300"
+                          title={`De consulta, pero NO aportaron nada a este turno. Si uno vive aquí turno tras turno, o no hacía falta o la búsqueda no lo encuentra:\n${d.sinUsar.join('\n')}`}
+                        >
+                          🗄️ sin usar {d.sinUsar.length}
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+
                 {l.detalle && (
                   <p className="mt-1 text-[11px] text-rose-700 dark:text-rose-300 m-0 leading-snug break-words">{l.detalle}</p>
                 )}
