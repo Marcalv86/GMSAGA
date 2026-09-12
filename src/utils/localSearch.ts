@@ -391,28 +391,87 @@ export function buscar(indice: Indice, consulta: string, maximo = 8): Resultado[
 /**
  * Recupera fragmentos hasta llenar el presupuesto de caracteres.
  *
- * Se descartan los que puntúan muy por debajo del mejor: rellenar el hueco con
- * fragmentos mediocres solo mete ruido, y el ruido en un prompt cuesta lo mismo
- * que la información.
+ * EL REPARTO IMPORTA TANTO COMO LA PUNTUACIÓN.
+ *
+ * Antes esto cogía los 12 mejores fragmentos del montón y los metía en orden
+ * hasta llenar. Suena razonable y está mal, porque los fragmentos no compiten
+ * en igualdad: un documento con muchas secciones que casan puede quedarse con
+ * los doce huecos, y entonces los demás no pierden la puja, es que no llegan a
+ * jugarla.
+ *
+ * Medido en la campaña: en una conversación con Jarlaxle —un drow de
+ * Menzoberranzan— el compendio de Bregan D'aerthe ganaba todos los turnos por
+ * su nombre propio y la cantera de cultura drow sacaba CERO fragmentos, con la
+ * escena pidiéndola a gritos. El Narrador, sin ella, no se equivocaba: se
+ * quedaba en vaguedades («la pompa de las mujeres de allá abajo»), que es un
+ * agujero tapado con un gesto y no se nota leyendo.
+ *
+ * Así que ahora se reparte en dos vueltas: primero UN fragmento de cada
+ * documento que venga al caso, de mejor a peor, y solo después se rellena el
+ * hueco que quede con los segundos y terceros. Ningún documento puede
+ * acaparar, y el que tiene algo que decir dice al menos una cosa.
+ *
+ * El corte por puntuación se mantiene —el ruido en un prompt cuesta lo mismo
+ * que la información— pero baja del 35% al 15%: con el reparto arreglado, lo
+ * que antes había que cortar por acaparamiento ahora se corta solo por
+ * presupuesto.
  */
 export function recuperar(files: ProjectFile[], consulta: string, presupuesto = 6000): Resultado[] {
   const indice = construirIndice(files);
-  const candidatos = buscar(indice, consulta, 12);
+  // Se piden muchos más candidatos que huecos: con doce no había de dónde
+  // diversificar, porque los doce eran del mismo puñado de documentos.
+  const candidatos = buscar(indice, consulta, 40);
   if (!candidatos.length) return [];
 
-  const corte = candidatos[0].puntuacion * 0.35;
+  const corte = candidatos[0].puntuacion * 0.15;
+  /** Ni el mejor documento del turno se lleva más de esto. */
+  const topePorDocumento = Math.max(1800, Math.round(presupuesto * 0.4));
+  const MAX_FRAGMENTOS_POR_DOCUMENTO = 3;
+
   const elegidos: Resultado[] = [];
+  const yaElegidos = new Set<Resultado>();
+  const gastadoPor = new Map<string, number>();
+  const cuantosDe = new Map<string, number>();
   let gastado = 0;
 
-  for (const c of candidatos) {
-    if (c.puntuacion < corte) break;
-    const coste = c.fragmento.texto.length + c.fragmento.titulo.length + 40;
-    if (gastado + coste > presupuesto && elegidos.length) break;
+  const costeDe = (c: Resultado) => c.fragmento.texto.length + c.fragmento.titulo.length + 40;
+
+  const intentar = (c: Resultado, respetarTopeDeDocumento: boolean): boolean => {
+    if (yaElegidos.has(c)) return false;
+    if (c.puntuacion < corte) return false;
+    const doc = c.fragmento.fileName;
+    const coste = costeDe(c);
+    if (gastado + coste > presupuesto) return false;
+    if (respetarTopeDeDocumento) {
+      if ((cuantosDe.get(doc) || 0) >= MAX_FRAGMENTOS_POR_DOCUMENTO) return false;
+      if ((gastadoPor.get(doc) || 0) + coste > topePorDocumento) return false;
+    }
     elegidos.push(c);
+    yaElegidos.add(c);
     gastado += coste;
+    gastadoPor.set(doc, (gastadoPor.get(doc) || 0) + coste);
+    cuantosDe.set(doc, (cuantosDe.get(doc) || 0) + 1);
+    return true;
+  };
+
+  // Primera vuelta: lo mejor de cada documento. Esto es lo que garantiza que
+  // una cantera pertinente entre aunque otro documento puntúe más alto en
+  // todos sus fragmentos.
+  const vistos = new Set<string>();
+  for (const c of candidatos) {
+    if (vistos.has(c.fragmento.fileName)) continue;
+    vistos.add(c.fragmento.fileName);
+    intentar(c, true);
   }
 
-  return elegidos;
+  // Segunda vuelta: con lo que sobre, se profundiza en los que más puntúan.
+  for (const c of candidatos) intentar(c, true);
+
+  // Tercera: si aún sobra presupuesto y ya no hay nada que respete los topes,
+  // se rellena sin ellos antes que devolver hueco sin usar.
+  for (const c of candidatos) intentar(c, false);
+
+  return elegidos.sort((a, b) => b.puntuacion - a.puntuacion);
 }
 
 /**
@@ -443,12 +502,37 @@ export function consultaDelTurno({
    */
   suyo?: string[];
 }): string {
+  /*
+   * EL EQUILIBRIO ENTRE LO QUE CAMBIA Y LO QUE NO.
+   *
+   * Tres de las cuatro partes de esta consulta son iguales todos los turnos:
+   * los nombres vivos y lo suyo (que además iba duplicado). Solo el texto de
+   * la jugadora y la última narración se mueven, y la narración pesaba hasta
+   * mil doscientos caracteres frente a un «abro la puerta» de quince.
+   *
+   * El resultado era una consulta casi constante, y con una consulta constante
+   * ganan siempre los mismos documentos: medido en la campaña, cinco de ellos
+   * entraban en el 100% de los turnos y cuatro no entraban jamás. Y va a peor
+   * solo, porque `nombres` crece con cada PNJ que conoce.
+   *
+   * Además, esos mil doscientos caracteres son de la escena ANTERIOR. En una
+   * transición —un viaje, un salto, subir a cubierta— tiran de la búsqueda
+   * hacia donde estaba, no hacia donde va, que es justo lo contrario de lo que
+   * hace falta.
+   *
+   * Así que lo que declara la jugadora AHORA se dobla (mismo truco que ya se
+   * usaba con lo suyo), la cola de narración se recorta, y los nombres llevan
+   * tope para que la parte fija no siga engordando sin freno.
+   */
+  const MAX_NOMBRES = 30;
   const partes = [
     textoJugadora || '',
-    (ultimaNarracion || '').slice(-1200),
-    (nombres || []).join(' '),
+    // Doblado: es lo único de aquí que describe el turno que se va a jugar.
+    textoJugadora || '',
+    (ultimaNarracion || '').slice(-700),
+    (nombres || []).slice(0, MAX_NOMBRES).join(' '),
     // Repetido a propósito: en BM25 un término que aparece dos veces pesa más,
-    // y lo suyo tiene que competir con mil palabras de narración reciente.
+    // y lo suyo tiene que competir con la narración reciente.
     (suyo || []).join(' '),
     (suyo || []).join(' ')
   ];
