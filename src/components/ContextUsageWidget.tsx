@@ -107,7 +107,7 @@ export const ContextUsageWidget: React.FC<{
         ? `${Math.round(n / 1000).toLocaleString('es-ES')} mil`
         : n.toLocaleString('es-ES');
 
-  const estimatedTokens = carga.tokens;
+  const estimatedTokens = carga.isContextCached ? carga.uncachedTokens : carga.tokens;
 
   /*
    * CONTRA QUÉ SE MIDE ESTA BARRA.
@@ -190,9 +190,16 @@ export const ContextUsageWidget: React.FC<{
 
         {/* Tokens & Chars Counter */}
         <div className="flex justify-between items-center text-[10px] text-[var(--text-secondary)] mt-1.5 font-cinzel">
-          <span>
-            {esEstimacion ? '~' : ''}
-            {compact(tokensMostrados)} / {compact(MAX_TOKENS)} tokens
+          <span className="flex items-center gap-1.5">
+            <span>
+              {esEstimacion ? '~' : ''}
+              {compact(tokensMostrados)} / {compact(MAX_TOKENS)} tokens
+            </span>
+            {carga.isContextCached && (
+              <span className="text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 px-1 py-0.5 rounded text-[9px] font-sans" title="Context Caching activo: el lore estático (>32k tokens) está cacheado en el servidor y no consume el límite TPM activo por turno">
+                ⚡ Caché Activa
+              </span>
+            )}
           </span>
           <span>{esEstimacion ? `${compact(totalChars)} car.` : `medido · ${modeloDeNarracion}`}</span>
         </div>

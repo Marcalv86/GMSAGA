@@ -1274,6 +1274,9 @@ export interface CargaDelTurno {
   total: number;
   /** La misma cifra en tokens, estimada. */
   tokens: number;
+  /** Tokens activos que consumen el techo TPM por minuto (descontando lore en caché si supera 32k caracteres). */
+  uncachedTokens: number;
+  isContextCached: boolean;
   // Contexto para explicarlo en la interfaz
   ventanaHistorial: string;
   mensajesQueViajan: number;
@@ -1426,6 +1429,13 @@ export function estimarCargaDelTurno({
     // Un turno que no se puede armar no debe romper una barra de progreso.
   }
 
+  const CONTEXT_CACHING_THRESHOLD = 32768;
+  const isContextCached = archivos >= CONTEXT_CACHING_THRESHOLD;
+  const uncachedChars = isContextCached
+    ? andamiaje + directivas + memoria + capituloActual + capitulosPrevios + fragmentosRescatados
+    : total;
+  const uncachedTokens = Math.round(uncachedChars / CARACTERES_POR_TOKEN);
+
   return {
     andamiaje,
     directivas,
@@ -1438,6 +1448,8 @@ export function estimarCargaDelTurno({
     otros: Math.max(0, total - declarado),
     total,
     tokens: Math.round(total / CARACTERES_POR_TOKEN),
+    uncachedTokens,
+    isContextCached,
     ventanaHistorial,
     mensajesQueViajan: viajan.length,
     mensajesRecortados: mensajesDelCapitulo.length - viajan.length,
