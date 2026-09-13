@@ -90,7 +90,6 @@ interface ChatMessageItemProps {
   setPreguntaOraculo: (p: string) => void;
   setOraculoAbierto: (open: boolean) => void;
   handleRollRequestClick: (req: RollRequest) => void;
-  onOpenTransitionModal?: () => void;
   project?: Project;
   turnNumber?: number;
 }
@@ -137,7 +136,6 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   setPreguntaOraculo,
   setOraculoAbierto,
   handleRollRequestClick,
-  onOpenTransitionModal,
   project,
   turnNumber
 }) => {
@@ -479,26 +477,6 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> Rehacer
                   </button>
-                  {!isIncomplete && (
-                    <button
-                      onClick={() => onContinueNarrative(idx)}
-                      disabled={isGenerating}
-                      className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
-                      title="Pedir al Narrador que continúe y profundice en esta escena"
-                    >
-                      <Play className="w-3.5 h-3.5" /> Continuar
-                    </button>
-                  )}
-                  {onOpenTransitionModal && isLastMessage && (
-                    <button
-                      onClick={onOpenTransitionModal}
-                      disabled={isGenerating}
-                      className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
-                      title="Salto de tiempo (descanso largo/corto, horas, días) o cambiar de escena"
-                    >
-                      <FastForward className="w-3.5 h-3.5" /> Salto de Escena
-                    </button>
-                  )}
                 </>
               )}
               {!isModel && (
@@ -588,7 +566,6 @@ interface ChatMessagesListProps {
   setDeleteModal: (v: { index: number; role: 'user' | 'model'; isLast: boolean } | null) => void;
   setPreguntaOraculo: (p: string) => void;
   setOraculoAbierto: (open: boolean) => void;
-  onOpenTransitionModal: () => void;
   project?: Project;
 }
 
@@ -606,7 +583,6 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
   setDeleteModal,
   setPreguntaOraculo,
   setOraculoAbierto,
-  onOpenTransitionModal,
   project
 }) => {
   const turnNumbers = React.useMemo(() => {
@@ -651,7 +627,6 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
             setPreguntaOraculo={setPreguntaOraculo}
             setOraculoAbierto={setOraculoAbierto}
             handleRollRequestClick={acciones.handleRollRequestClick}
-            onOpenTransitionModal={onOpenTransitionModal}
             project={project}
           />
         );
@@ -1358,7 +1333,6 @@ export const ChatView: React.FC<{
                 setDeleteModal={setDeleteModal}
                 setPreguntaOraculo={setPreguntaOraculo}
                 setOraculoAbierto={setOraculoAbierto}
-                onOpenTransitionModal={handleOpenTransitionModal}
                 project={project}
               />
             )}
