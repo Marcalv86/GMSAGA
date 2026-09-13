@@ -39,6 +39,7 @@ import {
   estacionDelDia,
   leerViaje,
   leerLugares,
+  marcoDeLugar,
   type ViajeLeido,
   type LugarLeido,
   leerAvanceDeTiempo,
@@ -2271,8 +2272,58 @@ Esto NO es una lista de bajas: es la escena mejor servida que tienes. Quien lo g
    * lleva, que es lo único que un modelo no puede «olvidar».
    */
   const viaje = project.memory?.viaje;
+
+  /*
+   * EL ÚLTIMO SITIO QUE APUNTÓ EL NARRADOR, LEÍDO POR LA APLICACIÓN.
+   *
+   * Hace falta aquí para el caso contrario al de abajo: no para contar un
+   * viaje abierto, sino para darse cuenta de que NO hay ninguno y debería.
+   */
+  const lugarApuntado = [...(project.timeline || [])]
+    .sort((a, b) => (a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay))
+    .filter(e => e.lugar)
+    .pop()?.lugar;
+  const marcoActual = marcoDeLugar(lugarApuntado);
+
   const bloqueViaje = (() => {
-    if (!viaje?.destino || !viaje.jornadas) return '';
+    if (!viaje?.destino || !viaje.jornadas) {
+      /*
+       * ⛔ TRAVESÍA SIN TRAYECTO ABIERTO: EL AGUJERO QUE SE REPITIÓ DOS VECES.
+       *
+       * La regla de declarar `[VIAJE:]` en cuanto se está de camino existe y
+       * es correcta, pero vive en una línea perdida entre ciento y pico reglas
+       * fijas, y el Narrador la pasaba por alto exactamente igual dos partidas
+       * seguidas: escena que arranca YA en el mar —sin haber visto zarpar—,
+       * ningún `[VIAJE:]`, y dos jornadas de navegación despachadas en una
+       * frase en pasado («las dos jornadas de navegación transcurrieron»).
+       *
+       * El fallo no era del modelo: era que la aplicación se callaba justo en
+       * el caso en el que tenía que gritar. Cuando hay viaje abierto pone el
+       * número delante en cada turno; cuando no lo hay —que es cuando hace
+       * falta— no decía nada. Esto lo cierra: si el sitio apuntado es una
+       * travesía y no hay trayecto contándose, el aviso va en el bloque vivo,
+       * al final del prompt, no enterrado en el andamiaje.
+       */
+      if (marcoActual?.nombre === 'travesía naval' || marcoActual?.nombre === 'travesía terrestre') {
+        const porMar = marcoActual.nombre === 'travesía naval';
+        return `
+### 🧭 ⛔ ESTÁIS EN TRAVESÍA Y NO HAY NINGÚN TRAYECTO ABIERTO
+El último sitio apuntado en el diario es **«${lugarApuntado}»**, y eso es una **${marcoActual.nombre}**. Una travesía SIEMPRE tiene un destino y unas jornadas por delante, y ahora mismo la aplicación no está contando ninguna.
+
+**⛔ Declara \`[VIAJE: destino | jornadas: N]\` EN ESTE MISMO TURNO**, con las jornadas que FALTAN desde aquí —no las del trayecto entero— según la distancia real del mundo.
+- **Da igual que el viaje empezara fuera de cámara**, antes de este capítulo o antes de la primera línea que escribiste. Si se está de camino a algún sitio, ese camino se cuenta.
+- **Y si ya has dicho una cifra en voz alta** por boca de cualquier personaje —«nos quedan cuatro jornadas»—, esa cifra manda: emítela tal cual.
+- ⛔ **Hasta que ese número exista y se consuma, NO se llega.** Ni puerto, ni murallas a la vista, ni «las dos jornadas de navegación transcurrieron sin más tregua». Un trayecto resumido en una frase es tiempo que la jugadora no ha jugado.${
+          porMar
+            ? '\n- Un barco es un sitio cerrado con gente dentro: las jornadas de mar se viven en guardias, raciones, marejada y conversaciones que solo pasan porque no hay nada que hacer.'
+            : '\n- Por tierra manda el terreno: nombra cuál es —bosque, páramo, cordillera, camino real— antes de decidir qué ocurre en él.'
+        }
+
+✅ **¿Y si aquí ya no se viaja?** Si el trayecto terminó y esto es un barco atracado, un campamento asentado o una escena parada, entonces **no declares ningún viaje**: apunta dónde se está de verdad con \`[HUD]\` o \`[LUGAR: ...]\` y este aviso se apaga solo. Lo que no vale es dejar el sitio viejo puesto y seguir como si nada.
+`.trim();
+      }
+      return '';
+    }
     const cal = project.calendar;
     const hoyAbs =
       calendarioValido(cal) && project.currentDate ? aDiaAbsoluto(cal, project.currentDate) : undefined;

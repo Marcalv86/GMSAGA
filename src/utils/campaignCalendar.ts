@@ -916,9 +916,25 @@ const CLIMAS: [RegExp, string][] = [
  * El orden importa: lo más específico primero. «Cripta del templo» es cripta
  * antes que templo, y «puerto» es ciudad antes que mar.
  */
+/*
+ * De qué clase es el sitio donde pasa la escena.
+ *
+ * ⚠️ El orden importa: se queda con el PRIMERO que casa, así que va de lo más
+ * específico a lo más genérico. Un camarote es naval antes que interior.
+ *
+ * ⚓ La fila naval empezó pidiendo «alta mar» o el nombre de un tipo de barco, y
+ * eso dejaba fuera justo el caso que la estrenó: el Narrador apuntó «Mar de las
+ * Espadas, aproximación costera a Luskan» y la aplicación no vio ninguna
+ * travesía —ni chip en el desplegable, ni aviso de que faltaba un [VIAJE:]—.
+ * Ahora entra también el mar por su nombre, la navegación y los aparejos.
+ */
 const MARCOS: [RegExp, string, string][] = [
   [/mazmorra|cripta|cueva|caverna|sima|subterrán|catacumb|tumba|mina|sótano|antípoda|infraoscur|underdark|túnel/i, '🕳️', 'subterráneo'],
-  [/barco|nav[ií]o|nave|cubierta|sentina|bodega del|camarote|bergant|galera|carabela|fragata|alta mar|a bordo|proa|popa|jarcia/i, '⚓', 'travesía naval'],
+  [
+    /barco|nav[ií]o|nave|cubierta|sentina|bodega del|camarote|bergant|galera|carabela|fragata|goleta|balandro|mar de |mar abierto|alta ?mar|en el mar|oc[eé]ano|navegaci[oó]n|navegando|surcando|singladura|traves[ií]a (?:mar[ií]tima|naval)|a bordo|proa|popa|jarcia|mástil|tim[oó]n|bauprés|obenque|fondeader|escollera|arrecife|marejada|oleaje|abordaje|atracad|amarrad/i,
+    '⚓',
+    'travesía naval'
+  ],
   [/ciudad|villa|pueblo|aldea|puerto|muelle|barrio|distrito|mercado|plaza|taberna|posada|calle|gremio|lonja/i, '🏘️', 'urbano'],
   [/castillo|fortaleza|torre|templo|santuario|mansión|palacio|salón|biblioteca|academia|sala|cámara|capilla/i, '🕯️', 'interior'],
   [/camino|ruta|sendero|bosque|selva|desierto|montaña|colina|llanura|pantano|ciénaga|páramo|estepa|valle|río|vado|campamento|yerm/i, '🏕️', 'travesía terrestre']
