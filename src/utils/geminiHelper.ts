@@ -2509,7 +2509,14 @@ ${allPreviousHistory}`
   if (deConsulta.length > 0) {
     deConsultaCatalogo = `\n\n### 📚 COMPENDIOS Y ARCHIVOS DE CONSULTA EN LA BIBLIOTECA (ON-DEMAND):
 Los siguientes compendios de lore, ambientación y reglas forman parte del archivo del proyecto. Para optimizar tokens y agilizar la respuesta, su texto completo permanece en la biblioteca y sus fragmentos pertinentes se rescatan dinámicamente según lo que suceda en la escena. Si necesitas verificar un dato muy específico no recogido en los fragmentos, indícalo a la jugadora:
-${deConsulta.map(f => `- 📄 **${f.name}**${f.analysis ? `: ${f.analysis.slice(0, 220).trim()}...` : (f.category ? ` [Categoría: ${f.category}]` : '')}`).join('\n')}
+${deConsulta.map(f => {
+  const cat = f.category ? ` [${f.category}]` : '';
+  const tags = f.etiquetasBusqueda
+    ? ` (Temas clave: ${f.etiquetasBusqueda.split(',').slice(0, 8).map(t => t.trim().replace(/^['"`]+|['"`]+$/g, '')).filter(Boolean).join(', ')})`
+    : '';
+  const desc = f.analysis ? `: ${f.analysis.slice(0, 180).trim()}...` : '';
+  return `- 📄 **${f.name}**${cat}${tags}${desc}`;
+}).join('\n')}
 ${
       deConsulta.some(f => f.category === 'mecanica')
         ? '\n⚙️ **Los archivos de MECÁNICA son PORTÁTILES.** Un subsistema traído de un módulo —persecución por los tejados, frío extremo, intriga urbana, asedio— NO está atado a la ciudad ni a la región donde se publicó: si en esta escena hay una huida por los tejados, se usan esas reglas aunque el documento hable de otra ciudad. Lo que se adapta es el decorado, no el procedimiento.'
@@ -9200,32 +9207,54 @@ ${elenco.slice(0, 60).join(', ')}
 De esa lista, incluye como etiqueta a TODO EL QUE ESTE DOCUMENTO AYUDE A INTERPRETAR, **aunque el documento no lo mencione ni una vez**. Un texto sobre la cultura de un pueblo etiqueta a los personajes de ese pueblo; uno sobre una ciudad etiqueta a quien vive o manda en ella; uno sobre una orden o banda etiqueta a sus miembros. Este es el motivo por el que existe esta tarea: el buscador ya encuentra las palabras que están escritas, lo que no puede es deducir a quién le sirven.\n`
     : '';
 
+  const cantidad = texto.length < 12000 ? 'entre veinticinco y cuarenta' : 'entre cuarenta y setenta';
+
   const response = await generateContentWithFailover({
     primaryModel: modelo,
     contents: `Eres el documentalista de una mesa de rol. Te doy un documento de la biblioteca de una campaña y tienes que decir POR QUÉ TÉRMINOS habría que encontrarlo cuando la escena lo necesite.
 
 QUÉ ESCRIBIR:
 - Los nombres propios que contiene: lugares, pueblos, facciones, dioses, personajes, objetos, criaturas.
-- Los conceptos que trata: de qué habla este documento y no otro.
-- Las palabras con las que alguien buscaría esto sin saber cómo se titula: si va de navegación, «barco, cubierta, tormenta, puerto, motín»; si va de una ciudad, sus barrios y sus gremios.
+- Los conceptos y biomas que trata: de qué habla este documento y no otro (ej. si va de navegación: «barco, cubierta, tormenta, puerto, motín»; si va de una ciudad: sus barrios, gremios y leyes).
+- Situaciones o disparadores de escena: qué acción, peligro o tema hace necesario este texto (ej. naufragio, abordaje, veneno, juicio, sigilo, emboscada, interrogatorio, frío, supervivencia).
 - Sinónimos y variantes de lo anterior, que quien juega no escribe siempre igual.
 ${bloqueElenco}
 QUÉ NO ESCRIBIR:
 - Palabras genéricas de rol que valen para cualquier documento: aventura, campaña, personaje, jugador, dados, nivel, partida, reglas, director. Ensucian el índice y no distinguen nada.
-- Frases. Esto son términos sueltos, no descripciones.
+- Frases o explicaciones. Esto son términos sueltos, no descripciones.
 
-FORMATO: una sola línea de términos separados por comas. Entre cuarenta y ochenta. Nada más: sin encabezado, sin explicación, sin comentar lo que has hecho. Conserva el idioma del documento.
+FORMATO: una sola línea de términos separados por comas. ${cantidad}. Nada más: sin encabezado, sin comillas, sin numeración, sin comentar lo que has hecho. Conserva el idioma del documento.
 
 DOCUMENTO (${file.name}):
 ${muestra}`,
     config
   });
 
-  const salida = (response.text || '')
+  const textoCrudo = (response.text || '')
     .replace(/^[^:\n]{0,60}:\s*/, '')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!salida) throw new Error('El modelo no ha devuelto ninguna etiqueta.');
+  if (!textoCrudo) throw new Error('El modelo no ha devuelto ninguna etiqueta.');
+
+  // Limpieza y deduplicación precisa de términos
+  const terminosUnicos: string[] = [];
+  const vistos = new Set<string>();
+  for (const t of textoCrudo.split(',')) {
+    const limpio = t
+      .replace(/^[\s\d\-•*`'"]+|[\s.`'"]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (limpio.length >= 2 && limpio.length <= 60) {
+      const norma = limpio.toLowerCase();
+      if (!vistos.has(norma)) {
+        vistos.add(norma);
+        terminosUnicos.push(limpio);
+      }
+    }
+  }
+
+  const salida = terminosUnicos.join(', ');
+  if (!salida) throw new Error('El modelo no ha devuelto ninguna etiqueta válida tras limpiar.');
   return salida;
 }
 

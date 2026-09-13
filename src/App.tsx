@@ -2886,8 +2886,15 @@ export default function App() {
   /** Las etiquetas escritas o corregidas a mano desde el modal de Archivos. */
   const handleGuardarEtiquetas = async (fileId: string, etiquetas: string) => {
     if (!currentPId) return;
+    const limpias = etiquetas
+      .split(',')
+      .map(t => t.trim().replace(/^[\s`'"]+|[\s.`'"]+$/g, ''))
+      .filter(t => t.length >= 2)
+      .filter((t, i, arr) => arr.findIndex(x => x.toLowerCase() === t.toLowerCase()) === i)
+      .join(', ');
+
     const frescos = await loadFilesFromDB(currentPId);
-    const updated = frescos.map(f => (f.id === fileId ? { ...f, etiquetasBusqueda: etiquetas } : f));
+    const updated = frescos.map(f => (f.id === fileId ? { ...f, etiquetasBusqueda: limpias } : f));
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
   };

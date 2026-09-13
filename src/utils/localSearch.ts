@@ -130,7 +130,30 @@ const VACIAS = new Set([
   'when',
   'what',
   'which',
-  'they'
+  'they',
+  // Palabras genéricas y metatérminos de rol que distorsionan el IDF en BM25
+  'personaje',
+  'personajes',
+  'jugador',
+  'jugadora',
+  'jugadores',
+  'campana',
+  'partida',
+  'partidas',
+  'aventura',
+  'aventuras',
+  'director',
+  'narrador',
+  'manual',
+  'manuales',
+  'documento',
+  'documentos',
+  'archivo',
+  'archivos',
+  'capitulo',
+  'seccion',
+  'pagina',
+  'paginas'
 ]);
 
 export function normalizarTexto(v: string): string {
@@ -262,23 +285,23 @@ export function trocear(file: ProjectFile): Fragmento[] {
  * lo único que entiende un índice BM25.
  */
 const PALABRAS_DE_CATEGORIA: Partial<Record<NonNullable<ProjectFile['category']>, string>> = {
-  compendio: 'compendio resumen novelas trasfondo material de fondo canon',
-  cantera: 'cantera lugar lugares localizacion escenario ciudad barrio taberna edificio sitio',
-  lore: 'lore ambientacion historia cultura facciones religion costumbres mundo',
+  compendio: 'compendio resumen novelas trasfondo material de fondo canon cronologia',
+  cantera: 'cantera lugar lugares localizacion escenario ciudad barrio taberna edificio sitio puerto muelle costa mar isla ruina cueva mazmorra templo fortaleza castillo camino sendero bosque',
+  lore: 'lore ambientacion historia cultura facciones religion costumbres mundo ordenes panteon deidades dioses nobleza gremios linajes',
   // Aquí van las palabras de la SITUACIÓN, no las del módulo de origen: una
   // persecución por los tejados de Luskan tiene que enganchar con las reglas de
   // persecución vengan de donde vengan.
   mecanica:
-    'mecanica regla reglas subsistema procedimiento tirada prueba complicacion persecucion perseguir huir huida escapar carrera tejados sigilo urbano intriga frio helada ventisca temperatura exposicion agotamiento asedio viaje travesia peligro',
-  sheet_npc: 'ficha pnj personaje monstruo criatura estadisticas',
+    'mecanica regla reglas subsistema procedimiento tirada prueba complicacion persecucion perseguir huir huida escapar carrera tejados sigilo urbano intriga frio helada ventisca temperatura exposicion agotamiento asedio viaje travesia peligro navegacion naufragio abordaje veneno buceo combate',
+  sheet_npc: 'ficha pnj personaje monstruo criatura estadisticas enemigo rival aliado',
   sheet_pj:
     'ficha protagonista personaje jugador diario runas adivinacion posesiones pertenencias equipo trasfondo cuaderno reliquia',
   sheet_companion:
     'ficha compañero familiar montura animal polilla lechuza cuervo mascota vinculo empatico espiritu',
-  oracle: 'oraculo tabla tablas azar resultado',
-  roster: 'elenco reparto personajes lista',
-  index: 'indice ganchos aventura',
-  document: 'documento'
+  oracle: 'oraculo tabla tablas azar resultado tirada suceso evento',
+  roster: 'elenco reparto personajes lista nombres pnjs habitantes',
+  index: 'indice ganchos aventura trama capitulos guia',
+  document: 'documento texto referencia apunte'
 };
 
 function crearFragmento(file: ProjectFile, titulo: string, texto: string): Fragmento {
