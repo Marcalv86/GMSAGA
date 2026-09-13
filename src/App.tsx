@@ -2725,10 +2725,15 @@ export default function App() {
 
   const handleUpdateFileCategory = async (fileId: string, category: FileCategory) => {
     if (!currentPId) return;
-    const isAlwaysPresent = category === 'sheet_pj' || category === 'sheet_companion';
-    const updated = currentFiles.map(f =>
-      f.id === fileId ? { ...f, category, onDemand: isAlwaysPresent ? false : f.onDemand } : f
-    );
+    /*
+     * Cambiar de categoría ya no apaga el modo consulta.
+     *
+     * Etiquetar un archivo como ficha le quitaba el «de consulta» por su
+     * cuenta, así que marcarla y luego clasificarla deshacía lo primero sin
+     * decir nada. Clasificar es decir QUÉ ES un documento; si viaja entero o
+     * se queda en la biblioteca es otra decisión, y es de quien juega.
+     */
+    const updated = currentFiles.map(f => (f.id === fileId ? { ...f, category } : f));
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
     // Marcar un documento como ficha del OC es decir quién es: se lee solo.
@@ -2738,9 +2743,24 @@ export default function App() {
   const handleToggleOnDemand = async (fileId: string, onDemand: boolean) => {
     if (!currentPId) return;
     const target = currentFiles.find(f => f.id === fileId);
-    if (target && (target.category === 'sheet_pj' || target.category === 'sheet_companion')) {
-      return;
-    }
+    /*
+     * LAS FICHAS TAMBIÉN SE PUEDEN MANDAR A LA BIBLIOTECA.
+     *
+     * Aquí había un candado: la ficha del protagonista y las de sus
+     * compañeros no se podían marcar de consulta, punto. La intención era
+     * buena —perder la ficha es el peor de los olvidos— pero convertía en ley
+     * lo que debería ser una elección, y en una campaña con fichas de cuarenta
+     * mil caracteres eso es media cuota por turno que no hay forma de recortar.
+     *
+     * Se quita, no porque el riesgo no exista, sino porque ya hay con qué
+     * verlo: las etiquetas de búsqueda hacen encontrable el documento por
+     * términos que no están escritos dentro, y el panel de uso de la
+     * biblioteca enseña si está entrando o vive en «sin usar». Y sobre todo
+     * porque lo esencial no depende de este archivo: el nombre, la especie,
+     * los idiomas, la apariencia, el inventario y las monedas viajan SIEMPRE
+     * desde la memoria, en su propio bloque. Lo que se manda a la biblioteca
+     * es el fondo del documento, no su identidad.
+     */
     const updated = currentFiles.map(f => (f.id === fileId ? { ...f, onDemand } : f));
     setCurrentFiles(updated);
     // Invalidar caché de tokens medidos para reflejar el nuevo peso de la biblioteca

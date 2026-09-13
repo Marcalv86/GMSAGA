@@ -1411,16 +1411,19 @@ export function estimarCargaDelTurno({
   // tablas de oráculo son la excepción a la excepción: se mandan siempre,
   // porque un oráculo que hay que pedir no sirve de nada.
   const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
+  /*
+   * Las fichas ya no son una excepción, así que aquí tampoco.
+   *
+   * Este desglose tiene que contar lo MISMO que `buildTurnPayload` manda, o la
+   * barra vuelve a mentir —y una barra de cuota que miente es lo que ya
+   * costó una tarde entera—. Quedan como intocables los oráculos, el roster y
+   * el índice: un oráculo que hay que pedir no sirve de nada, y los otros dos
+   * son listas de nombres que valen justo para que el buscador encuentre a
+   * quién buscar.
+   */
   const viajaEntero = (f: ProjectFile) =>
     esTexto(f) &&
-    (!f.onDemand ||
-      f.category === 'oracle' ||
-      f.category === 'roster' ||
-      f.category === 'index' ||
-      f.category === 'sheet_pj' ||
-      f.category === 'sheet_companion' ||
-      looksLikeProtagonistSheet(f) ||
-      looksLikeCompanionSheet(f));
+    (!f.onDemand || f.category === 'oracle' || f.category === 'roster' || f.category === 'index');
   const archivos = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
 
   const deConsulta = files.filter(
@@ -1429,11 +1432,7 @@ export function estimarCargaDelTurno({
       Boolean(f.onDemand) &&
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
-      f.category !== 'index' &&
-      f.category !== 'sheet_pj' &&
-      f.category !== 'sheet_companion' &&
-      !looksLikeProtagonistSheet(f) &&
-      !looksLikeCompanionSheet(f)
+      f.category !== 'index'
   );
   const archivosDeConsulta = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
   const medios = files.filter(f => f.isImage || f.isAudio).length;
@@ -2394,13 +2393,31 @@ ${allPreviousHistory}`
    * mezclan con los de ella, que es otra forma de estropearlo.
    */
   const companionFiles = files.filter(
-    f => esTexto(f) && (f.category === 'sheet_companion' || looksLikeCompanionSheet(f, project.memory))
+    f =>
+      esTexto(f) &&
+      !f.onDemand &&
+      (f.category === 'sheet_companion' || looksLikeCompanionSheet(f, project.memory))
   );
   const companionIds = new Set(companionFiles.map(f => f.id));
 
+  /*
+   * Solo las fichas que NO están marcadas de consulta viajan enteras.
+   *
+   * Antes entraban todas por narices, estuviera el interruptor como
+   * estuviera. Ahora una ficha marcada de consulta cae por el mismo camino
+   * que cualquier compendio: se anuncia en el catálogo y se rescatan sus
+   * fragmentos según la escena.
+   *
+   * ⚠️ Lo que NO se va con ella: el nombre, la especie, los idiomas, la
+   * apariencia, el inventario, las monedas y el estado siguen viajando cada
+   * turno desde la memoria, en su propio bloque. A la biblioteca se manda el
+   * fondo del documento —trasfondo, equipo de partida, cláusulas de canon—,
+   * nunca la identidad.
+   */
   const pjSheetFiles = files.filter(
     f =>
       esTexto(f) &&
+      !f.onDemand &&
       !companionIds.has(f.id) &&
       (f.category === 'sheet_pj' || looksLikeProtagonistSheet(f, project.memory))
   );
@@ -2450,9 +2467,7 @@ ${allPreviousHistory}`
       !companionIds.has(f.id) &&
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
-      f.category !== 'index' &&
-      f.category !== 'sheet_pj' &&
-      f.category !== 'sheet_companion'
+      f.category !== 'index'
   );
   const deConsultaIds = new Set(deConsulta.map(f => f.id));
 

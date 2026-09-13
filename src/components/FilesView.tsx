@@ -143,12 +143,10 @@ export const FilesView: React.FC<{
     !f.isImage &&
     !f.isAudio &&
     f.category !== 'style_sample' &&
-    (!f.onDemand ||
-      f.category === 'oracle' ||
-      f.category === 'roster' ||
-      f.category === 'index' ||
-      f.category === 'sheet_pj' ||
-      f.category === 'sheet_companion');
+    // Las fichas dejaron de ser intocables: si están de consulta, no cuentan
+    // como peso fijo. Solo siguen viajando siempre los oráculos, el roster y
+    // el índice, que son lo que no tiene sentido tener que pedir.
+    (!f.onDemand || f.category === 'oracle' || f.category === 'roster' || f.category === 'index');
   const textChars = files.reduce((acc, f) => acc + (countsAsContext(f) ? f.length || 0 : 0), 0);
   const budgetShare = (textChars / CONTEXT_BUDGET_CHARS) * 100;
   const budgetLevel = budgetShare < 25 ? 'holgado' : budgetShare < 50 ? 'ajustado' : 'excesivo';
@@ -165,9 +163,7 @@ export const FilesView: React.FC<{
           f.onDemand &&
           f.category !== 'oracle' &&
           f.category !== 'roster' &&
-          f.category !== 'index' &&
-          f.category !== 'sheet_pj' &&
-          f.category !== 'sheet_companion'
+          f.category !== 'index'
       ),
     [files]
   );
