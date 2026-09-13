@@ -1549,9 +1549,31 @@ export const ChatView: React.FC<{
                               decir lo que el AM ya dice en dos letras. El
                               icono sí aporta: se lee sin leer.
                             */}
-                            <div className="text-base text-right -mt-1.5 leading-none">
-                              {iconoDeFranja(fecha!.minute)}
-                            </div>
+                            {/*
+                              BAJO TIERRA NO HAY FRANJA DEL DÍA.
+                              Las cuatro son luz de superficie, y en una cueva
+                              —o en una ciudad del subsuelo— enseñar «es de
+                              día» a las nueve y media no significa nada: ahí
+                              abajo no sale el sol. El reloj sigue corriendo
+                              porque el mundo de arriba sigue girando y los
+                              viajes y descansos se cuentan igual, pero el
+                              icono deja de hablar de luz.
+                            */}
+                            {(() => {
+                              const bajoTierra = marcoDeLugar(lugarUlt?.lugar)?.nombre === 'subterráneo';
+                              return (
+                                <div
+                                  className="text-base text-right -mt-1.5 leading-none"
+                                  title={
+                                    bajoTierra
+                                      ? 'Bajo tierra no hay día ni noche: el reloj sigue corriendo porque arriba sigue pasando el tiempo, pero aquí la luz no la pone el sol.'
+                                      : undefined
+                                  }
+                                >
+                                  {bajoTierra ? '🌑' : iconoDeFranja(fecha!.minute)}
+                                </div>
+                              );
+                            })()}
                             <div className="border-t border-[var(--glass-border)] pt-2 flex items-baseline justify-between gap-2">
                               <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">Día</span>
                               <span className="text-[11px] text-right text-[var(--text-primary)]">
