@@ -20,6 +20,7 @@ import {
   fechaCompleta,
   fechaLegible,
   iconoDeClima,
+  marcoDeLugar,
   franjaDelDia,
   estacionDelDia,
   horaLegible
@@ -1501,7 +1502,33 @@ export const ChatView: React.FC<{
                         {hayCalendario ? (
                           <>
                             <div className="flex items-baseline justify-between gap-2">
-                              <span className="font-cinzel text-[11px] text-[var(--text-secondary)]">Hora</span>
+                              <span className="font-cinzel text-[11px] text-[var(--text-secondary)] flex items-center gap-1.5">
+                                Hora
+                                {/*
+                                  EN QUÉ CLASE DE SITIO ESTÁ LA ESCENA.
+                                  Va aquí, en el hueco que dejaba el rótulo, y
+                                  no en una fila propia: es una etiqueta de una
+                                  palabra y una fila entera para ella sería
+                                  darle más peso del que tiene.
+                                  ⚠️ Y lo que enseña es la lectura de la
+                                  APLICACIÓN sobre el lugar que escribió el
+                                  Narrador, no una declaración suya. Si el chip
+                                  dice «naval» y la escena va de otra cosa, es
+                                  que el lugar apuntado se ha quedado viejo.
+                                */}
+                                {(() => {
+                                  const marco = marcoDeLugar(ultima?.lugar);
+                                  if (!marco) return null;
+                                  return (
+                                    <span
+                                      className="inline-flex items-center gap-1 text-[10px] bg-[var(--surface)] border border-[var(--user-border)] px-1.5 py-0.5 rounded font-sans normal-case"
+                                      title={`La escena transcurre en un marco ${marco.nombre}. Lo deduce la aplicación del lugar apuntado en el diario («${ultima?.lugar}»), y es lo que decide qué reglas están vivas: en travesía hay jornadas que contar, bajo tierra aprieta la luz, en ciudad manda quién gobierna.`}
+                                    >
+                                      {marco.icono} {marco.nombre}
+                                    </span>
+                                  );
+                                })()}
+                              </span>
                               <span className="font-mono text-base font-bold text-[var(--accent)] tabular-nums">
                                 {horaLegible(fecha!.minute)}
                               </span>

@@ -22,6 +22,7 @@ import {
   Trash2,
   Pencil,
   Globe,
+  Plus,
   Users
 } from 'lucide-react';
 import { Chat, Project, ProjectFile } from '../types';
@@ -130,6 +131,17 @@ export const MesaView: React.FC<{
    * cuando hace falta comprobar algo de fuera, no como estado permanente.
    */
   const [buscarEnLaWeb, setBuscarEnLaWeb] = useState(false);
+  /*
+   * El «+» del compositor, igual que en el chat de Jugar.
+   *
+   * Adjuntar y encender internet vivían sueltos: uno como botón fijo al lado
+   * del campo y el otro como interruptor en la fila de arriba, compitiendo por
+   * el ancho con el selector de modelo. En una pantalla de móvil eso son tres
+   * cosas peleándose por la misma franja, y encima cada chat colocaba lo suyo
+   * en un sitio distinto. Aquí el «+» es lo mismo en los dos: el sitio donde
+   * están las opciones de entrada.
+   */
+  const [menuAbierto, setMenuAbierto] = useState(false);
 
   /*
    * Los vídeos se leen del texto que se está escribiendo, no de un adjunto
@@ -753,22 +765,6 @@ export const MesaView: React.FC<{
                 </option>
               ))}
             </select>
-            <button
-              onClick={() => setBuscarEnLaWeb(v => !v)}
-              className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 min-h-[32px] text-[10px] font-cinzel transition-colors cursor-pointer ${
-              buscarEnLaWeb
-                ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
-                : 'border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]'
-            }`}
-            title={
-              buscarEnLaWeb
-                ? 'Puede mirar en internet para contestar, y te dirá qué ha consultado. Tus documentos siguen mandando sobre lo que encuentre.'
-                : 'Contesta solo con lo que tiene: tus documentos, la crónica y la memoria. Enciéndelo si necesitas que compruebe algo de fuera.'
-            }
-          >
-              <Globe className="w-3.5 h-3.5 shrink-0" />
-              {buscarEnLaWeb ? 'Puede buscar en internet' : 'Sin internet'}
-            </button>
           </div>
 
           {adjuntos.length > 0 && (
@@ -804,15 +800,108 @@ export const MesaView: React.FC<{
               e.target.value = '';
             }}
           />
-          <button
-            onClick={() => inputArchivo.current?.click()}
-            disabled={pensando || adjuntos.length >= 4}
-            className="shrink-0 w-11 h-11 rounded-xl border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] flex items-center justify-center transition-all disabled:opacity-30 cursor-pointer"
-            title="Adjuntar una imagen (máximo 4). Para vídeo, pega el enlace de YouTube: lo verá."
-            aria-label="Adjuntar imagen"
-          >
-            <ImagePlus className="w-4 h-4" />
-          </button>
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setMenuAbierto(v => !v)}
+              disabled={pensando}
+              className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all disabled:opacity-30 cursor-pointer ${
+                menuAbierto
+                  ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
+                  : 'border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]'
+              }`}
+              title="Opciones: adjuntar imagen, buscar en internet…"
+              aria-label="Opciones de entrada"
+            >
+              <Plus className={`w-4 h-4 transition-transform duration-200 ${menuAbierto ? 'rotate-45' : ''}`} />
+            </button>
+            {/*
+              Que internet está encendido tiene que verse con el menú CERRADO.
+              Al mudar el interruptor aquí dentro dejó de estar a la vista, y un
+              ajuste activo que no se ve es peor que uno incómodo: se olvida
+              encendido y luego no se entiende por qué el Director contesta con
+              cosas de fuera. El punto lo dice sin ocupar nada.
+            */}
+            {buscarEnLaWeb && !menuAbierto && (
+              <span
+                className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[var(--accent)] border-2 border-[var(--bg-color)] flex items-center justify-center pointer-events-none"
+                title="El Director puede buscar en internet en esta pregunta"
+              >
+                <Globe className="w-1.5 h-1.5 text-[var(--on-accent)]" />
+              </span>
+            )}
+
+            {menuAbierto && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMenuAbierto(false)} />
+                <div className="absolute bottom-full left-0 mb-2 w-64 sm:w-72 bg-[var(--bg-color)] border border-[var(--glass-border)] rounded-xl shadow-2xl backdrop-blur-md p-1.5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150 font-lora">
+                  <div className="px-2.5 py-1 text-[10px] font-cinzel font-bold text-[var(--text-secondary)] tracking-wider border-b border-[var(--glass-border)] mb-1">
+                    OPCIONES DE ENTRADA
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuAbierto(false);
+                        inputArchivo.current?.click();
+                      }}
+                      disabled={adjuntos.length >= 4}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group disabled:opacity-40"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <ImagePlus className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                          Adjuntar Imagen
+                        </div>
+                        <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                          {adjuntos.length >= 4 ? 'Máximo 4 alcanzado' : 'Para vídeo, pega el enlace'}
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBuscarEnLaWeb(v => !v);
+                        setMenuAbierto(false);
+                      }}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group"
+                    >
+                      <div
+                        className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                          buscarEnLaWeb
+                            ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30'
+                            : 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20'
+                        }`}
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                          Buscar en internet
+                        </div>
+                        <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                          {buscarEnLaWeb ? 'Activado · te dirá qué consultó' : 'Solo tus documentos y la crónica'}
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 w-8 h-4 rounded-full transition-colors relative ${
+                          buscarEnLaWeb ? 'bg-[var(--accent)]' : 'bg-[var(--glass-border)]'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${
+                            buscarEnLaWeb ? 'left-[18px]' : 'left-0.5'
+                          }`}
+                        />
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
           <textarea
             value={texto}
             onChange={e => setTexto(e.target.value)}

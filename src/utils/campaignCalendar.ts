@@ -883,6 +883,42 @@ const CLIMAS: [RegExp, string][] = [
   [/frío|helad|gélid|escarcha/i, '🥶']
 ];
 
+/**
+ * En qué clase de sitio transcurre la escena, deducido del nombre del lugar.
+ *
+ * Los cinco marcos que las directivas obligan a mirar antes de narrar —urbano,
+ * naval, terrestre, interior y subterráneo— tienen cada uno sus reglas vivas:
+ * en travesía hay jornadas que contar, en ciudad no; bajo tierra aprieta la luz
+ * y en un salón aprieta quién te está mirando.
+ *
+ * Aquí se adivinan por el texto del lugar, que es lo único que hay: el Narrador
+ * lo escribe en \`[AGENDA: ... | lugar: ...]\` y nadie lo teclea en un
+ * formulario. Es una heurística y falla a veces —«el Pozo» puede ser una plaza
+ * o una sima—, así que sirve para poner un icono, nunca para decidir nada.
+ *
+ * El orden importa: lo más específico primero. «Cripta del templo» es cripta
+ * antes que templo, y «puerto» es ciudad antes que mar.
+ */
+const MARCOS: [RegExp, string, string][] = [
+  [/mazmorra|cripta|cueva|caverna|sima|subterrán|catacumb|tumba|mina|sótano|antípoda|infraoscur|underdark|túnel/i, '🕳️', 'subterráneo'],
+  [/barco|nav[ií]o|nave|cubierta|sentina|bodega del|camarote|bergant|galera|carabela|fragata|alta mar|a bordo|proa|popa|jarcia/i, '⚓', 'travesía naval'],
+  [/ciudad|villa|pueblo|aldea|puerto|muelle|barrio|distrito|mercado|plaza|taberna|posada|calle|gremio|lonja/i, '🏙️', 'urbano'],
+  [/castillo|fortaleza|torre|templo|santuario|mansión|palacio|salón|biblioteca|academia|sala|cámara|capilla/i, '🕯️', 'interior'],
+  [/camino|ruta|sendero|bosque|selva|desierto|montaña|colina|llanura|pantano|ciénaga|páramo|estepa|valle|río|vado|campamento|yerm/i, '🏕️', 'travesía terrestre']
+];
+
+export interface MarcoDeEscena {
+  icono: string;
+  nombre: string;
+}
+
+export function marcoDeLugar(lugar?: string): MarcoDeEscena | undefined {
+  if (!lugar || !lugar.trim()) return undefined;
+  const hit = MARCOS.find(([re]) => re.test(lugar));
+  if (!hit) return undefined;
+  return { icono: hit[1], nombre: hit[2] };
+}
+
 export function iconoDeClima(clima?: string): string {
   if (!clima) return '';
   return (CLIMAS.find(([re]) => re.test(clima)) || [, '🌤️'])[1] as string;
