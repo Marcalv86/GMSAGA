@@ -1299,6 +1299,14 @@ export default function App() {
       viajeEnCurso = { ...mem.viaje, llegadaPrematura: undefined };
     }
 
+    // Detección automática en segundo plano: si las jornadas transcurridas alcanzan o superan el total del viaje, el trayecto se completa automáticamente en segundo plano.
+    if (viajeEnCurso && Number.isFinite(viajeEnCurso.iniciadoAbs)) {
+      const diasHechos = Math.max(0, diaActual - viajeEnCurso.iniciadoAbs);
+      if (diasHechos >= viajeEnCurso.jornadas) {
+        viajeEnCurso = undefined;
+      }
+    }
+
     /*
      * Lo que queda fijado de un sitio.
      *
