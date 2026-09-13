@@ -950,18 +950,22 @@ export function iconoDeClima(clima?: string): string {
  * ciudad del subsuelo ese ritmo lo marca un pilar de calor que alguien
  * enciende por la base y que se va apagando solo.
  *
- * De ahí que la serie sea un gradiente de temperatura y no de luz: frío,
- * templándose, al rojo, enfriándose. Se lee igual de rápido que la de arriba y
- * dice lo que de verdad cambia en un sitio sin cielo.
+ * De ahí que la serie sea un gradiente de temperatura y no de luz: apagado,
+ * templándose, al rojo vivo, enfriándose. Se lee igual de rápido que la de
+ * arriba y dice lo que de verdad cambia en un sitio sin cielo.
+ *
+ * Y son cuadrados a propósito: un cuadrado se lee como un TRAMO del propio
+ * pilar, que es lo que se mira ahí abajo para saber la hora. Un círculo sería
+ * un astro, y astros no hay.
  */
 export function iconoDeFranjaSubterranea(minuto?: number): string {
   if (minuto === undefined) return '';
   const hora = Math.floor(minuto / 60);
-  if (hora < 6) return '🌑';
-  if (hora < 9) return '🟠';
-  if (hora < 19) return '🔴';
-  if (hora < 22) return '🟣';
-  return '🌑';
+  if (hora < 6) return '⬛';
+  if (hora < 9) return '🟥';
+  if (hora < 19) return '🟨';
+  if (hora < 22) return '🟪';
+  return '⬛';
 }
 
 /**
