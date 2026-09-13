@@ -52,6 +52,7 @@ import { ImportCampaignModal } from './components/ImportCampaignModal';
 import { Logger } from './components/Logger';
 import { logError, logInfo, logWarn } from './utils/logger';
 import { presionDelMinuto } from './utils/callLog';
+import { conciliarAfinidadesTrasSincronizar } from './utils/affinityProgression';
 import { aplicarEtiquetados, OrdenDeEtiquetado } from './utils/ordenesDeMesa';
 import { sanitizeProjectMemory } from './utils/sanitizers';
 import { ExtractedCampaignResult } from './utils/campaignImporter';
@@ -1174,9 +1175,18 @@ export default function App() {
          * medio elenco entraba en la campaña ya con química. Que suba después,
          * jugando, un punto por día como todo lo demás.
          */
+        /*
+         * Y LO MISMO VALE PARA EL VÍNCULO Y LA CONFIANZA.
+         *
+         * El arreglo de la atracción se quedó a medias: `atr` se forzaba a cero
+         * y los otros dos ejes seguían adoptando lo que trajera la etiqueta.
+         * Pero la confianza es justo la que peor se aguanta de regalo: un
+         * oficial que acaba de encadenarla salía del primer encuentro con
+         * CON 12/20. Los tres ejes son lo mismo y se ganan igual, jugando.
+         */
         const atrInicial = 0;
-        const vinInicial = v.vin !== undefined ? Math.max(0, Math.min(20, Math.round(v.vin))) : undefined;
-        const conInicial = v.con !== undefined ? Math.max(0, Math.min(20, Math.round(v.con))) : undefined;
+        const vinInicial = v.vin !== undefined ? 0 : undefined;
+        const conInicial = v.con !== undefined ? 0 : undefined;
 
         nuevosNpcs.push({
           id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -1192,11 +1202,7 @@ export default function App() {
           vin: vinInicial,
           con: conInicial,
           orientacion: v.orientacion,
-          ultimoDiaSubida: {
-            atr: undefined,
-            vin: vinInicial !== undefined ? marca : undefined,
-            con: conInicial !== undefined ? marca : undefined
-          },
+          ultimoDiaSubida: {},
           recurrente: true,
           diasVistos: [marca]
         });
@@ -3234,6 +3240,20 @@ export default function App() {
         return {
           memory: {
             ...memoriaSincronizada,
+            /*
+             * La afinidad NO la decide la sincronización.
+             *
+             * `...syncResult.memory` vuelca la lista de PNJs rehecha por la IA,
+             * y con ella los tres ejes tal cual los haya escrito. Es la única
+             * puerta de las tres que no tenía portero, y por ahí entraban
+             * números de quince sesiones el primer día.
+             */
+            npcs: conciliarAfinidadesTrasSincronizar(
+              p.memory?.npcs || [],
+              memoriaSincronizada.npcs || [],
+              diaDeHoy,
+              (a, b) => coincidenNombresNpc(a, b)
+            ),
             gm_bambalinas: cuaderno.movimientos.length ? cuaderno.movimientos : memoriaSincronizada.gm_bambalinas,
             gm_relojes: cuaderno.relojes.length ? cuaderno.relojes : memoriaSincronizada.gm_relojes,
             gm_facciones: mesa.facciones.length ? mesa.facciones : memoriaSincronizada.gm_facciones,
