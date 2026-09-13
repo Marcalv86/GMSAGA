@@ -231,7 +231,33 @@ export const InstructionsView: React.FC<{
   };
 
   const handleRestoreMasterInstructions = () => {
-    const message = '¿Deseas restaurar las directivas narrativas y de lore por defecto para este Tomo?';
+    /*
+     * EL AVISO TIENE QUE DECIR LO QUE ESTE BOTÓN HACE DE VERDAD.
+     *
+     * Se llama «Restaurar directivas por defecto» y decía «¿deseas restaurar
+     * las directivas narrativas y de lore por defecto?», que suena a volver a
+     * poner lo bueno. Lo que hace es sobrescribir de golpe las directivas de
+     * campaña, el sistema de juego, el estilo narrativo y las reglas de
+     * enfermedad con los textos de fábrica. En una campaña trabajada eso son
+     * meses de escritura —el lore, la conducta de los PNJs, la voz— borrados
+     * con un clic y sin vuelta atrás.
+     *
+     * Un botón destructivo que se presenta como restaurador es una trampa. Así
+     * que el aviso cuenta cuánto texto propio hay en juego: una cifra concreta
+     * hace parar a quien iba a pulsar por curiosidad, y no estorba a quien sí
+     * quiere empezar de cero.
+     */
+    const propio =
+      (instructions?.length || 0) + (system?.length || 0) + (style?.length || 0);
+    const hayTrabajoPropio = propio > 400;
+
+    const message = hayTrabajoPropio
+      ? `⚠️ ESTO BORRA LO QUE HAS ESCRITO TÚ.\n\n` +
+        `Se sustituyen por los textos de fábrica: tus directivas de campaña, tu sistema de juego y tu estilo narrativo. ` +
+        `Son ${propio.toLocaleString('es-ES')} caracteres tuyos y NO se pueden recuperar.\n\n` +
+        `Si solo querías ver las de fábrica para copiar alguna regla, cancela: esto no sirve para eso.\n\n` +
+        `¿Seguro que quieres empezar de cero?`
+      : '¿Deseas restaurar las directivas narrativas y de lore por defecto para este Tomo?';
     const executeRestore = async () => {
       setInstructions(DEFAULT_DM_INSTRUCTIONS);
       setSystem(DEFAULT_SYSTEM);
