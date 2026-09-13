@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Project, ProjectFile, FileCategory } from '../types';
 import { classifyFileAuto } from '../utils/geminiHelper';
 import { recuperar } from '../utils/localSearch';
@@ -29,7 +30,12 @@ import {
   ClipboardList,
   ListFilter,
   Music,
-  Network
+  Network,
+  FileText,
+  Eye,
+  Edit3,
+  Copy,
+  Check
 } from 'lucide-react';
 export const FilesView: React.FC<{
   project: Project;
@@ -40,6 +46,7 @@ export const FilesView: React.FC<{
   onAnalyzeImageFile?: (file: ProjectFile) => Promise<void>;
   onUpdateFileAnalysis?: (fileId: string, analysis: string) => Promise<void>;
   onDeleteFileAnalysis?: (fileId: string) => Promise<void>;
+  onUpdateFileContent?: (fileId: string, content: string) => Promise<void>;
   onUpdateFileCategory?: (fileId: string, category: FileCategory) => Promise<void>;
   onToggleOnDemand?: (fileId: string, onDemand: boolean) => Promise<void>;
   /** Deja de una hoja de oráculo solo las tablas y las reglas. */
@@ -64,6 +71,7 @@ export const FilesView: React.FC<{
   onAnalyzeImageFile,
   onUpdateFileAnalysis,
   onDeleteFileAnalysis,
+  onUpdateFileContent,
   onUpdateFileCategory,
   onToggleOnDemand,
   onDistillOracle,
@@ -225,6 +233,39 @@ export const FilesView: React.FC<{
    */
   const [archivoDeEtiquetas, setArchivoDeEtiquetas] = useState<ProjectFile | null>(null);
   const [borradorEtiquetas, setBorradorEtiquetas] = useState('');
+
+  // Lector Markdown y Editor de Documentos
+  const [documentoEnLectura, setDocumentoEnLectura] = useState<ProjectFile | null>(null);
+  const [modoEdicionDoc, setModoEdicionDoc] = useState(false);
+  const [borradorDoc, setBorradorDoc] = useState('');
+  const [docCopiado, setDocCopiado] = useState(false);
+  const [isGuardandoDoc, setIsGuardandoDoc] = useState(false);
+
+  const abrirLectorDocumento = (file: ProjectFile, empezarEditando = false) => {
+    setDocumentoEnLectura(file);
+    setBorradorDoc(file.content || '');
+    setModoEdicionDoc(empezarEditando);
+    setDocCopiado(false);
+  };
+
+  const handleGuardarContenidoDoc = async () => {
+    if (!documentoEnLectura || !onUpdateFileContent) return;
+    setIsGuardandoDoc(true);
+    try {
+      await onUpdateFileContent(documentoEnLectura.id, borradorDoc);
+      setDocumentoEnLectura(prev => (prev ? { ...prev, content: borradorDoc, length: borradorDoc.length } : null));
+      setModoEdicionDoc(false);
+    } finally {
+      setIsGuardandoDoc(false);
+    }
+  };
+
+  const handleCopiarDoc = async () => {
+    if (!borradorDoc) return;
+    await navigator.clipboard.writeText(borradorDoc);
+    setDocCopiado(true);
+    setTimeout(() => setDocCopiado(false), 2000);
+  };
 
   const abrirEtiquetas = (file: ProjectFile) => {
     setArchivoDeEtiquetas(file);
@@ -778,9 +819,16 @@ export const FilesView: React.FC<{
                   {/* Document Text Snippet */}
                   {!f.isImage && !f.isAudio && (
                     <div className="mt-3">
-                      <p className="text-xs text-[var(--text-secondary)] line-clamp-3 bg-black/5 p-2.5 rounded-md italic">
+                      <div
+                        onClick={() => abrirLectorDocumento(f, false)}
+                        className="text-xs text-[var(--text-secondary)] line-clamp-3 bg-black/5 hover:bg-black/10 p-2.5 rounded-md italic cursor-pointer transition-colors group/snip relative border border-transparent hover:border-[var(--glass-border)]"
+                        title="Haz clic para abrir el documento completo en el lector Markdown"
+                      >
                         {f.content.slice(0, 180)}...
-                      </p>
+                        <span className="block mt-1 text-[10px] font-cinzel font-bold text-[var(--accent)] not-italic opacity-75 group-hover/snip:opacity-100 flex items-center gap-1">
+                          <Eye className="w-3 h-3" /> Leer documento completo...
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -918,16 +966,15 @@ export const FilesView: React.FC<{
                             )}
                           </button>
                         )}
-                        {(currentCat === 'roster' || currentCat === 'index') && (
-                          <button
-                            onClick={() => handleOpenAnalysisModal(f)}
-                            className="px-2 py-1 bg-[var(--surface)] border border-[var(--user-border)] rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer flex items-center gap-1"
-                            title="Leer y corregir la lista a mano: añadir lo que falte, arreglar una entrada que se haya quedado corta"
-                          >
-                            <Search className="w-3.5 h-3.5" />{' '}
-                            {currentCat === 'roster' ? 'Ver / corregir el elenco' : 'Ver / corregir el índice'}
-                          </button>
-                        )}
+                        {/* Botón universal para leer en Markdown o editar cualquier archivo de texto */}
+                        <button
+                          onClick={() => abrirLectorDocumento(f, false)}
+                          className="px-2 py-1 bg-[var(--surface)] border border-[var(--user-border)] rounded text-[10px] md:text-[11px] font-cinzel font-bold hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer flex items-center gap-1"
+                          title="Abrir lector Markdown con formato enriquecido y editor del documento"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" /> Leer / Editar
+                        </button>
+
                         {currentCat === 'oracle' && f.analysis && f.analysis.trim().length > 80 && (
                           <button
                             onClick={() => handleOpenAnalysisModal(f)}
@@ -1183,6 +1230,175 @@ export const FilesView: React.FC<{
                   >
                     Guardar
                   </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Lectura Markdown y Edición de Documento */}
+      {documentoEnLectura && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 md:p-6">
+          <div className="bg-[var(--bg-color)] border border-[var(--glass-border)] rounded-xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col font-lora overflow-hidden">
+            {/* Cabecera del Modal */}
+            <div className="p-3 sm:p-4 border-b border-[var(--glass-border)] bg-[var(--surface-soft)] flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-lg bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center shrink-0 text-[var(--accent)]">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-cinzel text-sm sm:text-base font-bold text-[var(--text-primary)] truncate" title={documentoEnLectura.name}>
+                      {documentoEnLectura.name}
+                    </h3>
+                    <span className="text-[10px] font-cinzel px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-900 border border-amber-500/30 uppercase font-bold shrink-0">
+                      {documentoEnLectura.category || 'document'}
+                    </span>
+                    <span className={`text-[10px] font-cinzel px-2 py-0.5 rounded-full border font-bold shrink-0 ${
+                      documentoEnLectura.onDemand
+                        ? 'bg-blue-50 text-blue-900 border-blue-300'
+                        : 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                    }`}>
+                      {documentoEnLectura.onDemand ? 'De consulta' : 'Siempre presente'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                    {borradorDoc.length.toLocaleString()} caracteres · ~{Math.round(borradorDoc.length / 4).toLocaleString()} tokens estimados
+                  </p>
+                </div>
+              </div>
+
+              {/* Botones de control y pestañas */}
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <div className="flex bg-[var(--surface)] p-0.5 rounded-lg border border-[var(--user-border)]">
+                  <button
+                    onClick={() => setModoEdicionDoc(false)}
+                    className={`px-2.5 sm:px-3 py-1 text-xs font-cinzel font-bold rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                      !modoEdicionDoc
+                        ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-2xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Vista Lectura</span>
+                  </button>
+                  <button
+                    onClick={() => setModoEdicionDoc(true)}
+                    className={`px-2.5 sm:px-3 py-1 text-xs font-cinzel font-bold rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                      modoEdicionDoc
+                        ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-2xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <Edit3 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Editar</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleCopiarDoc}
+                  className="p-1.5 rounded-md border border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition-all cursor-pointer"
+                  title="Copiar texto al portapapeles"
+                >
+                  {docCopiado ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+
+                <button
+                  onClick={() => setDocumentoEnLectura(null)}
+                  className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Cerrar visor"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Cuerpo del Documento */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[var(--surface)] min-h-[300px] max-h-[65vh]">
+              {!modoEdicionDoc ? (
+                <div className="prose dark:prose-invert max-w-none font-lora text-[var(--text-primary)] leading-relaxed text-sm sm:text-base space-y-3">
+                  {borradorDoc.trim() ? (
+                    <ReactMarkdown>{borradorDoc}</ReactMarkdown>
+                  ) : (
+                    <p className="italic text-[var(--text-secondary)] text-center py-12">
+                      Este documento no contiene texto todavía. Pulsa en «Editar» para añadir contenido.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col min-h-[360px]">
+                  <textarea
+                    value={borradorDoc}
+                    onChange={e => setBorradorDoc(e.target.value)}
+                    placeholder="Escribe o pega aquí el contenido en Markdown..."
+                    className="flex-1 w-full p-4 bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg text-xs sm:text-sm font-mono leading-relaxed outline-none focus:border-[var(--accent)] resize-none shadow-inner min-h-[340px]"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Pie del Modal */}
+            <div className="p-3 sm:p-4 border-t border-[var(--glass-border)] bg-[var(--surface-soft)] flex flex-wrap items-center justify-between gap-2 shrink-0 text-xs">
+              <div className="flex items-center gap-2">
+                {onToggleOnDemand &&
+                  documentoEnLectura.category !== 'style_sample' &&
+                  documentoEnLectura.category !== 'oracle' &&
+                  documentoEnLectura.category !== 'roster' &&
+                  documentoEnLectura.category !== 'index' && (
+                  <button
+                    onClick={async () => {
+                      const nuevoOnDemand = !documentoEnLectura.onDemand;
+                      await onToggleOnDemand(documentoEnLectura.id, nuevoOnDemand);
+                      setDocumentoEnLectura(prev => (prev ? { ...prev, onDemand: nuevoOnDemand } : null));
+                    }}
+                    className={`px-2.5 py-1 border rounded text-[11px] font-cinzel font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      documentoEnLectura.onDemand
+                        ? 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
+                        : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {documentoEnLectura.onDemand ? <BookOpen className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                    {documentoEnLectura.onDemand ? 'Cambiar a: Siempre presente' : 'Cambiar a: De consulta'}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 ml-auto">
+                {modoEdicionDoc ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setBorradorDoc(documentoEnLectura.content || '');
+                        setModoEdicionDoc(false);
+                      }}
+                      disabled={isGuardandoDoc}
+                      className="px-3 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded-md hover:bg-[var(--surface)] cursor-pointer text-[var(--text-secondary)]"
+                    >
+                      Descartar
+                    </button>
+                    <button
+                      onClick={handleGuardarContenidoDoc}
+                      disabled={isGuardandoDoc}
+                      className="px-4 py-1.5 text-xs font-cinzel bg-emerald-700 hover:bg-emerald-800 text-white rounded-md font-bold cursor-pointer transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-60"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      {isGuardandoDoc ? 'Guardando...' : 'Guardar Cambios'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setModoEdicionDoc(true)}
+                      className="px-3 py-1.5 text-xs font-cinzel border border-[var(--user-border)] bg-[var(--surface)] hover:border-[var(--accent)] rounded-md font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" /> Editar Documento
+                    </button>
+                    <button
+                      onClick={() => setDocumentoEnLectura(null)}
+                      className="px-4 py-1.5 text-xs font-cinzel bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] rounded-md font-bold cursor-pointer transition-colors shadow-2xs"
+                    >
+                      Cerrar
+                    </button>
+                  </>
                 )}
               </div>
             </div>

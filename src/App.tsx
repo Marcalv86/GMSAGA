@@ -2726,6 +2726,16 @@ export default function App() {
     await saveFilesToDB(currentPId, updated);
   };
 
+  const handleUpdateFileContent = async (fileId: string, newContent: string) => {
+    if (!currentPId) return;
+    const frescos = await loadFilesFromDB(currentPId);
+    const updated = frescos.map(f =>
+      f.id === fileId ? { ...f, content: newContent, length: newContent.length } : f
+    );
+    setCurrentFiles(updated);
+    await saveFilesToDB(currentPId, updated);
+  };
+
   /**
    * Rellenar la ficha del protagonista leyendo su documento, sin pedirlo.
    *
@@ -4713,6 +4723,7 @@ export default function App() {
               onAnalyzeImageFile={handleAnalyzeImageFile}
               onUpdateFileAnalysis={handleUpdateFileAnalysis}
               onDeleteFileAnalysis={handleDeleteFileAnalysis}
+              onUpdateFileContent={handleUpdateFileContent}
               onUpdateFileCategory={handleUpdateFileCategory}
               onToggleOnDemand={handleToggleOnDemand}
               onDistillOracle={handleDistillOracle}
