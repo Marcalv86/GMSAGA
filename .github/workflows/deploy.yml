@@ -11,10 +11,29 @@ permissions:
   pages: write
   id-token: write
 
-# Permitir un único despliegue concurrente
+# Un único despliegue a la vez, y SIEMPRE gana el más nuevo.
+#
+# Antes esto era `group: "pages"` con `cancel-in-progress: false`, que es el
+# ejemplo que da GitHub, y tiene dos problemas para un repositorio de una sola
+# persona:
+#
+# 1. Con `false`, un run nuevo se pone EN COLA detrás del anterior. Si el
+#    anterior se queda colgado —y se quedó: uno estuvo diez horas en `pending`
+#    sin que le asignaran máquina— todo lo que llegue después espera por él
+#    indefinidamente. Media docena de commits se quedaron sin publicar así.
+# 2. Y solo cabe UN run en cola: al llegar el tercero, el segundo se cancela.
+#    Empujar varias veces seguidas garantizaba que ninguno llegara a ejecutarse.
+#
+# Con `true`, un push nuevo cancela lo que hubiera en marcha y entra él. Para
+# publicar una web es justo lo que se quiere: lo que debe acabar en producción
+# es el último commit, no el primero que pilló sitio en la cola.
+#
+# El nombre del grupo cambia a propósito: si el grupo "pages" se queda
+# encasquillado por un despliegue que se canceló a medias, seguir usándolo deja
+# la cola bloqueada para siempre. Uno nuevo empieza limpio.
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: "pages-deploy"
+  cancel-in-progress: true
 
 jobs:
   build:
