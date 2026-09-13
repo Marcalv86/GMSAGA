@@ -28,7 +28,8 @@ import {
   Dices,
   ClipboardList,
   ListFilter,
-  Music
+  Music,
+  Network
 } from 'lucide-react';
 export const FilesView: React.FC<{
   project: Project;
@@ -47,6 +48,8 @@ export const FilesView: React.FC<{
   onGenerarEtiquetas?: (file: ProjectFile) => Promise<void>;
   onGuardarEtiquetas?: (fileId: string, etiquetas: string) => Promise<void>;
   onAutoClassifyAll?: () => Promise<void>;
+  onRelacionarBiblioteca?: () => Promise<void>;
+  isRelacionando?: boolean;
   onExtractNpc?: (file: ProjectFile) => Promise<void>;
   onCreateNpcFromImage?: (file: ProjectFile) => Promise<void>;
   onUsePortraitAsPc?: (file: ProjectFile) => Promise<void>;
@@ -68,6 +71,8 @@ export const FilesView: React.FC<{
   onGenerarEtiquetas,
   onGuardarEtiquetas,
   onAutoClassifyAll,
+  onRelacionarBiblioteca,
+  isRelacionando = false,
   onExtractNpc,
   onCreateNpcFromImage,
   onUsePortraitAsPc,
@@ -450,12 +455,25 @@ export const FilesView: React.FC<{
           {onAutoClassifyAll && (
             <button
               onClick={onAutoClassifyAll}
-              disabled={isGenerating}
+              disabled={isGenerating || isRelacionando}
               className="px-2.5 sm:px-3 py-1.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md font-cinzel text-xs font-bold hover:bg-amber-200 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 shrink-0 shadow-2xs"
               title="Re-analizar y clasificar automáticamente todos los archivos por tipo y vincularlos con la memoria"
               aria-label="Auto-Clasificar"
             >
               <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Auto-Clasificar</span>
+            </button>
+          )}
+
+          {onRelacionarBiblioteca && (
+            <button
+              onClick={onRelacionarBiblioteca}
+              disabled={isGenerating || isRelacionando}
+              className="px-2.5 sm:px-3 py-1.5 bg-linear-to-r from-amber-700/90 to-amber-900 text-white rounded-md font-cinzel text-xs font-bold hover:brightness-110 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0 shadow-xs"
+              title="Analizar relaciones cruzadas entre todos los documentos, tejer red semántica y enriquecer etiquetas de búsqueda"
+              aria-label="Vincular Biblioteca"
+            >
+              <Network className={`w-3.5 h-3.5 ${isRelacionando ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isRelacionando ? 'Vinculando...' : 'Vincular Biblioteca'}</span>
             </button>
           )}
         </div>

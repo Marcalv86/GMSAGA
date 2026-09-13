@@ -108,6 +108,7 @@ import {
   extraerIdentidadDeDocumentos,
   extraerMecanicasDeDocumento,
   generarEtiquetasDeBusqueda,
+  relacionarBibliotecaInteligente,
   elencoDeLaCampana,
   fusionarTrama,
   isNarrativeIncomplete,
@@ -3035,6 +3036,88 @@ export default function App() {
     }
   };
 
+  const [isRelacionandoBiblioteca, setIsRelacionandoBiblioteca] = useState(false);
+
+  const handleRelacionarBiblioteca = async () => {
+    if (!currentPId || !currentProject) return;
+    if (isRelacionandoBiblioteca) return;
+
+    const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
+    const candidatos = currentFiles.filter(
+      f => esTexto(f) && ((f.content || '').trim().length > 30 || (f.etiquetasBusqueda || '').trim().length > 0)
+    );
+
+    if (candidatos.length < 2) {
+      setAlertConfig({
+        isOpen: true,
+        title: 'Documentos insuficientes',
+        message: 'Se necesitan al menos 2 documentos de texto o compendios en la biblioteca para que la IA pueda tejer relaciones inteligentes entre ellos.'
+      });
+      return;
+    }
+
+    setIsRelacionandoBiblioteca(true);
+    setTopProgress({
+      active: true,
+      label: `Analizando relaciones cruzadas entre ${candidatos.length} documentos de la biblioteca...`,
+      type: 'general'
+    });
+
+    try {
+      const resultado = await relacionarBibliotecaInteligente({
+        project: currentProject,
+        files: currentFiles
+      });
+
+      const frescos = await loadFilesFromDB(currentPId);
+
+      // 1. Actualizamos las etiquetas cruzadas en cada archivo
+      const mapaNuevasEtiquetas = new Map(resultado.archivosActualizados.map(a => [a.id, a.nuevasEtiquetas]));
+      let actualizados = frescos.map(f => {
+        const nuevas = mapaNuevasEtiquetas.get(f.id);
+        return nuevas ? { ...f, etiquetasBusqueda: nuevas } : f;
+      });
+
+      // 2. Creamos o actualizamos el archivo "🗺️ Red Semántica y Mapa de Relaciones.md"
+      const nombreMapa = '🗺️ Red Semántica y Mapa de Relaciones.md';
+      const existeMapa = actualizados.find(f => f.name === nombreMapa);
+      const fileId = existeMapa?.id || `file_${Date.now()}_maparelaciones`;
+
+      const archivoMapa: ProjectFile = {
+        id: fileId,
+        name: nombreMapa,
+        type: 'text/markdown',
+        mime: 'text/markdown',
+        content: resultado.mapaMarkdown,
+        length: resultado.mapaMarkdown.length,
+        category: 'index',
+        onDemand: false,
+        etiquetasBusqueda: 'mapa de relaciones, red semantica, conexiones, facciones cruzadas, vinculos, compendios, biblioteca, enlaces'
+      };
+
+      actualizados = [...actualizados.filter(f => f.name !== nombreMapa), archivoMapa];
+
+      setCurrentFiles(actualizados);
+      await saveFilesToDB(currentPId, actualizados);
+
+      setAlertConfig({
+        isOpen: true,
+        title: 'Biblioteca Vinculada con Éxito',
+        message: `¡Red semántica completada!\n\n• Documentos interconectados: ${resultado.archivosActualizados.length}\n• Nuevos términos puente creados: ${resultado.totalConexiones}\n• Se ha generado el documento "${nombreMapa}" en la biblioteca para consulta y orientación del Narrador.`
+      });
+    } catch (err) {
+      logError('general', 'No se ha podido relacionar la biblioteca', err);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Error al vincular la biblioteca',
+        message: describeApiError(err)
+      });
+    } finally {
+      setIsRelacionandoBiblioteca(false);
+      setTopProgress({ active: false, label: '', type: 'general' });
+    }
+  };
+
   const handleExtractMechanics = async (file: ProjectFile) => {
     if (!currentPId) return;
     if (extractingFileIds.includes(file.id)) return;
@@ -4637,6 +4720,8 @@ export default function App() {
               onGenerarEtiquetas={handleGenerarEtiquetas}
               onGuardarEtiquetas={handleGuardarEtiquetas}
               onAutoClassifyAll={handleAutoClassifyAll}
+              onRelacionarBiblioteca={handleRelacionarBiblioteca}
+              isRelacionando={isRelacionandoBiblioteca}
               onExtractNpc={handleExtractNpc}
               onCreateNpcFromImage={handleCreateNpcFromImage}
               isGenerating={isGenerating}

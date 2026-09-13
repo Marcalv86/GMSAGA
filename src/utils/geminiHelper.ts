@@ -9610,4 +9610,148 @@ export async function batchNovelizeMessages({
   return updatedMessages;
 }
 
+export interface ResultadoRelacionBiblioteca {
+  archivosActualizados: {
+    id: string;
+    name: string;
+    etiquetasAnadidas: string[];
+    nuevasEtiquetas: string;
+  }[];
+  mapaMarkdown: string;
+  totalConexiones: number;
+}
+
+/**
+ * Analiza la totalidad de documentos de la biblioteca para encontrar relaciones
+ * semánticas cruzadas, facciones compartidas, vínculos geográficos y dependencias
+ * temáticas. Enriquece las etiquetas de búsqueda de cada documento con términos puente.
+ */
+export async function relacionarBibliotecaInteligente({
+  project,
+  files
+}: {
+  project: Project;
+  files: ProjectFile[];
+}): Promise<ResultadoRelacionBiblioteca> {
+  const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
+  const candidatos = files.filter(
+    f => esTexto(f) && ((f.content || '').trim().length > 30 || (f.etiquetasBusqueda || '').trim().length > 0)
+  );
+
+  if (candidatos.length < 2) {
+    throw new Error('Se necesitan al menos 2 documentos de texto en la biblioteca para establecer relaciones inteligentes.');
+  }
+
+  const modelo = getBackgroundTaskModel();
+  const config = {
+    temperature: 0.1,
+    ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+  } as any;
+
+  const elenco = elencoDeLaCampana(project);
+
+  // Preparamos un dossier sintético de cada documento para no saturar tokens
+  const dossier = candidatos
+    .map((f, idx) => {
+      const preview = (f.content || '').slice(0, 1500).replace(/\s+/g, ' ').trim();
+      const tags = (f.etiquetasBusqueda || '').trim();
+      return `[DOCUMENTO ${idx + 1}] ID: "${f.id}" | ARCHIVO: "${f.name}" | CATEGORÍA: ${f.category || 'document'}\nETIQUETAS ACTUALES: ${tags || '(sin etiquetas)'}\nEXTRACTO INICIAL:\n${preview}\n`;
+    })
+    .join('\n----------------------------------------\n');
+
+  const prompt = `Eres el archivista y documentalista supremo de una campaña de rol en los Reinos Olvidados (Faerûn / D&D).
+Tienes delante la lista de TODOS los documentos y compendios de la biblioteca de la campaña.
+
+Tu misión es tejer la RED DE RELACIONES SEMÁNTICAS CRUZADAS entre ellos:
+1. Detecta qué documentos comparten facciones, personajes, rutas geográficas, misterios, peligros, religiones o subsistemas de reglas.
+2. Genera ETIQUETAS CRUZADAS (Cross-Tags) para cada documento: términos clave de OTROS documentos con los que conecta íntimamente, para que cuando una escena busque por un tema, el buscador local rescate ambos documentos vinculados.
+3. Genera un MAPA DE RELACIONES en formato Markdown claro, organizado y con viñetas que resuma cómo se interconectan los compendios y documentos.
+
+ELENCO Y ENTIDADES VIVAS DE LA CAMPAÑA:
+${elenco.slice(0, 60).join(', ')}
+
+DOCUMENTOS DE LA BIBLIOTECA:
+${dossier}
+
+RESPONDE ESTRICTAMENTE EN FORMATO JSON VÁLIDO con la siguiente estructura (sin rodeos, sin comentarios fuera del JSON):
+{
+  "conexiones": [
+    {
+      "id": "ID_DEL_DOCUMENTO",
+      "etiquetasCruzadas": ["termino_puente_1", "termino_puente_2", "termino_puente_3"]
+    }
+  ],
+  "mapaMarkdown": "# 🗺️ Red Semántica y Mapa de Relaciones de la Biblioteca\\n\\n### 🔗 Vínculos Geográficos y Facciones Compartidas\\n- ...\\n\\n### 📜 Vínculos de Trasfondo, Personajes y Magia\\n- ...\\n\\n### 🎲 Vínculos Mecánicos, Biomas y Peligros\\n- ..."
+}`;
+
+  const response = await generateContentWithFailover({
+    primaryModel: modelo,
+    contents: prompt,
+    config
+  });
+
+  const rawText = (response.text || '').trim();
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('No se pudo interpretar la respuesta de relaciones en formato JSON.');
+  }
+
+  let parsed: {
+    conexiones?: { id: string; etiquetasCruzadas?: string[] }[];
+    mapaMarkdown?: string;
+  };
+
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    throw new Error('Error al parsear el mapa de relaciones JSON devuelto por el modelo.');
+  }
+
+  const mapaMarkdown = parsed.mapaMarkdown || '# 🗺️ Red Semántica de la Biblioteca\n\nNo se generó descripción detallada.';
+  const conexiones = parsed.conexiones || [];
+
+  let totalConexiones = 0;
+  const archivosActualizados: ResultadoRelacionBiblioteca['archivosActualizados'] = [];
+
+  for (const c of conexiones) {
+    const file = candidatos.find(f => f.id === c.id || f.name === c.id);
+    if (!file) continue;
+
+    const existentes = (file.etiquetasBusqueda || '')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+    const existentesNorm = new Set(existentes.map(t => t.toLowerCase()));
+
+    const anadidas: string[] = [];
+    for (const tag of c.etiquetasCruzadas || []) {
+      const limpio = String(tag)
+        .replace(/^[\s\d\-•*`'"]+|[\s.`'"]+$/g, '')
+        .trim();
+      if (limpio.length >= 2 && limpio.length <= 60) {
+        const norm = limpio.toLowerCase();
+        if (!existentesNorm.has(norm)) {
+          existentesNorm.add(norm);
+          existentes.push(limpio);
+          anadidas.push(limpio);
+          totalConexiones++;
+        }
+      }
+    }
+
+    archivosActualizados.push({
+      id: file.id,
+      name: file.name,
+      etiquetasAnadidas: anadidas,
+      nuevasEtiquetas: existentes.join(', ')
+    });
+  }
+
+  return {
+    archivosActualizados,
+    mapaMarkdown,
+    totalConexiones
+  };
+}
+
 
