@@ -228,6 +228,23 @@ export function horaLegible(minuto: number): string {
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
+/**
+ * La misma hora en formato de doce, con AM y PM.
+ *
+ * El reloj de veinticuatro es el que se guarda y el que manda en los cálculos.
+ * Este es solo para enseñar: «09:30 AM» se lee de un vistazo y no hay que
+ * traducirlo, mientras que un rótulo como «por la mañana» ocupa una línea
+ * entera para decir lo que el AM ya dice en dos letras.
+ */
+export function horaLegible12(minuto: number): string {
+  const m = Math.max(0, Math.round(minuto || 0)) % MINUTOS_POR_DIA;
+  const h24 = Math.floor(m / 60);
+  const min = m % 60;
+  const sufijo = h24 < 12 ? 'AM' : 'PM';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(min).padStart(2, '0')} ${sufijo}`;
+}
+
 /** «3 de Siembra de 1492» o «Fuego Alto de 1492» si cae en festival. */
 export function fechaLegible(cal: CalendarConfig, fecha: CampaignDate): string {
   const slots = yearLayout(cal);
@@ -247,10 +264,10 @@ export function fechaCompleta(cal: CalendarConfig, fecha: CampaignDate): string 
 export function fechaCompacta(cal: CalendarConfig, fecha: CampaignDate): string {
   const slots = yearLayout(cal);
   const slot = slots[Math.min(Math.max(0, fecha.dayOfYear - 1), slots.length - 1)];
-  if (!slot) return `${horaLegible(fecha.minute)}`;
+  if (!slot) return `${horaLegible12(fecha.minute)}`;
   const dia =
     slot.kind === 'festival' ? slot.festivalName : `${slot.day} ${cal.months[slot.monthIndex]?.name || ''}`;
-  return `${dia} · ${horaLegible(fecha.minute)}`;
+  return `${dia} · ${horaLegible12(fecha.minute)}`;
 }
 
 /** «faltan 3 días», «hoy», «venció hace 2 días». */
@@ -902,7 +919,7 @@ const CLIMAS: [RegExp, string][] = [
 const MARCOS: [RegExp, string, string][] = [
   [/mazmorra|cripta|cueva|caverna|sima|subterrán|catacumb|tumba|mina|sótano|antípoda|infraoscur|underdark|túnel/i, '🕳️', 'subterráneo'],
   [/barco|nav[ií]o|nave|cubierta|sentina|bodega del|camarote|bergant|galera|carabela|fragata|alta mar|a bordo|proa|popa|jarcia/i, '⚓', 'travesía naval'],
-  [/ciudad|villa|pueblo|aldea|puerto|muelle|barrio|distrito|mercado|plaza|taberna|posada|calle|gremio|lonja/i, '🏙️', 'urbano'],
+  [/ciudad|villa|pueblo|aldea|puerto|muelle|barrio|distrito|mercado|plaza|taberna|posada|calle|gremio|lonja/i, '🏘️', 'urbano'],
   [/castillo|fortaleza|torre|templo|santuario|mansión|palacio|salón|biblioteca|academia|sala|cámara|capilla/i, '🕯️', 'interior'],
   [/camino|ruta|sendero|bosque|selva|desierto|montaña|colina|llanura|pantano|ciénaga|páramo|estepa|valle|río|vado|campamento|yerm/i, '🏕️', 'travesía terrestre']
 ];
@@ -924,16 +941,27 @@ export function iconoDeClima(clima?: string): string {
   return (CLIMAS.find(([re]) => re.test(clima)) || [, '🌤️'])[1] as string;
 }
 
+/**
+ * Cuatro momentos del día, no siete.
+ *
+ * Había siete iconos y era ruido: entre «🌤️ media mañana» y «☀️ mediodía» no
+ * hay una diferencia que alguien necesite ver de un vistazo, y con la hora
+ * escrita al lado en números la mitad sobraban. Cuatro se distinguen sin
+ * pensar —es de noche, amanece, es de día, atardece— y es lo que cambia algo
+ * en una escena.
+ *
+ * El juego es coherente entre sí a propósito: los cuatro son siluetas de
+ * ciudad con distinta luz, así que se leen como una serie y no como cuatro
+ * dibujos sueltos.
+ */
 export function iconoDeFranja(minuto?: number): string {
   if (minuto === undefined) return '';
   const hora = Math.floor(minuto / 60);
-  if (hora < 5) return '🌑';
-  if (hora < 7) return '🌅';
-  if (hora < 12) return '🌤️';
-  if (hora < 14) return '☀️';
-  if (hora < 19) return '🌇';
-  if (hora < 21) return '🌆';
-  return '🌙';
+  if (hora < 6) return '🌃';
+  if (hora < 9) return '🌆';
+  if (hora < 19) return '🏙️';
+  if (hora < 22) return '🌇';
+  return '🌃';
 }
 
 const HITOS: [RegExp, string][] = [

@@ -22,9 +22,8 @@ import {
   iconoDeClima,
   iconoDeFranja,
   marcoDeLugar,
-  franjaDelDia,
   estacionDelDia,
-  horaLegible
+  horaLegible12
 } from '../utils/campaignCalendar';
 import {
   PROBABILIDADES,
@@ -1215,7 +1214,7 @@ export const ChatView: React.FC<{
                     {emoji}
                   </span>
                   <span className="hidden sm:inline">{fechaCompacta(project.calendar!, project.currentDate)}</span>
-                  <span className="sm:hidden">{horaLegible(project.currentDate.minute)}</span>
+                  <span className="sm:hidden">{horaLegible12(project.currentDate.minute)}</span>
                 </span>
               </>
             );
@@ -1541,11 +1540,17 @@ export const ChatView: React.FC<{
                                 })()}
                               </span>
                               <span className="font-mono text-base font-bold text-[var(--accent)] tabular-nums">
-                                {horaLegible(fecha!.minute)}
+                                {horaLegible12(fecha!.minute)}
                               </span>
                             </div>
-                            <div className="text-[11px] text-[var(--text-secondary)] text-right -mt-1.5">
-                              {franjaDelDia(fecha!.minute)}
+                            {/*
+                              El momento del día, en emoji y no en texto.
+                              «Por la mañana» ocupaba una línea entera para
+                              decir lo que el AM ya dice en dos letras. El
+                              icono sí aporta: se lee sin leer.
+                            */}
+                            <div className="text-base text-right -mt-1.5 leading-none">
+                              {iconoDeFranja(fecha!.minute)}
                             </div>
                             <div className="border-t border-[var(--glass-border)] pt-2 flex items-baseline justify-between gap-2">
                               <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">Día</span>
