@@ -48,6 +48,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Search,
   RefreshCw,
   Save,
   Scissors,
@@ -73,6 +74,7 @@ interface ChatMessageItemProps {
   isLastMessage: boolean;
   isGenerating: boolean;
   hasOracle: boolean;
+  isSearchHit: boolean;
   copiedIndex: number | null;
   handleCopyMessage: (idx: number, content: string) => void;
   handleStartEditing: (idx: number, content: string) => void;
@@ -102,6 +104,7 @@ const areChatMessageItemPropsEqual = (
   if (prev.isLastMessage !== next.isLastMessage) return false;
   if (prev.isGenerating !== next.isGenerating) return false;
   if (prev.hasOracle !== next.hasOracle) return false;
+  if (prev.isSearchHit !== next.isSearchHit) return false;
   if (prev.copiedIndex !== next.copiedIndex) return false;
   if (prev.project?.manualDmRolls !== next.project?.manualDmRolls) return false;
   return true;
@@ -116,6 +119,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   isLastMessage,
   isGenerating,
   hasOracle,
+  isSearchHit,
   copiedIndex,
   handleCopyMessage,
   handleStartEditing,
@@ -192,7 +196,11 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
       id={`msg-${idx}`}
       className={`flex flex-col group/msg ${
         m.role === 'user' ? 'items-end' : 'items-start'
-      } animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out relative`}
+      } animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out relative ${
+        isSearchHit
+          ? 'ring-2 ring-[var(--light-gold)] ring-offset-4 ring-offset-[var(--bg-color)] rounded-lg'
+          : ''
+      }`}
     >
       {/*
         Ni «Narrador» ni «Tu Acción»: la prosa a todo el ancho y la burbuja
@@ -550,6 +558,8 @@ interface ChatMessagesListProps {
   setEditDraft: (v: string) => void;
   isGenerating: boolean;
   hasOracle: boolean;
+  hits: number[];
+  activeHit: number;
   copiedIndex: number | null;
   acciones: {
     handleCopyMessage: (idx: number, content: string) => void;
@@ -575,6 +585,8 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
   setEditDraft,
   isGenerating,
   hasOracle,
+  hits,
+  activeHit,
   copiedIndex,
   acciones,
   setDeleteModal,
@@ -588,6 +600,7 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
       {messages.map((m, idx) => {
         const isEditing = editingIndex === idx;
         const isLastMessage = idx === messages.length - 1;
+        const isSearchHit = hits.length > 0 && hits[activeHit] === idx;
 
         return (
           <ChatMessageItem
@@ -600,6 +613,7 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
             isLastMessage={isLastMessage}
             isGenerating={isGenerating}
             hasOracle={hasOracle}
+            isSearchHit={isSearchHit}
             copiedIndex={copiedIndex === idx ? idx : null}
             handleCopyMessage={acciones.handleCopyMessage}
             handleStartEditing={acciones.handleStartEditing}
@@ -786,6 +800,44 @@ export const ChatView: React.FC<{
   // Ventana rápida de emojis temáticos
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+
+  /*
+   * El buscador del capítulo, ahora dentro del menú «+».
+   *
+   * Vivía en la barra superior y allí no se usaba: ese es el sitio más escaso
+   * de la aplicación y competía con el selector de Narrador, la hora y el
+   * clima. Aquí abajo, en el menú de entrada, está al lado de adjuntar y
+   * dictar —cosas que se hacen escribiendo, no leyendo— y no le quita hueco a
+   * nada. La caja de búsqueda sigue apareciendo arriba cuando se abre, que es
+   * donde tiene que estar para no tapar el texto que se busca.
+   */
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [chronicleQuery, setChronicleQuery] = useState('');
+  const [activeHit, setActiveHit] = useState(0);
+
+  const normalise = (v: string) =>
+    v
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+  const hits = React.useMemo(() => {
+    const q = normalise(chronicleQuery.trim());
+    if (q.length < 2 || !chat?.messages) return [] as number[];
+    return chat.messages.map((m, i) => (normalise(m.content || '').includes(q) ? i : -1)).filter(i => i >= 0);
+  }, [chronicleQuery, chat?.messages]);
+
+  React.useEffect(() => {
+    setActiveHit(0);
+  }, [chronicleQuery]);
+
+  const goToHit = (next: number) => {
+    if (!hits.length) return;
+    const idx = (next + hits.length) % hits.length;
+    setActiveHit(idx);
+    const el = document.getElementById(`msg-${hits[idx]}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   const actionsMenuRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1186,14 +1238,6 @@ export const ChatView: React.FC<{
         {/* Acciones de la Crónica alineadas a la derecha */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Buscador dentro del capítulo */}
-          {/*
-            El buscador del capítulo se ha quitado por no usarse.
-            La barra superior es el sitio más escaso de la aplicación —en un
-            móvil compiten ahí el selector de Narrador, la hora, el clima y tres
-            herramientas— y un botón que nadie toca ocupa el hueco de uno que
-            sí. La búsqueda sigue existiendo donde de verdad se busca: en el
-            registro, en la memoria y en los archivos.
-          */}
           {/* Leer en novela vive con las demás herramientas de mirar el capítulo. */}
           {onOpenNovelReader && (
             <button
@@ -1271,6 +1315,8 @@ export const ChatView: React.FC<{
                 setEditDraft={setEditDraft}
                 isGenerating={isGenerating}
                 hasOracle={Boolean(hasOracle)}
+                hits={hits}
+                activeHit={activeHit}
                 copiedIndex={copiedIndex}
                 acciones={acciones}
                 setDeleteModal={setDeleteModal}
@@ -1340,6 +1386,64 @@ export const ChatView: React.FC<{
           frase es mejor que dejar solo el icono: son dos acciones que no se
           usan a cada turno y un icono suelto no se reconoce sin probarlo.
         */}
+        {/*
+          LA CAJA DE BÚSQUEDA, ENCIMA DEL COMPOSITOR Y NO EN LA CABECERA.
+          Se abre desde el menú «+», pero aparece aquí: buscando se mira la
+          conversación, así que la caja tiene que estar en un borde y no en
+          medio. Abajo además cae cerca del pulgar, que es desde donde se
+          escribe y se navega entre resultados.
+        */}
+        {isSearchOpen && (
+          <div className="max-w-[900px] mx-auto mb-2 flex items-center gap-1.5 bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg px-2 py-1.5 shadow-2xs">
+            <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
+            <input
+              autoFocus
+              value={chronicleQuery}
+              onChange={e => setChronicleQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') goToHit(e.shiftKey ? activeHit - 1 : activeHit + 1);
+                if (e.key === 'Escape') {
+                  setIsSearchOpen(false);
+                  setChronicleQuery('');
+                }
+              }}
+              placeholder="Buscar en este capítulo..."
+              className="bg-transparent outline-none text-xs font-lora flex-1 min-w-0"
+            />
+            {chronicleQuery.trim().length > 1 && (
+              <span className="text-[11px] text-[var(--text-secondary)] tabular-nums shrink-0">
+                {hits.length ? `${activeHit + 1}/${hits.length}` : '0'}
+              </span>
+            )}
+            <button
+              onClick={() => goToHit(activeHit - 1)}
+              disabled={!hits.length}
+              className="px-1.5 min-h-[28px] text-[var(--text-secondary)] hover:text-[var(--accent)] disabled:opacity-30 cursor-pointer"
+              title="Anterior"
+            >
+              ↑
+            </button>
+            <button
+              onClick={() => goToHit(activeHit + 1)}
+              disabled={!hits.length}
+              className="px-1.5 min-h-[28px] text-[var(--text-secondary)] hover:text-[var(--accent)] disabled:opacity-30 cursor-pointer"
+              title="Siguiente"
+            >
+              ↓
+            </button>
+            <button
+              onClick={() => {
+                setIsSearchOpen(false);
+                setChronicleQuery('');
+              }}
+              className="px-1.5 min-h-[28px] text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+              title="Cerrar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {chat?.messages && chat.messages.length > 0 && !isGenerating && (
           <div className="max-w-[900px] mx-auto mb-2 flex justify-between items-center gap-2">
             {/*
@@ -1852,6 +1956,28 @@ export const ChatView: React.FC<{
                   </div>
 
                   <div className="flex flex-col gap-0.5">
+                    {/* Opción 0: Buscar en el capítulo */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        setIsSearchOpen(true);
+                      }}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <Search className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                          Buscar en el capítulo
+                        </div>
+                        <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                          Qué se dijo y quién lo dijo
+                        </div>
+                      </div>
+                    </button>
+
                     {/* Opción 1: Adjuntar Archivo */}
                     <button
                       type="button"
