@@ -153,7 +153,7 @@ export function construirDocumentoMarkdownDeCapitulo(
 
   const pcName = meta.pcName;
 
-  let doc = `# 📜 Crónica Archivada: ${chat.name}\n\n`;
+  let doc = `<!-- chapter_id: ${chat.id} -->\n# 📜 Crónica Archivada: ${chat.name}\n\n`;
   doc += `> **Tomo / Campaña:** ${project.name}\n`;
   doc += `> **Protagonista:** ${pcName}\n`;
   if (meta.fechasDetectadas.length > 0) {
@@ -233,6 +233,12 @@ export function convertirChatAArchivoDeConsulta(
  * Encuentra si un capítulo ya ha sido archivado previamente en la lista de archivos
  */
 export function buscarArchivoDeCapitulo(files: ProjectFile[], chatId: string): ProjectFile | undefined {
+  if (!files || !chatId) return undefined;
   const fileId = `file_archive_cap_${chatId}`;
-  return files.find(f => f.id === fileId || f.name.includes(`Crónica — `) && f.content.includes(`file_archive_cap_${chatId}`));
+  return files.find(
+    f =>
+      f.id === fileId ||
+      (f.content && f.content.includes(`chapter_id: ${chatId}`)) ||
+      (f.name.includes('Crónica — ') && f.content && f.content.includes(fileId))
+  );
 }
