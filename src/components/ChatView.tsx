@@ -19,6 +19,7 @@ import {
   fechaCompacta,
   fechaCompleta,
   fechaLegible,
+  iconoDeClima,
   franjaDelDia,
   estacionDelDia,
   horaLegible
@@ -51,7 +52,6 @@ import {
   Save,
   Scissors,
   Scroll,
-  Search,
   Send,
   Smile,
   Square,
@@ -73,7 +73,6 @@ interface ChatMessageItemProps {
   isLastMessage: boolean;
   isGenerating: boolean;
   hasOracle: boolean;
-  isSearchHit: boolean;
   copiedIndex: number | null;
   handleCopyMessage: (idx: number, content: string) => void;
   handleStartEditing: (idx: number, content: string) => void;
@@ -103,7 +102,6 @@ const areChatMessageItemPropsEqual = (
   if (prev.isLastMessage !== next.isLastMessage) return false;
   if (prev.isGenerating !== next.isGenerating) return false;
   if (prev.hasOracle !== next.hasOracle) return false;
-  if (prev.isSearchHit !== next.isSearchHit) return false;
   if (prev.copiedIndex !== next.copiedIndex) return false;
   if (prev.project?.manualDmRolls !== next.project?.manualDmRolls) return false;
   return true;
@@ -118,7 +116,6 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   isLastMessage,
   isGenerating,
   hasOracle,
-  isSearchHit,
   copiedIndex,
   handleCopyMessage,
   handleStartEditing,
@@ -195,11 +192,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
       id={`msg-${idx}`}
       className={`flex flex-col group/msg ${
         m.role === 'user' ? 'items-end' : 'items-start'
-      } animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out relative ${
-        isSearchHit
-          ? 'ring-2 ring-[var(--light-gold)] ring-offset-4 ring-offset-[var(--bg-color)] rounded-lg'
-          : ''
-      }`}
+      } animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out relative`}
     >
       {/*
         Ni «Narrador» ni «Tu Acción»: la prosa a todo el ancho y la burbuja
@@ -557,8 +550,6 @@ interface ChatMessagesListProps {
   setEditDraft: (v: string) => void;
   isGenerating: boolean;
   hasOracle: boolean;
-  hits: number[];
-  activeHit: number;
   copiedIndex: number | null;
   acciones: {
     handleCopyMessage: (idx: number, content: string) => void;
@@ -584,8 +575,6 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
   setEditDraft,
   isGenerating,
   hasOracle,
-  hits,
-  activeHit,
   copiedIndex,
   acciones,
   setDeleteModal,
@@ -599,7 +588,6 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
       {messages.map((m, idx) => {
         const isEditing = editingIndex === idx;
         const isLastMessage = idx === messages.length - 1;
-        const isSearchHit = hits.length > 0 && hits[activeHit] === idx;
 
         return (
           <ChatMessageItem
@@ -612,7 +600,6 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
             isLastMessage={isLastMessage}
             isGenerating={isGenerating}
             hasOracle={hasOracle}
-            isSearchHit={isSearchHit}
             copiedIndex={copiedIndex === idx ? idx : null}
             handleCopyMessage={acciones.handleCopyMessage}
             handleStartEditing={acciones.handleStartEditing}
@@ -736,33 +723,6 @@ export const ChatView: React.FC<{
 
   // Buscador dentro del capítulo: a partir de cierto punto es imposible encontrar
   // qué dijo un PNJ sin recorrer cientos de mensajes a mano.
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [chronicleQuery, setChronicleQuery] = useState('');
-  const [activeHit, setActiveHit] = useState(0);
-
-  const normalise = (v: string) =>
-    v
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-
-  const hits = React.useMemo(() => {
-    const q = normalise(chronicleQuery.trim());
-    if (q.length < 2 || !chat?.messages) return [] as number[];
-    return chat.messages.map((m, i) => (normalise(m.content || '').includes(q) ? i : -1)).filter(i => i >= 0);
-  }, [chronicleQuery, chat?.messages]);
-
-  React.useEffect(() => {
-    setActiveHit(0);
-  }, [chronicleQuery]);
-
-  const goToHit = (next: number) => {
-    if (!hits.length) return;
-    const idx = (next + hits.length) % hits.length;
-    setActiveHit(idx);
-    const el = document.getElementById(`msg-${hits[idx]}`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
   const [editDraft, setEditDraft] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [deleteModal, setDeleteModal] = useState<{
@@ -1188,6 +1148,26 @@ export const ChatView: React.FC<{
                   <Icono className="w-3.5 h-3.5 opacity-80" />
                   <span className="hidden sm:inline">{fechaCompacta(project.calendar!, project.currentDate)}</span>
                   <span className="sm:hidden">{horaLegible(project.currentDate.minute)}</span>
+                  {/*
+                    El tiempo que hace, al lado de la hora.
+                    Cabe de sobra —es un emoji— y las dos cosas se miran a la
+                    vez: saber que son las nueve y media no sirve de mucho sin
+                    saber si se sale a un temporal. Sale del diario, de la
+                    última entrada que traiga clima, y si no hay ninguna no se
+                    pinta nada en vez de dejar un hueco.
+                  */}
+                  {(() => {
+                    const conClima = [...(project.timeline || [])]
+                      .sort((a, b) => (a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay))
+                      .filter(e => e.clima);
+                    const ultimo = conClima[conClima.length - 1];
+                    if (!ultimo?.clima) return null;
+                    return (
+                      <span className="text-[13px] leading-none" title={`Tiempo: ${ultimo.clima}`}>
+                        {iconoDeClima(ultimo.clima)}
+                      </span>
+                    );
+                  })()}
                 </span>
               </>
             );
@@ -1206,66 +1186,14 @@ export const ChatView: React.FC<{
         {/* Acciones de la Crónica alineadas a la derecha */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Buscador dentro del capítulo */}
-          {isSearchOpen ? (
-            <div className="flex items-center gap-1.5 bg-[var(--bg-color)] border border-[var(--user-border)] rounded-lg px-2 py-1 shadow-2xs">
-              <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
-              <input
-                autoFocus
-                value={chronicleQuery}
-                onChange={e => setChronicleQuery(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') goToHit(e.shiftKey ? activeHit - 1 : activeHit + 1);
-                  if (e.key === 'Escape') {
-                    setIsSearchOpen(false);
-                    setChronicleQuery('');
-                  }
-                }}
-                placeholder="Buscar..."
-                className="bg-transparent outline-none text-xs font-lora w-24 sm:w-44 md:w-56"
-              />
-              {chronicleQuery.trim().length > 1 && (
-                <span className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] tabular-nums shrink-0">
-                  {hits.length ? `${activeHit + 1}/${hits.length}` : '0'}
-                </span>
-              )}
-              <button
-                onClick={() => goToHit(activeHit - 1)}
-                disabled={!hits.length}
-                className="px-1 text-[var(--text-secondary)] hover:text-[var(--accent)] disabled:opacity-30 cursor-pointer"
-                title="Anterior"
-              >
-                ↑
-              </button>
-              <button
-                onClick={() => goToHit(activeHit + 1)}
-                disabled={!hits.length}
-                className="px-1 text-[var(--text-secondary)] hover:text-[var(--accent)] disabled:opacity-30 cursor-pointer"
-                title="Siguiente"
-              >
-                ↓
-              </button>
-              <button
-                onClick={() => {
-                  setIsSearchOpen(false);
-                  setChronicleQuery('');
-                }}
-                className="px-1 text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
-                title="Cerrar"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[var(--glass)] px-2 sm:px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
-              title="Buscar dentro de este capítulo"
-              aria-label="Buscar"
-            >
-              <Search className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Buscar</span>
-            </button>
-          )}
-
+          {/*
+            El buscador del capítulo se ha quitado por no usarse.
+            La barra superior es el sitio más escaso de la aplicación —en un
+            móvil compiten ahí el selector de Narrador, la hora, el clima y tres
+            herramientas— y un botón que nadie toca ocupa el hueco de uno que
+            sí. La búsqueda sigue existiendo donde de verdad se busca: en el
+            registro, en la memoria y en los archivos.
+          */}
           {/* Leer en novela vive con las demás herramientas de mirar el capítulo. */}
           {onOpenNovelReader && (
             <button
@@ -1343,8 +1271,6 @@ export const ChatView: React.FC<{
                 setEditDraft={setEditDraft}
                 isGenerating={isGenerating}
                 hasOracle={Boolean(hasOracle)}
-                hits={hits}
-                activeHit={activeHit}
                 copiedIndex={copiedIndex}
                 acciones={acciones}
                 setDeleteModal={setDeleteModal}
