@@ -656,27 +656,6 @@ export default function App() {
   const currentProject = projects.find(p => p.id === currentPId);
   const currentChat = currentChats.find(c => c.id === currentChatId);
 
-  // Auto-iniciar la primera carga del Capítulo I si está vacío
-  useEffect(() => {
-    if (
-      !isGenerating &&
-      currentPId &&
-      currentChats.length > 0 &&
-      currentChatId === currentChats[0].id &&
-      currentChat &&
-      (!currentChat.messages || currentChat.messages.length === 0)
-    ) {
-      const timer = setTimeout(() => {
-        if (!isGenerating && currentChat && currentChat.messages.length === 0) {
-          void handleSendMessage(
-            "Inicia el Capítulo I de esta campaña basándote en los documentos e identidad cargados. Establece el HUD inicial, declara el [VIAJE: destino | jornadas: N] correspondiente según la distancia real en la Costa de la Espada, y narra la primera escena de la travesía o punto de partida con detalle sensorial y un PNJ hablando."
-          );
-        }
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [currentPId, currentChatId, currentChats, currentChat?.messages?.length, isGenerating]);
-
   // Sync selectedMapFile with live data
   useEffect(() => {
     if (selectedMapFile) {
