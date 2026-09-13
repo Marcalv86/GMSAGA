@@ -103,6 +103,7 @@ import {
   getStoredApiKeys,
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
+  estudiarContextoInicialDeCampana,
   tramarLaCampana,
   leerElTableroDeDocumentos,
   extraerIdentidadDeDocumentos,
@@ -141,6 +142,7 @@ import {
   extraerMinutoDeTexto,
   fechaLegible,
   iconoDeHito,
+  marcoDeLugar,
   obtenerInfoRelacion,
   parsearFechaTexto
 } from './utils/campaignCalendar';
@@ -766,6 +768,10 @@ export default function App() {
 
       const porElReloj = t.minutos > 0 ? avanzar(cal, fecha, { minutos: t.minutos }) : fecha;
 
+      const esArranque =
+        !(p.timeline || []).some(e => e.autoria === 'narrador' && e.absDay) ||
+        (p.timeline || []).length <= 1;
+
       /*
        * LA FECHA DEL CHAT MANDA SOBRE LA DEL CALENDARIO.
        *
@@ -776,20 +782,35 @@ export default function App() {
        * calendario. Se adelanta hasta ahí y así el chat y el calendario dicen
        * el mismo día.
        *
-       * Solo hacia delante y solo si el salto es plausible: una fecha absurda
-       * no arrastra la campaña a ninguna parte, y retroceder rompería todo lo
-       * ya anotado.
+       * En el arranque de campaña o primera escena narrada, la fecha del HUD
+       * se adopta directamente para sincronizar el calendario al día exacto
+       * de la ficción, sin exigir que sea posterior a la fecha inicial por defecto.
        */
       const nuevaFecha = (() => {
         if (!t.fechaHud) return porElReloj;
+        const minutoHud = extraerMinutoDeTexto(t.momentoHud);
+
+        if (esArranque) {
+          const leidaArranque = parsearFechaTexto(cal, t.fechaHud, porElReloj.year);
+          if (leidaArranque) {
+            return {
+              year: leidaArranque.year || porElReloj.year,
+              dayOfYear: leidaArranque.dayOfYear,
+              minute: minutoHud ?? porElReloj.minute ?? 540
+            };
+          }
+        }
+
         const absReloj = aDiaAbsoluto(cal, porElReloj);
         for (const ano of [porElReloj.year, porElReloj.year + 1]) {
           const leida = parsearFechaTexto(cal, t.fechaHud, ano);
           if (!leida) continue;
           const absHud = aDiaAbsoluto(cal, { ...leida, year: ano });
-          if (absHud > absReloj && absHud - absReloj <= 90) {
-            const minutoHud = extraerMinutoDeTexto(t.momentoHud);
+          if (absHud >= absReloj && absHud - absReloj <= 90) {
             return { year: ano, dayOfYear: leida.dayOfYear, minute: minutoHud ?? porElReloj.minute };
+          }
+          if (leida.year && leida.year !== porElReloj.year && Math.abs(leida.year - porElReloj.year) <= 20) {
+            return { year: leida.year, dayOfYear: leida.dayOfYear, minute: minutoHud ?? porElReloj.minute };
           }
         }
         return porElReloj;
@@ -836,9 +857,28 @@ export default function App() {
                 !(e.chatId === (currentChatId || undefined) && e.msgIndex === anclaDeEsteMensaje)
             );
 
+      const entradasAgendaEfectivas =
+        t.agenda.length > 0
+          ? t.agenda
+          : (t.lugarHud || t.fechaHud)
+          ? [
+              {
+                titulo: t.lugarHud || (esArranque ? 'Arranque de la campaña' : 'Escena'),
+                resumen: `Escena en ${t.lugarHud || 'el entorno de la partida'}.${t.momentoHud ? ` Momento: ${t.momentoHud}.` : ''}${t.climaHud ? ` Clima: ${t.climaHud}.` : ''}`,
+                lugar: t.lugarHud,
+                clima: t.climaHud,
+                hito: esArranque ? 'Inicio de la aventura' : undefined,
+                mood: esArranque ? '⚔️' : '📖',
+                tipo: 'hito' as const,
+                minute: extraerMinutoDeTexto(t.momentoHud) ?? nuevaFecha.minute,
+                diaOffset: 0 as number | undefined
+              }
+            ]
+          : [];
+
       const timelineCompleto = [
         ...timelinePrevioSinEsteMensaje,
-        ...t.agenda.map((entrada, i) => {
+        ...entradasAgendaEfectivas.map((entrada, i) => {
           const entryAbsDay =
             entrada.diaOffset !== undefined
               ? Math.max(hoyAbs, Math.min(nuevoAbs, hoyAbs + entrada.diaOffset))
@@ -1300,10 +1340,28 @@ export default function App() {
     }
 
     // Detección automática en segundo plano: si las jornadas transcurridas alcanzan o superan el total del viaje, el trayecto se completa automáticamente en segundo plano.
-    if (viajeEnCurso && Number.isFinite(viajeEnCurso.iniciadoAbs)) {
+    if (viajeEnCurso && Number.isFinite(viajeEnCurso.iniciadoAbs) && diaActual > 0 && viajeEnCurso.iniciadoAbs > 0) {
       const diasHechos = Math.max(0, diaActual - viajeEnCurso.iniciadoAbs);
       if (diasHechos >= viajeEnCurso.jornadas) {
         viajeEnCurso = undefined;
+      }
+    }
+
+    // Detección heurística de viaje a partir del marco/lugar de la escena si aún no hay ningún trayecto activo:
+    if (!viajeEnCurso && t.lugarHud) {
+      const marco = marcoDeLugar(t.lugarHud);
+      if (marco?.nombre.includes('travesía') || marco?.nombre === 'subterráneo' || marco?.nombre.includes('ruinas')) {
+        const matchDestino = t.lugarHud.match(/(?:hacia|rumbo a|destino|aproximaci[oó]n a|viaje a)\s+([^·—,\n]+)/i);
+        if (matchDestino) {
+          const dest = matchDestino[1].trim();
+          if (dest.length >= 3 && !/^(el|la|los|las|un|una|este|esta|alta mar)$/i.test(dest)) {
+            viajeEnCurso = {
+              destino: dest,
+              jornadas: 8,
+              iniciadoAbs: diaActual > 0 ? diaActual : 1
+            };
+          }
+        }
       }
     }
 
@@ -2202,11 +2260,43 @@ export default function App() {
         const sinTrama = !currentProject.memory?.plan_de_campana?.premisa;
         const hayConQueTramar =
           currentFiles.some(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200) ||
-          effectiveChats.some(c => (c.messages || []).length >= 2);
+          effectiveChats.some(c => (c.messages || []).length >= 1);
 
         if (needsInitialSync || needsDailySync) {
           setTimeout(async () => {
             try {
+              // 1. Estudio ágil de documentos, contexto y arranque de campaña:
+              const estudio = await estudiarContextoInicialDeCampana({
+                project: currentProject,
+                files: currentFiles,
+                chats: effectiveChats
+              });
+
+              if (estudio) {
+                await handleUpdateProjectField(p => {
+                  const updates: Partial<Project> = {};
+                  if (estudio.calendario && (!p.calendar || !calendarioValido(p.calendar))) {
+                    updates.calendar = estudio.calendario;
+                  }
+                  if (estudio.fechaInicial && (!p.currentDate || !Number.isFinite(p.currentDate.year))) {
+                    updates.currentDate = estudio.fechaInicial;
+                  }
+                  const memActual = p.memory || {};
+                  const memUpdates: Partial<typeof memActual> = {};
+                  if (estudio.viajeInicial && !memActual.viaje) {
+                    memUpdates.viaje = estudio.viajeInicial;
+                  }
+                  if (estudio.lugarInicial && !memActual.current_status) {
+                    memUpdates.current_status = estudio.lugarInicial;
+                  }
+                  if (Object.keys(memUpdates).length > 0) {
+                    updates.memory = { ...memActual, ...memUpdates };
+                  }
+                  return updates;
+                });
+              }
+
+              // 2. Síntesis narrativa de memoria general
               const newRawMem = await generateClaudeProjectMemory({
                 project: currentProject,
                 chats: effectiveChats,
@@ -2224,7 +2314,7 @@ export default function App() {
             } catch (err) {
               console.warn('Auto-background memory synthesis skipped:', err);
             }
-          }, 3000);
+          }, 1500);
         }
 
         /*

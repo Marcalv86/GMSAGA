@@ -453,6 +453,8 @@ export interface FechaDeHud {
   momento?: string;
   /** El lugar, que viene en la misma línea y sirve para rellenar la entrada. */
   lugar?: string;
+  /** El clima o luz extraído de la cabecera (🌤). */
+  clima?: string;
 }
 
 /**
@@ -475,6 +477,11 @@ export function leerFechaDeHud(texto?: string): FechaDeHud | null {
   // una fecha mencionada de pasada dentro de la prosa.
   const cabecera = texto.slice(0, 1200);
 
+  const lineaClima = cabecera.match(/^[ \t>*]*🌤[ \t]*([^\n\r]+)/m);
+  const climaLimpio = lineaClima
+    ? lineaClima[1].split(/👥/)[0].trim().replace(/^[*_\s]+|[*_\s]+$/g, '')
+    : undefined;
+
   const partirFechaYMomento = (v: string): { fechaTexto?: string; momento?: string } => {
     const trozos = v
       .split(/,|·|\|/)
@@ -489,13 +496,13 @@ export function leerFechaDeHud(texto?: string): FechaDeHud | null {
   if (linea) {
     const [ubicacion, ...resto] = linea[1].split(/—|--|–/);
     const tiempo = resto.join('—').trim();
-    const lugar = (ubicacion || '')
-      .split(/·|\s+-\s+/)[0]
-      ?.trim()
-      .replace(/^[*_\s]+|[*_\s]+$/g, '');
+    const lugarLimpio = (ubicacion || '').trim().replace(/^[*_\s]+|[*_\s]+$/g, '');
     if (tiempo) {
       const { fechaTexto, momento } = partirFechaYMomento(tiempo);
-      if (fechaTexto) return { fechaTexto, momento, lugar: lugar || undefined };
+      if (fechaTexto) return { fechaTexto, momento, lugar: lugarLimpio || undefined, clima: climaLimpio };
+    }
+    if (lugarLimpio) {
+      return { lugar: lugarLimpio, clima: climaLimpio };
     }
   }
 
@@ -503,17 +510,17 @@ export function leerFechaDeHud(texto?: string): FechaDeHud | null {
   const legacy = cabecera.match(/^[ \t>*]*📅[ \t]*([^\n\r]+)/m);
   if (legacy) {
     const { fechaTexto, momento } = partirFechaYMomento(legacy[1].replace(/⏳/g, '·'));
-    if (fechaTexto) return { fechaTexto, momento };
+    if (fechaTexto) return { fechaTexto, momento, clima: climaLimpio };
   }
 
   // Fecha: ... / Tiempo: ...
   const explicita = cabecera.match(/^[ \t>*]*(?:fecha|tiempo)\s*:\s*([^\n\r]+)/im);
   if (explicita) {
     const { fechaTexto, momento } = partirFechaYMomento(explicita[1]);
-    if (fechaTexto) return { fechaTexto, momento };
+    if (fechaTexto) return { fechaTexto, momento, clima: climaLimpio };
   }
 
-  return null;
+  return climaLimpio ? { clima: climaLimpio } : null;
 }
 
 /**
@@ -931,15 +938,16 @@ const CLIMAS: [RegExp, string][] = [
  * Ahora entra también el mar por su nombre, la navegación y los aparejos.
  */
 const MARCOS: [RegExp, string, string][] = [
-  [/mazmorra|cripta|cueva|caverna|sima|subterrán|catacumb|tumba|mina|sótano|antípoda|infraoscur|underdark|túnel/i, '🕳️', 'subterráneo'],
+  [/mazmorra|cripta|cueva|caverna|sima|subterrán|catacumb|tumba|mina|sótano|antípoda|infraoscur|underdark|túnel|foso|alcantarill/i, '🕳️', 'subterráneo'],
   [
-    /barco|nav[ií]o|nave|cubierta|sentina|bodega del|camarote|bergant|galera|carabela|fragata|goleta|balandro|mar de |mar abierto|alta ?mar|en el mar|oc[eé]ano|navegaci[oó]n|navegando|surcando|singladura|traves[ií]a (?:mar[ií]tima|naval)|a bordo|proa|popa|jarcia|mástil|tim[oó]n|bauprés|obenque|fondeader|escollera|arrecife|marejada|oleaje|abordaje|atracad|amarrad/i,
+    /barco|nav[ií]o|nave|cubierta|sentina|bodega del|camarote|bergant|galera|carabela|fragata|goleta|balandro|mar de |mar abierto|alta ?mar|en mitad del mar|en el mar|oc[eé]ano|navegaci[oó]n|navegando|surcando|singladura|traves[ií]a (?:mar[ií]tima|naval)|a bordo|proa|popa|jarcia|mástil|tim[oó]n|bauprés|obenque|fondeader|escollera|arrecife|marejada|oleaje|abordaje|atracad|amarrad|embarcac/i,
     '⚓',
     'travesía naval'
   ],
+  [/ruinas?|yacimiento|reliquia|necr[oó]polis|antiguo templo|torre[oó]n derruido|fortaleza derruida|bastión derruido|excavaci[oó]n|vestigio/i, '🏛️', 'ruinas / travesía'],
   [/ciudad|villa|pueblo|aldea|puerto|muelle|barrio|distrito|mercado|plaza|taberna|posada|calle|gremio|lonja/i, '🏘️', 'urbano'],
   [/castillo|fortaleza|torre|templo|santuario|mansión|palacio|salón|biblioteca|academia|sala|cámara|capilla/i, '🕯️', 'interior'],
-  [/camino|ruta|sendero|bosque|selva|desierto|montaña|colina|llanura|pantano|ciénaga|páramo|estepa|valle|río|vado|campamento|yerm/i, '🏕️', 'travesía terrestre']
+  [/camino|ruta|sendero|senda|marcha|bosque|selva|desierto|montaña|colina|llanura|pantano|ciénaga|páramo|estepa|valle|río|vado|campamento|yerm|traves[ií]a|expedici[oó]n/i, '🏕️', 'travesía terrestre']
 ];
 
 export interface MarcoDeEscena {
@@ -1756,3 +1764,71 @@ export function leerEstamos(texto: string): string | null {
   }
   return ultimo;
 }
+
+/**
+ * Deduce la fecha inicial de campaña buscando referencias canónicas en documentos y textos de arranque.
+ */
+export function deducirFechaInicialDeTextos(
+  cal: CalendarConfig,
+  textos: string[],
+  anoPorDefecto = 1372
+): CampaignDate | null {
+  for (const t of textos) {
+    if (!t || typeof t !== 'string') continue;
+    // Buscar patrones de fecha típicos de Harptos / Fantasía
+    const lineas = t.split(/\r?\n/).slice(0, 60);
+    for (const linea of lineas) {
+      if (
+        /flamerule|alturiak|ches|tarsakh|mirtul|kythorn|eleasias|eleasis|eleint|marpenoth|uktar|nightal|hammer|martillo|estivalia|pleno invierno|verdeflor|cosecha/i.test(
+          linea
+        )
+      ) {
+        const parsed = parsearFechaTexto(cal, linea, anoPorDefecto);
+        if (parsed && parsed.dayOfYear > 0) {
+          return parsed;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Deduce si los textos de arranque o documentos describen una travesía o viaje en curso.
+ */
+export function deducirViajeInicialDeTextos(
+  textos: string[],
+  diaActual = 1
+): { destino: string; jornadas: number; iniciadoAbs: number } | null {
+  for (const t of textos) {
+    if (!t || typeof t !== 'string') continue;
+    const snippet = t.slice(0, 10000);
+    // Buscar patrones como "de Moonshae a Luskan", "rumbo a Luskan", "viaje a/hacia [Destino]", "travesía a [Destino]"
+    const matchRumbo = snippet.match(
+      /(?:de\s+[^a-z0-9áéíóúñ]+\s+a\s+|rumbo\s+a\s+|traves[ií]a\s+(?:mar[ií]tima\s+|naval\s+|terrestre\s+)?(?:a|hacia)\s+|navegando\s+(?:a|hacia)\s+|viaje\s+(?:a|hacia)\s+|expedici[oó]n\s+(?:a|hacia)\s+)([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/
+    );
+    if (matchRumbo) {
+      const dest = matchRumbo[1].trim();
+      // Buscar si menciona jornadas (ej. "8 a 12 días", "10 jornadas", "8 días")
+      const matchJornadas = snippet.match(/(\d{1,2})\s*(?:a|-)\s*(\d{1,2})\s*(?:d[ií]as|jornadas)/i) ||
+        snippet.match(/(\d{1,2})\s*(?:d[ií]as|jornadas)/i);
+      let jornadas = 8;
+      if (matchJornadas) {
+        if (matchJornadas[2]) {
+          jornadas = Math.round((parseInt(matchJornadas[1], 10) + parseInt(matchJornadas[2], 10)) / 2);
+        } else {
+          jornadas = parseInt(matchJornadas[1], 10);
+        }
+      }
+      if (dest.length >= 3 && !/^(el|la|los|las|un|una|este|esta|aquel|noche|dia)$/i.test(dest)) {
+        return {
+          destino: dest,
+          jornadas: Math.min(400, Math.max(1, jornadas)),
+          iniciadoAbs: diaActual
+        };
+      }
+    }
+  }
+  return null;
+}
+

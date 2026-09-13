@@ -24,7 +24,8 @@ import {
   iconoDeFranjaSubterranea,
   marcoDeLugar,
   estacionDelDia,
-  horaLegible12
+  horaLegible12,
+  leerFechaDeHud
 } from '../utils/campaignCalendar';
 import {
   PROBABILIDADES,
@@ -779,11 +780,47 @@ export const ChatView: React.FC<{
    * que es justo lo que se decide al mirarlo.
    */
   const [tiempoAbierto, setTiempoAbierto] = useState(false);
+  const [destinoViajeInput, setDestinoViajeInput] = useState('');
+  const [jornadasViajeInput, setJornadasViajeInput] = useState(8);
+  const [mostrarCrearViaje, setMostrarCrearViaje] = useState(false);
 
   const jornadas = useMemo(
     () => diasJugadosEnElCapitulo((chat?.messages || []).map(m => m.content)),
     [chat?.messages?.length, chat?.id]
   );
+
+  const lugarDetectado = useMemo(() => {
+    const ordenado = [...(project?.timeline || [])].sort((a, b) =>
+      a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay
+    );
+    const enTimeline = [...ordenado].filter(e => e.lugar).pop()?.lugar;
+    if (enTimeline) return enTimeline;
+
+    const msgs = chat?.messages || [];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const text = msgs[i].content || '';
+      const parsedHud = parseSceneHUD(text)?.sceneHUD;
+      if (parsedHud?.location && parsedHud.location !== 'Entorno de la escena') {
+        return [parsedHud.location, parsedHud.subLocation, parsedHud.region].filter(Boolean).join(' · ');
+      }
+      const fHud = leerFechaDeHud(text);
+      if (fHud?.lugar) return fHud.lugar;
+    }
+
+    if (project?.memory?.current_status) return project.memory.current_status;
+    if (project?.memory?.viaje?.destino) return `Travesía naval rumbo a ${project.memory.viaje.destino}`;
+    if (project?.memory?.locations?.[0]?.name) return project.memory.locations[0].name;
+
+    return undefined;
+  }, [
+    project?.timeline,
+    project?.memory?.current_status,
+    project?.memory?.viaje,
+    project?.memory?.locations,
+    chat?.messages
+  ]);
+
+  const marcoActual = useMemo(() => marcoDeLugar(lugarDetectado), [lugarDetectado]);
 
   // Modal de Salto de Tiempo / Cambio de Escena
   const [showTransitionModal, setShowTransitionModal] = useState(false);
@@ -1475,7 +1512,7 @@ export const ChatView: React.FC<{
               hace. La cuenta de jornadas es un dato del desplegable, no su
               motivo de existir: mientras haya calendario, el botón está.
             */}
-            {jornadas.dias > 0 || (calendarioValido(project?.calendar) && project?.currentDate) ? (
+            {jornadas.dias > 0 || (calendarioValido(project?.calendar) && project?.currentDate) || marcoActual ? (
               <div className="relative shrink-0">
                 <button
                   onClick={() => setTiempoAbierto(v => !v)}
@@ -1484,12 +1521,35 @@ export const ChatView: React.FC<{
                       ? 'border-amber-700/50 bg-amber-500/10 text-amber-950 dark:text-amber-100 font-bold'
                       : 'border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)]'
                   }`}
-                  title="Ver la fecha, la hora, el tiempo que hace y el trayecto en curso"
+                  title="Ver la fecha, la hora, el tiempo que hace, el marco del lugar y el trayecto en curso"
                 >
-                  <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-                  {jornadas.dias > 0
-                    ? `${jornadas.dias} ${jornadas.dias === 1 ? 'jornada' : 'jornadas'}`
-                    : 'jornada'}
+                  {marcoActual ? (
+                    <span className="text-xs shrink-0 leading-none">{marcoActual.icono}</span>
+                  ) : (
+                    <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  {(() => {
+                    const v = project?.memory?.viaje;
+                    if (v?.destino && v.jornadas) {
+                      const cal = project?.calendar;
+                      const fecha = project?.currentDate;
+                      const hoyAbs = fecha && cal ? aDiaAbsoluto(cal, fecha) : undefined;
+                      const hechas =
+                        hoyAbs !== undefined && Number.isFinite(v.iniciadoAbs)
+                          ? Math.max(0, hoyAbs - v.iniciadoAbs)
+                          : 0;
+                      const jActual = Math.min(hechas + 1, v.jornadas);
+                      return `J${jActual}/${v.jornadas} · ${v.destino}`;
+                    }
+                    const txtJornada =
+                      jornadas.dias > 0
+                        ? `${jornadas.dias} ${jornadas.dias === 1 ? 'jornada' : 'jornadas'}`
+                        : '1ª jornada';
+                    if (marcoActual) {
+                      return `${txtJornada} · ${marcoActual.nombre}`;
+                    }
+                    return txtJornada;
+                  })()}
                   {tiempoAbierto ? (
                     <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
                   ) : (
@@ -1541,30 +1601,14 @@ export const ChatView: React.FC<{
                             <div className="flex items-baseline justify-between gap-2">
                               <span className="font-cinzel text-[11px] text-[var(--text-secondary)] flex items-center gap-1.5">
                                 Hora
-                                {/*
-                                  EN QUÉ CLASE DE SITIO ESTÁ LA ESCENA.
-                                  Va aquí, en el hueco que dejaba el rótulo, y
-                                  no en una fila propia: es una etiqueta de una
-                                  palabra y una fila entera para ella sería
-                                  darle más peso del que tiene.
-                                  ⚠️ Y lo que enseña es la lectura de la
-                                  APLICACIÓN sobre el lugar que escribió el
-                                  Narrador, no una declaración suya. Si el chip
-                                  dice «naval» y la escena va de otra cosa, es
-                                  que el lugar apuntado se ha quedado viejo.
-                                */}
-                                {(() => {
-                                  const marco = marcoDeLugar(lugarUlt?.lugar);
-                                  if (!marco) return null;
-                                  return (
-                                    <span
-                                      className="inline-flex items-center gap-1 text-[10px] bg-[var(--surface)] border border-[var(--user-border)] px-1.5 py-0.5 rounded font-sans normal-case"
-                                      title={`La escena transcurre en un marco ${marco.nombre}. Lo deduce la aplicación del lugar apuntado en el diario («${lugarUlt?.lugar}»), y es lo que decide qué reglas están vivas: en travesía hay jornadas que contar, bajo tierra aprieta la luz, en ciudad manda quién gobierna.`}
-                                    >
-                                      {marco.icono} {marco.nombre}
-                                    </span>
-                                  );
-                                })()}
+                                {marcoActual && (
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[10px] bg-[var(--surface)] border border-[var(--user-border)] px-1.5 py-0.5 rounded font-sans normal-case"
+                                    title={`La escena transcurre en un marco ${marcoActual.nombre} («${lugarDetectado}»).`}
+                                  >
+                                    {marcoActual.icono} {marcoActual.nombre}
+                                  </span>
+                                )}
                               </span>
                               <span className="font-mono text-base font-bold text-[var(--accent)] tabular-nums">
                                 {horaLegible12(fecha!.minute)}
@@ -1572,28 +1616,15 @@ export const ChatView: React.FC<{
                             </div>
                             {/*
                               El momento del día, en emoji y no en texto.
-                              «Por la mañana» ocupaba una línea entera para
-                              decir lo que el AM ya dice en dos letras. El
-                              icono sí aporta: se lee sin leer.
-                            */}
-                            {/*
-                              BAJO TIERRA NO HAY FRANJA DEL DÍA.
-                              Las cuatro son luz de superficie, y en una cueva
-                              —o en una ciudad del subsuelo— enseñar «es de
-                              día» a las nueve y media no significa nada: ahí
-                              abajo no sale el sol. El reloj sigue corriendo
-                              porque el mundo de arriba sigue girando y los
-                              viajes y descansos se cuentan igual, pero el
-                              icono deja de hablar de luz.
                             */}
                             {(() => {
-                              const bajoTierra = marcoDeLugar(lugarUlt?.lugar)?.nombre === 'subterráneo';
+                              const bajoTierra = marcoActual?.nombre === 'subterráneo';
                               return (
                                 <div
                                   className="text-base text-right -mt-1.5 leading-none"
                                   title={
                                     bajoTierra
-                                      ? 'Aquí abajo la luz no la pone el sol, así que el icono marca calor y no luz: frío, templándose, al rojo, enfriándose. La hora sigue contando igual —quién duerme, qué está abierto, quién patrulla— y cómo se señala ahí el paso de las horas es cosa de tus documentos.'
+                                      ? 'Aquí abajo la luz no la pone el sol, así que el icono marca calor y no luz: frío, templándose, al rojo, enfriándose.'
                                       : undefined
                                   }
                                 >
@@ -1618,59 +1649,128 @@ export const ChatView: React.FC<{
                               </div>
                             )}
                           {/*
-                            EL TRAYECTO ABIERTO, Y LA FORMA DE ABANDONARLO.
-
-                            Va aquí porque el viaje es tiempo, y el tiempo se
-                            mira en este desplegable. Pero sobre todo porque
-                            la aplicación ya NO deja que el Narrador cierre un
-                            trayecto cuyas jornadas no ha cumplido, y poner un
-                            cerrojo sin dar una llave es dejar a la jugadora
-                            encerrada en un viaje que quizá ya no quiere hacer.
-                            Aquí está la llave: suya, no suya del Narrador.
+                            EL TRAYECTO ABIERTO, Y LA FORMA DE ABANDONARLO O FIJARLO.
                           */}
                           {(() => {
                             const v = project?.memory?.viaje;
-                            if (!v?.destino || !v.jornadas || !onUpdateProject) return null;
-                            const hoyAbs = fecha ? aDiaAbsoluto(cal!, fecha) : undefined;
-                            const hechas =
-                              hoyAbs !== undefined && Number.isFinite(v.iniciadoAbs)
-                                ? Math.max(0, hoyAbs - v.iniciadoAbs)
-                                : 0;
-                            const faltan = Math.max(0, v.jornadas - hechas);
-                            return (
-                              <div className="border-t border-[var(--glass-border)] pt-2 space-y-1.5">
-                                <div className="flex items-baseline justify-between gap-2">
-                                  <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">
-                                    Rumbo a
-                                  </span>
-                                  <span className="text-[11px] text-right text-[var(--text-primary)]">{v.destino}</span>
-                                </div>
-                                <p className="text-[10px] text-[var(--text-secondary)] m-0 leading-snug">
-                                  {faltan > 0
-                                    ? `Jornada ${Math.min(hechas + 1, v.jornadas)} de ${v.jornadas} · ${
-                                        faltan === 1 ? 'queda 1 jornada' : `quedan ${faltan} jornadas`
-                                      }. Hasta que se cumplan, el Narrador no puede dar por llegado el viaje.`
-                                    : 'El camino ya está cumplido: se puede llegar en cuanto la escena lo permita.'}
-                                </p>
-                                <button
-                                  onClick={() => {
-                                    if (
-                                      !window.confirm(
-                                        `¿Dar por terminado el trayecto a ${v.destino}?\n\nLa aplicación dejará de contar jornadas y el Narrador podrá situar la escena donde quiera. Úsalo si el viaje ya no va a ocurrir, o si de verdad habéis llegado y la cuenta se quedó atrás.`
+                            if (v?.destino && v.jornadas && onUpdateProject) {
+                              const hoyAbs = fecha ? aDiaAbsoluto(cal!, fecha) : undefined;
+                              const hechas =
+                                hoyAbs !== undefined && Number.isFinite(v.iniciadoAbs)
+                                  ? Math.max(0, hoyAbs - v.iniciadoAbs)
+                                  : 0;
+                              const faltan = Math.max(0, v.jornadas - hechas);
+                              return (
+                                <div className="border-t border-[var(--glass-border)] pt-2 space-y-1.5">
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0 flex items-center gap-1">
+                                      {marcoActual?.icono || '🗺️'} Rumbo a
+                                    </span>
+                                    <span className="text-[11px] text-right font-semibold text-[var(--text-primary)]">{v.destino}</span>
+                                  </div>
+                                  <p className="text-[10px] text-[var(--text-secondary)] m-0 leading-snug">
+                                    {faltan > 0
+                                      ? `Jornada ${Math.min(hechas + 1, v.jornadas)} de ${v.jornadas} · ${
+                                          faltan === 1 ? 'queda 1 jornada' : `quedan ${faltan} jornadas`
+                                        }. Hasta que se cumplan, el Narrador no puede dar por llegado el viaje.`
+                                      : 'El camino ya está cumplido: se puede llegar en cuanto la escena lo permita.'}
+                                  </p>
+                                  <button
+                                    onClick={() => {
+                                      if (
+                                        !window.confirm(
+                                          `¿Dar por terminado el trayecto a ${v.destino}?\n\nLa aplicación dejará de contar jornadas y el Narrador podrá situar la escena donde quiera.`
+                                        )
                                       )
-                                    )
-                                      return;
-                                    onUpdateProject(prev => ({
-                                      memory: prev.memory ? { ...prev.memory, viaje: undefined } : prev.memory
-                                    }));
-                                    setTiempoAbierto(false);
-                                  }}
-                                  className="w-full text-[10px] font-cinzel uppercase tracking-wide border border-[var(--user-border)] rounded px-2 py-1 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors"
-                                >
-                                  Cerrar el trayecto a mano
-                                </button>
-                              </div>
-                            );
+                                        return;
+                                      onUpdateProject(prev => ({
+                                        memory: prev.memory ? { ...prev.memory, viaje: undefined } : prev.memory
+                                      }));
+                                      setTiempoAbierto(false);
+                                    }}
+                                    className="w-full text-[10px] font-cinzel uppercase tracking-wide border border-[var(--user-border)] rounded px-2 py-1 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors"
+                                  >
+                                    Cerrar el trayecto a mano
+                                  </button>
+                                </div>
+                              );
+                            }
+
+                            // Si estamos en un marco de travesía pero no hay viaje registrado en memoria:
+                            if (marcoActual?.nombre.includes('travesía') && onUpdateProject) {
+                              return (
+                                <div className="border-t border-[var(--glass-border)] pt-2 space-y-1.5">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[10px] font-cinzel text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                                      {marcoActual.icono} {marcoActual.nombre} en marcha
+                                    </span>
+                                  </div>
+                                  {!mostrarCrearViaje ? (
+                                    <button
+                                      onClick={() => setMostrarCrearViaje(true)}
+                                      className="w-full text-[10px] font-cinzel border border-amber-600/40 bg-amber-500/10 rounded px-2 py-1 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition-colors text-center"
+                                    >
+                                      + Fijar destino y contar jornadas
+                                    </button>
+                                  ) : (
+                                    <div className="p-2 rounded bg-[var(--surface)] border border-[var(--user-border)] space-y-1.5 text-[11px]">
+                                      <div>
+                                        <label className="text-[9px] uppercase tracking-wider text-[var(--text-secondary)] block">Destino</label>
+                                        <input
+                                          type="text"
+                                          placeholder="ej. Luskan, Aguasprofundas..."
+                                          value={destinoViajeInput}
+                                          onChange={e => setDestinoViajeInput(e.target.value)}
+                                          className="w-full text-xs px-2 py-1 rounded border border-[var(--user-border)] bg-[var(--bg-color)] text-[var(--text-primary)]"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[9px] uppercase tracking-wider text-[var(--text-secondary)] block">Jornadas estimadas</label>
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={60}
+                                          value={jornadasViajeInput}
+                                          onChange={e => setJornadasViajeInput(Math.max(1, parseInt(e.target.value) || 1))}
+                                          className="w-full text-xs px-2 py-1 rounded border border-[var(--user-border)] bg-[var(--bg-color)] text-[var(--text-primary)]"
+                                        />
+                                      </div>
+                                      <div className="flex gap-1 pt-1">
+                                        <button
+                                          onClick={() => {
+                                            if (!destinoViajeInput.trim()) return;
+                                            const hoyAbs = fecha && cal ? aDiaAbsoluto(cal, fecha) : 0;
+                                            onUpdateProject(prev => ({
+                                              memory: {
+                                                ...(prev.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' }),
+                                                viaje: {
+                                                  destino: destinoViajeInput.trim(),
+                                                  jornadas: jornadasViajeInput,
+                                                  iniciadoAbs: hoyAbs
+                                                }
+                                              }
+                                            }));
+                                            setMostrarCrearViaje(false);
+                                          }}
+                                          disabled={!destinoViajeInput.trim()}
+                                          className="flex-1 py-1 text-[10px] font-cinzel rounded bg-[var(--accent)] text-white disabled:opacity-50"
+                                        >
+                                          Fijar rumbo
+                                        </button>
+                                        <button
+                                          onClick={() => setMostrarCrearViaje(false)}
+                                          className="px-2 py-1 text-[10px] border border-[var(--user-border)] rounded text-[var(--text-secondary)]"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            return null;
                           })()}
                           </>
                         ) : (
@@ -1686,11 +1786,11 @@ export const ChatView: React.FC<{
                             {climaUlt?.clima || <span className="text-[var(--text-secondary)] italic">sin registrar</span>}
                           </span>
                         </div>
-                        {lugarUlt?.lugar && (
+                        {(lugarDetectado || lugarUlt?.lugar) && (
                           <div className="flex items-baseline justify-between gap-2">
                             <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">Lugar</span>
-                            <span className="text-[11px] text-right text-[var(--text-primary)] truncate" title={lugarUlt.lugar}>
-                              {lugarUlt.lugar}
+                            <span className="text-[11px] text-right text-[var(--text-primary)] truncate" title={lugarDetectado || lugarUlt?.lugar}>
+                              {lugarDetectado || lugarUlt?.lugar}
                             </span>
                           </div>
                         )}

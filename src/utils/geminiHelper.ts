@@ -49,6 +49,8 @@ import {
   AvanceDeNivel,
   parsearFechaTexto,
   extraerMinutoDeTexto,
+  deducirFechaInicialDeTextos,
+  deducirViajeInicialDeTextos,
   EntradaDeAgenda,
   leerHilos,
   limpiarEtiquetasDeTiempo,
@@ -3988,6 +3990,10 @@ export interface TiempoReportado {
   fechaHud?: string;
   /** El momento del día de esa misma cabecera: «madrugada», «media tarde». */
   momentoHud?: string;
+  /** El lugar exacto extraído de la cabecera de HUD de la escena (📍). */
+  lugarHud?: string;
+  /** El clima o luz extraído de la cabecera de HUD (🌤). */
+  climaHud?: string;
   /** Progreso hacia el siguiente nivel, si el Narrador lo ha anotado. */
   avanceDeNivel?: AvanceDeNivel;
   /** Conjuros, rasgos o competencias ganados en este turno. */
@@ -4078,6 +4084,7 @@ async function saveStreamedMessage(
       viaje ||
       lugares.length ||
       hudDeEsteTurno?.fechaTexto ||
+      hudDeEsteTurno?.lugar ||
       avanceDeNivel ||
       !nadaAprendido(aprendido) ||
       !cuadernoQuieto(bambalinas, relojes) ||
@@ -4098,6 +4105,8 @@ async function saveStreamedMessage(
         lugares,
         fechaHud: hudDeEsteTurno?.fechaTexto,
         momentoHud: hudDeEsteTurno?.momento,
+        lugarHud: hudDeEsteTurno?.lugar,
+        climaHud: hudDeEsteTurno?.clima,
         avanceDeNivel,
         aprendido,
         bambalinas,
@@ -7114,6 +7123,120 @@ REGLAS DE SALIDA:
     throw err;
   }
 }
+
+export interface EstudioInicialCampanaResult {
+  calendario?: CalendarConfig;
+  fechaInicial?: CampaignDate;
+  lugarInicial?: string;
+  marcoInicial?: string;
+  viajeInicial?: { destino: string; jornadas: number; iniciadoAbs: number };
+  situacionInicial?: string;
+  pcActualizado?: Partial<PlayerCharacter>;
+}
+
+/**
+ * Estudio y sincronización inicial de documentos, contexto y arranque de campaña.
+ * Se ejecuta tras el primer mensaje o carga inicial para activar el calendario canónico,
+ * sincronizar la fecha real del mundo, detectar travesías en curso (mar, bosque, ruinas, mazmorra)
+ * y registrar el viaje en memoria si arranca en mitad de un trayecto.
+ */
+export async function estudiarContextoInicialDeCampana({
+  project,
+  files = [],
+  chats = []
+}: {
+  project: Project;
+  files?: ProjectFile[];
+  chats?: Chat[];
+}): Promise<EstudioInicialCampanaResult> {
+  const docFiles = files.filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 20);
+  const textosArranque = [
+    project.instructions || '',
+    project.name || '',
+    ...docFiles.map(f => f.content || ''),
+    ...chats.flatMap(c => (c.messages || []).slice(0, 4).map(m => m.content || ''))
+  ];
+
+  const resultado: EstudioInicialCampanaResult = {};
+
+  const textoUnificado = textosArranque.join('\n').slice(0, 80000);
+  const esFaerun = /harptos|faer[uú]n|forgotten realms|reinos olvidados|toril|menzoberranzan|waterdeep|aguasprofundas|luskan|moonshae|jarlaxle|bregan d['’]aerthe|d&d 5e/i.test(
+    textoUnificado
+  );
+
+  const cal = (esFaerun || !project.calendar || !calendarioValido(project.calendar))
+    ? CALENDARIO_HARPTOS
+    : project.calendar;
+  resultado.calendario = cal;
+
+  // 1. Extraer o deducir fecha canónica inicial de los documentos
+  const fechaDeducida = deducirFechaInicialDeTextos(cal, textosArranque, project.currentDate?.year || 1372);
+  if (fechaDeducida) {
+    resultado.fechaInicial = fechaDeducida;
+  }
+
+  // 2. Extraer del primer mensaje del narrador si tiene HUD
+  for (const c of chats) {
+    const modelMsg = (c.messages || []).find(m => m.role === 'model' && m.content);
+    if (modelMsg) {
+      const fHud = leerFechaDeHud(modelMsg.content);
+      if (fHud?.lugar) {
+        resultado.lugarInicial = fHud.lugar;
+        const marco = marcoDeLugar(fHud.lugar);
+        if (marco) resultado.marcoInicial = marco.nombre;
+        if (fHud.fechaTexto && !resultado.fechaInicial) {
+          const p = parsearFechaTexto(cal, fHud.fechaTexto, project.currentDate?.year || 1372);
+          if (p) {
+            resultado.fechaInicial = {
+              ...p,
+              minute: extraerMinutoDeTexto(fHud.momento) ?? 540
+            };
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  const diaActualAbs = resultado.fechaInicial
+    ? aDiaAbsoluto(cal, resultado.fechaInicial)
+    : project.currentDate
+    ? aDiaAbsoluto(cal, project.currentDate)
+    : 1;
+
+  // 3. Deducir si hay viaje inicial o travesía
+  const viajeDeducido = deducirViajeInicialDeTextos(textosArranque, diaActualAbs);
+  if (viajeDeducido) {
+    resultado.viajeInicial = viajeDeducido;
+  }
+
+  // 4. Si aún no hay lugar inicial, deducirlo del contenido de arranque
+  if (!resultado.lugarInicial) {
+    if (/carabela|barco|bergant[ií]n|mar de las espadas|alta mar|azote de las olas/i.test(textoUnificado)) {
+      resultado.lugarInicial = 'A bordo del Azote de las Olas · Alta mar en el Mar de las Espadas';
+      resultado.marcoInicial = 'travesía naval';
+      if (!resultado.viajeInicial) {
+        resultado.viajeInicial = {
+          destino: 'Luskan',
+          jornadas: 10,
+          iniciadoAbs: diaActualAbs
+        };
+      }
+    } else if (/bosque alto|picos de la niebla|sendero/i.test(textoUnificado)) {
+      resultado.lugarInicial = 'Sendero del Bosque Alto';
+      resultado.marcoInicial = 'travesía terrestre';
+    } else if (/bajomonta[ñn]a|underdark|infraoscuridad/i.test(textoUnificado)) {
+      resultado.lugarInicial = 'Bajomontaña';
+      resultado.marcoInicial = 'subterráneo';
+    } else if (/ruinas/i.test(textoUnificado)) {
+      resultado.lugarInicial = 'Ruinas arcanas';
+      resultado.marcoInicial = 'ruinas / travesía';
+    }
+  }
+
+  return resultado;
+}
+
 
 
 /**

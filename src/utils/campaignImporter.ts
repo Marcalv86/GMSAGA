@@ -2,6 +2,7 @@ import { Project, Chat, NPC, Quest, Location, PlayerCharacter, Memory } from '..
 import { generateContentWithFailover } from './geminiHelper';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from './sanitizers';
+import { CALENDARIO_HARPTOS } from './campaignCalendar';
 
 export interface ExtractedCampaignResult {
   sourceType: 'pdf' | 'text' | 'markdown' | 'json' | 'notebooklm';
@@ -252,6 +253,8 @@ export function importCampaignLocalFallback(
     instructions: DEFAULT_DM_INSTRUCTIONS,
     system: DEFAULT_SYSTEM,
     style: DEFAULT_STYLE,
+    calendar: CALENDARIO_HARPTOS,
+    currentDate: { year: 1492, dayOfYear: 1, minute: 480 },
     memory,
     files: [],
     chats: []
@@ -415,6 +418,8 @@ function formatParsedDataToCampaign(
     instructions: parsed.directives ? `${DEFAULT_DM_INSTRUCTIONS}\n\n### Directivas de la Campaña Importada\n${parsed.directives}` : DEFAULT_DM_INSTRUCTIONS,
     system: DEFAULT_SYSTEM,
     style: DEFAULT_STYLE,
+    calendar: CALENDARIO_HARPTOS,
+    currentDate: { year: 1492, dayOfYear: 1, minute: 480 },
     memory,
     files: [],
     chats: []
