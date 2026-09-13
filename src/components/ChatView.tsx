@@ -10,7 +10,7 @@ import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from
 import { formatNarrativeText } from '../utils/textFormatter';
 import { parseMessageSegments, RollBadgeCard } from './RollBadge';
 import { parseSceneHUD, SceneHUDCard } from './SceneHUDCard';
-import { ChevronDown, ChevronUp, Moon, Sun, Sunrise, Sunset } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
   CALENDARIO_FANTASTICO,
   aDiaAbsoluto,
@@ -20,6 +20,7 @@ import {
   fechaCompleta,
   fechaLegible,
   iconoDeClima,
+  iconoDeFranja,
   marcoDeLugar,
   franjaDelDia,
   estacionDelDia,
@@ -1184,13 +1185,25 @@ export const ChatView: React.FC<{
           */}
           {calendarioValido(project?.calendar) && project?.currentDate && (() => {
             /*
-             * El icono sale de la hora, no del nombre de la franja.
-             * Casarlo por texto se rompía con «al anochecer», que contiene
-             * «noche» y salía con la luna cuando todavía es el crepúsculo.
-             * Los cortes son los mismos que usa `franjaDelDia`.
+             * UN SOLO ICONO, Y EMOJI.
+             *
+             * Aquí había un icono de lucide para la franja del día MÁS el
+             * emoji del clima, y a las nueve y media de una mañana nublada eso
+             * eran dos soles seguidos: uno dibujado y otro emoji. La hora ya
+             * está escrita al lado en números, así que el icono de franja no
+             * aporta nada que no se lea; el del clima sí.
+             *
+             * Manda el clima cuando lo hay, y si no consta se cae a la franja
+             * —que para eso existe `iconoDeFranja`— para no dejar el hueco
+             * suelto. Uno siempre, dos nunca.
              */
-            const hora = Math.floor((project.currentDate.minute || 0) / 60);
-            const Icono = hora < 5 ? Moon : hora < 7 ? Sunrise : hora < 19 ? Sun : hora < 21 ? Sunset : Moon;
+            const climaAhora = [...(project.timeline || [])]
+              .sort((a, b) => (a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay))
+              .filter(e => e.clima)
+              .pop();
+            const emoji = climaAhora?.clima
+              ? iconoDeClima(climaAhora.clima)
+              : iconoDeFranja(project.currentDate.minute);
             return (
               <>
                 <span className="border-r border-[var(--glass-border)] h-4 inline shrink-0" />
@@ -1198,29 +1211,11 @@ export const ChatView: React.FC<{
                   className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-cinzel text-[var(--text-secondary)] shrink-0 tabular-nums"
                   title={`En la ficción: ${fechaCompleta(project.calendar!, project.currentDate)}`}
                 >
-                  <Icono className="w-3.5 h-3.5 opacity-80" />
+                  <span className="text-[13px] leading-none" title={climaAhora?.clima ? `Tiempo: ${climaAhora.clima}` : undefined}>
+                    {emoji}
+                  </span>
                   <span className="hidden sm:inline">{fechaCompacta(project.calendar!, project.currentDate)}</span>
                   <span className="sm:hidden">{horaLegible(project.currentDate.minute)}</span>
-                  {/*
-                    El tiempo que hace, al lado de la hora.
-                    Cabe de sobra —es un emoji— y las dos cosas se miran a la
-                    vez: saber que son las nueve y media no sirve de mucho sin
-                    saber si se sale a un temporal. Sale del diario, de la
-                    última entrada que traiga clima, y si no hay ninguna no se
-                    pinta nada en vez de dejar un hueco.
-                  */}
-                  {(() => {
-                    const conClima = [...(project.timeline || [])]
-                      .sort((a, b) => (a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay))
-                      .filter(e => e.clima);
-                    const ultimo = conClima[conClima.length - 1];
-                    if (!ultimo?.clima) return null;
-                    return (
-                      <span className="text-[13px] leading-none" title={`Tiempo: ${ultimo.clima}`}>
-                        {iconoDeClima(ultimo.clima)}
-                      </span>
-                    );
-                  })()}
                 </span>
               </>
             );
@@ -1486,10 +1481,26 @@ export const ChatView: React.FC<{
                    * dejarían el hueco en blanco teniendo el dato una línea más
                    * arriba.
                    */
-                  const conClima = [...(project?.timeline || [])]
-                    .sort((a, b) => (a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay))
-                    .filter(e => e.clima || e.lugar);
-                  const ultima = conClima[conClima.length - 1];
+                  /*
+                   * CADA CAMPO MIRA SU PROPIA ENTRADA, Y NO UNA COMÚN.
+                   *
+                   * Antes se cogía la última entrada que tuviera clima O lugar
+                   * y de ahí salían los dos. Si esa entrada traía lugar pero no
+                   * clima, el desplegable decía «tiempo: sin registrar» mientras
+                   * la cabecera —que sí busca la última CON clima— enseñaba un
+                   * sol. Dos sitios de la misma pantalla contándose cosas
+                   * distintas, que es peor que no enseñar ninguna.
+                   *
+                   * El diario no rellena todos los campos en todas las
+                   * entradas, así que lo correcto es que cada dato busque el
+                   * suyo: el último clima conocido y el último lugar conocido,
+                   * aunque no vengan del mismo día.
+                   */
+                  const ordenado = [...(project?.timeline || [])].sort((a, b) =>
+                    a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay
+                  );
+                  const climaUlt = [...ordenado].filter(e => e.clima).pop();
+                  const lugarUlt = [...ordenado].filter(e => e.lugar).pop();
                   const hayCalendario = calendarioValido(cal) && Boolean(fecha);
                   const est = hayCalendario ? estacionDelDia(cal!, fecha!.dayOfYear) : null;
 
@@ -1517,12 +1528,12 @@ export const ChatView: React.FC<{
                                   que el lugar apuntado se ha quedado viejo.
                                 */}
                                 {(() => {
-                                  const marco = marcoDeLugar(ultima?.lugar);
+                                  const marco = marcoDeLugar(lugarUlt?.lugar);
                                   if (!marco) return null;
                                   return (
                                     <span
                                       className="inline-flex items-center gap-1 text-[10px] bg-[var(--surface)] border border-[var(--user-border)] px-1.5 py-0.5 rounded font-sans normal-case"
-                                      title={`La escena transcurre en un marco ${marco.nombre}. Lo deduce la aplicación del lugar apuntado en el diario («${ultima?.lugar}»), y es lo que decide qué reglas están vivas: en travesía hay jornadas que contar, bajo tierra aprieta la luz, en ciudad manda quién gobierna.`}
+                                      title={`La escena transcurre en un marco ${marco.nombre}. Lo deduce la aplicación del lugar apuntado en el diario («${lugarUlt?.lugar}»), y es lo que decide qué reglas están vivas: en travesía hay jornadas que contar, bajo tierra aprieta la luz, en ciudad manda quién gobierna.`}
                                     >
                                       {marco.icono} {marco.nombre}
                                     </span>
@@ -1561,14 +1572,14 @@ export const ChatView: React.FC<{
                         <div className="border-t border-[var(--glass-border)] pt-2 flex items-baseline justify-between gap-2">
                           <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">Tiempo</span>
                           <span className="text-[11px] text-right text-[var(--text-primary)]">
-                            {ultima?.clima || <span className="text-[var(--text-secondary)] italic">sin registrar</span>}
+                            {climaUlt?.clima || <span className="text-[var(--text-secondary)] italic">sin registrar</span>}
                           </span>
                         </div>
-                        {ultima?.lugar && (
+                        {lugarUlt?.lugar && (
                           <div className="flex items-baseline justify-between gap-2">
                             <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">Lugar</span>
-                            <span className="text-[11px] text-right text-[var(--text-primary)] truncate" title={ultima.lugar}>
-                              {ultima.lugar}
+                            <span className="text-[11px] text-right text-[var(--text-primary)] truncate" title={lugarUlt.lugar}>
+                              {lugarUlt.lugar}
                             </span>
                           </div>
                         )}
