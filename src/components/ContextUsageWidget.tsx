@@ -108,9 +108,7 @@ export const ContextUsageWidget: React.FC<{
       f.onDemand &&
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
-      f.category !== 'index' &&
-      f.category !== 'sheet_pj' &&
-      f.category !== 'sheet_companion'
+      f.category !== 'index'
   );
 
   // Un número como 127.694 no dice nada de un vistazo; 128 mil sí.

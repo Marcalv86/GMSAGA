@@ -919,21 +919,11 @@ export const FilesView: React.FC<{
                             <Search className="w-3.5 h-3.5" /> Ver el destilado
                           </button>
                         )}
-                        {(currentCat === 'sheet_pj' || currentCat === 'sheet_companion') && (
-                          <span
-                            className="px-2 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded text-[10px] md:text-[11px] font-cinzel flex items-center gap-1 font-semibold select-none"
-                            title="Las fichas, diario personal y familiares viajan SIEMPRE íntegros al Narrador para preservar los detalles vivos del personaje."
-                          >
-                            <Pin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Siempre presente
-                          </span>
-                        )}
                         {onToggleOnDemand &&
                           currentCat !== 'style_sample' &&
                           currentCat !== 'oracle' &&
                           currentCat !== 'roster' &&
-                          currentCat !== 'index' &&
-                          currentCat !== 'sheet_pj' &&
-                          currentCat !== 'sheet_companion' && (
+                          currentCat !== 'index' && (
                           <button
                             onClick={() => onToggleOnDemand(f.id, !f.onDemand)}
                             className={`px-2 py-1 border rounded text-[10px] md:text-[11px] font-cinzel transition-colors cursor-pointer flex items-center gap-1 ${

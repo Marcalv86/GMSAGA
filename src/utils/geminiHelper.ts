@@ -5712,13 +5712,14 @@ export function construirPromptOOC({
   const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
 
   const companionFiles = allFiles.filter(
-    f => esTexto(f) && (f.category === 'sheet_companion' || looksLikeCompanionSheet(f, project.memory))
+    f => esTexto(f) && !f.onDemand && (f.category === 'sheet_companion' || looksLikeCompanionSheet(f, project.memory))
   );
   const companionIds = new Set(companionFiles.map(f => f.id));
 
   const pjSheetFiles = allFiles.filter(
     f =>
       esTexto(f) &&
+      !f.onDemand &&
       !companionIds.has(f.id) &&
       (f.category === 'sheet_pj' || looksLikeProtagonistSheet(f, project.memory))
   );
@@ -5732,9 +5733,7 @@ export function construirPromptOOC({
       !companionIds.has(f.id) &&
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
-      f.category !== 'index' &&
-      f.category !== 'sheet_pj' &&
-      f.category !== 'sheet_companion'
+      f.category !== 'index'
   );
   const deConsultaIds = new Set(deConsulta.map(f => f.id));
 
