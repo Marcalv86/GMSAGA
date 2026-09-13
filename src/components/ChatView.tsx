@@ -65,7 +65,8 @@ import {
   Mic,
   MoreHorizontal,
   Copy,
-  MicOff
+  MicOff,
+  FileText
 } from 'lucide-react';
 interface ChatMessageItemProps {
   m: { role: 'user' | 'model'; content: string };
@@ -698,6 +699,7 @@ export const ChatView: React.FC<{
   isNearTokenLimit?: boolean;
   chatTokensCount?: number;
   onCreateNewChat?: () => void;
+  onArchiveChatAsFile?: () => void;
   onOpenMesa?: () => void;
   /** Si este capítulo ya está cerrado, es decir, si hay otro después. */
   estaCerrado?: boolean;
@@ -731,6 +733,7 @@ export const ChatView: React.FC<{
   isNearTokenLimit,
   chatTokensCount,
   onCreateNewChat,
+  onArchiveChatAsFile,
   onOpenMesa,
   estaCerrado
 }) => {
@@ -2192,6 +2195,30 @@ export const ChatView: React.FC<{
                             {project?.manualDmRolls
                               ? 'Tú tiras por los PNJs (Transparencia)'
                               : 'El DM tira en secreto (Fluido)'}
+                          </div>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* Opción 5: Archivar Capítulo en Biblioteca (On-Demand) */}
+                    {onArchiveChatAsFile && chat?.messages && chat.messages.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsActionsMenuOpen(false);
+                          onArchiveChatAsFile();
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group border-t border-[var(--glass-border)] mt-0.5 pt-1.5"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                          <FileText className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                            Archivar en Biblioteca
+                          </div>
+                          <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                            Memoria persistente de consulta (On-Demand)
                           </div>
                         </div>
                       </button>

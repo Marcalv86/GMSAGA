@@ -3,6 +3,7 @@ import {
   BookOpen,
   Check,
   FolderSync,
+  Library,
   Menu,
   Moon,
   Paperclip,
@@ -112,8 +113,10 @@ import {
   isNarrativeIncomplete,
   novelizeUserMessage,
   generarNoticiasSaltoTemporal,
-  anclarHistorialPorHud
+  anclarHistorialPorHud,
+  consolidarCronicaAlCerrarCapitulo
 } from './utils/geminiHelper';
+import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo } from './utils/chapterArchiver';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
@@ -1570,8 +1573,99 @@ export default function App() {
   };
 
   // Chapter / Chat Management
+  const handleArchiveChatAsFile = async (
+    targetChat?: Chat,
+    options?: { silent?: boolean; openFilesTab?: boolean }
+  ) => {
+    const chat = targetChat || currentChat;
+    if (!currentPId || !currentProject || !chat) return;
+
+    const mensajesValidos = (chat.messages || []).filter(
+      m => m.content && m.content.trim() && m.content !== 'Pensando...' && m.content !== 'Tirando dados...'
+    );
+
+    if (mensajesValidos.length === 0) {
+      if (!options?.silent) {
+        setAlertConfig({
+          isOpen: true,
+          title: 'Capítulo Vacío',
+          message: 'Este capítulo no tiene mensajes narrativos que archivar en la biblioteca.'
+        });
+      }
+      return;
+    }
+
+    if (!options?.silent) {
+      setTopProgress({
+        active: true,
+        label: `Archivando "${chat.name}" como documento de consulta permanente (On-Demand)...`,
+        type: 'general'
+      });
+    }
+
+    try {
+      let resumen: string | undefined = undefined;
+      if (hasConfiguredApiKey() && mensajesValidos.length >= 2) {
+        try {
+          resumen = await consolidarCronicaAlCerrarCapitulo({
+            project: currentProject,
+            capitulo: chat
+          });
+        } catch (e) {
+          console.warn('[Archiver] Consolidación con IA omitida, archivando texto íntegro:', e);
+        }
+      }
+
+      const archivedFile = convertirChatAArchivoDeConsulta(chat, currentProject, resumen);
+
+      const refreshedFiles = await loadFilesFromDB(currentPId);
+      // Reemplazar si ya existía una versión anterior de este capítulo archivado
+      const filtered = refreshedFiles.filter(f => f.id !== archivedFile.id && f.name !== archivedFile.name);
+      const updatedFiles = [...filtered, archivedFile];
+
+      setCurrentFiles(updatedFiles);
+      await saveFilesToDB(currentPId, updatedFiles);
+
+      logInfo(
+        'general',
+        `Capítulo archivado como documento: ${archivedFile.name}`,
+        `Guardado en IndexedDB con categoría "document", marcado On-Demand (${archivedFile.length} caracteres).`
+      );
+
+      if (!options?.silent) {
+        setAlertConfig({
+          isOpen: true,
+          title: '📜 Capítulo Archivado en la Biblioteca',
+          message: `El capítulo "${chat.name}" ha sido compilado y guardado como documento permanente "${archivedFile.name}" en los Archivos del Tomo.\n\n` +
+            `• Está marcado como «De Consulta» (On-Demand): no consume tokens en cada turno.\n` +
+            `• El Narrador lo consultará automáticamente mediante búsqueda semántica/BM25 cuando la historia haga referencia a sucesos o personajes de este capítulo.\n` +
+            `• Puedes consultarlo y leerlo cuando desees desde la pestaña de Archivos.`
+        });
+        if (options?.openFilesTab) {
+          setActiveTab('files');
+        }
+      }
+    } catch (err: any) {
+      logError('general', `Error al archivar capítulo ${chat.name}`, err);
+      if (!options?.silent) {
+        setAlertConfig({
+          isOpen: true,
+          title: 'Error al Archivar',
+          message: `No se pudo archivar el capítulo: ${err?.message || 'Error desconocido'}`
+        });
+      }
+    } finally {
+      if (!options?.silent) {
+        setTopProgress({ active: false, label: '', type: 'general' });
+      }
+    }
+  };
+
   const handleCreateChat = () => {
     if (!currentPId || !currentProject) return;
+
+    const capituloCerrado = currentChat;
+    const tieneMensajes = capituloCerrado && (capituloCerrado.messages || []).length > 0;
 
     const newChatId = 'cap_' + Date.now();
     const newChat: Chat = {
@@ -1586,9 +1680,9 @@ export default function App() {
     setCurrentChatId(newChatId);
     setActiveTab('chat');
 
-    // Al cerrar capítulo, se actualiza simultáneamente la memoria persistente y la de la pestaña de memoria del personaje y entidades.
-    const capituloCerrado = currentChat;
-    if (capituloCerrado && (capituloCerrado.messages || []).length > 0) {
+    // Al cerrar capítulo, se archiva automáticamente como documento de consulta On-Demand y se sincroniza la memoria.
+    if (tieneMensajes) {
+      void handleArchiveChatAsFile(capituloCerrado, { silent: true });
       void handleTriggerMemorySyncWithAI();
     }
   };
@@ -4236,6 +4330,9 @@ export default function App() {
              * guardado.
              */
             const estaCerrado = idx < currentChats.length - 1;
+            const archivoArchivado = buscarArchivoDeCapitulo(currentFiles, c.id);
+            const tieneMensajes = (c.messages || []).length > 0;
+
             return (
               <div
                 key={c.id}
@@ -4256,26 +4353,55 @@ export default function App() {
                   <Scroll className="w-3.5 h-3.5 shrink-0 opacity-70" />
                   <span className="truncate">{c.name}</span>
                 </span>
-                {estaCerrado && (
-                  <BookCheck
-                    className={`w-3.5 h-3.5 shrink-0 mr-1 ${isSelected ? 'opacity-80' : 'opacity-45'}`}
-                    aria-label="Capítulo cerrado"
-                  />
-                )}
-                <button
-                  type="button"
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleDeleteChat(c.id);
-                  }}
-                  className={`opacity-70 md:opacity-0 group-hover:opacity-100 p-1 text-xs hover:scale-110 transition-all cursor-pointer ${
-                    isSelected ? 'text-white/80 hover:text-white' : 'text-red-600 hover:text-red-700'
-                  }`}
-                  title="Borrar sesión"
-                  aria-label="Borrar sesión"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                
+                <div className="flex items-center gap-1 shrink-0">
+                  {archivoArchivado && (
+                    <span
+                      title="Archivado en los Archivos del Tomo (De consulta On-Demand en biblioteca)"
+                      className={`inline-flex items-center text-[10px] px-1 py-0.5 rounded opacity-80 ${
+                        isSelected ? 'bg-black/20 text-white' : 'bg-teal-500/15 text-teal-700 dark:text-teal-300'
+                      }`}
+                    >
+                      <Library className="w-3 h-3 shrink-0" />
+                    </span>
+                  )}
+                  {estaCerrado && (
+                    <BookCheck
+                      className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'opacity-80' : 'opacity-45'}`}
+                      aria-label="Capítulo cerrado"
+                    />
+                  )}
+                  {tieneMensajes && (
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        void handleArchiveChatAsFile(c);
+                      }}
+                      className={`opacity-0 group-hover:opacity-100 p-1 text-xs hover:scale-110 transition-all cursor-pointer ${
+                        isSelected ? 'text-white/80 hover:text-white' : 'text-teal-600 hover:text-teal-700'
+                      }`}
+                      title={archivoArchivado ? 'Recompilar y actualizar archivo de consulta' : 'Archivar como documento de consulta (On-Demand)'}
+                      aria-label="Archivar capítulo"
+                    >
+                      <Paperclip className="w-3 h-3" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleDeleteChat(c.id);
+                    }}
+                    className={`opacity-70 md:opacity-0 group-hover:opacity-100 p-1 text-xs hover:scale-110 transition-all cursor-pointer ${
+                      isSelected ? 'text-white/80 hover:text-white' : 'text-red-600 hover:text-red-700'
+                    }`}
+                    title="Borrar sesión"
+                    aria-label="Borrar sesión"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -4435,6 +4561,7 @@ export default function App() {
               isNearTokenLimit={isCurrentChatNearTokenLimit}
               chatTokensCount={effectiveChatTokens}
               onCreateNewChat={handleCreateChat}
+              onArchiveChatAsFile={handleArchiveChatAsFile}
               onOpenMesa={() => setActiveTab('mesa')}
               estaCerrado={
                 currentChats.length > 1 &&
