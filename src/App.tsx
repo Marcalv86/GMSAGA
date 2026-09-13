@@ -2924,6 +2924,18 @@ export default function App() {
     }
   };
 
+  const handleToggleAllOnDemand = async (onDemand: boolean) => {
+    if (!currentPId) return;
+    const frescos = await loadFilesFromDB(currentPId);
+    const updated = frescos.map(f => {
+      if (f.isImage || f.isAudio) return f;
+      return { ...f, onDemand };
+    });
+    setCurrentFiles(updated);
+    setChatTokenLoads({});
+    await saveFilesToDB(currentPId, updated);
+  };
+
   /**
    * Destila una hoja de oráculo. El resultado se guarda como análisis del
    * archivo, que es lo que a partir de entonces viaja al Narrador: el documento
@@ -4726,6 +4738,7 @@ export default function App() {
               onUpdateFileContent={handleUpdateFileContent}
               onUpdateFileCategory={handleUpdateFileCategory}
               onToggleOnDemand={handleToggleOnDemand}
+              onToggleAllOnDemand={handleToggleAllOnDemand}
               onDistillOracle={handleDistillOracle}
               onExtractMechanics={handleExtractMechanics}
               onGenerarEtiquetas={handleGenerarEtiquetas}

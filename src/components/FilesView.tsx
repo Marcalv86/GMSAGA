@@ -49,6 +49,7 @@ export const FilesView: React.FC<{
   onUpdateFileContent?: (fileId: string, content: string) => Promise<void>;
   onUpdateFileCategory?: (fileId: string, category: FileCategory) => Promise<void>;
   onToggleOnDemand?: (fileId: string, onDemand: boolean) => Promise<void>;
+  onToggleAllOnDemand?: (onDemand: boolean) => Promise<void>;
   /** Deja de una hoja de oráculo solo las tablas y las reglas. */
   onDistillOracle?: (file: ProjectFile) => Promise<void>;
   onExtractMechanics?: (file: ProjectFile) => Promise<void>;
@@ -74,6 +75,7 @@ export const FilesView: React.FC<{
   onUpdateFileContent,
   onUpdateFileCategory,
   onToggleOnDemand,
+  onToggleAllOnDemand,
   onDistillOracle,
   onExtractMechanics,
   onGenerarEtiquetas,
@@ -502,6 +504,18 @@ export const FilesView: React.FC<{
               aria-label="Auto-Clasificar"
             >
               <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Auto-Clasificar</span>
+            </button>
+          )}
+
+          {onToggleAllOnDemand && (
+            <button
+              onClick={() => onToggleAllOnDemand(false)}
+              disabled={isGenerating || isRelacionando}
+              className="px-2.5 sm:px-3 py-1.5 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-md font-cinzel text-xs font-bold hover:bg-emerald-200 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0 shadow-2xs"
+              title="Cargar y enviar todos los documentos de texto enteros en cada turno (máxima inmersión, lore e idiomas)"
+              aria-label="Enviar Todo Siempre"
+            >
+              <Pin className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Enviar Todo Siempre</span>
             </button>
           )}
 
