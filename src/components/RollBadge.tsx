@@ -44,7 +44,19 @@ const PATRONES = {
    * El «d20 =» y el «vs …» son opcionales, y el «contra» puede ser una CD
    * numérica o el nombre de una pasiva.
    */
-  dm: String.raw`\[\s*Tirada\s+(?:DM|PNJ)\s*\(([^)]+?)\)\s*:\s*(?:d(\d+)\s*=\s*)?(\d+)\s*([+-]\s*\d+)?\s*(?:=\s*(\d+))?\s*(?:(?:vs|contra)\s+(?:(?:CD|DC)\s*[:=]?\s*(\d+)|([^\]]+?)))?\s*\]`
+  dm: String.raw`\[\s*Tirada\s+(?:DM|PNJ)\s*\(([^)]+?)\)\s*:\s*(?:d(\d+)\s*=\s*)?(\d+)\s*([+-]\s*\d+)?\s*(?:=\s*(\d+))?\s*(?:(?:vs|contra|frente\s+a)\s+(?:(?:CD|DC)\s*[:=]?\s*(\d+)|([^\]]+?)))?\s*\]`,
+  /**
+   * Resolución de tirada con corchetes:
+   *   [Tirada: 14 natural + 3 = 17 vs CD 13 | Éxito]
+   *   [Tirada (Perspicacia): 14 natural vs CD 13]
+   */
+  resolucionCorchetes: String.raw`\[\s*Tirada(?:\s*\(([^)]+?)\))?\s*:\s*(?:d(\d+)\s*=\s*)?(\d+)\s*(?:natural)?\s*([+-]\s*\d+)?\s*(?:=\s*(\d+))?\s*(?:(?:vs|contra|frente\s+a)\s+(?:(?:CD|DC)\s*[:=]?\s*(\d+)|([^\]|]+?)))?(?:\s*[|,]\s*[^\]]+)?\s*\]`,
+  /**
+   * Resolución sin corchetes o fuga al inicio de párrafo:
+   *   14 natural frente a CD 13:
+   *   16 natural + 3 de Destreza = 19 frente a CD 14:
+   */
+  resolucionFuga: String.raw`(?:^|\n)\s*(\d+)\s+natural\s*(?:([+-]\s*\d+)(?:\s+de\s+[a-záéíóúñ]+)?)?\s*(?:=\s*(\d+))?\s+(?:frente\s+a|vs|contra)\s+(?:CD|DC)\s*[:=]?\s*(\d+)\s*[:—–-]?\s*`
 } as const;
 
 const nuevaRegex = (patron: string) => new RegExp(patron, 'gi');
@@ -168,6 +180,60 @@ export function parseMessageSegments(text: string): MessageSegment[] {
       index: match.index,
       endIndex: match.index + match[0].length,
       roll: leerTiradaDeDM(match)
+    });
+  }
+
+  const isOverlapping = (idx: number, end: number) => items.some(it => Math.max(it.index, idx) < Math.min(it.endIndex, end));
+
+  // 6. Tirada Resolución (Corchetes)
+  const resCorchetesRegex = nuevaRegex(PATRONES.resolucionCorchetes);
+  while ((match = resCorchetesRegex.exec(text)) !== null) {
+    if (isOverlapping(match.index, match.index + match[0].length)) continue;
+    const ctx = match[1]?.trim() || 'Resolución';
+    const sides = match[2] ? parseInt(match[2], 10) : 20;
+    const natural = parseInt(match[3], 10);
+    const mod = match[4] ? parseInt(match[4].replace(/\s+/g, ''), 10) : 0;
+    const total = match[5] ? parseInt(match[5], 10) : natural + mod;
+    const dc = match[6] ? parseInt(match[6], 10) : undefined;
+    const contra = match[7]?.trim();
+    items.push({
+      index: match.index,
+      endIndex: match.index + match[0].length,
+      roll: {
+        type: 'dm',
+        dmContext: ctx,
+        sides,
+        natural,
+        modifier: mod,
+        total,
+        dc,
+        contra: contra || undefined,
+        rawText: match[0]
+      }
+    });
+  }
+
+  // 7. Tirada Fuga / Sin corchetes (ej: "14 natural frente a CD 13:")
+  const resFugaRegex = nuevaRegex(PATRONES.resolucionFuga);
+  while ((match = resFugaRegex.exec(text)) !== null) {
+    if (isOverlapping(match.index, match.index + match[0].length)) continue;
+    const natural = parseInt(match[1], 10);
+    const mod = match[2] ? parseInt(match[2].replace(/\s+/g, ''), 10) : 0;
+    const total = match[3] ? parseInt(match[3], 10) : natural + mod;
+    const dc = match[4] ? parseInt(match[4], 10) : undefined;
+    items.push({
+      index: match.index,
+      endIndex: match.index + match[0].length,
+      roll: {
+        type: 'dm',
+        dmContext: 'Resolución de tirada',
+        sides: 20,
+        natural,
+        modifier: mod,
+        total,
+        dc,
+        rawText: match[0]
+      }
     });
   }
 

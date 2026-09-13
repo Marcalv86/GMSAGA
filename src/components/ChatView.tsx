@@ -1340,7 +1340,7 @@ export const ChatView: React.FC<{
                   El pergamino aguarda
                 </h3>
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)] italic font-lora leading-relaxed">
-                  Escribe la primera acción de tu personaje o lanza los dados para que el Narrador comience el relato.
+                  Escribe la primera acción de tu personaje o espera a que el Narrador inicie el relato automáticamente.
                 </p>
               </div>
             ) : (

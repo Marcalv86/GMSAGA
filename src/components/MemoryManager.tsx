@@ -180,6 +180,8 @@ export const MemoryManager: React.FC<{
   hasChats?: boolean;
   /** Qué secciones mostrar. Sin esto, se muestran todas. */
   secciones?: SeccionMemoria[];
+  /** Banner opcional fijo arriba al hacer scroll */
+  topBanner?: React.ReactNode;
 }> = ({
   project,
   files,
@@ -190,7 +192,8 @@ export const MemoryManager: React.FC<{
   onUploadEntityImage,
   isGenerating = false,
   hasChats = false,
-  secciones
+  secciones,
+  topBanner
 }) => {
   /**
    * Qué secciones se muestran. Sirve para partir esta vista en dos: las fichas
@@ -607,6 +610,11 @@ export const MemoryManager: React.FC<{
 
   return (
     <div className="flex-1 overflow-y-auto px-2.5 sm:px-4 md:px-[5%] py-3 md:py-8 font-lora w-full max-w-full overflow-x-hidden">
+      {topBanner && (
+        <div className="sticky top-0 z-30 bg-[var(--bg-color)]/95 backdrop-blur-sm pb-3 pt-1 mb-2 shadow-xs">
+          {topBanner}
+        </div>
+      )}
 
       {/* Banner de Memoria Viva Autónoma / Modo Supervisión */}
       <div className="mb-4 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 p-3 sm:p-3.5 rounded-xl shadow-xs flex items-center justify-between gap-3 text-xs">

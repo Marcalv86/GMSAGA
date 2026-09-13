@@ -391,27 +391,6 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
         </div>
       ) : memoryMode === 'gm' ? (
         <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-          <div className="px-3 sm:px-6 pt-3 flex flex-col gap-2">
-            <button
-              onClick={() => setCuadernoAbierto(false)}
-              className="self-end min-h-[36px] px-3 rounded-lg border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Vuelve a tapar el cuaderno. Se cierra solo al cambiar de pestaña."
-            >
-              <LockIcon className="w-3.5 h-3.5" />
-              Cerrar el cuaderno
-            </button>
-          </div>
-          <div className="px-3 sm:px-6 pt-1">
-            <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 flex items-start gap-2">
-              <span className="text-base leading-none mt-0.5">🕯️</span>
-              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
-                <strong className="text-[var(--accent)] font-cinzel">Esto es el otro lado de la pantalla.</strong>{' '}
-                Lo que el Narrador sabe y tu personaje no: los giros que aún no han salido, lo que hace la gente
-                cuando no estás delante y los planes que corren por detrás. Míralo si quieres —es tu campaña—, pero
-                aquí es donde vive lo que todavía no se ha ganado jugando.
-              </p>
-            </div>
-          </div>
           <MemoryManager
             project={project}
             files={files}
@@ -421,30 +400,33 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             isGenerating={isGenerating}
             hasChats={chats.length > 0}
             secciones={['giros', 'bambalinas', 'relojes', 'facciones', 'preparado']}
+            topBanner={
+              <div className="flex flex-col gap-2 pt-2">
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setCuadernoAbierto(false)}
+                    className="min-h-[36px] px-3 rounded-lg border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-[var(--surface)] shadow-xs"
+                    title="Vuelve a tapar el cuaderno. Se cierra solo al cambiar de pestaña."
+                  >
+                    <LockIcon className="w-3.5 h-3.5" />
+                    Cerrar el cuaderno
+                  </button>
+                </div>
+                <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 flex items-start gap-2 shadow-xs">
+                  <span className="text-base leading-none mt-0.5">🕯️</span>
+                  <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                    <strong className="text-[var(--accent)] font-cinzel">Esto es el otro lado de la pantalla.</strong>{' '}
+                    Lo que el Narrador sabe y tu personaje no: los giros que aún no han salido, lo que hace la gente
+                    cuando no estás delante y los planes que corren por detrás. Míralo si quieres —es tu campaña—, pero
+                    aquí es donde vive lo que todavía no se ha ganado jugando.
+                  </p>
+                </div>
+              </div>
+            }
           />
         </div>
       ) : memoryMode === 'character' ? (
         <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-          {/*
-            El nombre importa, y es suyo: esto es la libreta de la jugadora.
-
-            Se llamaba «Memoria del Personaje & Entidades», que suena a base de
-            datos, y en realidad es exactamente lo que uno apunta en una mesa de
-            verdad —su ficha, lo que lleva, con quién se cruzó, dónde estuvo, qué
-            le deben— solo que se rellena sola jugando. Dicho así, y enfrente del
-            Cuaderno del GM, el reparto se entiende sin explicarlo.
-          */}
-          <div className="px-3 sm:px-6 pt-3">
-            <div className="rounded-lg border border-[var(--user-border)] bg-[var(--surface-soft)] px-3 py-2 flex items-start gap-2">
-              <span className="text-base leading-none mt-0.5">📖</span>
-              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
-                <strong className="text-[var(--accent)] font-cinzel">Tu cuaderno.</strong> Lo que apuntarías tú en una
-                libreta: tu ficha, lo que llevas, con quién te has cruzado, dónde has estado y qué tienes entre manos.
-                La diferencia es que <strong className="text-[var(--text-primary)]">se rellena solo jugando</strong>, y
-                si algo está mal se le dice al GM en el Chat y lo corrige él.
-              </p>
-            </div>
-          </div>
           <MemoryManager
             project={project}
             files={files}
@@ -453,6 +435,19 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             onTriggerAIUpdate={onTriggerAIUpdate ? async () => { onTriggerAIUpdate(); } : undefined}
             isGenerating={isGenerating}
             hasChats={chats.length > 0}
+            topBanner={
+              <div className="pt-2">
+                <div className="rounded-lg border border-[var(--user-border)] bg-[var(--surface-soft)] px-3 py-2 flex items-start gap-2 shadow-xs">
+                  <span className="text-base leading-none mt-0.5">📖</span>
+                  <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                    <strong className="text-[var(--accent)] font-cinzel">Tu cuaderno.</strong> Lo que apuntarías tú en una
+                    libreta: tu ficha, lo que llevas, con quién te has cruzado, dónde has estado y qué tienes entre manos.
+                    La diferencia es que <strong className="text-[var(--text-primary)]">se rellena solo jugando</strong>, y
+                    si algo está mal se le dice al GM en el Chat y lo corrige él.
+                  </p>
+                </div>
+              </div>
+            }
           />
         </div>
       ) : (

@@ -21,7 +21,7 @@ export interface RollRequest {
  * con 'Petición de Tirada', 'Petición de Salvación' o 'Tirada requerida'.
  */
 const ROLL_REQUEST_RE =
-  /(?:\*{1,2})?\[\s*(?:petici[oó]n\s+de\s+(?:tirada|salvaci[oó]n)|tirada\s+requerida)\s*:\s*([^\]|,\-(]+?)(?:\s*(?:[|,:\-]|(?:con\s+)?\(?)\s*(?:cd|dc|dificultad)?\s*[:=]?\s*(\d{1,3})\)?)?\s*\](?:\*{1,2})?/gi;
+  /(?:\*{1,2})?\[\s*(?:petici[oó]n\s+de\s+(?:tirada|salvaci[oó]n)|tirada\s+requerida)\s*:\s*([^\]]+)\](?:\*{1,2})?/gi;
 
 export function parseRollRequests(text: string): RollRequest[] {
   if (!text || (!text.toLowerCase().includes('tirada') && !text.toLowerCase().includes('salvaci'))) return [];
@@ -30,14 +30,21 @@ export function parseRollRequests(text: string): RollRequest[] {
   ROLL_REQUEST_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = ROLL_REQUEST_RE.exec(text)) !== null) {
-    const skill = (match[1] || '').trim();
-    if (!skill) continue;
-    const key = `${skill.toLowerCase()}|${match[2] || ''}`;
+    const rawContent = (match[1] || '').trim();
+    if (!rawContent) continue;
+
+    let dc: number | undefined = undefined;
+    const cdMatch = rawContent.match(/(?:cd|dc|dificultad)\s*[:=]?\s*(\d{1,3})/i);
+    if (cdMatch) {
+      dc = Number(cdMatch[1]);
+    }
+
+    const key = rawContent.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({
-      skill,
-      dc: match[2] ? Number(match[2]) : undefined,
+      skill: rawContent,
+      dc,
       raw: match[0]
     });
   }
