@@ -91,12 +91,14 @@ interface ChatMessageItemProps {
   handleRollRequestClick: (req: RollRequest) => void;
   onOpenTransitionModal?: () => void;
   project?: Project;
+  turnNumber?: number;
 }
 
 const areChatMessageItemPropsEqual = (
   prev: ChatMessageItemProps,
   next: ChatMessageItemProps
 ): boolean => {
+  if (prev.turnNumber !== next.turnNumber) return false;
   if (prev.m !== next.m && (prev.m.content !== next.m.content || prev.m.role !== next.m.role)) {
     return false;
   }
@@ -135,7 +137,8 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   setOraculoAbierto,
   handleRollRequestClick,
   onOpenTransitionModal,
-  project
+  project,
+  turnNumber
 }) => {
   const isModel = m.role === 'model';
   const rollRequests = isModel ? parseRollRequests(m.content) : [];
@@ -442,6 +445,14 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
         */}
         {!isEditing && (
           <div className="mt-2 flex items-center gap-2 min-h-6">
+            {turnNumber !== undefined && (
+              <span
+                className="text-[10px] font-cinzel font-semibold tracking-wider text-[var(--text-secondary)] opacity-60 px-1 select-none shrink-0"
+                title={`Turno ${turnNumber} de este capítulo`}
+              >
+                T{turnNumber}
+              </span>
+            )}
             {!mostrarAcciones && (
               <button
                 onClick={() => setAccionesAbiertas(true)}
@@ -597,6 +608,16 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
   onOpenTransitionModal,
   project
 }) => {
+  const turnNumbers = React.useMemo(() => {
+    let t = 0;
+    return messages.map((m, i) => {
+      if (i === 0 || m.role === 'user') {
+        t++;
+      }
+      return t;
+    });
+  }, [messages]);
+
   return (
     <>
       {messages.map((m, idx) => {
@@ -609,6 +630,7 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
             key={idx}
             m={m}
             idx={idx}
+            turnNumber={turnNumbers[idx]}
             isEditing={isEditing}
             editDraft={isEditing ? editDraft : ''}
             setEditDraft={setEditDraft}
@@ -1276,6 +1298,21 @@ export const ChatView: React.FC<{
               <h2 className="font-cinzel text-base sm:text-lg md:text-xl text-[var(--accent)] font-bold tracking-wider m-0">
                 {chat?.name || `Capítulo ${chapterIndex + 1}`}
               </h2>
+              {chat?.messages && chat.messages.length > 0 && (
+                <div className="mt-1 flex items-center justify-center gap-2 text-[11px] font-cinzel text-[var(--text-secondary)] opacity-80 select-none">
+                  <span className="font-semibold text-[var(--accent)]">
+                    {(() => {
+                      let t = 0;
+                      chat.messages.forEach((m, i) => {
+                        if (i === 0 || m.role === 'user') t++;
+                      });
+                      return t === 1 ? '1 turno jugado' : `${t} turnos jugados`;
+                    })()}
+                  </span>
+                  <span>•</span>
+                  <span>{chat.messages.length} mensajes</span>
+                </div>
+              )}
               {isBackgroundSyncing && (
                 <div className="mt-1.5">
                   <span
