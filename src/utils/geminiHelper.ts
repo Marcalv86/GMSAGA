@@ -3127,7 +3127,12 @@ ${bloqueVivo}`;
     ? `\n\n[⛔ CÓMO SE LEE LO QUE ACABA DE ESCRIBIR LA JUGADORA (aplícalo, no lo narres): eso NO es prosa tuya que continuar, es lo que ella DECLARA, esté en primera o en tercera persona y lleve corchetes o no. 1) No se lo devuelvas ampliado: ni gestos, ni posturas, ni miradas, ni MOTIVOS que ella no haya escrito. Arranca por el mundo. 2) De todo lo que haya ahí, para el mundo solo EXISTE lo que un testigo con ojos y oídos habría captado desde donde está. Los juicios, opiniones, comparaciones, recuerdos y motivos NO han salido de su boca: ningún PNJ los responde, los alude ni los adivina. Callar sí se ve, y un PNJ puede interpretarlo mal —eso es bueno—; acertar con el porqué porque tú lo has leído, no.]`
     : '';
 
-  const finalUserPayload = userText + diceContext + recordatorioDeTurno;
+  const esTurnoUno = (currentChat.messages || []).length <= 1;
+  const turnOneScanPrompt = esTurnoUno 
+    ? `\n\n[⛔ TURNO 1 DE CAMPAÑA - ESCANEO INICIAL OBLIGATORIO DE DOCUMENTOS DE ARRANQUE]: Este es el primer turno de la campaña. Has recibido documentos adjuntos de arranque y premisa. Analízalos a fondo. Si la premisa o el documento de arranque sitúa al grupo en alta mar, en un barco, o en trayecto hacia un destino, ES OBLIGATORIO que declares en este primer turno las etiquetas [ESTAMOS: ...], [LUGAR: ...] y [VIAJE: Destino | jornadas: N] (ej. [VIAJE: Luskan | jornadas: 10]) para que la aplicación configure la travesía y el HUD correctamente. No dejes estos campos vacíos ni omitas el viaje si la premisa es marítima.`
+    : '';
+
+  const finalUserPayload = userText + diceContext + recordatorioDeTurno + turnOneScanPrompt;
 
   if (lastRole === 'user') {
     contents[contents.length - 1].parts.push({ text: '\n\n' + finalUserPayload });
