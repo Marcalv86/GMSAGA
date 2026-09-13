@@ -51,9 +51,70 @@ export interface LoOlvidado {
   entradasDeDiario: string[];
   hitos: string[];
   personajes: string[];
+  /** Frases tachadas del bloque de memoria general. */
+  frasesDeMemoria: string[];
 }
 
-const vacio = (): LoOlvidado => ({ notas: [], entradasDeDiario: [], hitos: [], personajes: [] });
+const vacio = (): LoOlvidado => ({
+  notas: [],
+  entradasDeDiario: [],
+  hitos: [],
+  personajes: [],
+  frasesDeMemoria: []
+});
+
+/**
+ * Tacha del bloque de memoria general las FRASES que hablen de algo.
+ *
+ * Es la pieza que faltaba para que «olvida que desembarcamos en Luskan»
+ * sirviera de verdad. La memoria general viaja entera en cada turno de
+ * partida, así que mientras esa frase siguiera ahí el Narrador volvía a
+ * plantar la escena en el muelle por mucho que se corrigiera el diario, se
+ * borrara el chat o se lo dijera la jugadora tres veces.
+ *
+ * Trabaja por FRASES, no por bloques: se quita la oración que lo menciona y el
+ * resto de la memoria se queda intacto. Y nunca vacía el bloque entero — si
+ * después de tachar no quedara nada, se deja como estaba: una memoria en
+ * blanco es mucho peor que una memoria con una frase de más.
+ */
+function tacharDeLaMemoria(texto: string | undefined, orden: string): { texto: string; fuera: string[] } {
+  const original = texto || '';
+  if (!original.trim()) return { texto: original, fuera: [] };
+  const clave = normalizar(orden);
+  if (clave.length < 6) return { texto: original, fuera: [] };
+
+  const fuera: string[] = [];
+  const lineas = original.split('\n').map(linea => {
+    // Una línea de lista o un encabezado se juega entero; la prosa, por frases.
+    const esLista = /^\s*([-*•]|\d+[.)])\s/.test(linea) || /^\s*#{1,6}\s/.test(linea);
+    if (esLista) {
+      if (normalizar(linea).includes(clave)) {
+        fuera.push(linea.trim().slice(0, 120));
+        return null;
+      }
+      return linea;
+    }
+    const frases = linea.split(/(?<=[.!?…])\s+/);
+    const quedan = frases.filter(f => {
+      if (f.trim() && normalizar(f).includes(clave)) {
+        fuera.push(f.trim().slice(0, 120));
+        return false;
+      }
+      return true;
+    });
+    return quedan.join(' ');
+  });
+
+  if (!fuera.length) return { texto: original, fuera: [] };
+  const limpio = lineas
+    .filter(l => l !== null)
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  // El seguro: tachar no puede dejar la campaña sin memoria.
+  if (!limpio) return { texto: original, fuera: [] };
+  return { texto: limpio, fuera };
+}
 
 /** Si el texto de una ficha cae dentro de lo que se manda olvidar, o al revés. */
 const coincide = (candidato: string | undefined, orden: string) => {
@@ -125,6 +186,19 @@ export function aplicarOlvidos(
       const vetados = new Set([...(mem.no_son_pnj || []), ...fuera.map(n => n.name)]);
       mem.no_son_pnj = [...vetados];
     }
+
+    /*
+     * 5. El bloque de memoria general, que es el que de verdad manda.
+     *
+     * Iba sin goma, y era el único de los cinco que viaja ENTERO en cada turno
+     * de partida. Por eso una escena desmentida seguía dirigiendo la campaña
+     * desde ahí dentro aunque se hubiera limpiado todo lo demás.
+     */
+    const tachado = tacharDeLaMemoria(mem.raw_project_memory, orden);
+    if (tachado.fuera.length) {
+      mem.raw_project_memory = tachado.texto;
+      quitado.frasesDeMemoria.push(...tachado.fuera);
+    }
   }
 
   return { memoria: mem, timeline: linea, quitado };
@@ -132,7 +206,13 @@ export function aplicarOlvidos(
 
 /** Si no se quitó nada, no hace falta tocar la campaña ni decir nada. */
 export function nadaQueOlvidar(q: LoOlvidado): boolean {
-  return !q.notas.length && !q.entradasDeDiario.length && !q.hitos.length && !q.personajes.length;
+  return (
+    !q.notas.length &&
+    !q.entradasDeDiario.length &&
+    !q.hitos.length &&
+    !q.personajes.length &&
+    !q.frasesDeMemoria.length
+  );
 }
 
 /** Lo quitado, en una línea por familia, para enseñárselo a la jugadora. */
@@ -142,6 +222,8 @@ export function resumirOlvidos(q: LoOlvidado): string[] {
   if (q.entradasDeDiario.length) partes.push(`${q.entradasDeDiario.length} entrada(s) del diario`);
   if (q.hitos.length) partes.push(`${q.hitos.length} hito(s)`);
   if (q.personajes.length) partes.push(`la ficha de ${q.personajes.join(', ')}`);
+  if (q.frasesDeMemoria.length)
+    partes.push(`${q.frasesDeMemoria.length} frase(s) de la memoria general`);
   return partes;
 }
 
@@ -237,4 +319,43 @@ export function aplicarEtiquetados<T extends { name: string; etiquetasBusqueda?:
   });
 
   return { archivos: salida, aplicado };
+}
+
+
+/** `[ESTADO: dónde están y cómo están ahora mismo]`. */
+const ESTADO_RE = /\[\s*ESTADO\s*:\s*([^\]]+)\]/gi;
+
+/** La marca del bloque que gestiona la aplicación dentro de la memoria general. */
+const MARCA_ESTADO = '— DÓNDE ESTAMOS AHORA (corregido en la mesa) —';
+
+/**
+ * Lee la declaración de estado que hace el Director en la mesa.
+ */
+export function leerEstado(texto: string): string | null {
+  if (!texto || !/ESTADO/i.test(texto)) return null;
+  ESTADO_RE.lastIndex = 0;
+  let ultimo: string | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = ESTADO_RE.exec(texto)) !== null) {
+    const v = m[1].trim().replace(/\s+/g, ' ');
+    if (v.length >= 10) ultimo = v.slice(0, 600);
+  }
+  return ultimo;
+}
+
+/**
+ * Escribe ese estado en la memoria general, en un bloque que es SUYO.
+ *
+ * El Director no reescribe la memoria entera —eso es meterle la mano al
+ * cuaderno de la campaña, y una etiqueta mal emitida se llevaría por delante
+ * meses de juego—. Mantiene un solo bloque al final, siempre el mismo, que se
+ * reemplaza al completo cada vez. Va al final a propósito: es lo último que
+ * lee el Narrador de ese bloque, y lo último desmiente a lo anterior.
+ *
+ * Pasar una cadena vacía retira el bloque y deja la memoria como estaba.
+ */
+export function fijarEstadoEnMemoria(memoriaBruta: string | undefined, estado: string): string {
+  const base = (memoriaBruta || '').split(MARCA_ESTADO)[0].trimEnd();
+  if (!estado.trim()) return base;
+  return `${base}\n\n${MARCA_ESTADO}\n${estado.trim()}`.trim();
 }

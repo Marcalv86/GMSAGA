@@ -102,6 +102,7 @@ export const MesaView: React.FC<{
     inventario: CambioDeInventario;
     aprendido?: Aprendizaje[];
     estamos?: string | null;
+    estado?: string | null;
     viaje?: ViajeLeido | null;
     bambalinas?: MovimientoOculto[];
     relojes?: RelojOculto[];
@@ -262,6 +263,7 @@ export const MesaView: React.FC<{
           inventario: respuesta.inventario,
           aprendido: respuesta.aprendido,
           estamos: respuesta.estamos,
+          estado: respuesta.estado,
           viaje: respuesta.viaje,
           bambalinas: respuesta.bambalinas,
           relojes: respuesta.relojes,

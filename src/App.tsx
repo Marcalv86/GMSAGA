@@ -123,7 +123,7 @@ import { guardarMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
-import { aplicarOlvidos } from './utils/ordenesDeMesa';
+import { aplicarOlvidos, fijarEstadoEnMemoria } from './utils/ordenesDeMesa';
 import type { ViajeLeido, VinculoLeido } from './utils/campaignCalendar';
 import type { Aprendizaje, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from './types';
 import type { CambioDeInventario } from './types';
@@ -1490,6 +1490,7 @@ export default function App() {
     olvidos: string[];
     etiquetados?: OrdenDeEtiquetado[];
     estamos?: string | null;
+    estado?: string | null;
     viaje?: ViajeLeido | null;
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
@@ -1520,6 +1521,7 @@ export default function App() {
       !cuadernoQuieto(orden.bambalinas || [], orden.relojes || []) ||
       !sinNovedadDeMesa(orden.facciones || [], orden.preparado || []) ||
       Boolean(orden.estamos) ||
+      Boolean(orden.estado) ||
       Boolean(orden.viaje);
     if (!hayAlgo) return;
 
@@ -1570,6 +1572,19 @@ export default function App() {
        * viaje ya no va a ocurrir. Cerrarlo con «fin» sigue exigiendo que las
        * jornadas estén cumplidas, igual que en partida.
        */
+      /*
+       * EL ESTADO, ESCRITO DONDE EL NARRADOR SÍ LO LEE.
+       *
+       * La memoria general es el único bloque que viaja ENTERO en cada turno,
+       * y era el único que el Director no podía tocar. Ahora mantiene ahí un
+       * bloque suyo, al final —lo último desmiente a lo anterior—, que se
+       * reemplaza completo cada vez. No reescribe el resto: una etiqueta mal
+       * emitida no puede llevarse por delante meses de campaña.
+       */
+      if (orden.estado) {
+        mem = { ...mem, raw_project_memory: fijarEstadoEnMemoria(mem?.raw_project_memory, orden.estado) };
+      }
+
       if (orden.viaje) {
         if (orden.viaje.fin) {
           const abierto = mem?.viaje;

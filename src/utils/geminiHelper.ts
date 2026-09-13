@@ -65,7 +65,7 @@ import {
 import { cambioVacio, leerInventario } from './inventoryTag';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
 import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa } from './cuadernoOculto';
-import { leerEtiquetados, leerOlvidos, OrdenDeEtiquetado } from './ordenesDeMesa';
+import { leerEstado, leerEtiquetados, leerOlvidos, OrdenDeEtiquetado } from './ordenesDeMesa';
 import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
 import { logError, logWarn, logInfo } from './logger';
@@ -6032,6 +6032,10 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama]\` — apunta en tu cuaderno algo que ha pasado fuera de cámara. Sirve para cuando ella te pregunta «¿qué ha estado haciendo X estos días?» y hay que dejarlo escrito, o para corregir un apunte que se quedó corto. Queda fechado en el día de campaña actual.
 - \`[ESTAMOS: dónde transcurre la escena ahora]\` — **DÓNDE ESTÁIS DE VERDAD.** Es la corrección más importante que puedes hacer y hasta ahora no la tenías: si ella te dice que el Narrador la ha plantado en un sitio en el que no está, esto lo arregla. ⭐ **Emítela SIEMPRE que aceptes que el sitio está mal**, no te limites a decir que lo corriges: sin la etiqueta no se corrige nada y el Narrador vuelve a llevarla al mismo sitio el turno siguiente, porque lo que él lee es el diario, no esta conversación. Ejemplo: \`[ESTAMOS: la bodega de proa del bergantín corsario, en alta mar en el Mar de las Espadas]\`.
 - \`[VIAJE: destino | jornadas: N]\` y \`[VIAJE: cancelar]\` — el trayecto largo en marcha. Ábrelo si resulta que están de camino y nadie lo estaba contando; **cancélalo** si el viaje ya no va a ocurrir o si de verdad han llegado y la cuenta se quedó descolgada. ⚠️ \`[VIAJE: fin]\` solo cierra si las jornadas están cumplidas; para abandonar un camino a medias, \`cancelar\`.
+- \`[ESTADO: dónde están y cómo están ahora mismo]\` — **la memoria general de la campaña, que es la que el Narrador lee ENTERA en cada turno.** Mantiene un bloque tuyo al final que se reemplaza completo cada vez, así que escríbelo como una foto del presente: dónde están, con quién, en qué situación y qué acaba de pasar. Ejemplo: \`[ESTADO: Aryendell sigue prisionera en la bodega de proa del bergantín de Bregan D'aerthe, en alta mar en el Mar de las Espadas, con grilletes antimagia. NO han llegado a Luskan ni han desembarcado.\]\`
+- \`[OLVIDA: lo que hay que quitar]\` — tu goma, y ahora **también tacha frases de la memoria general**, que antes era lo único intocable. Si ahí dentro quedó escrito un suceso desmentido —«desembarcaron en los muelles de Luskan»— con olvidarlo no basta que lo quites del diario: quítalo también de ahí, o seguirá dirigiendo la campaña desde dentro. ⚠️ Nunca vacía el bloque entero: si al tachar no quedara nada, se deja como estaba.
+
+⭐ **LAS CUATRO DE ARRIBA SON LA DIFERENCIA ENTRE CORREGIR Y DECIR QUE CORRIGES.** Si aceptas que algo está mal y NO emites la etiqueta, no has arreglado nada: esta conversación no la lee el Narrador, y al turno siguiente volverá a hacer exactamente lo mismo. Emítelas siempre que des la razón, y di en voz alta lo que has corregido.
 - \`[RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve]\` — crea o mueve un plan que corre por detrás. «van: +1» lo avanza, «van: 4» lo fija.
 - \`[FACCIÓN: Nombre | es: qué es | quiere: su objetivo | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra (rival) | oculto: lo que ella no sabe]\` — la ficha de un bando. Sirve para apuntar uno nuevo cuando ella te lo cuenta y para corregir una postura que ha cambiado jugando.
 - \`[ETIQUETA: nombre del archivo | términos, separados, por, comas]\` — dile al buscador por qué términos debe encontrar un documento de la biblioteca. **Esto arregla el fallo más silencioso que hay**: el buscador casa palabras, no significados, así que no sabe que Jarlaxle es drow y en una conversación con él la cantera de Menzoberranzan no sube. Tú sí lo sabes.
@@ -6126,6 +6130,8 @@ export interface RespuestaDeMesa {
   /** Apuntes en su cuaderno: lo que ha pasado fuera de cámara. */
   /** Dónde transcurre la escena ahora, si el Director lo ha corregido. */
   estamos: string | null;
+  /** El estado de la campaña que el Director fija en la memoria general. */
+  estado: string | null;
   /** Un trayecto abierto, cerrado o cancelado desde la mesa. */
   viaje: ViajeLeido | null;
   bambalinas: MovimientoOculto[];
@@ -6314,6 +6320,7 @@ export async function preguntarAlDirectorOOC(
    * chat: el chat no era quien lo estaba diciendo.
    */
   const estamos = leerEstamos(bruto);
+  const estado = leerEstado(bruto);
   const viajeDeMesa = leerViaje(bruto);
 
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
@@ -6324,6 +6331,7 @@ export async function preguntarAlDirectorOOC(
     .replace(/\[\s*APRENDE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*BAMBALINAS\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*ESTAMOS\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*ESTADO\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*VIAJE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*RELOJ\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*FACCI[OÓ]N\s*:[^\]]*\]/gi, '')
@@ -6343,6 +6351,7 @@ export async function preguntarAlDirectorOOC(
     inventario,
     aprendido,
     estamos,
+    estado,
     viaje: viajeDeMesa,
     bambalinas,
     relojes,
