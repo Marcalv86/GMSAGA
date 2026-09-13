@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { Chat, Project, ProjectFile } from '../types';
 import { describeApiError, ImagenDeMesa, modelosParaElDirector, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
-import { SecretoLeido, VinculoLeido } from '../utils/campaignCalendar';
+import { SecretoLeido, ViajeLeido, VinculoLeido } from '../utils/campaignCalendar';
 import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from '../types';
 import {
   conMiles,
@@ -101,6 +101,8 @@ export const MesaView: React.FC<{
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
     aprendido?: Aprendizaje[];
+    estamos?: string | null;
+    viaje?: ViajeLeido | null;
     bambalinas?: MovimientoOculto[];
     relojes?: RelojOculto[];
     facciones?: Faccion[];
@@ -259,6 +261,8 @@ export const MesaView: React.FC<{
           vinculos: respuesta.vinculos,
           inventario: respuesta.inventario,
           aprendido: respuesta.aprendido,
+          estamos: respuesta.estamos,
+          viaje: respuesta.viaje,
           bambalinas: respuesta.bambalinas,
           relojes: respuesta.relojes,
           facciones: respuesta.facciones,

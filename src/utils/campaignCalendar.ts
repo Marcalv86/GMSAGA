@@ -560,6 +560,8 @@ const NIVEL_RE = /\[\s*NIVEL\s*:\s*([^\]]+)\]/gi;
 const AGENDA_RE = /\[\s*AGENDA\s*:\s*([^\]]+)\]/gi;
 const HILO_RE = /\[\s*HILO\s*:\s*([^\]]+)\]/gi;
 const VIAJE_RE = /\[\s*VIAJE\s*:\s*([^\]]+)\]/gi;
+/** `[ESTAMOS: la bodega del bergantín, en alta mar]` — dónde transcurre la escena AHORA. */
+const ESTAMOS_RE = /\[\s*ESTAMOS\s*:\s*([^\]]+)\]/gi;
 const LUGAR_RE = /\[\s*LUGAR\s*:\s*([^\]]+)\]/gi;
 
 /**
@@ -1557,6 +1559,7 @@ export function limpiarEtiquetasDePnj(texto: string): string {
     .replace(REVELADO_RE, '')
     .replace(SECRETO_RE, '')
     .replace(VIAJE_RE, '')
+    .replace(ESTAMOS_RE, '')
     .replace(LUGAR_RE, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
@@ -1725,4 +1728,31 @@ export function leerLugares(texto: string): LugarLeido[] {
     if (nombre.length > 1 && detalle.length > 3) out.push({ nombre, detalle });
   }
   return out;
+}
+
+
+/**
+ * Dónde transcurre la escena AHORA MISMO, corregido a mano desde la mesa.
+ *
+ * Existe porque el chat de mesa prometía algo que no podía cumplir. La
+ * jugadora le decía al Director «seguimos en el barco, no hemos llegado a
+ * Luskan», él contestaba «tienes razón, lo corrijo»… y no pasaba nada: sus
+ * etiquetas de corrección llegaban a los vínculos, al inventario y al
+ * cuaderno oculto, pero NO al sitio donde está la escena. El diario seguía
+ * diciendo Luskan, el diario es lo que viaja en cada turno, y el Narrador
+ * volvía a plantarla en el muelle una y otra vez por mucho que se corrigiera.
+ *
+ * Esto no apunta una nota sobre un lugar —para eso está \`[LUGAR:]\`—: dice
+ * dónde se está, y pisa lo que dijera el diario.
+ */
+export function leerEstamos(texto: string): string | null {
+  if (!texto) return null;
+  ESTAMOS_RE.lastIndex = 0;
+  let ultimo: string | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = ESTAMOS_RE.exec(texto)) !== null) {
+    const v = m[1].trim();
+    if (v) ultimo = v.slice(0, 120);
+  }
+  return ultimo;
 }

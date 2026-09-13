@@ -38,6 +38,7 @@ import {
   leerAgenda,
   estacionDelDia,
   leerViaje,
+  leerEstamos,
   leerLugares,
   marcoDeLugar,
   type ViajeLeido,
@@ -6029,6 +6030,8 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
   - **\`~\` es «se lo han quitado»**, y es distinto de \`-\`. Si la requisaron, la detuvieron, la registraron o la robaron, sus cosas siguen siendo suyas y las tiene otro: van con \`~\` y con quién las tiene. Borrarlas con \`-\` hace desaparecer al personaje de la partida —sus documentos, sus herramientas y sus reliquias son lo que la define—. Cuando las recupere, \`+\` se las devuelve a las manos.
 - \`[APRENDE: +Nombre (tipo)]\` — apunta un conjuro, un rasgo, una competencia, un idioma o una mejora de característica que ella tenga y no conste. Tipos: conjuro, rasgo, competencia, mejora. Es LA vía para arreglar el hueco más silencioso que hay: su ficha se subió congelada en un nivel y todo lo que ha ganado subiendo desde entonces no está escrito en ninguna parte. Si te dice «al subir a nivel 4 cogí Bola de fuego y +2 a Sabiduría», lo apuntas y ya cuenta: \`[APRENDE: +Bola de fuego (conjuro), +2 a Sabiduría (mejora, nivel 4)]\`.
 - \`[BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama]\` — apunta en tu cuaderno algo que ha pasado fuera de cámara. Sirve para cuando ella te pregunta «¿qué ha estado haciendo X estos días?» y hay que dejarlo escrito, o para corregir un apunte que se quedó corto. Queda fechado en el día de campaña actual.
+- \`[ESTAMOS: dónde transcurre la escena ahora]\` — **DÓNDE ESTÁIS DE VERDAD.** Es la corrección más importante que puedes hacer y hasta ahora no la tenías: si ella te dice que el Narrador la ha plantado en un sitio en el que no está, esto lo arregla. ⭐ **Emítela SIEMPRE que aceptes que el sitio está mal**, no te limites a decir que lo corriges: sin la etiqueta no se corrige nada y el Narrador vuelve a llevarla al mismo sitio el turno siguiente, porque lo que él lee es el diario, no esta conversación. Ejemplo: \`[ESTAMOS: la bodega de proa del bergantín corsario, en alta mar en el Mar de las Espadas]\`.
+- \`[VIAJE: destino | jornadas: N]\` y \`[VIAJE: cancelar]\` — el trayecto largo en marcha. Ábrelo si resulta que están de camino y nadie lo estaba contando; **cancélalo** si el viaje ya no va a ocurrir o si de verdad han llegado y la cuenta se quedó descolgada. ⚠️ \`[VIAJE: fin]\` solo cierra si las jornadas están cumplidas; para abandonar un camino a medias, \`cancelar\`.
 - \`[RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve]\` — crea o mueve un plan que corre por detrás. «van: +1» lo avanza, «van: 4» lo fija.
 - \`[FACCIÓN: Nombre | es: qué es | quiere: su objetivo | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra (rival) | oculto: lo que ella no sabe]\` — la ficha de un bando. Sirve para apuntar uno nuevo cuando ella te lo cuenta y para corregir una postura que ha cambiado jugando.
 - \`[ETIQUETA: nombre del archivo | términos, separados, por, comas]\` — dile al buscador por qué términos debe encontrar un documento de la biblioteca. **Esto arregla el fallo más silencioso que hay**: el buscador casa palabras, no significados, así que no sabe que Jarlaxle es drow y en una conversación con él la cantera de Menzoberranzan no sube. Tú sí lo sabes.
@@ -6121,6 +6124,10 @@ export interface RespuestaDeMesa {
   /** Conjuros, rasgos o competencias que el Director apunta porque ella se lo pide. */
   aprendido: Aprendizaje[];
   /** Apuntes en su cuaderno: lo que ha pasado fuera de cámara. */
+  /** Dónde transcurre la escena ahora, si el Director lo ha corregido. */
+  estamos: string | null;
+  /** Un trayecto abierto, cerrado o cancelado desde la mesa. */
+  viaje: ViajeLeido | null;
   bambalinas: MovimientoOculto[];
   /** Relojes creados o movidos desde la mesa. */
   relojes: RelojOculto[];
@@ -6296,6 +6303,18 @@ export async function preguntarAlDirectorOOC(
   const facciones = leerFacciones(bruto);
   const preparado = leerPreparado(bruto);
   const etiquetados = leerEtiquetados(bruto);
+  /*
+   * Y lo que de verdad faltaba: DÓNDE ESTAMOS y SI SEGUIMOS DE CAMINO.
+   *
+   * El Director podía corregir vínculos, inventario y cuaderno, pero no el
+   * sitio ni el trayecto. Así que cuando la jugadora le decía «no hemos
+   * llegado a Luskan», él contestaba que lo corregía y no corregía nada: el
+   * diario seguía apuntando el muelle, y el diario es lo que viaja en cada
+   * turno de partida. Por eso volvía al muelle por mucho que se borrara el
+   * chat: el chat no era quien lo estaba diciendo.
+   */
+  const estamos = leerEstamos(bruto);
+  const viajeDeMesa = leerViaje(bruto);
 
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
   const texto = stripStateTag(limpiarEtiquetasDeTiempo(limpiarEtiquetasDePnj(bruto)))
@@ -6304,6 +6323,8 @@ export async function preguntarAlDirectorOOC(
     .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*APRENDE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*BAMBALINAS\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*ESTAMOS\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*VIAJE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*RELOJ\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*FACCI[OÓ]N\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*PREPARADO\s*:[^\]]*\]/gi, '')
@@ -6321,6 +6342,8 @@ export async function preguntarAlDirectorOOC(
     vinculos,
     inventario,
     aprendido,
+    estamos,
+    viaje: viajeDeMesa,
     bambalinas,
     relojes,
     facciones,

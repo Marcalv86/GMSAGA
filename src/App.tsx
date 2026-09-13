@@ -124,7 +124,7 @@ import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario }
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
 import { aplicarOlvidos } from './utils/ordenesDeMesa';
-import type { VinculoLeido } from './utils/campaignCalendar';
+import type { ViajeLeido, VinculoLeido } from './utils/campaignCalendar';
 import type { Aprendizaje, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from './types';
 import type { CambioDeInventario } from './types';
 import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
@@ -1489,6 +1489,8 @@ export default function App() {
   const corregirDesdeLaMesa = async (orden: {
     olvidos: string[];
     etiquetados?: OrdenDeEtiquetado[];
+    estamos?: string | null;
+    viaje?: ViajeLeido | null;
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
     aprendido?: Aprendizaje[];
@@ -1516,13 +1518,73 @@ export default function App() {
       !cambioVacio(orden.inventario) ||
       !nadaAprendido(orden.aprendido || []) ||
       !cuadernoQuieto(orden.bambalinas || [], orden.relojes || []) ||
-      !sinNovedadDeMesa(orden.facciones || [], orden.preparado || []);
+      !sinNovedadDeMesa(orden.facciones || [], orden.preparado || []) ||
+      Boolean(orden.estamos) ||
+      Boolean(orden.viaje);
     if (!hayAlgo) return;
 
     await handleUpdateProjectField(p => {
       const marca = calendarioValido(p.calendar) && p.currentDate ? aDiaAbsoluto(p.calendar, p.currentDate) : 0;
       const { memoria, timeline } = aplicarOlvidos(p.memory, p.timeline, orden.olvidos);
       let mem = memoria;
+      let diario = timeline;
+
+      /*
+       * ⛔ DÓNDE ESTAMOS, CORREGIDO DE VERDAD.
+       *
+       * El agujero que hacía inútil corregir por el chat: el Director decía
+       * «tienes razón, seguimos en el barco» y no tocaba nada, porque no tenía
+       * ninguna etiqueta que llegase al sitio. Y el sitio lo lee el Narrador
+       * del DIARIO, no de esta conversación — de ahí que borrar el chat de
+       * partida no sirviera de nada y volviera al mismo muelle una y otra vez.
+       *
+       * Se corrige la ÚLTIMA entrada del diario que llevaba lugar, en su sitio
+       * y sin añadir una nueva: esto es una errata, no un suceso. Si no había
+       * ninguna, se apunta una en el día de hoy para que haya de dónde leerlo.
+       */
+      if (orden.estamos) {
+        const ordenado = [...(diario || [])].sort((a, b) =>
+          a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay
+        );
+        const ultimoConLugar = [...ordenado].filter(e => e.lugar).pop();
+        diario = ultimoConLugar
+          ? (diario || []).map(e => (e === ultimoConLugar ? { ...e, lugar: orden.estamos! } : e))
+          : [
+              ...(diario || []),
+              {
+                id: `tl_sitio_${Date.now()}`,
+                absDay: marca,
+                date:
+                  calendarioValido(p.calendar) && p.currentDate ? fechaLegible(p.calendar, p.currentDate) : '',
+                title: 'Dónde transcurre la escena',
+                summary: orden.estamos!,
+                lugar: orden.estamos!
+              }
+            ];
+      }
+
+      /*
+       * Y el trayecto, que hasta ahora solo podía tocar el Narrador.
+       *
+       * Cancelar desde la mesa vale siempre: es la jugadora diciendo que ese
+       * viaje ya no va a ocurrir. Cerrarlo con «fin» sigue exigiendo que las
+       * jornadas estén cumplidas, igual que en partida.
+       */
+      if (orden.viaje) {
+        if (orden.viaje.fin) {
+          const abierto = mem?.viaje;
+          const cumplidas =
+            abierto && Number.isFinite(abierto.iniciadoAbs) ? Math.max(0, marca - abierto.iniciadoAbs) : 0;
+          if (orden.viaje.cancelado || !abierto || cumplidas >= abierto.jornadas) {
+            mem = { ...mem, viaje: undefined };
+          }
+        } else if (orden.viaje.destino && orden.viaje.jornadas) {
+          mem = {
+            ...mem,
+            viaje: { destino: orden.viaje.destino, jornadas: orden.viaje.jornadas, iniciadoAbs: marca }
+          };
+        }
+      }
 
       // Correcciones sobre personajes que YA existen. Aquí no se fichan nuevos:
       // para eso está la partida; esto es una corrección, no una escena.
@@ -1610,7 +1672,7 @@ export default function App() {
         };
       }
 
-      return { memory: sanitizeProjectMemory(mem), timeline };
+      return { memory: sanitizeProjectMemory(mem), timeline: diario };
     });
   };
 
