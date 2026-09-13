@@ -1631,6 +1631,61 @@ export const ChatView: React.FC<{
                                 </span>
                               </div>
                             )}
+                          {/*
+                            EL TRAYECTO ABIERTO, Y LA FORMA DE ABANDONARLO.
+
+                            Va aquí porque el viaje es tiempo, y el tiempo se
+                            mira en este desplegable. Pero sobre todo porque
+                            la aplicación ya NO deja que el Narrador cierre un
+                            trayecto cuyas jornadas no ha cumplido, y poner un
+                            cerrojo sin dar una llave es dejar a la jugadora
+                            encerrada en un viaje que quizá ya no quiere hacer.
+                            Aquí está la llave: suya, no suya del Narrador.
+                          */}
+                          {(() => {
+                            const v = project?.memory?.viaje;
+                            if (!v?.destino || !v.jornadas || !onUpdateProject) return null;
+                            const hoyAbs = fecha ? aDiaAbsoluto(cal!, fecha) : undefined;
+                            const hechas =
+                              hoyAbs !== undefined && Number.isFinite(v.iniciadoAbs)
+                                ? Math.max(0, hoyAbs - v.iniciadoAbs)
+                                : 0;
+                            const faltan = Math.max(0, v.jornadas - hechas);
+                            return (
+                              <div className="border-t border-[var(--glass-border)] pt-2 space-y-1.5">
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className="font-cinzel text-[11px] text-[var(--text-secondary)] shrink-0">
+                                    Rumbo a
+                                  </span>
+                                  <span className="text-[11px] text-right text-[var(--text-primary)]">{v.destino}</span>
+                                </div>
+                                <p className="text-[10px] text-[var(--text-secondary)] m-0 leading-snug">
+                                  {faltan > 0
+                                    ? `Jornada ${Math.min(hechas + 1, v.jornadas)} de ${v.jornadas} · ${
+                                        faltan === 1 ? 'queda 1 jornada' : `quedan ${faltan} jornadas`
+                                      }. Hasta que se cumplan, el Narrador no puede dar por llegado el viaje.`
+                                    : 'El camino ya está cumplido: se puede llegar en cuanto la escena lo permita.'}
+                                </p>
+                                <button
+                                  onClick={() => {
+                                    if (
+                                      !window.confirm(
+                                        `¿Dar por terminado el trayecto a ${v.destino}?\n\nLa aplicación dejará de contar jornadas y el Narrador podrá situar la escena donde quiera. Úsalo si el viaje ya no va a ocurrir, o si de verdad habéis llegado y la cuenta se quedó atrás.`
+                                      )
+                                    )
+                                      return;
+                                    onUpdateProject(prev => ({
+                                      memory: prev.memory ? { ...prev.memory, viaje: undefined } : prev.memory
+                                    }));
+                                    setTiempoAbierto(false);
+                                  }}
+                                  className="w-full text-[10px] font-cinzel uppercase tracking-wide border border-[var(--user-border)] rounded px-2 py-1 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors"
+                                >
+                                  Cerrar el trayecto a mano
+                                </button>
+                              </div>
+                            );
+                          })()}
                           </>
                         ) : (
                           <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
