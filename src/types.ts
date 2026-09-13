@@ -682,6 +682,14 @@ export interface Memory {
     jornadas: number;
     /** Día absoluto de la campaña en que se zarpó. */
     iniciadoAbs: number;
+    /**
+     * El Narrador dio el trayecto por terminado antes de tiempo.
+     *
+     * No se le hace caso —el viaje sigue abierto—, pero queda anotado para
+     * poder decírselo al turno siguiente con el número delante, que es lo
+     * único que no puede discutir.
+     */
+    llegadaPrematura?: boolean;
   };
   no_son_pnj?: string[];
   gm_secrets?: SecretoDeCampana[];

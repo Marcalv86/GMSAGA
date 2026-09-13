@@ -2332,7 +2332,23 @@ El último sitio apuntado en el diario es **«${lugarApuntado}»**, y eso es una
         ? Math.max(0, hoyAbs - viaje.iniciadoAbs)
         : 0;
     const faltan = Math.max(0, viaje.jornadas - hechas);
-    return `
+    /*
+     * EL DESMENTIDO, CUANDO INTENTÓ LLEGAR ANTES DE TIEMPO.
+     *
+     * La aplicación ya ha rechazado el cierre; esto es decírselo. Va lo primero
+     * del bloque porque es lo que tiene que leer antes de escribir una línea
+     * más: si no, sigue tan campante desde el puerto en el que cree estar.
+     */
+    const desmentido = viaje.llegadaPrematura
+      ? `### ⛔ NO HABÉIS LLEGADO. EL TURNO ANTERIOR DISTE POR TERMINADO UN TRAYECTO QUE NO LO ESTÁ.
+Cerraste el viaje a ${viaje.destino} cuando todavía ${faltan === 1 ? 'queda 1 jornada' : `quedan ${faltan} jornadas`} de camino, así que la aplicación **no lo ha cerrado**: el trayecto sigue abierto y el destino sigue por delante.
+**Arregla la contradicción DENTRO de la ficción, en este mismo turno y sin salirte del relato.** Lo que se vio no era el destino: una costa parecida, un cabo que engaña, un fondeadero intermedio, un viento que ha obligado a virar, una corriente que ha alargado la ruta. Un personaje puede decirlo en voz alta —es lo más limpio—: quien conoce la ruta corrige al que se ha confundido.
+⛔ **Lo que NO vale es seguir como si hubierais desembarcado.** La jugadora tiene las dos versiones delante en su propio chat.
+
+`
+      : '';
+
+    return `${desmentido}
 ### 🧭 TRAVESÍA EN CURSO — RUMBO A ${viaje.destino.toUpperCase()}
 **Jornada ${Math.min(hechas + 1, viaje.jornadas)} de ${viaje.jornadas}. ${
       faltan > 0

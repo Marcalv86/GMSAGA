@@ -1586,25 +1586,49 @@ export interface ViajeLeido {
   jornadas?: number;
   /** \`[VIAJE: fin]\`: se ha llegado, o el trayecto se cancela. */
   fin: boolean;
+  /**
+   * La apertura que venía en ESTE MISMO turno, aunque después llegara un
+   * cierre. Sin esto, abrir y cerrar de un tirón borraba el viaje entero.
+   */
+  aperturaDelTurno?: { destino: string; jornadas: number };
+  /**
+   * El cierre era una CANCELACIÓN («cancelar»), no una llegada. Cancelar vale
+   * siempre —el trayecto se abandona—; llegar hay que ganárselo.
+   */
+  cancelado?: boolean;
 }
 
 /**
  * Lee \`[VIAJE: Luskan | jornadas: 10]\` y \`[VIAJE: fin]\`.
  *
- * Se queda con la ÚLTIMA etiqueta del turno: si el Narrador abre y cierra un
- * trayecto en el mismo mensaje, lo que vale es cómo acaba.
+ * ⚠️ ANTES se quedaba solo con la ÚLTIMA etiqueta del turno, y ahí estaba el
+ * agujero: el Narrador abría el trayecto y lo cerraba en el MISMO mensaje
+ * —\`[VIAJE: Luskan | jornadas: 2]\` … \`[VIAJE: fin]\`—, la apertura se perdía
+ * por el camino y la aplicación se quedaba sin ningún viaje que contar. Dos
+ * jornadas de mar despachadas en un turno, y el reloj avanzando un solo día.
+ *
+ * Ahora la apertura NO se pierde aunque venga un cierre detrás: se devuelve
+ * aparte, y es quien aplica esto el que decide si ese cierre vale. Un trayecto
+ * de dos jornadas no se puede abrir y terminar sin que pase el tiempo.
  */
 export function leerViaje(texto: string): ViajeLeido | null {
   if (!texto) return null;
   VIAJE_RE.lastIndex = 0;
   let ultimo: ViajeLeido | null = null;
+  let apertura: { destino: string; jornadas: number } | undefined;
   let m: RegExpExecArray | null;
   while ((m = VIAJE_RE.exec(texto)) !== null) {
     const campos = m[1].split('|').map(x => x.trim()).filter(Boolean);
     if (!campos.length) continue;
     const cabeza = campos[0];
     if (/^(fin|final|llegada|llegamos|cancelar|cancelado)$/i.test(cabeza)) {
-      ultimo = { destino: '', fin: true };
+      ultimo = {
+        destino: '',
+        fin: true,
+        cancelado: /^(cancelar|cancelado)$/i.test(cabeza),
+        // La apertura de este turno sobrevive al cierre a propósito.
+        aperturaDelTurno: apertura
+      };
       continue;
     }
     const jornadas = campos
@@ -1612,12 +1636,15 @@ export function leerViaje(texto: string): ViajeLeido | null {
       .map(c => c.match(/(\d{1,3})/)?.[1])
       .find(Boolean);
     const n = jornadas ? parseInt(jornadas, 10) : NaN;
+    // Un trayecto de cero jornadas no es un trayecto, y uno de mil es un error
+    // de tecleo que dejaría la campaña anclada para siempre.
+    const jornadasLimpias = Number.isFinite(n) ? Math.min(400, Math.max(1, n)) : undefined;
+    if (jornadasLimpias) apertura = { destino: cabeza.slice(0, 80), jornadas: jornadasLimpias };
     ultimo = {
       destino: cabeza.slice(0, 80),
-      // Un trayecto de cero jornadas no es un trayecto, y uno de mil es un error
-      // de tecleo que dejaría la campaña anclada para siempre.
-      jornadas: Number.isFinite(n) ? Math.min(400, Math.max(1, n)) : undefined,
-      fin: false
+      jornadas: jornadasLimpias,
+      fin: false,
+      aperturaDelTurno: apertura
     };
   }
   return ultimo;

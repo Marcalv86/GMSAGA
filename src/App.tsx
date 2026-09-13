@@ -1233,16 +1233,57 @@ export default function App() {
     let viajeEnCurso = mem.viaje;
     if (t.viaje) {
       if (t.viaje.fin) {
-        viajeEnCurso = undefined;
+        /*
+         * ⛔ LLEGAR HAY QUE GANÁRSELO.
+         *
+         * El agujero que dejó a la campaña navegando de Moonshae a Luskan en un
+         * día: el Narrador emitía la apertura y el cierre EN EL MISMO mensaje
+         * —«[VIAJE: Luskan | jornadas: 2]» … «[VIAJE: fin]»— y la aplicación se
+         * quedaba con el cierre. El viaje no llegaba a existir, nadie contaba
+         * nada, y el turno terminaba atracando en el puerto.
+         *
+         * Ahora el cierre solo vale si las jornadas están cumplidas de verdad
+         * contra el calendario. Si no, el trayecto SIGUE ABIERTO y queda
+         * marcado para que el turno siguiente se lo diga con el número delante.
+         *
+         * Cancelar es otra cosa y sí vale siempre: abandonar un camino es una
+         * decisión, no un atajo.
+         */
+        const abiertoAhora = t.viaje.aperturaDelTurno
+          ? {
+              destino: t.viaje.aperturaDelTurno.destino,
+              jornadas: t.viaje.aperturaDelTurno.jornadas,
+              iniciadoAbs: diaActual
+            }
+          : mem.viaje;
+        const cumplidas =
+          abiertoAhora && Number.isFinite(abiertoAhora.iniciadoAbs)
+            ? Math.max(0, diaActual - abiertoAhora.iniciadoAbs)
+            : 0;
+        if (!t.viaje.cancelado && abiertoAhora && cumplidas < abiertoAhora.jornadas) {
+          viajeEnCurso = { ...abiertoAhora, llegadaPrematura: true };
+        } else {
+          viajeEnCurso = undefined;
+        }
       } else if (t.viaje.destino && t.viaje.jornadas) {
         // Re-declarar el mismo destino no reinicia el contador: el día en que se
         // zarpó es el que manda, y si no, cada recordatorio alargaría el viaje.
         const mismoDestino =
           mem.viaje?.destino?.toLowerCase().trim() === t.viaje.destino.toLowerCase().trim();
         viajeEnCurso = mismoDestino
-          ? { ...mem.viaje!, jornadas: t.viaje.jornadas }
+          ? { ...mem.viaje!, jornadas: t.viaje.jornadas, llegadaPrematura: undefined }
           : { destino: t.viaje.destino, jornadas: t.viaje.jornadas, iniciadoAbs: diaActual };
       }
+    } else if (mem.viaje?.llegadaPrematura) {
+      /*
+       * El aviso de llegada prematura dura UN turno, no toda la travesía.
+       *
+       * Se le dice una vez, con el número delante, y se retira. Si vuelve a
+       * intentarlo, vuelve a saltar; pero un recordatorio que no se apaga nunca
+       * se convierte en ruido y deja de leerse, que es como se pierden todas
+       * las reglas de este prompt.
+       */
+      viajeEnCurso = { ...mem.viaje, llegadaPrematura: undefined };
     }
 
     /*
