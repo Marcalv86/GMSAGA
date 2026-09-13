@@ -942,6 +942,29 @@ export function iconoDeClima(clima?: string): string {
 }
 
 /**
+ * Los mismos cuatro momentos, pero bajo tierra.
+ *
+ * Ahí abajo no sale el sol, así que las siluetas de ciudad con luz no dicen
+ * nada. Pero la hora SÍ sigue contando: un asentamiento subterráneo tiene su
+ * ritmo —quién duerme, qué está abierto, quién patrulla— y en más de una
+ * ciudad del subsuelo ese ritmo lo marca un pilar de calor que alguien
+ * enciende por la base y que se va apagando solo.
+ *
+ * De ahí que la serie sea un gradiente de temperatura y no de luz: frío,
+ * templándose, al rojo, enfriándose. Se lee igual de rápido que la de arriba y
+ * dice lo que de verdad cambia en un sitio sin cielo.
+ */
+export function iconoDeFranjaSubterranea(minuto?: number): string {
+  if (minuto === undefined) return '';
+  const hora = Math.floor(minuto / 60);
+  if (hora < 6) return '🌑';
+  if (hora < 9) return '🟠';
+  if (hora < 19) return '🔴';
+  if (hora < 22) return '🟣';
+  return '🌑';
+}
+
+/**
  * Cuatro momentos del día, no siete.
  *
  * Había siete iconos y era ruido: entre «🌤️ media mañana» y «☀️ mediodía» no

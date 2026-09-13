@@ -21,6 +21,7 @@ import {
   fechaLegible,
   iconoDeClima,
   iconoDeFranja,
+  iconoDeFranjaSubterranea,
   marcoDeLugar,
   estacionDelDia,
   horaLegible12
@@ -1566,11 +1567,13 @@ export const ChatView: React.FC<{
                                   className="text-base text-right -mt-1.5 leading-none"
                                   title={
                                     bajoTierra
-                                      ? 'Aquí abajo la luz no la pone el sol, así que no hay franja del día que enseñar. Pero la HORA sigue contando: un asentamiento subterráneo tiene su propio ritmo —quién duerme, qué está abierto, quién patrulla— y cómo se marca ahí el paso de las horas es cosa de tus documentos.'
+                                      ? 'Aquí abajo la luz no la pone el sol, así que el icono marca calor y no luz: frío, templándose, al rojo, enfriándose. La hora sigue contando igual —quién duerme, qué está abierto, quién patrulla— y cómo se señala ahí el paso de las horas es cosa de tus documentos.'
                                       : undefined
                                   }
                                 >
-                                  {bajoTierra ? '🌑' : iconoDeFranja(fecha!.minute)}
+                                  {bajoTierra
+                                    ? iconoDeFranjaSubterranea(fecha!.minute)
+                                    : iconoDeFranja(fecha!.minute)}
                                 </div>
                               );
                             })()}
