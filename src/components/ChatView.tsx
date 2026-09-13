@@ -1566,7 +1566,7 @@ export const ChatView: React.FC<{
                                   className="text-base text-right -mt-1.5 leading-none"
                                   title={
                                     bajoTierra
-                                      ? 'Bajo tierra no hay día ni noche: el reloj sigue corriendo porque arriba sigue pasando el tiempo, pero aquí la luz no la pone el sol.'
+                                      ? 'Aquí abajo la luz no la pone el sol, así que no hay franja del día que enseñar. Pero la HORA sigue contando: un asentamiento subterráneo tiene su propio ritmo —quién duerme, qué está abierto, quién patrulla— y cómo se marca ahí el paso de las horas es cosa de tus documentos.'
                                       : undefined
                                   }
                                 >
