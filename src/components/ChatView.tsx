@@ -1491,7 +1491,17 @@ export const ChatView: React.FC<{
               escribir y tiene al lado las dos salidas —saltar el tiempo o
               cerrar el capítulo—, que es justo lo que se decide al mirarlo.
             */}
-            {jornadas.dias > 0 ? (
+            {/*
+              ⚠️ EL BOTÓN NO SE ESCONDE PORQUE EL CAPÍTULO ACABE DE EMPEZAR.
+              Antes se ocultaba mientras no hubiera ninguna jornada contada, y
+              en el primer turno de un capítulo nuevo eso es SIEMPRE: no hay
+              todavía ningún HUD fechado que contar. Justo entonces desaparecía
+              lo único que enseña la hora, el clima, el sitio y el trayecto
+              abierto —con su botón para cerrarlo—, que es cuando más falta
+              hace. La cuenta de jornadas es un dato del desplegable, no su
+              motivo de existir: mientras haya calendario, el botón está.
+            */}
+            {jornadas.dias > 0 || (calendarioValido(project?.calendar) && project?.currentDate) ? (
               <div className="relative shrink-0">
                 <button
                   onClick={() => setTiempoAbierto(v => !v)}
@@ -1500,10 +1510,12 @@ export const ChatView: React.FC<{
                       ? 'border-amber-700/50 bg-amber-500/10 text-amber-950 dark:text-amber-100 font-bold'
                       : 'border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)]'
                   }`}
-                  title="Ver la fecha, la hora y el tiempo que hace en la ficción"
+                  title="Ver la fecha, la hora, el tiempo que hace y el trayecto en curso"
                 >
                   <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-                  {jornadas.dias} {jornadas.dias === 1 ? 'jornada' : 'jornadas'}
+                  {jornadas.dias > 0
+                    ? `${jornadas.dias} ${jornadas.dias === 1 ? 'jornada' : 'jornadas'}`
+                    : 'jornada'}
                   {tiempoAbierto ? (
                     <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
                   ) : (
@@ -1710,14 +1722,23 @@ export const ChatView: React.FC<{
                         )}
 
                         <p className="text-[10px] text-[var(--text-secondary)] m-0 pt-2 border-t border-[var(--glass-border)] leading-snug">
-                          <strong>{jornadas.dias}</strong> {jornadas.dias === 1 ? 'jornada jugada' : 'jornadas jugadas'} en este
-                          capítulo
-                          {jornadas.primera && jornadas.ultima && jornadas.dias > 1
-                            ? ` (de ${jornadas.primera} a ${jornadas.ultima})`
-                            : jornadas.primera
-                            ? ` (${jornadas.primera})`
-                            : ''}
-                          . Cuenta días con escena, no tiempo transcurrido: un salto suma uno, no los que salta.
+                          {jornadas.dias > 0 ? (
+                            <>
+                              <strong>{jornadas.dias}</strong>{' '}
+                              {jornadas.dias === 1 ? 'jornada jugada' : 'jornadas jugadas'} en este capítulo
+                              {jornadas.primera && jornadas.ultima && jornadas.dias > 1
+                                ? ` (de ${jornadas.primera} a ${jornadas.ultima})`
+                                : jornadas.primera
+                                ? ` (${jornadas.primera})`
+                                : ''}
+                              . Cuenta días con escena, no tiempo transcurrido: un salto suma uno, no los que salta.
+                            </>
+                          ) : (
+                            <>
+                              Este capítulo todavía no tiene ninguna jornada contada: se cuentan por los días
+                              fechados que va escribiendo el Narrador, y aún no ha escrito ninguno.
+                            </>
+                          )}
                         </p>
                       </div>
                     </>
