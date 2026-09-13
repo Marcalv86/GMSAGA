@@ -532,29 +532,36 @@ export default function App() {
             };
           }
 
-          // Migración y actualización automática de directivas del DM si el proyecto tiene la versión previa
-          if (
-            !p.instructions ||
-            (p.instructions.includes('# Instrucciones de Sistema') &&
-              (!p.instructions.includes('8.1 Montaje Alterno') ||
-                !p.instructions.includes('Principio de Progresión en Bambalinas') ||
-                !p.instructions.includes('⭐ 00. CARGA DE CONTEXTO') ||
-                !p.instructions.includes('Arraigo en el Mundo e Interconexión de Faerûn') ||
-                !p.instructions.includes('8.2 Protocolo de Transición de Escena') ||
-                !p.instructions.includes('13c. Prohibición de Metarol')))
-          ) {
+          /*
+           * ⛔ AQUÍ SE BORRABA EL TRABAJO DE LA GENTE, Y AL ABRIR LA APLICACIÓN.
+           *
+           * Esto era una «migración»: si las directivas del proyecto no
+           * contenían seis frases concretas —«8.1 Montaje Alterno», «⭐ 00.
+           * CARGA DE CONTEXTO» y cuatro más— se daba por hecho que eran de una
+           * versión antigua y se SOBRESCRIBÍAN ENTERAS con las de fábrica.
+           *
+           * El problema es que esa comprobación no distingue «directivas
+           * viejas» de «directivas editadas». Quitar un apartado que ya no
+           * hacía falta —el de arranque de campaña, por ejemplo, una vez la
+           * campaña ha arrancado— bastaba para que al siguiente arranque de la
+           * aplicación desapareciera TODO lo escrito. Sin aviso, sin poder
+           * deshacer, y sin que nadie relacionara una cosa con la otra: se
+           * edita un día y se pierde al abrir otro.
+           *
+           * Una migración puede RELLENAR lo que está vacío. Lo que no puede es
+           * pisar texto que alguien ha escrito a mano, y menos por no encontrar
+           * una cadena literal. Así que ahora solo actúa cuando no hay nada que
+           * perder; para traerse las reglas nuevas de fábrica está el botón de
+           * restaurar, que avisa de lo que se lleva por delante.
+           *
+           * Y esto ya no deja a nadie sin las reglas del motor: las que de
+           * verdad hacen falta para que la interfaz funcione viven en
+           * CORE_INTERFACE_PROTOCOLS, que viaja en cada turno pase lo que pase
+           * con este cuadro de texto.
+           */
+          if (!p.instructions || !p.instructions.trim()) {
             modified = true;
-            if (!p.instructions) {
-              p = { ...p, instructions: DEFAULT_DM_INSTRUCTIONS };
-            } else if (p.instructions.includes('### Directivas de la Campaña Importada')) {
-              const customPart = p.instructions.split('### Directivas de la Campaña Importada')[1] || '';
-              p = {
-                ...p,
-                instructions: `${DEFAULT_DM_INSTRUCTIONS}\n\n### Directivas de la Campaña Importada${customPart}`
-              };
-            } else {
-              p = { ...p, instructions: DEFAULT_DM_INSTRUCTIONS };
-            }
+            p = { ...p, instructions: DEFAULT_DM_INSTRUCTIONS };
           }
 
           return p;
