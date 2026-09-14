@@ -1432,7 +1432,9 @@ export function estimarCargaDelTurno({
       f.category === 'oracle' ||
       f.category === 'roster' ||
       f.category === 'index' ||
-      f.category === 'sheet_npc');
+      f.category === 'sheet_npc' ||
+      f.category === 'mecanica' ||
+      f.category === 'cantera');
   const archivos = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
 
   const deConsulta = files.filter(
@@ -1442,7 +1444,9 @@ export function estimarCargaDelTurno({
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
       f.category !== 'index' &&
-      f.category !== 'sheet_npc'
+      f.category !== 'sheet_npc' &&
+      f.category !== 'mecanica' &&
+      f.category !== 'cantera'
   );
   const archivosDeConsulta = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
   const medios = files.filter(f => f.isImage || f.isAudio).length;
@@ -2577,7 +2581,7 @@ ${allPreviousHistory}`
   })();
 
 
-  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos, elencos, índices, fichas de PJ, familiares y fichas de PNJs)
+  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos, elencos, índices, fichas de PJ, familiares, PNJs, mecánicas y canteras)
   const deConsulta = files.filter(
     f =>
       esTexto(f) &&
@@ -2587,7 +2591,9 @@ ${allPreviousHistory}`
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
       f.category !== 'index' &&
-      f.category !== 'sheet_npc'
+      f.category !== 'sheet_npc' &&
+      f.category !== 'mecanica' &&
+      f.category !== 'cantera'
   );
   const deConsultaIds = new Set(deConsulta.map(f => f.id));
 
