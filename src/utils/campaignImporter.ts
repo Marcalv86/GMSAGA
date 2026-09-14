@@ -308,7 +308,7 @@ function formatParsedDataToCampaign(
     inventory: Array.isArray(rawChar.inventory) ? rawChar.inventory : [],
     currencies: rawChar.currencies || { cp: 0, sp: 0, ep: 0, gp: 25, pp: 0 }
   };
-  const playerCharacter = sanitizePlayerCharacter(rawPlayerCharacter, 'Aryendell');
+  const playerCharacter = sanitizePlayerCharacter(rawPlayerCharacter, 'Protagonista');
 
   // Capítulos y Mensajes
   const rawChapters = Array.isArray(parsed.chapters) && parsed.chapters.length > 0 ? parsed.chapters : [];

@@ -55,7 +55,8 @@ import { logError, logInfo, logWarn } from './utils/logger';
 import { presionDelMinuto } from './utils/callLog';
 import { conciliarAfinidadesTrasSincronizar } from './utils/affinityProgression';
 import { aplicarEtiquetados, OrdenDeEtiquetado } from './utils/ordenesDeMesa';
-import { sanitizeProjectMemory } from './utils/sanitizers';
+import { sanitizeProjectMemory, esNombreDeProtagonista } from './utils/sanitizers';
+import { buscarEstadisticasCanonicas, statblockAPlayerCharacter } from './utils/canonicalNpcStats';
 import { ExtractedCampaignResult } from './utils/campaignImporter';
 import { writeCampaignToDisk } from './utils/diskBackup';
 import {
@@ -1089,6 +1090,7 @@ export default function App() {
           aparenta: v.aparenta ?? cambiado.aparenta,
           oculta: v.oculta ?? cambiado.oculta,
           vinculo: v.vinculo ?? cambiado.vinculo,
+          idiomas: v.idiomas ?? cambiado.idiomas,
           ...afinidadActualizada,
           // Que el Narrador se moleste en escribir un vínculo ya dice que este
           // personaje cuenta, aunque la cuenta de días aún no haya llegado.
@@ -1201,17 +1203,23 @@ export default function App() {
       // Un nombre propio de verdad, no «el tabernero» ni «los guardias».
       if (limpio.length < 3 || limpio.length > 60) return;
       if (!/^[\p{Lu}]/u.test(limpio)) return;
+      if (esNombreDeProtagonista(limpio, mem.player_character?.name, currentProject?.name, mem.no_son_pnj)) return;
       if (npcs.some(n => coincidenNombresNpc(n.name, limpio, { alias: n.alias, trueIdentity: n.trueIdentity }))) return;
       if (nuevosNpcs.some(n => coincidenNombresNpc(n.name, limpio))) return;
       if (t.vinculos.some(v => coincidenNombresNpc(v.nombre, limpio))) return; // ese lo crea el vínculo, con más datos
       if (coincidenNombresNpc(limpio, mem.player_character?.name || '')) return;
 
+      const canonico = buscarEstadisticasCanonicas(limpio);
+
       nuevosNpcs.push({
         id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        name: limpio,
+        name: canonico?.name || limpio,
         relation: 'Neutral',
         status: 'Vivo',
-        notes: 'Apareció en escena.',
+        notes: canonico ? `Lugarteniente / Personaje de los Reinos Olvidados (${canonico.source || 'D&D 5e'}).` : 'Apareció en escena.',
+        cr: canonico?.cr,
+        idiomas: canonico?.languages,
+        characterSheet: canonico ? statblockAPlayerCharacter(canonico) : undefined,
         diasVistos: [marca]
       });
     });
@@ -1220,14 +1228,14 @@ export default function App() {
     t.vinculos.forEach(v => {
       if (
         v.nombre &&
-        // El protagonista no es un PNJ. Esta guarda estaba en el camino de
-        // [PRESENTES:] pero faltaba aquí, así que un [VÍNCULO:] con su nombre
-        // le abría ficha propia.
+        // El protagonista no es un PNJ.
+        !esNombreDeProtagonista(v.nombre, mem.player_character?.name, currentProject?.name, mem.no_son_pnj) &&
         !coincidenNombresNpc(v.nombre, mem.player_character?.name || '') &&
         !npcs.some(n => coincidenNombresNpc(n.name, v.nombre, { alias: n.alias, trueIdentity: n.trueIdentity })) &&
         !nuevosNpcs.some(n => coincidenNombresNpc(n.name, v.nombre))
       ) {
         const relInfo = obtenerInfoRelacion(v.vinculo || '');
+        const canonico = buscarEstadisticasCanonicas(v.nombre);
         /*
          * La atracción nace en 0, aunque el Narrador la estrene en 7.
          *
@@ -1254,14 +1262,17 @@ export default function App() {
 
         nuevosNpcs.push({
           id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          name: v.nombre,
+          name: canonico?.name || v.nombre,
           relation: `${relInfo.icono} ${relInfo.label}`,
           status: 'Vivo',
           description: v.aparenta ? `Aparenta: ${v.aparenta}` : undefined,
-          notes: v.oculta ? `Oculta: ${v.oculta}` : 'Vínculo establecido durante la narración.',
+          notes: v.oculta ? `Oculta: ${v.oculta}` : (canonico ? `Lugarteniente / Personaje oficial (${canonico.source || 'D&D 5e'}).` : 'Vínculo establecido durante la narración.'),
           aparenta: v.aparenta,
           oculta: v.oculta,
           vinculo: v.vinculo,
+          idiomas: v.idiomas || canonico?.languages,
+          cr: canonico?.cr,
+          characterSheet: canonico ? statblockAPlayerCharacter(canonico) : undefined,
           atr: atrInicial,
           vin: vinInicial,
           con: conInicial,

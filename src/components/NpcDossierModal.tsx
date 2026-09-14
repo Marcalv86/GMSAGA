@@ -13,7 +13,8 @@ import {
   Scroll,
   Calendar,
   BookOpen,
-  VenetianMask
+  VenetianMask,
+  Languages
 } from 'lucide-react';
 
 interface NpcDossierModalProps {
@@ -279,6 +280,21 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                 </div>
               )}
 
+              {/* Idiomas y nivel de dominio */}
+              {npc.idiomas && (
+                <div className="bg-[var(--surface-soft)] p-3.5 rounded-xl border border-[var(--user-border)] flex items-start gap-2.5 shadow-2xs">
+                  <Languages className="w-4 h-4 text-[var(--accent)] shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <span className="font-cinzel text-xs font-bold text-[var(--accent)] uppercase tracking-wider block mb-0.5">
+                      Idiomas & Dominio Lingüístico
+                    </span>
+                    <p className="text-xs sm:text-sm text-[var(--text-primary)] m-0 leading-relaxed font-lora">
+                      {npc.idiomas}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* 3. Three Affinity Meters (ATR, VÍN, CON) */}
               <div className="bg-[var(--surface-soft)] p-4 rounded-xl border border-[var(--accent)]/30 space-y-3.5 shadow-2xs">
                 <div className="flex items-center justify-between border-b border-[var(--accent)]/20 pb-2">
@@ -533,6 +549,26 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
           {/* TAB 3: D&D Character Sheet */}
           {activeTab === 'sheet' && sheet && (
             <div className="space-y-4">
+              {/* Header Badges: CR, Class, Type */}
+              <div className="flex flex-wrap items-center gap-2 p-2.5 bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)]">
+                {(npc.cr || sheet.cr || sheet.level) && (
+                  <span className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-800 dark:text-amber-300 font-cinzel font-bold border border-amber-500/40 text-xs">
+                    ⚔️ Valor de Desafío (CR): {npc.cr || sheet.cr || sheet.level}
+                  </span>
+                )}
+                {(sheet.class || sheet.title) && (
+                  <span className="px-2.5 py-1 rounded bg-[var(--accent)]/15 text-[var(--accent)] font-cinzel font-semibold text-xs border border-[var(--accent)]/30">
+                    📜 {sheet.class || sheet.title}
+                  </span>
+                )}
+                {(npc.idiomas || (sheet.languages && sheet.languages.length > 0)) && (
+                  <span className="px-2.5 py-1 rounded bg-teal-500/15 text-teal-800 dark:text-teal-300 font-cinzel text-xs flex items-center gap-1 border border-teal-500/30">
+                    <Languages className="w-3.5 h-3.5" />
+                    <span>{npc.idiomas || sheet.languages?.join(', ')}</span>
+                  </span>
+                )}
+              </div>
+
               {/* Combat core stats */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div className="bg-[var(--surface-soft)] p-2.5 rounded-lg border border-[var(--user-border)] text-center">
@@ -592,7 +628,24 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                 </div>
               )}
 
-              {/* Actions and Traits */}
+              {/* Traits / Special Abilities */}
+              {sheet.traits && sheet.traits.length > 0 && (
+                <div className="bg-[var(--surface-soft)] p-3.5 rounded-xl border border-[var(--user-border)] space-y-2">
+                  <span className="font-cinzel text-xs font-bold text-[var(--accent)] uppercase tracking-wider block">
+                    Rasgos & Habilidades Especiales
+                  </span>
+                  <div className="space-y-2">
+                    {sheet.traits.map((trait, i) => (
+                      <div key={i} className="text-xs bg-[var(--surface)] p-2.5 rounded-lg border border-[var(--user-border)]">
+                        <strong className="font-cinzel text-[var(--accent)]">{trait.name}</strong>
+                        <p className="text-[var(--text-secondary)] mt-1 m-0">{trait.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions and Attacks */}
               {sheet.actions && sheet.actions.length > 0 && (
                 <div className="bg-[var(--surface-soft)] p-3.5 rounded-xl border border-[var(--user-border)] space-y-2">
                   <span className="font-cinzel text-xs font-bold text-[var(--accent)] uppercase tracking-wider block">

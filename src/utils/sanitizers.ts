@@ -137,7 +137,72 @@ export function sanitizePlayerCharacter(
 /**
  * Limpia y normaliza toda la memoria viva del proyecto.
  */
-export function sanitizeProjectMemory(mem?: Memory): Memory {
+export function sanitizeProjectMemory(mem?: Memory, projectName?: string): Memory {
+  return sanitizeMemory(mem, projectName);
+}
+
+/**
+ * Comprueba de manera exhaustiva si una cadena representa al Personaje Jugador / OC.
+ * Valida de forma dinámica contra el nombre del personaje en ficha, el nombre de campaña,
+ * términos genéricos y excepciones marcadas por el usuario.
+ */
+export function esNombreDeProtagonista(
+  nombre?: string,
+  pcName?: string,
+  projectName?: string,
+  noSonPnj?: string[]
+): boolean {
+  if (!nombre || !nombre.trim()) return false;
+  const plegar = (v?: string) =>
+    (v || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  const nl = plegar(nombre);
+  if (!nl) return false;
+
+  const generic = new Set([
+    'protagonista',
+    'jugador',
+    'el jugador',
+    'la jugadora',
+    'personaje jugador',
+    'oc',
+    'pj',
+    'pc',
+    'hero',
+    'heroe',
+    'heroina'
+  ]);
+  if (generic.has(nl)) return true;
+
+  if (pcName) {
+    const pcL = plegar(pcName);
+    if (pcL && !generic.has(pcL)) {
+      if (nl === pcL) return true;
+      if (nl.length > 3 && (nl.includes(pcL) || pcL.includes(nl))) return true;
+      const pcPila = pcL.split(/\s+/)[0];
+      if (pcPila.length > 3 && nl.split(/\s+/)[0] === pcPila) return true;
+    }
+  }
+
+  if (projectName) {
+    const prL = plegar(projectName);
+    if (prL && !generic.has(prL) && prL.length > 3) {
+      if (nl === prL || nl.includes(prL) || prL.includes(nl)) return true;
+    }
+  }
+
+  if (noSonPnj && noSonPnj.length) {
+    if (noSonPnj.some(v => plegar(v) === nl)) return true;
+  }
+
+  return false;
+}
+
+export function sanitizeMemory(mem?: Memory, projectName?: string): Memory {
   if (!mem) {
     return {
       story: '',
@@ -153,19 +218,6 @@ export function sanitizeProjectMemory(mem?: Memory): Memory {
 
   const cleanPc = sanitizePlayerCharacter(mem.player_character);
 
-  /*
-   * EL PROTAGONISTA NO ES UN PNJ, Y AQUÍ SE LE CERRABA MAL LA PUERTA.
-   *
-   * Se comparaba contra `cleanPc.name`, que YA VIENE CON EL NOMBRE DE RESERVA
-   * puesto: si la ficha no tenía nombre, la comparación se hacía contra
-   * «Protagonista» y cualquier ficha del OC —«Aryendell»— pasaba limpiamente.
-   * Y como el compendio de la campaña habla del OC en cada página, el extractor
-   * de PNJs le hacía su tarjeta como a uno más.
-   *
-   * Ahora se compara contra el nombre DE VERDAD, sin el relleno, y plegando
-   * tildes: «Aryéndell» y «Aryendell» eran dos personas distintas para un
-   * `toLowerCase()` a secas.
-   */
   const plegar = (v?: string) =>
     (v || '')
       .trim()
@@ -173,23 +225,8 @@ export function sanitizeProjectMemory(mem?: Memory): Memory {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
 
-  const generic = new Set(['protagonista', 'jugador', 'el jugador', 'personaje jugador', 'oc', 'pj', 'hero', 'heroe']);
-  const nombreReal = plegar(mem.player_character?.name);
-  const pcClean = generic.has(nombreReal) ? '' : nombreReal;
-  // «Aryendell Sylvaris» y «Aryendell» son la misma: el nombre de pila cuenta.
-  const pcPila = pcClean.split(/\s+/)[0] || '';
-
-  const esElProtagonista = (nombre?: string) => {
-    const nl = plegar(nombre);
-    if (!nl) return false;
-    if (generic.has(nl)) return true;
-    if (!pcClean) return false;
-    if (nl === pcClean) return true;
-    if (nl.length > 3 && (nl.includes(pcClean) || pcClean.includes(nl))) return true;
-    // Nombre de pila suelto contra ficha con apellido, y al revés.
-    if (pcPila.length > 3 && plegar(nombre).split(/\s+/)[0] === pcPila) return true;
-    return false;
-  };
+  const esElProtagonista = (nombre?: string) =>
+    esNombreDeProtagonista(nombre, cleanPc.name, projectName, mem.no_son_pnj);
 
   // Y los que la jugadora haya marcado a mano como «esto no es un PNJ».
   const vetados = new Set((mem.no_son_pnj || []).map(plegar).filter(Boolean));

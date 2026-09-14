@@ -49,8 +49,13 @@ import {
   Footprints,
   Timer,
   Flag,
-  Layers
+  Layers,
+  Languages,
+  Zap,
+  Loader2
 } from 'lucide-react';
+import { esNombreDeProtagonista } from '../utils/sanitizers';
+import { obtenerOGenerarFichaNpc } from '../utils/canonicalNpcStats';
 
 export function getAtrInfo(val?: number) {
   const v = val !== undefined && val !== null ? Math.max(0, Math.min(20, Math.round(val))) : 0;
@@ -283,6 +288,66 @@ export const MemoryManager: React.FC<{
   const [selectedLocForDossier, setSelectedLocForDossier] = useState<Location | null>(null);
 
   const [expandedQuestIds, setExpandedQuestIds] = useState<Set<string>>(new Set());
+  const [generatingNpcId, setGeneratingNpcId] = useState<string | null>(null);
+
+  // Auto-limpieza: evitar que Aryendell (el OC) o el protagonista aparezcan como NPC
+  useEffect(() => {
+    const npcsActuales = project.memory?.npcs || [];
+    const pcName = project.memory?.player_character?.name;
+    const projName = project.name;
+    const noSonPnj = project.memory?.no_son_pnj;
+
+    const tieneProtagonista = npcsActuales.some(n =>
+      esNombreDeProtagonista(n.name, pcName, projName, noSonPnj)
+    );
+
+    if (tieneProtagonista) {
+      const npcsLimpios = npcsActuales.filter(
+        n => !esNombreDeProtagonista(n.name, pcName, projName, noSonPnj)
+      );
+      onUpdateMemory(mem => ({
+        ...mem,
+        npcs: npcsLimpios
+      }));
+    }
+  }, [project.memory?.npcs, project.memory?.player_character?.name, project.name]);
+
+  // Genera o consulta la ficha canónica D&D 5e oficial para un PNJ
+  const handleGenerarFichaNpc = async (n: NPC) => {
+    setGeneratingNpcId(n.id);
+    try {
+      const res = await obtenerOGenerarFichaNpc(n);
+      onUpdateMemory(mem => {
+        const actualizados = (mem.npcs || []).map(item => {
+          if (item.id === n.id) {
+            return {
+              ...item,
+              cr: res.cr,
+              idiomas: res.idiomas || item.idiomas,
+              characterSheet: res.sheet
+            };
+          }
+          return item;
+        });
+        return {
+          ...mem,
+          npcs: actualizados
+        };
+      });
+      if (selectedNpcForDossier && selectedNpcForDossier.id === n.id) {
+        setSelectedNpcForDossier({
+          ...selectedNpcForDossier,
+          cr: res.cr,
+          idiomas: res.idiomas || selectedNpcForDossier.idiomas,
+          characterSheet: res.sheet
+        });
+      }
+    } catch (err) {
+      console.error('Error al generar ficha D&D 5e de PNJ:', err);
+    } finally {
+      setGeneratingNpcId(null);
+    }
+  };
 
   const toggleExpandLoc = (id: string) => {
     setExpandedLocIds(prev => {
@@ -2140,8 +2205,12 @@ export const MemoryManager: React.FC<{
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            {memory.npcs && memory.npcs.length > 0 ? (
-              memory.npcs.map((n, i) => {
+            {(() => {
+              const npcsValidos = (memory.npcs || []).filter(
+                n => !esNombreDeProtagonista(n.name, memory.player_character?.name, project.name, memory.no_son_pnj)
+              );
+              if (npcsValidos.length === 0) return null;
+              return npcsValidos.map((n, i) => {
                 // Find matching image if not explicitly set
                 const matchingFile = n.portrait
                   ? allImageFiles.find(f => f.content === n.portrait)
@@ -2214,6 +2283,86 @@ export const MemoryManager: React.FC<{
                         {n.alias && (
                           <div className="text-[10px] text-amber-800 dark:text-amber-300 font-cinzel font-semibold mb-1 flex items-center gap-1 truncate">
                             <span>🎭 Alias:</span> <span className="italic">{n.alias}</span>
+                          </div>
+                        )}
+
+                        {/* Idiomas */}
+                        {n.idiomas && (
+                          <div className="text-[10px] text-[var(--accent)] font-cinzel font-medium mb-1 flex items-center gap-1 truncate" title={`Idiomas: ${n.idiomas}`}>
+                            <Languages className="w-3 h-3 text-[var(--accent)] shrink-0 opacity-80" />
+                            <span className="truncate">{n.idiomas}</span>
+                          </div>
+                        )}
+
+                        {/* Mini-ficha D&D 5e Statblock */}
+                        {(n.characterSheet || n.cr) ? (
+                          <div className="my-1.5 p-1.5 bg-[var(--surface-color)]/70 border border-[var(--user-border)] rounded text-[10px] shadow-2xs">
+                            {/* Badges / Header de Ficha */}
+                            <div className="flex flex-wrap items-center gap-1 mb-1 pb-1 border-b border-[var(--glass-border)] text-[9px]">
+                              {(n.cr || n.characterSheet?.cr || n.characterSheet?.level) && (
+                                <span className="px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/30">
+                                  ⚔️ VD {n.cr || n.characterSheet?.cr || n.characterSheet?.level}
+                                </span>
+                              )}
+                              {(n.characterSheet?.class || n.characterSheet?.title) && (
+                                <span className="px-1.5 py-0.2 rounded bg-[var(--accent)]/10 text-[var(--accent)] font-cinzel font-semibold truncate max-w-[130px]" title={n.characterSheet.class || n.characterSheet.title}>
+                                  {n.characterSheet.class || n.characterSheet.title}
+                                </span>
+                              )}
+                              {typeof n.characterSheet?.ac === 'number' && (
+                                <span className="px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-700 dark:text-blue-300 font-bold">
+                                  🛡️ {n.characterSheet.ac} CA
+                                </span>
+                              )}
+                              {typeof n.characterSheet?.hp === 'number' && (
+                                <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold">
+                                  ❤️ {n.characterSheet.hp}/{n.characterSheet.maxHp || n.characterSheet.hp} PG
+                                </span>
+                              )}
+                              {n.characterSheet?.speed && (
+                                <span className="px-1.5 py-0.2 rounded bg-slate-500/10 text-slate-700 dark:text-slate-300 font-mono text-[8px]">
+                                  {n.characterSheet.speed}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Matriz de Atributos D&D */}
+                            {n.characterSheet?.attributes && (
+                              <div className="grid grid-cols-6 gap-0.5 text-center font-mono text-[8.5px] bg-black/5 dark:bg-white/5 p-1 rounded">
+                                {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(attr => {
+                                  const val = n.characterSheet?.attributes?.[attr] ?? 10;
+                                  const mod = Math.floor((val - 10) / 2);
+                                  const labels: Record<string, string> = { str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR' };
+                                  return (
+                                    <div key={attr} className="flex flex-col">
+                                      <span className="text-[7.5px] text-[var(--text-secondary)] font-cinzel font-bold">{labels[attr]}</span>
+                                      <span className="font-bold text-[var(--text-primary)] leading-tight">
+                                        {val} <span className="text-[7.5px] opacity-70">({mod >= 0 ? `+${mod}` : mod})</span>
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="my-1 flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleGenerarFichaNpc(n)}
+                              disabled={generatingNpcId === n.id}
+                              className="px-2 py-0.5 text-[9px] font-cinzel font-bold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 rounded cursor-pointer flex items-center gap-1 transition-all disabled:opacity-50"
+                              title="Cargar estadísticas canónicas oficiales de D&D 5e o generar mini-ficha"
+                            >
+                              {generatingNpcId === n.id ? (
+                                <>
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin" /> Consultando 5e...
+                                </>
+                              ) : (
+                                <>
+                                  <Zap className="w-2.5 h-2.5 text-amber-500" /> Cargar / Generar Ficha D&D 5e
+                                </>
+                              )}
+                            </button>
                           </div>
                         )}
 
@@ -2356,8 +2505,8 @@ export const MemoryManager: React.FC<{
                     </div>
                   </div>
                 );
-              })
-            ) : (
+              });
+            })() || (
               <div className="col-span-full text-[var(--text-secondary)] italic py-8 px-6 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] max-w-2xl mx-auto shadow-2xs leading-relaxed text-xs md:text-sm">
                 No hay PNJs registrados en la memoria. Los personajes con los que interactúes se añadirán automáticamente aquí.
               </div>

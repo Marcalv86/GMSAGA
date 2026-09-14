@@ -10,6 +10,9 @@ import {
 } from '../types';
 import {
   CALENDARIO_FANTASTICO,
+  CALENDARIOS_PREDEFINIDOS,
+  detectarCalendarioMundo,
+  DeteccionCalendario,
   aDiaAbsoluto,
   aDiaAbsolutoDesdeTexto,
   calendarioValido,
@@ -52,7 +55,10 @@ import {
   Sun,
   PartyPopper,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  Globe,
+  Wand2,
+  Check
 } from 'lucide-react';
 
 export interface DailyAgendaDiaryProps {
@@ -322,6 +328,26 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
     onConfirm: () => Promise<void> | void;
   } | null>(null);
 
+  // World Calendar Switcher & Auto-Detection Modal state
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [autoDetectResult, setAutoDetectResult] = useState<DeteccionCalendario | null>(null);
+  const [isDetectingCalendar, setIsDetectingCalendar] = useState(false);
+
+  const handleRunAutoDetection = () => {
+    setIsDetectingCalendar(true);
+    setTimeout(() => {
+      const res = detectarCalendarioMundo(project, files);
+      setAutoDetectResult(res);
+      setIsDetectingCalendar(false);
+    }, 250);
+  };
+
+  const handleApplyCalendar = async (newCal: CalendarConfig) => {
+    await onUpdate({ calendar: newCal });
+    setIsCalendarModalOpen(false);
+    setAutoDetectResult(null);
+  };
+
   // Synchronize calendar navigation when diaSeleccionado changes externally
   useEffect(() => {
     const mesIdx = mesDelDia(cal, fechaActiva.dayOfYear);
@@ -568,12 +594,21 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
               línea, se elige una vez por campaña y no se vuelve a mirar. Lo que
               de verdad se consulta aquí es qué día y qué hora es.
             */}
-            <span className="text-[11px] sm:text-xs px-2.5 py-1 rounded-lg bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--glass-border)] font-cinzel font-semibold flex items-center gap-1.5 flex-wrap">
-              <span className="hidden sm:inline">{cal.name}</span>
+            <button
+              onClick={() => {
+                setIsCalendarModalOpen(true);
+                handleRunAutoDetection();
+              }}
+              className="text-[11px] sm:text-xs px-2.5 py-1 rounded-lg bg-[var(--surface-soft)] hover:bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--glass-border)] hover:border-[var(--accent)] font-cinzel font-semibold flex items-center gap-1.5 flex-wrap cursor-pointer transition-all shadow-2xs group"
+              title="Cambiar o detectar automáticamente el calendario del mundo"
+            >
+              <Globe className="w-3.5 h-3.5 text-[var(--accent)] shrink-0 group-hover:rotate-12 transition-transform" />
+              <span className="hidden sm:inline font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)]">{cal.name}</span>
               <span className="hidden sm:inline">·</span>
               <span className="text-[var(--accent)] font-bold">📅 {fechaLegible(cal, fechaSegura)}</span>
               <span>⏳ {horaLegible(fechaSegura.minute)}</span>
-            </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--accent)]/15 text-[var(--accent)] font-bold ml-0.5">Adaptable</span>
+            </button>
           </div>
           <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0">
             Agenda narrativa con vista de día, selección de calendario, crónica y galería de ilustraciones de cada jornada.
@@ -582,6 +617,19 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
 
         {/* View Mode Switcher & Actions */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start md:justify-end">
+          {/* Button to open World Calendar modal */}
+          <button
+            onClick={() => {
+              setIsCalendarModalOpen(true);
+              handleRunAutoDetection();
+            }}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-cinzel font-bold bg-[var(--surface)] hover:bg-[var(--surface-soft)] text-[var(--text-primary)] border border-[var(--user-border)] hover:border-[var(--accent)] transition-all cursor-pointer shadow-2xs shrink-0"
+            title="Cambiar o autodetectar el calendario del mundo (Star Wars, Forgotten Realms, Golarion, Cyberpunk, etc.)"
+          >
+            <Globe className="w-3.5 h-3.5 text-[var(--accent)]" />
+            <span>Calendario del Mundo</span>
+          </button>
+
           {/* View Mode Switcher Pills */}
           <div className="flex flex-wrap items-center gap-1 bg-[var(--surface)] p-1 rounded-xl border border-[var(--glass-border)] shadow-2xs w-full sm:w-auto justify-start">
             <button
@@ -1952,6 +2000,195 @@ export const DailyAgendaDiary: React.FC<DailyAgendaDiaryProps> = ({
                 📅 {previewImage.date}
               </span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* World Calendar Switcher & Auto-Detection Modal */}
+      {isCalendarModalOpen && (
+        <div
+          onClick={() => setIsCalendarModalOpen(false)}
+          className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-[185] p-3 sm:p-5"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-2xl shadow-2xl w-[780px] max-w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 font-lora"
+          >
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-[var(--glass-border)] bg-[var(--sidebar-bg)] flex justify-between items-center gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-[var(--accent)]/15 text-[var(--accent)]">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-cinzel font-bold text-base sm:text-lg text-[var(--accent)] m-0">
+                    Calendario del Mundo & Sistema Temporal
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)] m-0">
+                    Adapta automáticamente la agenda, meses, semanas y festivales al universo de tu campaña (Forgotten Realms, Star Wars, Golarion, Cyberpunk o personalizado).
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCalendarModalOpen(false)}
+                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--surface-soft)] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+              {/* Auto-Detection Section */}
+              <div className="bg-gradient-to-r from-[var(--accent)]/10 via-[var(--surface)] to-[var(--surface-soft)] border border-[var(--accent)]/40 rounded-2xl p-4 sm:p-5 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-[var(--accent)] text-[var(--on-accent)] shrink-0 mt-0.5">
+                      <Wand2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-cinzel font-bold text-sm text-[var(--text-primary)] m-0 flex items-center gap-2">
+                        <span>Auto-Detección por Universo de Campaña</span>
+                        {autoDetectResult && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-[var(--accent)] text-[var(--on-accent)]">
+                            {autoDetectResult.confianza} confianza
+                          </span>
+                        )}
+                      </h4>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1 mb-0 leading-relaxed">
+                        {autoDetectResult
+                          ? autoDetectResult.motivo
+                          : 'Analiza la memoria del proyecto, fichas de personaje y archivos para sugerir el cómputo temporal exacto.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <button
+                      onClick={handleRunAutoDetection}
+                      disabled={isDetectingCalendar}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-cinzel font-bold bg-[var(--surface)] hover:bg-[var(--surface-soft)] border border-[var(--accent)] text-[var(--accent)] hover:text-[var(--accent-hover)] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isDetectingCalendar ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Escaneando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Re-Escanear</span>
+                        </>
+                      )}
+                    </button>
+
+                    {autoDetectResult && autoDetectResult.calendar.name !== cal.name && (
+                      <button
+                        onClick={() => handleApplyCalendar(autoDetectResult.calendar)}
+                        className="px-4 py-1.5 rounded-xl text-xs font-cinzel font-bold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Aplicar ({autoDetectResult.sistemaDetectado})</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {autoDetectResult && (
+                  <div className="mt-3 pt-3 border-t border-[var(--accent)]/20 flex flex-wrap items-center gap-3 text-xs text-[var(--text-secondary)]">
+                    <span>Sistema detectado: <strong className="text-[var(--accent)] font-cinzel">{autoDetectResult.sistemaDetectado}</strong></span>
+                    <span>·</span>
+                    <span>Calendario recomendado: <strong className="text-[var(--text-primary)]">{autoDetectResult.calendar.name}</strong></span>
+                  </div>
+                )}
+              </div>
+
+              {/* Presets List */}
+              <div>
+                <h4 className="font-cinzel font-bold text-xs uppercase tracking-wider text-[var(--text-secondary)] mb-3 flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  <span>Calendarios Predefinidos Disponibles</span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {CALENDARIOS_PREDEFINIDOS.map((preset, pIdx) => {
+                    const isSelected = cal.name === preset.name;
+                    const totalDias = diasPorAno(preset);
+                    const numMeses = preset.months.length;
+                    const numFestivales = preset.festivals?.length || 0;
+                    const diasSemana = preset.weekdays?.length || 0;
+
+                    return (
+                      <div
+                        key={pIdx}
+                        onClick={() => handleApplyCalendar(preset)}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-[var(--accent)]/10 border-[var(--accent)] shadow-md ring-1 ring-[var(--accent)]'
+                            : 'bg-[var(--surface)] hover:bg-[var(--surface-soft)] border-[var(--glass-border)] hover:border-[var(--accent)]/50'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <h5 className="font-cinzel font-bold text-sm text-[var(--text-primary)] m-0 flex items-center gap-1.5">
+                              {preset.name.includes('Harptos') && <span>🐉</span>}
+                              {preset.name.includes('Galáctico') && <span>🌌</span>}
+                              {preset.name.includes('Absalom') && <span>⚔️</span>}
+                              {preset.name.includes('Cyberpunk') && <span>🏙️</span>}
+                              {preset.name.includes('Fantástico') && <span>🏰</span>}
+                              {preset.name.includes('Gregoriano') && <span>⚙️</span>}
+                              <span>{preset.name}</span>
+                            </h5>
+                            {isSelected && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-[var(--accent)] text-[var(--on-accent)] shrink-0">
+                                Activo
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
+                            <span>📅 {numMeses} meses ({totalDias} días/año)</span>
+                            {diasSemana > 0 && <span>· {diasSemana} días/sem</span>}
+                            {numFestivales > 0 && <span>· {numFestivales} festivales</span>}
+                            {preset.yearSuffix && (
+                              <span className="px-1.5 py-0.2 rounded bg-[var(--surface-soft)] font-mono text-[11px]">
+                                {preset.yearSuffix}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-[var(--glass-border)] flex items-center justify-between text-xs font-cinzel">
+                          <span className="text-[var(--text-secondary)] text-[11px] truncate max-w-[200px]">
+                            {preset.months.slice(0, 3).map(m => m.name.split(' ')[0]).join(', ')}...
+                          </span>
+                          <button
+                            type="button"
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                              isSelected
+                                ? 'bg-[var(--accent)] text-[var(--on-accent)]'
+                                : 'text-[var(--accent)] hover:bg-[var(--accent)]/15'
+                            }`}
+                          >
+                            {isSelected ? 'Seleccionado' : 'Usar este'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-[var(--glass-border)] bg-[var(--sidebar-bg)] flex justify-end gap-2">
+              <button
+                onClick={() => setIsCalendarModalOpen(false)}
+                className="px-4 py-1.5 rounded-xl font-cinzel text-xs font-bold border border-[var(--user-border)] hover:bg-[var(--surface-soft)] cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

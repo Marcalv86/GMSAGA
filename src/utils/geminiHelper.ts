@@ -1714,6 +1714,49 @@ ${bloqueElenco}
     }
     if (n.notes) lineas.push(`- Notas: ${corta(n.notes, 400)}`);
 
+    // Idiomas del personaje y nivel de dominio
+    if (n.idiomas) {
+      lineas.push(`- 🗣️ Idiomas & dominio: ${corta(n.idiomas, 200)}`);
+    } else if (n.characterSheet?.languages?.length) {
+      lineas.push(`- 🗣️ Idiomas & dominio: ${corta(n.characterSheet.languages.join(', '), 200)}`);
+    }
+
+    // Mini-ficha D&D 5e / Bloque de estadísticas de monstruo o PNJ
+    const sheet = n.characterSheet;
+    const cr = n.cr || sheet?.cr || sheet?.challengeRating || sheet?.level;
+    if (sheet || cr) {
+      const parts: string[] = [];
+      if (cr) parts.push(`Desafío: ${cr}`);
+      if (sheet?.class || sheet?.title) parts.push(`Clase/Rol: ${sheet.class || sheet.title}`);
+      if (typeof sheet?.ac === 'number') parts.push(`CA: ${sheet.ac}`);
+      if (typeof sheet?.hp === 'number') parts.push(`PG: ${sheet.hp}/${sheet.maxHp || sheet.hp}`);
+      if (sheet?.speed) parts.push(`Vel: ${sheet.speed}`);
+      if (parts.length) {
+        lineas.push(`- ⚔️ FICHA D&D 5e: ${parts.join(' · ')}`);
+      }
+
+      if (sheet?.attributes) {
+        const a = sheet.attributes;
+        const m = (val?: number) => {
+          if (typeof val !== 'number') return '+0';
+          const mod = Math.floor((val - 10) / 2);
+          return mod >= 0 ? `+${mod}` : `${mod}`;
+        };
+        lineas.push(
+          `- 📊 Atributos: FUE ${a.str ?? 10} (${m(a.str)}) | DES ${a.dex ?? 10} (${m(a.dex)}) | CON ${a.con ?? 10} (${m(a.con)}) | INT ${a.int ?? 10} (${m(a.int)}) | SAB ${a.wis ?? 10} (${m(a.wis)}) | CAR ${a.cha ?? 10} (${m(a.cha)})`
+        );
+      }
+
+      if (sheet?.actions?.length) {
+        const actResumen = sheet.actions.slice(0, 3).map(act => `${act.name}${act.damageOrEffect ? ` (${act.damageOrEffect})` : ''}`).join('; ');
+        lineas.push(`- 💥 Acciones/Ataques: ${corta(actResumen, 250)}`);
+      }
+      if (sheet?.traits?.length) {
+        const rasgResumen = sheet.traits.slice(0, 3).map(t => t.name).join(', ');
+        lineas.push(`- ⚡ Rasgos clave: ${corta(rasgResumen, 200)}`);
+      }
+    }
+
     /*
      * El equipo es lo que hace que un personaje ACTÚE como quien es. Sin esta
      * línea, el sombrero de disfraz, la varita o el piwafwi son adorno en una
@@ -8299,6 +8342,7 @@ Para cada personaje:
 - "alias": apodo o nombre falso, si lo tiene
 - "trueIdentity": identidad real, si el documento la revela
 - "disguise": el disfraz o apariencia falsa, si la usa
+- "idiomas": idioma racial lógico de base (drow + señas silenciosas para drows, élfico para elfos, etc.) y común de la superficie u otro secundario lógico con su nivel de dominio (chapurreado / básico, medio, o avanzado / fluido). Ejemplo: "Drow (nativo), Señas drow (avanzado), Común (medio)"
 - "sheet": ficha opcional con hp, maxHp, ac, speed, attributes, traits
 
 Responde ÚNICAMENTE con un JSON de esta forma:
@@ -8316,6 +8360,7 @@ Responde ÚNICAMENTE con un JSON de esta forma:
       "alias": "...",
       "trueIdentity": "...",
       "disguise": "...",
+      "idiomas": "Drow (nativo), Señas drow (avanzado), Común (medio)",
       "sheet": {
         "hp": 15, "maxHp": 15, "ac": 13, "speed": "30 pies",
         "attributes": { "str": 12, "dex": 14, "con": 12, "int": 10, "wis": 11, "cha": 10 },
@@ -8349,6 +8394,7 @@ function pnjDesdeJson(bruto: any, respaldo: string): NPC {
     alias: texto(bruto?.alias),
     trueIdentity: texto(bruto?.trueIdentity),
     disguise: texto(bruto?.disguise),
+    idiomas: texto(bruto?.idiomas),
     characterSheet: tieneFicha
       ? {
           name: nombre,
@@ -8400,6 +8446,7 @@ export function fusionarPnjs(lista: NPC[]): NPC[] {
       alias: masLargo(previo.alias, npc.alias),
       trueIdentity: masLargo(previo.trueIdentity, npc.trueIdentity),
       disguise: masLargo(previo.disguise, npc.disguise),
+      idiomas: masLargo(previo.idiomas, npc.idiomas),
       // La ficha mecánica suele estar en un apéndice, lejos del retrato: gana
       // la que exista, no la que llegó primero.
       characterSheet: previo.characterSheet || npc.characterSheet

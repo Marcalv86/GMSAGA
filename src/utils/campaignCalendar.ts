@@ -100,11 +100,230 @@ export const CALENDARIO_HARPTOS: CalendarConfig = {
   ],
   weekdays: ['Primer día', 'Segundo día', 'Tercer día', 'Cuarto día', 'Quinto día', 'Sexto día', 'Séptimo día', 'Octavo día', 'Noveno día', 'Décimo día (Cabalgada)'],
   yearSuffix: 'CV',
-  // Martillo es «Deepwinter» y el primer festival del año es Pleno Invierno.
   estacionInicial: 'invierno'
 };
 
-export const CALENDARIOS_PREDEFINIDOS: CalendarConfig[] = [CALENDARIO_HARPTOS, CALENDARIO_FANTASTICO, CALENDARIO_GREGORIANO];
+/**
+ * Calendario Galáctico Estándar (Star Wars / Coruscant):
+ * 10 meses de 35 días (350 días) + 3 semanas festivas intercalares de 5 días (15 días) + 3 días festivos sueltos = 368 días.
+ * Semanas de 5 días (Primeday, Centaxday, Taungsday, Zhellday, Benduday).
+ * Sufijo: ABY (Después de la Batalla de Yavin) / BBY (Antes de la Batalla de Yavin).
+ */
+export const CALENDARIO_STAR_WARS: CalendarConfig = {
+  name: 'Galáctico Estándar (Star Wars / Coruscant)',
+  months: [
+    { name: 'Elona (1er Mes)', days: 35 },
+    { name: 'Nau (2º Mes)', days: 35 },
+    { name: 'Semon (3er Mes)', days: 35 },
+    { name: 'Padron (4º Mes)', days: 35 },
+    { name: 'Relona (5º Mes)', days: 35 },
+    { name: 'Atoko (6º Mes)', days: 35 },
+    { name: 'Celona (7º Mes)', days: 35 },
+    { name: 'Telona (8º Mes)', days: 35 },
+    { name: 'Katell (9º Mes)', days: 35 },
+    { name: 'Welona (10º Mes)', days: 35 }
+  ],
+  festivals: [
+    { name: 'Semana del Festival de Año Nuevo', afterMonth: 0 },
+    { name: 'Semana de la Reconciliación', afterMonth: 4 },
+    { name: 'Festival de las Estrellas', afterMonth: 8 },
+    { name: 'Día del Solsticio Galáctico', afterMonth: 9 }
+  ],
+  weekdays: ['Primeday', 'Centaxday', 'Taungsday', 'Zhellday', 'Benduday'],
+  yearSuffix: 'ABY',
+  estacionInicial: 'primavera'
+};
+
+/**
+ * Cómputo de Absalom (Golarion / Pathfinder 1e & 2e):
+ * 12 meses de 30/31 días correspondientes al año solar estándar (365 días), semanas de 7 días.
+ * Sufijo: AR (Absalom Reckoning).
+ */
+export const CALENDARIO_GOLARION: CalendarConfig = {
+  name: 'Cómputo de Absalom (Golarion / Pathfinder)',
+  months: [
+    { name: 'Abadius', days: 31 },
+    { name: 'Calistril', days: 28 },
+    { name: 'Pharast', days: 31 },
+    { name: 'Gozran', days: 30 },
+    { name: 'Desnus', days: 31 },
+    { name: 'Sarenith', days: 30 },
+    { name: 'Erastus', days: 31 },
+    { name: 'Arodus', days: 31 },
+    { name: 'Rova', days: 30 },
+    { name: 'Lamashan', days: 31 },
+    { name: 'Neth', days: 30 },
+    { name: 'Kuthona', days: 31 }
+  ],
+  festivals: [],
+  weekdays: ['Moonday (Lunes)', 'Toilday (Labor)', 'Weilday (Telar)', 'Oathday (Juramento)', 'Fireday (Fuego)', 'Starday (Estelar)', 'Sunday (Sol)'],
+  yearSuffix: 'AR',
+  estacionInicial: 'invierno'
+};
+
+/**
+ * Calendario Cyberpunk / Cronología Terrestre (2077 / 2020 / Moderno)
+ */
+export const CALENDARIO_CYBERPUNK: CalendarConfig = {
+  name: 'Cronología Cyberpunk / Tierra 2077',
+  months: [
+    { name: 'enero', days: 31 },
+    { name: 'febrero', days: 28 },
+    { name: 'marzo', days: 31 },
+    { name: 'abril', days: 30 },
+    { name: 'mayo', days: 31 },
+    { name: 'junio', days: 30 },
+    { name: 'julio', days: 31 },
+    { name: 'agosto', days: 31 },
+    { name: 'septiembre', days: 30 },
+    { name: 'octubre', days: 31 },
+    { name: 'noviembre', days: 30 },
+    { name: 'diciembre', days: 31 }
+  ],
+  festivals: [],
+  weekdays: ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'],
+  yearSuffix: '',
+  estacionInicial: 'invierno'
+};
+
+export const CALENDARIOS_PREDEFINIDOS: CalendarConfig[] = [
+  CALENDARIO_HARPTOS,
+  CALENDARIO_STAR_WARS,
+  CALENDARIO_GOLARION,
+  CALENDARIO_CYBERPUNK,
+  CALENDARIO_FANTASTICO,
+  CALENDARIO_GREGORIANO
+];
+
+export interface DeteccionCalendario {
+  calendar: CalendarConfig;
+  motivo: string;
+  confianza: 'alta' | 'media' | 'baja';
+  sistemaDetectado: string;
+}
+
+/**
+ * Analiza de forma exhaustiva los archivos, la memoria, las notas de campaña y las fichas de personaje
+ * para deducir automáticamente el calendario de mundo correspondiente a la ambientación jugada.
+ */
+export function detectarCalendarioMundo(
+  project?: { name?: string; description?: string; memory?: any },
+  files?: { name?: string; content?: string }[]
+): DeteccionCalendario {
+  const trozos: string[] = [];
+
+  if (project?.name) trozos.push(project.name);
+  if (project?.description) trozos.push(project.description);
+  if (project?.memory?.story) trozos.push(project.memory.story);
+  if (project?.memory?.current_status) trozos.push(project.memory.current_status);
+
+  const pc = project?.memory?.player_character;
+  if (pc) {
+    if (pc.class) trozos.push(pc.class);
+    if (pc.race) trozos.push(pc.race);
+    if (pc.backstory) trozos.push(pc.backstory);
+    if (pc.personality) trozos.push(pc.personality);
+    if (pc.notes) trozos.push(pc.notes);
+  }
+
+  if (Array.isArray(files)) {
+    files.slice(0, 15).forEach(f => {
+      if (f.name) trozos.push(f.name);
+      if (f.content) trozos.push(f.content.slice(0, 4000));
+    });
+  }
+
+  const texto = trozos.join(' ').toLowerCase();
+
+  // Puntuación Star Wars
+  const starWarsKeywords = [
+    'star wars', 'jedi', 'sith', 'coruscant', 'tatooine', 'aby', 'bby', 'mandalor',
+    'blaster', 'lightsaber', 'holocron', 'la fuerza', 'hiperespacio', 'imperio galactico',
+    'rebelion', 'republica galactica', 'dathomir', 'outer rim', 'borde exterior', 'padawan',
+    'droide', 'tie fighter', 'x-wing', 'millennium falcon', 'wookiee', 'hutt'
+  ];
+  let swScore = 0;
+  starWarsKeywords.forEach(kw => {
+    if (texto.includes(kw)) swScore += (kw === 'star wars' || kw === 'coruscant' || kw === 'jedi' || kw === 'aby' || kw === 'bby') ? 4 : 2;
+  });
+
+  // Puntuación Forgotten Realms / Harptos
+  const harptosKeywords = [
+    'faerun', 'toril', 'harptos', 'reinos olvidados', 'forgotten realms', 'waterdeep',
+    'aguasprofundas', 'baldur', 'puerta de baldur', 'neverwinter', 'noyvern', 'drow',
+    'menzoberranzan', 'luskan', 'moonshae', 'dr', 'cv', 'lolth', 'd&d', '5e', 'elminster',
+    'jarlaxle', 'bregan d\'aerthe', 'alturiak', 'tarsakh', 'mirtul', 'kythorn', 'flamerule',
+    'eleasis', 'eleint', 'marpenoth', 'uktar', 'nightal', 'greengrass', 'midsummer'
+  ];
+  let harptosScore = 0;
+  harptosKeywords.forEach(kw => {
+    if (texto.includes(kw)) harptosScore += (kw === 'harptos' || kw === 'faerun' || kw === 'reinos olvidados' || kw === 'forgotten realms') ? 5 : 2;
+  });
+
+  // Puntuación Golarion / Pathfinder
+  const golarionKeywords = [
+    'golarion', 'absalom', 'pathfinder', 'pf2e', 'varisia', 'cheliax', 'sarenrae', 'pharasma',
+    'abadius', 'calistril', 'pharast', 'gozran', 'desnus', 'sarenith', 'erastus', 'arodus', 'rova'
+  ];
+  let golarionScore = 0;
+  golarionKeywords.forEach(kw => {
+    if (texto.includes(kw)) golarionScore += (kw === 'golarion' || kw === 'absalom' || kw === 'pathfinder') ? 5 : 2;
+  });
+
+  // Puntuación Cyberpunk / Tierra
+  const cyberpunkKeywords = [
+    'cyberpunk', 'night city', 'arasaka', 'militech', '2077', '2020', 'edgerunner',
+    'braindance', 'netrunner', 'choom', 'sandevistan', 'cyberware'
+  ];
+  let cyberpunkScore = 0;
+  cyberpunkKeywords.forEach(kw => {
+    if (texto.includes(kw)) cyberpunkScore += (kw === 'cyberpunk' || kw === 'night city' || kw === 'arasaka') ? 5 : 2;
+  });
+
+  if (swScore >= 3 && swScore > harptosScore && swScore > golarionScore && swScore > cyberpunkScore) {
+    return {
+      calendar: CALENDARIO_STAR_WARS,
+      motivo: 'Detectadas referencias al universo galáctico (Star Wars, Coruscant, era ABY/BBY, Fuerzas o planetas del Borde Exterior).',
+      confianza: swScore > 8 ? 'alta' : 'media',
+      sistemaDetectado: 'Star Wars'
+    };
+  }
+
+  if (golarionScore >= 3 && golarionScore > harptosScore) {
+    return {
+      calendar: CALENDARIO_GOLARION,
+      motivo: 'Detectadas referencias al Cómputo de Absalom o Golarion (Pathfinder).',
+      confianza: golarionScore > 8 ? 'alta' : 'media',
+      sistemaDetectado: 'Pathfinder / Golarion'
+    };
+  }
+
+  if (cyberpunkScore >= 3 && cyberpunkScore > harptosScore) {
+    return {
+      calendar: CALENDARIO_CYBERPUNK,
+      motivo: 'Detectadas referencias al entorno de Night City / Cyberpunk 2077.',
+      confianza: cyberpunkScore > 8 ? 'alta' : 'media',
+      sistemaDetectado: 'Cyberpunk 2077 / Moderno'
+    };
+  }
+
+  if (harptosScore >= 3) {
+    return {
+      calendar: CALENDARIO_HARPTOS,
+      motivo: 'Detectadas referencias a Faerûn, Reinos Olvidados o términos del Cómputo de Harptos.',
+      confianza: harptosScore > 8 ? 'alta' : 'media',
+      sistemaDetectado: 'Reinos Olvidados (Faerûn / D&D 5e)'
+    };
+  }
+
+  // Si no hay suficiente información o es fantasía abierta
+  return {
+    calendar: CALENDARIO_HARPTOS,
+    motivo: 'Calendario predeterminado de fantasía / Reinos Olvidados adaptable a cualquier cómputo.',
+    confianza: 'baja',
+    sistemaDetectado: 'Reinos Olvidados / Fantasía'
+  };
+}
 
 export const MINUTOS_POR_DIA = 24 * 60;
 
@@ -1449,6 +1668,8 @@ export interface VinculoLeido {
   aparenta?: string;
   oculta?: string;
   vinculo?: string;
+  /** Idioma racial lógico y secundario/común, indicando nivel de dominio */
+  idiomas?: string;
   atr?: number;
   vin?: number;
   con?: number;
@@ -1484,6 +1705,7 @@ export function leerVinculos(texto: string): VinculoLeido[] {
         else if (campo === 'aparenta' || campo === 'muestra') v.aparenta = valor;
         else if (campo === 'oculta' || campo === 'calla' || campo === 'piensa') v.oculta = valor;
         else if (campo === 'grado' || campo === 'vinculo' || campo === 'relacion') v.vinculo = valor;
+        else if (campo === 'idiomas' || campo === 'idioma' || campo === 'lenguas' || campo === 'lengua' || campo === 'habla') v.idiomas = valor;
         else if (campo === 'atr' || campo === 'atraccion') {
           const num = parseInt(valor, 10);
           if (!isNaN(num)) v.atr = Math.max(0, Math.min(20, num));

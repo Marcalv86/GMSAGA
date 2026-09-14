@@ -324,6 +324,8 @@ export interface PlayerCharacter {
   gender?: string;
   subclass?: string;
   level?: string;
+  cr?: string | number; // Valor de Desafío / Challenge Rating para monstruos o PNJs (ej. "CR 5", "CR 15", 5)
+  challengeRating?: string;
   levelProgress?: number; // 0-100 percentage towards next level
   /**
    * Hitos anotados hacia el siguiente nivel, tal como los lleva el Narrador.
@@ -742,6 +744,8 @@ export interface NPC {
   alias?: string; // Alias, apodo o disfraz bajo el que se dio a conocer (ej: "Oficial Corsario...", "J.B.")
   trueIdentity?: string; // Verdadera identidad descubierta (ej: "Jarlaxle Baenre")
   disguise?: string; // Notas del disfraz o apariencia falsa si aún no ha sido desenmascarado
+  idiomas?: string; // Idioma lógico racial de base (con señas si aplica) y común u otro secundario, indicando nivel de dominio (chapurreado, medio, avanzado)
+  cr?: string | number; // Valor de Desafío / Challenge Rating canónico o asignado (ej: "CR 5", "CR 15")
   characterSheet?: PlayerCharacter;
 
   /**
