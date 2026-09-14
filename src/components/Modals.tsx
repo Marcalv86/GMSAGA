@@ -15,6 +15,8 @@ import {
   setStoredTopP,
   getStoredAutoFailover,
   setStoredAutoFailover,
+  getStoredAutoNovelize,
+  setStoredAutoNovelize,
   getStoredBackgroundModel,
   setStoredBackgroundModel,
   getStoredApiKeys,
@@ -62,7 +64,8 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Clock
+  Clock,
+  BookOpen
 } from 'lucide-react';
 export interface PromptConfig {
   isOpen: boolean;
@@ -138,6 +141,7 @@ export const ApiKeyModal: React.FC<{
   const [temperature, setTemperature] = useState<number>(getStoredTemperature());
   const [topP, setTopP] = useState<number>(getStoredTopP());
   const [autoFailover, setAutoFailover] = useState<boolean>(getStoredAutoFailover());
+  const [autoNovelize, setAutoNovelize] = useState<boolean>(getStoredAutoNovelize());
   const [historyWindow, setHistoryWindow] = useState<HistoryWindowSetting>(getStoredHistoryWindow());
   const [keyRotationMode, setKeyRotationMode] = useState<KeyRotationMode>(getStoredKeyRotationMode());
   const [apiKeysList, setApiKeysList] = useState<string[]>(getStoredApiKeys());
@@ -352,6 +356,7 @@ export const ApiKeyModal: React.FC<{
       setTemperature(getStoredTemperature());
       setTopP(getStoredTopP());
       setAutoFailover(getStoredAutoFailover());
+      setAutoNovelize(getStoredAutoNovelize());
       setHistoryWindow(getStoredHistoryWindow());
       setUso(resumirUso());
     }
@@ -376,6 +381,7 @@ export const ApiKeyModal: React.FC<{
     setStoredTemperature(temperature);
     setStoredTopP(topP);
     setStoredAutoFailover(autoFailover);
+    setStoredAutoNovelize(autoNovelize);
     setStoredHistoryWindow(historyWindow);
     setSavedSuccess(true);
     setTimeout(() => {
@@ -701,6 +707,42 @@ export const ApiKeyModal: React.FC<{
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Novelización en segundo plano / Ahorro de cuota */}
+              <div className="pt-3 border-t border-[var(--glass-border)]">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--glass-border)] p-3 rounded-lg flex items-start justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <label
+                        onClick={() => setAutoNovelize(!autoNovelize)}
+                        className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-[var(--accent)]" />
+                        Novelización Automática en Segundo Plano
+                      </label>
+                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
+                        autoNovelize
+                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                          : 'bg-stone-500/10 text-stone-600 dark:text-stone-300 border-stone-500/20'
+                      }`}>
+                        {autoNovelize ? 'Activa' : 'Desactivada (Recomendado)'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
+                      Si está activa, genera una reescritura narrativa de tus acciones 3.5 segundos después de cada turno. Al mantenerla desactivada, <strong>proteges tu cuota de tokens por minuto (TPM)</strong> para que tus turnos de narración nunca se saturen. Siempre puedes pulsar «Novelizar» bajo demanda dentro del Lector de Novela.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={autoNovelize}
+                      onChange={e => setAutoNovelize(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
                   </label>
                 </div>
               </div>

@@ -379,6 +379,15 @@ export function setStoredAutoFailover(enabled: boolean): void {
   localStorage.setItem('gmstudio_auto_failover', enabled ? 'on' : 'off');
 }
 
+export function getStoredAutoNovelize(): boolean {
+  // Por defecto 'off' para proteger la cuota de tokens por minuto (TPM) en la capa gratuita.
+  return localStorage.getItem('gmstudio_auto_novelize') === 'on';
+}
+
+export function setStoredAutoNovelize(enabled: boolean): void {
+  localStorage.setItem('gmstudio_auto_novelize', enabled ? 'on' : 'off');
+}
+
 /**
  * Cadena de modelos de respaldo en cascada ante saturación o fallos de servidores de Google.
  * Si el modelo principal está ocupado (503/429), la app salta automáticamente al siguiente
@@ -3909,6 +3918,15 @@ export async function generateStoryTurnStream({
           }
           if (fallo.isRateLimit) {
             markKeyCooldown(currentApiKey, fallo.retryAfterMs || 60000);
+            const haySiguienteModelo = modelIndex < failoverChain.length - 1;
+            // Si el límite alcanzado es de fichas de entrada por minuto (input_token_count)
+            // y venimos de un reintento o ya se probó una clave, insistir con más claves
+            // contra el mismo modelo saturado quemará las demás claves: saltamos de modelo.
+            if (fallo.isTokenQuotaLimit && haySiguienteModelo && (intento > 0 || k > 0)) {
+              setLoadingText(`Tope de fichas por minuto alcanzado para ${modelDisplayName}. Saltando de inmediato a modelo de respaldo...`);
+              saltarAlSiguienteModelo = true;
+              break;
+            }
             const hayOtrasClaves = disponibles.slice(k + 1).some(kk => !clavesMuertas.has(kk) && !isKeyInCooldown(kk));
             if (hayOtrasClaves) {
               setLoadingText(`Cuota agotada en la Clave ${nClave}. Rotando a la siguiente para ${modelDisplayName}...`);
@@ -3927,6 +3945,23 @@ export async function generateStoryTurnStream({
             // contexto pasado de largo). Repetirla con otra clave da exactamente
             // el mismo 400: lo único que puede cambiar algo es otro modelo.
             saltarAlSiguienteModelo = true;
+            break;
+          }
+
+          if (fallo.isOverloaded) {
+            // Un 503/UNAVAILABLE indica que los servidores de Google para este modelo
+            // están experimentando alta demanda global. Probar otras claves de usuario
+            // contra el mismo modelo caído no resuelve la saturación y quema tokens TPM.
+            // Si hay un modelo de respaldo disponible en la cadena, conmutamos de inmediato.
+            const haySiguienteModelo = modelIndex < failoverChain.length - 1;
+            if (haySiguienteModelo) {
+              setLoadingText(`Google saturado en ${modelDisplayName} (503). Conmutando de inmediato a modelo de respaldo...`);
+              saltarAlSiguienteModelo = true;
+              break;
+            } else if (intento < MAX_REINTENTOS_POR_SATURACION) {
+              await esperar(fallo.retryAfterMs || reboteMs(intento), signal);
+              continue;
+            }
             break;
           }
 
@@ -4285,7 +4320,17 @@ export async function generateContentWithFailover({
   proposito?: string;
 }): Promise<any> {
   const { keys: rotadas } = getRotatedApiKeys();
-  const todasLasClaves = rotadas.length > 0 ? rotadas : [''];
+  // Para tareas secundarias o de fondo (memoria, trazado, novelización, lectura de fichas),
+  // si el usuario dispone de varias claves en su bolsillo, invertimos el orden de las claves
+  // para que utilicen las claves secundarias (ej. clave 6, 5, 4...). De este modo NUNCA consumen
+  // la cuota de fichas por minuto (TPM) ni interfieren con la clave principal del narrador.
+  const esTareaDeFondo = Boolean(proposito && proposito !== 'Turno narrado');
+  const todasLasClaves =
+    rotadas.length > 1 && esTareaDeFondo
+      ? [...rotadas].reverse()
+      : rotadas.length > 0
+        ? rotadas
+        : [''];
   const base = sanitizeModelId(primaryModel || getBackgroundTaskModel(), DEFAULT_BACKGROUND_MODEL_ID);
   const rawChain = preferredChain || getModelFailoverChain(base);
   const chain = rawChain
@@ -4463,6 +4508,11 @@ export async function generateContentWithFailover({
           }
           if (fallo.isRateLimit) {
             if (currentKey) markKeyCooldown(currentKey, fallo.retryAfterMs || 60000);
+            const haySiguienteModelo = i < chain.length - 1;
+            if (fallo.isTokenQuotaLimit && haySiguienteModelo && (intento > 0 || k > 0)) {
+              saltarAlSiguienteModelo = true;
+              break;
+            }
             const hayOtrasClaves = disponibles.slice(k + 1).some(kk => !clavesMuertas.has(kk) && !isKeyInCooldown(kk));
             if (!hayOtrasClaves && fallo.retryAfterMs > 0 && fallo.retryAfterMs <= 15000 && intento < MAX_REINTENTOS_POR_SATURACION) {
               await esperar(fallo.retryAfterMs + 500, signal);
@@ -4472,6 +4522,17 @@ export async function generateContentWithFailover({
           }
           if (fallo.isBadRequest) {
             saltarAlSiguienteModelo = true;
+            break;
+          }
+          if (fallo.isOverloaded) {
+            const haySiguienteModelo = i < chain.length - 1;
+            if (haySiguienteModelo) {
+              saltarAlSiguienteModelo = true;
+              break;
+            } else if (intento < MAX_REINTENTOS_POR_SATURACION) {
+              await esperar(fallo.retryAfterMs || reboteMs(intento), signal);
+              continue;
+            }
             break;
           }
           if (fallo.isTransient && intento < MAX_REINTENTOS_POR_SATURACION) {
@@ -9799,6 +9860,7 @@ DIRECTRICES EDITORIALES INVIOLABLES:
 
   const modelo = getBackgroundTaskModel();
   const response = await generateContentWithFailover({
+    proposito: 'Novelización',
     primaryModel: modelo,
     contents: prompt,
     config: {

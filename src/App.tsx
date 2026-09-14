@@ -115,6 +115,7 @@ import {
   fusionarTrama,
   isNarrativeIncomplete,
   novelizeUserMessage,
+  getStoredAutoNovelize,
   generarNoticiasSaltoTemporal,
   anclarHistorialPorHud,
   consolidarCronicaAlCerrarCapitulo
@@ -2301,8 +2302,16 @@ export default function App() {
       });
 
       // Novelización en segundo plano de la respuesta tras concluir con éxito la generación
-      // Se espacia 3.5 segundos tras el turno para dejar margen de cuota (RPM/TPM) en la API gratuita.
-      if (currentProject && currentChatId && userPrompt && !userPrompt.startsWith('[Continúa') && !userPrompt.startsWith('⏳ [')) {
+      // Solo se ejecuta si está activada en Configuración (por defecto OFF para no consumir TPM/RPM en capa gratuita).
+      // Siempre se puede novelizar bajo demanda desde el Lector de Novela.
+      if (
+        getStoredAutoNovelize() &&
+        currentProject &&
+        currentChatId &&
+        userPrompt &&
+        !userPrompt.startsWith('[Continúa') &&
+        !userPrompt.startsWith('⏳ [')
+      ) {
         const targetChatId = currentChatId;
         const targetProj = currentProject;
         const targetPrompt = userPrompt;

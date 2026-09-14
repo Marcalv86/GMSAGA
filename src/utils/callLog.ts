@@ -469,18 +469,19 @@ export interface PresionDelMinuto {
  * es el MENOR: la aplicación rota claves al saturarse, así que el envío acaba
  * en la más libre. Solo se bloquea de verdad cuando no queda ninguna con sitio.
  */
-export function presionDelMinuto(modelo: string, totalClaves: number): PresionDelMinuto {
+export function presionDelMinuto(_modelo: string, totalClaves: number): PresionDelMinuto {
   const claves = Math.max(1, totalClaves);
   const porClave = new Array<number>(claves).fill(0);
   const desde = Date.now() - 60_000;
   let llamadas = 0;
 
   for (const l of getLlamadas()) {
-    if (l.modelo !== modelo) continue;
     const t = Date.parse(l.inicio);
     if (!Number.isFinite(t) || t < desde) continue;
-    // Una llamada fallida también consumió cuota: Google la contó al recibirla,
-    // y no descontarla es justo lo que hace que un 429 parezca inexplicable.
+    // La cuota de tokens de entrada en la capa gratuita de Google AI Studio
+    // (generate_content_free_tier_input_token_count) es global por proyecto/clave,
+    // por lo que las tareas de fondo (Flash Lite) también consumen cuota de esa clave.
+    // Una llamada fallida también consumió cuota: Google la contó al recibirla.
     const fichas = l.fichasEntrada ?? fichasAproximadas(l.caracteresEnviados) ?? 0;
     if (!fichas) continue;
     const i = Math.min(claves - 1, Math.max(0, (l.claveN || 1) - 1));
