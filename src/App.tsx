@@ -1616,6 +1616,8 @@ export default function App() {
     relojes?: RelojOculto[];
     facciones?: Faccion[];
     preparado?: CartaPreparada[];
+    corregirCronica?: string | null;
+    rehacerUltimoTurno?: string | null;
   }) => {
     /*
      * Las etiquetas de búsqueda viven en los archivos, no en el proyecto, así
@@ -1639,7 +1641,9 @@ export default function App() {
       !sinNovedadDeMesa(orden.facciones || [], orden.preparado || []) ||
       Boolean(orden.estamos) ||
       Boolean(orden.estado) ||
-      Boolean(orden.viaje);
+      Boolean(orden.viaje) ||
+      Boolean(orden.corregirCronica) ||
+      Boolean(orden.rehacerUltimoTurno);
     if (!hayAlgo) return;
 
     await handleUpdateProjectField(p => {
@@ -1859,6 +1863,30 @@ export default function App() {
 
       return { memory: sanitizeProjectMemory(mem), timeline: diario };
     });
+
+    if (orden.corregirCronica && currentChat && currentChat.messages.length > 0) {
+      const lastModelIdx = [...currentChat.messages]
+        .map((m, i) => ({ m, i }))
+        .reverse()
+        .find(x => x.m.role === 'model')?.i;
+      if (lastModelIdx !== undefined) {
+        const updatedMsgs = currentChat.messages.map((m, idx) =>
+          idx === lastModelIdx ? { ...m, content: orden.corregirCronica! } : m
+        );
+        const updatedChat = { ...currentChat, messages: updatedMsgs };
+        const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));
+        setCurrentChats(chs);
+        if (currentPId) saveLocalChats(currentPId, chs);
+      }
+    } else if (orden.rehacerUltimoTurno && currentChat && currentChat.messages.length > 0) {
+      const lastModelIdx = [...currentChat.messages]
+        .map((m, i) => ({ m, i }))
+        .reverse()
+        .find(x => x.m.role === 'model')?.i;
+      if (lastModelIdx !== undefined) {
+        await handleRegenerateChatMessage(lastModelIdx, orden.rehacerUltimoTurno || undefined);
+      }
+    }
   };
 
   // Chapter / Chat Management
@@ -2556,7 +2584,9 @@ export default function App() {
       const priorMessages = currentChat.messages.slice(0, index);
       // Find previous user prompt
       const lastUserMsg = [...priorMessages].reverse().find(m => m.role === 'user');
-      const promptToUse = lastUserMsg ? lastUserMsg.content : 'Continúa con el relato de la escena.';
+      const promptToUse = updatedUserPrompt !== undefined && updatedUserPrompt.trim() !== ''
+        ? updatedUserPrompt
+        : (lastUserMsg ? lastUserMsg.content : 'Continúa con el relato de la escena.');
 
       const updatedChat = { ...currentChat, messages: priorMessages };
       const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));

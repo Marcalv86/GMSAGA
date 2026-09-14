@@ -676,7 +676,7 @@ export const MemoryManager: React.FC<{
   return (
     <div className="flex-1 overflow-y-auto px-2.5 sm:px-4 md:px-[5%] py-3 md:py-8 font-lora w-full max-w-full overflow-x-hidden">
       {topBanner && (
-        <div className="sticky top-0 z-30 bg-[var(--bg-color)]/95 backdrop-blur-sm pb-3 pt-1 mb-2 shadow-xs">
+        <div className="pb-3 pt-1 mb-2">
           {topBanner}
         </div>
       )}

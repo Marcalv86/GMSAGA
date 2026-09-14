@@ -450,7 +450,7 @@ export const InstructionsView: React.FC<{
                 </span>
               </div>
               <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed max-w-3xl">
-                Las directivas de juego (tiradas interactivas de dados y afinidad de PNJs) se integran automáticamente en el prompt del GM sin consumir cuota extra. <strong>Las directivas personalizables de abajo definen el lore y estilo que prefieras.</strong>
+                Las directivas de juego (tiradas interactivas de dados, afinidad de PNJs y formato de etiquetas) se integran automáticamente en el prompt del GM para controlar la interfaz. <strong>Las directivas personalizables de abajo definen el lore y estilo que prefieras.</strong>
               </p>
             </div>
           </div>

@@ -256,16 +256,28 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                   <RefreshCw className="w-3.5 h-3.5" /> Guardar y Regenerar Trama
                 </button>
               ) : (
-                <button
-                  onClick={() => {
-                    handleSaveEditOnly(idx);
-                    onContinueNarrative(idx);
-                  }}
-                  className="px-3 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] cursor-pointer font-bold shadow-xs"
-                  title="Guarda el texto y le pide a la IA que continúe narrando desde aquí"
-                >
-                  <Play className="w-3.5 h-3.5" /> Guardar y Continuar Relato
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      handleSaveEditOnly(idx);
+                      onRegenerateMessage(idx);
+                    }}
+                    className="px-3 py-1 text-xs font-cinzel bg-[var(--surface-soft)] border border-[var(--user-border)] text-[var(--text-primary)] rounded hover:bg-amber-50 cursor-pointer font-bold flex items-center gap-1"
+                    title="Borra esta respuesta y pide a la IA que vuelva a generar el turno del Narrador"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Rehacer con IA
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleSaveEditOnly(idx);
+                      onContinueNarrative(idx);
+                    }}
+                    className="px-3 py-1 text-xs font-cinzel bg-[var(--accent)] text-[var(--on-accent)] rounded hover:bg-[var(--accent-hover)] cursor-pointer font-bold shadow-xs flex items-center gap-1"
+                    title="Guarda el texto corregido y le pide a la IA que continúe narrando desde aquí"
+                  >
+                    <Play className="w-3.5 h-3.5" /> Guardar y Continuar Relato
+                  </button>
+                </>
               )}
             </div>
           </div>

@@ -119,6 +119,8 @@ export const MesaView: React.FC<{
     relojes?: RelojOculto[];
     facciones?: Faccion[];
     preparado?: CartaPreparada[];
+    corregirCronica?: string | null;
+    rehacerUltimoTurno?: string | null;
   }) => Promise<void> | void;
 }> = ({ project, chats, currentChatId, files, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria, onPlantarSecretos, onCorregirDesdeLaMesa }) => {
   const [mensajes, setMensajes] = useState<MensajeDeMesa[]>(() => leerMesa(project.id));
@@ -271,7 +273,9 @@ export const MesaView: React.FC<{
           bambalinas: respuesta.bambalinas,
           relojes: respuesta.relojes,
           facciones: respuesta.facciones,
-          preparado: respuesta.preparado
+          preparado: respuesta.preparado,
+          corregirCronica: respuesta.corregirCronica,
+          rehacerUltimoTurno: respuesta.rehacerUltimoTurno
         });
       }
     } catch (err) {
