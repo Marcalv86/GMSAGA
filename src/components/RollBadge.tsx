@@ -37,20 +37,20 @@ const PATRONES = {
   oraculoPregunta: String.raw`\[\s*Or[aá]culo\s*—\s*[«"']?([^»"'\n|]+?)[»"']?\s*\|\s*probabilidad\s*:\s*([^|\n]+?)\s*\|\s*d100\s*=\s*(\d+)(?:\s*\|\s*D[ÍI]GITOS\s+REPETIDOS)?\s*\]`,
   oraculoSignificado: String.raw`\[\s*Or[aá]culo\s*—\s*descubrir\s+significado\s*\|\s*d100\s*=\s*(\d+)\s+y\s+(\d+)\s*\]`,
   /**
-   * Tirada del DM o de un PNJ. Admite las tres formas que se ven en mesa:
-   *   [Tirada DM (DES, goblin acercándose): 14 vs SAB pasiva del PJ]   ← la de §4
-   *   [Tirada DM (SAB, perspicacia de Jarlaxle): 14 + 3 = 17 vs Engaño pasivo]
-   *   [Tirada PNJ (SAB de Dab'nay): d20 = 14 + 3 = 17 vs CD 12]
-   * El «d20 =» y el «vs …» son opcionales, y el «contra» puede ser una CD
-   * numérica o el nombre de una pasiva.
-   */
-  dm: String.raw`\[\s*Tirada\s+(?:DM|PNJ)\s*\(([^)]+?)\)\s*:\s*(?:d(\d+)\s*=\s*)?(\d+)\s*([+-]\s*\d+)?\s*(?:=\s*(\d+))?\s*(?:(?:vs|contra|frente\s+a)\s+(?:(?:CD|DC)\s*[:=]?\s*(\d+)|([^\]]+?)))?\s*\]`,
-  /**
-   * Resolución de tirada con corchetes:
+   * Patrón flexible para cualquier tirada de DM, PNJ, Oculta o Resolución con corchetes.
+   * Cubre todas las variantes de sintaxis generadas en mesa:
+   *   [Tirada DM (DES, goblin acercándose): 14 vs SAB pasiva del PJ]
+   *   [Tirada DM: DES (goblin) 14 vs SAB pasiva]
+   *   [Tirada DM (DES): 14]
+   *   [Tirada PNJ (Jarlaxle): 18 vs CD 15]
+   *   [Tirada de PNJ (SAB): 17 vs CD 14]
+   *   [Tirada del DM (DES): 14 vs 12]
+   *   [Tirada PNJ - Sigilo: 15 vs 12]
+   *   [Tirada oculta DM (DES): 14 vs 12]
    *   [Tirada: 14 natural + 3 = 17 vs CD 13 | Éxito]
-   *   [Tirada (Perspicacia): 14 natural vs CD 13]
+   *   [Tirada (Perspicacia): 14 vs CD 13]
    */
-  resolucionCorchetes: String.raw`\[\s*Tirada(?:\s*\(([^)]+?)\))?\s*:\s*(?:d(\d+)\s*=\s*)?(\d+)\s*(?:natural)?\s*([+-]\s*\d+)?\s*(?:=\s*(\d+))?\s*(?:(?:vs|contra|frente\s+a)\s+(?:(?:CD|DC)\s*[:=]?\s*(\d+)|([^\]|]+?)))?(?:\s*[|,]\s*[^\]]+)?\s*\]`,
+  tiradaGenerica: String.raw`\[\s*Tirada\b([^\]]+)\]`,
   /**
    * Resolución sin corchetes o fuga al inicio de párrafo:
    *   14 natural frente a CD 13:
@@ -61,21 +61,96 @@ const PATRONES = {
 
 const nuevaRegex = (patron: string) => new RegExp(patron, 'gi');
 
-/** Lee una coincidencia de tirada de DM / PNJ y la convierte en datos. */
-function leerTiradaDeDM(match: RegExpExecArray): RollInfo {
-  const modificador = match[4] ? parseInt(match[4].replace(/\s+/g, ''), 10) : 0;
-  const natural = parseInt(match[3], 10);
-  const contra = match[7]?.trim();
+/** Lee una coincidencia de tirada de DM / PNJ / genérica y la convierte en datos estructurados. */
+function parseGenericoTirada(rawText: string, innerContent: string): RollInfo | null {
+  // Ignorar si es una petición de tirada para el jugador [Petición de Tirada: ...]
+  if (/^petici[oó]n\b/i.test(innerContent.trim())) {
+    return null;
+  }
+
+  // 1. Contexto (quién o qué tira)
+  let dmContext = '';
+  const parenMatch = innerContent.match(/\(([^)]+)\)/);
+  if (parenMatch) {
+    dmContext = parenMatch[1].trim();
+  } else {
+    const headerMatch = innerContent.match(/^(?:(?:\s*oculta\s+)?(?:de\s+|del\s+)?(?:DM|PNJ|Master|Narrador)\s*[-:]?\s*([^:\d=[|]+)|([^:\d=[|]+):)/i);
+    if (headerMatch) {
+      dmContext = (headerMatch[1] || headerMatch[2] || '').trim();
+    }
+  }
+
+  if (!dmContext) {
+    if (/DM|Master|Narrador/i.test(innerContent)) {
+      dmContext = 'Tirada del DM';
+    } else if (/PNJ/i.test(innerContent)) {
+      dmContext = 'Tirada de PNJ';
+    } else {
+      dmContext = 'Resolución';
+    }
+  }
+
+  // 2. Dado de caras (ej: d20, d100, d6)
+  const sidesMatch = innerContent.match(/\bd(\d+)\b/i);
+  const sides = sidesMatch ? parseInt(sidesMatch[1], 10) : 20;
+
+  // 3. Resultado natural y modificadores
+  // Buscar números principales
+  const numMatches = innerContent.match(/(?:d\d+\s*=\s*)?(\d+)(?:\s*natural)?(?:\s*([+-]\s*\d+))?(?:\s*=\s*(\d+))?/i);
+  
+  let natural = 10;
+  let modifier = 0;
+  let total: number | undefined = undefined;
+
+  // Si encontramos un patrón numérico claro
+  const cleanNums = innerContent.replace(/\(([^)]+)\)/g, '').replace(/d\d+/g, '');
+  const digits = cleanNums.match(/\b\d+\b/g);
+
+  if (numMatches && numMatches[1]) {
+    natural = parseInt(numMatches[1], 10);
+    if (numMatches[2]) {
+      modifier = parseInt(numMatches[2].replace(/\s+/g, ''), 10);
+    }
+    if (numMatches[3]) {
+      total = parseInt(numMatches[3], 10);
+    } else {
+      total = natural + modifier;
+    }
+  } else if (digits && digits.length > 0) {
+    natural = parseInt(digits[0], 10);
+    total = natural;
+  }
+
+  // 4. Dificultad o Versus
+  let dc: number | undefined = undefined;
+  let contra: string | undefined = undefined;
+
+  const cdMatch = innerContent.match(/(?:CD|DC)\s*[:=]?\s*(\d+)/i);
+  if (cdMatch) {
+    dc = parseInt(cdMatch[1], 10);
+  } else {
+    const vsMatch = innerContent.match(/(?:vs|contra|frente\s+a)\s+([^\]|]+)/i);
+    if (vsMatch) {
+      const vsVal = vsMatch[1].trim();
+      const vsNum = vsVal.match(/^(\d+)/);
+      if (vsNum) {
+        dc = parseInt(vsNum[1], 10);
+      } else {
+        contra = vsVal;
+      }
+    }
+  }
+
   return {
     type: 'dm',
-    dmContext: match[1].trim(),
-    sides: match[2] ? parseInt(match[2], 10) : 20,
+    dmContext,
+    sides,
     natural,
-    modifier: modificador,
-    total: match[5] ? parseInt(match[5], 10) : natural + modificador,
-    dc: match[6] ? parseInt(match[6], 10) : undefined,
-    contra: contra || undefined,
-    rawText: match[0]
+    modifier,
+    total: total ?? (natural + modifier),
+    dc,
+    contra,
+    rawText
   };
 }
 
@@ -173,47 +248,23 @@ export function parseMessageSegments(text: string): MessageSegment[] {
     });
   }
 
-  // 5. Tirada DM / PNJ
-  const dmRollRegex = nuevaRegex(PATRONES.dm);
-  while ((match = dmRollRegex.exec(text)) !== null) {
-    items.push({
-      index: match.index,
-      endIndex: match.index + match[0].length,
-      roll: leerTiradaDeDM(match)
-    });
-  }
-
   const isOverlapping = (idx: number, end: number) => items.some(it => Math.max(it.index, idx) < Math.min(it.endIndex, end));
 
-  // 6. Tirada Resolución (Corchetes)
-  const resCorchetesRegex = nuevaRegex(PATRONES.resolucionCorchetes);
-  while ((match = resCorchetesRegex.exec(text)) !== null) {
+  // 5. Tiradas de DM, PNJ, Ocultas y Resolución con corchetes
+  const genericaRegex = nuevaRegex(PATRONES.tiradaGenerica);
+  while ((match = genericaRegex.exec(text)) !== null) {
     if (isOverlapping(match.index, match.index + match[0].length)) continue;
-    const ctx = match[1]?.trim() || 'Resolución';
-    const sides = match[2] ? parseInt(match[2], 10) : 20;
-    const natural = parseInt(match[3], 10);
-    const mod = match[4] ? parseInt(match[4].replace(/\s+/g, ''), 10) : 0;
-    const total = match[5] ? parseInt(match[5], 10) : natural + mod;
-    const dc = match[6] ? parseInt(match[6], 10) : undefined;
-    const contra = match[7]?.trim();
-    items.push({
-      index: match.index,
-      endIndex: match.index + match[0].length,
-      roll: {
-        type: 'dm',
-        dmContext: ctx,
-        sides,
-        natural,
-        modifier: mod,
-        total,
-        dc,
-        contra: contra || undefined,
-        rawText: match[0]
-      }
-    });
+    const rollInfo = parseGenericoTirada(match[0], match[1]);
+    if (rollInfo) {
+      items.push({
+        index: match.index,
+        endIndex: match.index + match[0].length,
+        roll: rollInfo
+      });
+    }
   }
 
-  // 7. Tirada Fuga / Sin corchetes (ej: "14 natural frente a CD 13:")
+  // 6. Tirada Fuga / Sin corchetes (ej: "14 natural frente a CD 13:")
   const resFugaRegex = nuevaRegex(PATRONES.resolucionFuga);
   while ((match = resFugaRegex.exec(text)) !== null) {
     if (isOverlapping(match.index, match.index + match[0].length)) continue;

@@ -31,6 +31,8 @@ export const ETIQUETAS_INTERNAS = [
   'AVANCE',
   'VIAJE',
   'LUGAR',
+  'ESTAMOS',
+  'ESCENA',
   'MEMORIA',
   'OLVIDA',
   'APRENDE',

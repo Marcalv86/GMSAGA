@@ -160,17 +160,19 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
 
   const invitaciones = isModel && hasOracle ? leerInvitaciones(m.content) : [];
   const isIncomplete = isModel && isNarrativeIncomplete(m.content);
-  const baseContent = isModel
-    ? limpiarInvitaciones(
-        stripStateTag(rollRequests.length ? stripRollRequests(m.content) : m.content)
-      )
-    : m.content;
+  const contentSinPeticiones = rollRequests.length ? stripRollRequests(m.content) : m.content;
+  const contentSinInvitaciones = isModel ? limpiarInvitaciones(contentSinPeticiones) : contentSinPeticiones;
 
-  // Extraer el HUD de escena y los segmentos in-line (texto y tiradas en orden cronológico)
+  // Extraer el HUD de escena y ubicación en cualquier posición (inicio, medio o final)
   const { narrativeText: textWithoutHUD, sceneHUD } = isModel
-    ? parseSceneHUD(baseContent)
-    : { narrativeText: baseContent, sceneHUD: null };
-  const segments = parseMessageSegments(textWithoutHUD);
+    ? parseSceneHUD(contentSinInvitaciones)
+    : { narrativeText: contentSinInvitaciones, sceneHUD: null };
+
+  // Limpiar etiquetas de sincronización interna que hayan quedado
+  const cleanContent = isModel ? stripStateTag(textWithoutHUD) : textWithoutHUD;
+
+  // Extraer los segmentos in-line (texto y tiradas en orden cronológico)
+  const segments = parseMessageSegments(cleanContent);
 
   // Detección de elementos técnicos sincronizados en segundo plano
   const hasSyncTags = isModel && (

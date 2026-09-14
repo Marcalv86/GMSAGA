@@ -31,54 +31,97 @@ export interface SceneHUDData {
 }
 
 /**
- * Analiza y extrae el HUD de escena del inicio de un mensaje de la IA.
- * Soporta formato por bloques (```text 📍... ```), formato de líneas sueltas (📍, 🌤, 👥, 🩸)
- * y formato estructurado [ESCENA: ...].
+ * Analiza y extrae el HUD de escena en cualquier posición de un mensaje de la IA
+ * (inicio, intermedio o final de texto).
+ * Soporta formato por bloques (```text 📍... ```), formato de líneas sueltas (📍, 🌤, 👥, 🩸),
+ * formato estructurado [ESCENA: ...] y etiquetas [ESTAMOS: ...] / [LUGAR: ...].
  */
 export function parseSceneHUD(rawContent: string): { narrativeText: string; sceneHUD: SceneHUDData | null } {
   if (!rawContent || typeof rawContent !== 'string') {
-    return { narrativeText: rawContent, sceneHUD: null };
+    return { narrativeText: rawContent || '', sceneHUD: null };
   }
 
   let text = rawContent;
   let hudRaw = '';
+  let matchIndex = -1;
+  let matchLength = 0;
 
-  // Patrón 1: Bloque de código al inicio con 📍, [ESCENA o 📅
-  const codeBlockMatch = text.match(/^[ \t]*```(?:text|md|markdown)?\s*\n([\s\S]*?(?:📍|\[ESCENA|📅)[\s\S]*?)```[ \t]*\n?/i);
+  // Patrón 1: Bloque de código en cualquier posición con 📍, [ESCENA, 📅, Lugar: o Estado:
+  const codeBlockRegex = /```(?:text|md|markdown)?\s*\n([\s\S]*?(?:📍|\[ESCENA|📅|Lugar:|Estado:|Clima:|Presentes:)[\s\S]*?)```[ \t]*(?:\r?\n|$)/i;
+  const codeBlockMatch = text.match(codeBlockRegex);
 
-  if (codeBlockMatch) {
+  if (codeBlockMatch && codeBlockMatch.index !== undefined) {
     hudRaw = codeBlockMatch[1];
-    text = text.slice(codeBlockMatch[0].length);
-  } else {
-    // Patrón 2: Bloque [ESCENA: ... ] o [ESCENA] ... [/ESCENA]
-    const tagMatch = text.match(/^[ \t]*\[\s*ESCENA(?:\s*:|\])([\s\S]*?)(?:\[\s*\/ESCENA\s*\]|\])[ \t]*\n?/i);
-    if (tagMatch) {
+    matchIndex = codeBlockMatch.index;
+    matchLength = codeBlockMatch[0].length;
+  }
+
+  // Patrón 2: Bloque [ESCENA: ... ] o [ESCENA] ... [/ESCENA]
+  if (!hudRaw) {
+    const tagRegex = /\[\s*ESCENA(?:\s*:|\])([\s\S]*?)(?:\[\s*\/ESCENA\s*\]|\])/i;
+    const tagMatch = text.match(tagRegex);
+    if (tagMatch && tagMatch.index !== undefined) {
       hudRaw = tagMatch[1];
-      text = text.slice(tagMatch[0].length);
-    } else {
-      // Patrón 3: Líneas directas que comienzan con 📍 al inicio del mensaje
-      const linesMatch = text.match(/^[ \t]*(📍[^\n\r]+(?:\r?\n[ \t]*(?:🌤|👥|🩸|⚡)[^\n\r]+)*)[ \t]*(?:\r?\n|$)/i);
-      if (linesMatch) {
-        hudRaw = linesMatch[1];
-        text = text.slice(linesMatch[0].length);
-      } else {
-        // Patrón 4: Formato previo de fecha/hora (📅 ... | ⏳ ...)
-        const legacyMatch = text.match(/^[ \t]*(📅[^\n\r]+(?:\r?\n[ \t]*(?:👤|🌟|⚜️|🖤|❤️)[^\n\r]+)*)[ \t]*(?:\r?\n|$)/i);
-        if (legacyMatch) {
-          hudRaw = legacyMatch[1];
-          text = text.slice(legacyMatch[0].length);
-        }
-      }
+      matchIndex = tagMatch.index;
+      matchLength = tagMatch[0].length;
     }
   }
 
-  if (!hudRaw.trim()) {
+  // Patrón 3: Líneas directas que comienzan con 📍 en cualquier posición (inicio, medio o fin)
+  if (!hudRaw) {
+    const linesRegex = /(?:^|\n)[ \t]*(📍[^\n\r]+(?:\r?\n[ \t]*(?:🌤|👥|🩸|⚡|Clima:|Ambiente:|Presentes:|Estado:|Tiempo:|Fecha:)[^\n\r]+)*)/i;
+    const linesMatch = text.match(linesRegex);
+    if (linesMatch && linesMatch.index !== undefined) {
+      hudRaw = linesMatch[1];
+      const offset = linesMatch[0].startsWith('\n') ? 1 : 0;
+      matchIndex = linesMatch.index + offset;
+      matchLength = linesMatch[0].length - offset;
+    }
+  }
+
+  // Patrón 4: [ESTAMOS: ... ] o [LUGAR: ... ]
+  if (!hudRaw) {
+    const estamosRegex = /\[\s*(?:ESTAMOS|LUGAR)\s*:\s*([^\]]+)\]/i;
+    const estamosMatch = text.match(estamosRegex);
+    if (estamosMatch && estamosMatch.index !== undefined) {
+      hudRaw = `📍 ${estamosMatch[1]}`;
+      matchIndex = estamosMatch.index;
+      matchLength = estamosMatch[0].length;
+
+      // Buscar si también hay [PRESENTES: ...], [ESTADO: ...], [TIEMPO: ...] o [CLIMA: ...] en el mensaje
+      const presMatch = text.match(/\[\s*PRESENTES\s*:\s*([^\]]+)\]/i);
+      if (presMatch) hudRaw += `\n👥 ${presMatch[1]}`;
+      const estMatch = text.match(/\[\s*ESTADO\s*:\s*([^\]]+)\]/i);
+      if (estMatch) hudRaw += `\n🩸 ${estMatch[1]}`;
+      const cliMatch = text.match(/\[\s*CLIMA\s*:\s*([^\]]+)\]/i);
+      if (cliMatch) hudRaw += `\n🌤 ${cliMatch[1]}`;
+    }
+  }
+
+  // Patrón 5: Formato previo de fecha/hora (📅 ... | ⏳ ...)
+  if (!hudRaw) {
+    const legacyRegex = /(?:^|\n)[ \t]*(📅[^\n\r]+(?:\r?\n[ \t]*(?:👤|🌟|⚜️|🖤|❤️)[^\n\r]+)*)/i;
+    const legacyMatch = text.match(legacyRegex);
+    if (legacyMatch && legacyMatch.index !== undefined) {
+      hudRaw = legacyMatch[1];
+      const offset = legacyMatch[0].startsWith('\n') ? 1 : 0;
+      matchIndex = legacyMatch.index + offset;
+      matchLength = legacyMatch[0].length - offset;
+    }
+  }
+
+  if (!hudRaw.trim() || matchIndex === -1) {
     return { narrativeText: rawContent, sceneHUD: null };
   }
 
+  // Recortar limpiamente el bloque HUD del texto narrativo
+  const narrativeText = (text.slice(0, matchIndex) + text.slice(matchIndex + matchLength))
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
   const hudData = parseHUDContent(hudRaw);
   return {
-    narrativeText: text.trim(),
+    narrativeText,
     sceneHUD: hudData
   };
 }
@@ -99,8 +142,13 @@ function parseHUDContent(raw: string): SceneHUDData {
 
   for (const line of lines) {
     // Línea de Ubicación y Tiempo (📍 ...)
-    if (line.startsWith('📍') || /^Lugar:/i.test(line)) {
-      const clean = line.replace(/^📍\s*/, '').replace(/^Lugar:\s*/i, '').trim();
+    if (line.startsWith('📍') || /^Lugar:/i.test(line) || /^\[\s*(?:ESTAMOS|LUGAR)\s*:/i.test(line)) {
+      const clean = line
+        .replace(/^📍\s*/, '')
+        .replace(/^Lugar:\s*/i, '')
+        .replace(/^\[\s*(?:ESTAMOS|LUGAR)\s*:\s*/i, '')
+        .replace(/\]$/, '')
+        .trim();
       
       // Separar por guión largo — para separar ubicación de fecha/hora
       const partsDash = clean.split(/—|--/);
@@ -121,8 +169,13 @@ function parseHUDContent(raw: string): SceneHUDData {
       }
     }
     // Línea de Clima, Luz y Presentes (🌤 ...)
-    else if (line.startsWith('🌤') || /^Clima:|^Ambiente:/i.test(line)) {
-      const clean = line.replace(/^🌤\s*/, '').replace(/^(?:Clima|Ambiente):\s*/i, '').trim();
+    else if (line.startsWith('🌤') || /^Clima:|^Ambiente:/i.test(line) || /^\[\s*CLIMA\s*:/i.test(line)) {
+      const clean = line
+        .replace(/^🌤\s*/, '')
+        .replace(/^(?:Clima|Ambiente):\s*/i, '')
+        .replace(/^\[\s*CLIMA\s*:\s*/i, '')
+        .replace(/\]$/, '')
+        .trim();
       
       // Puede contener 👥 incrustado
       if (clean.includes('👥')) {
@@ -134,13 +187,23 @@ function parseHUDContent(raw: string): SceneHUDData {
       }
     }
     // Línea exclusiva de Presentes (👥 ...)
-    else if (line.startsWith('👥') || /^Presentes:/i.test(line)) {
-      const clean = line.replace(/^👥\s*/, '').replace(/^Presentes:\s*/i, '').trim();
+    else if (line.startsWith('👥') || /^Presentes:/i.test(line) || /^\[\s*PRESENTES\s*:/i.test(line)) {
+      const clean = line
+        .replace(/^👥\s*/, '')
+        .replace(/^Presentes:\s*/i, '')
+        .replace(/^\[\s*PRESENTES\s*:\s*/i, '')
+        .replace(/\]$/, '')
+        .trim();
       extractCharacters(clean, characters);
     }
     // Línea de Estado y Salud (🩸 ...)
-    else if (line.startsWith('🩸') || /^Estado:/i.test(line)) {
-      const clean = line.replace(/^🩸\s*/, '').replace(/^Estado:\s*/i, '').trim();
+    else if (line.startsWith('🩸') || /^Estado:/i.test(line) || /^\[\s*ESTADO\s*:/i.test(line)) {
+      const clean = line
+        .replace(/^🩸\s*/, '')
+        .replace(/^Estado:\s*/i, '')
+        .replace(/^\[\s*ESTADO\s*:\s*/i, '')
+        .replace(/\]$/, '')
+        .trim();
       
       // Buscar patrón de PG (ej: 22/38 PG o 15 PG)
       const hpMatch = clean.match(/(\d+\s*\/\s*\d+\s*(?:PG|PV|HP)?|\d+\s*(?:PG|PV|HP))/i);
