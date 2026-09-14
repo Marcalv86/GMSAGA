@@ -55,7 +55,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { esNombreDeProtagonista } from '../utils/sanitizers';
-import { obtenerOGenerarFichaNpc } from '../utils/canonicalNpcStats';
+import { obtenerOGenerarFichaNpc, asegurarFichaCompletaNpc } from '../utils/canonicalNpcStats';
 
 export function getAtrInfo(val?: number) {
   const v = val !== undefined && val !== null ? Math.max(0, Math.min(20, Math.round(val))) : 0;
@@ -311,6 +311,35 @@ export const MemoryManager: React.FC<{
       }));
     }
   }, [project.memory?.npcs, project.memory?.player_character?.name, project.name]);
+
+  // Auto-asegurar que TODOS los PNJs en memoria tengan su ficha D&D 5e oficial con atributos desde el primer instante
+  useEffect(() => {
+    const npcsActuales = project.memory?.npcs || [];
+    if (!npcsActuales.length) return;
+
+    const faltanFichas = npcsActuales.some(
+      n => !n.characterSheet?.attributes || typeof n.characterSheet?.ac !== 'number' || !n.characterSheet?.hp
+    );
+
+    if (faltanFichas) {
+      const actualizados = npcsActuales.map(n => {
+        if (!n.characterSheet?.attributes || typeof n.characterSheet?.ac !== 'number' || !n.characterSheet?.hp) {
+          const { sheet, cr, idiomas } = asegurarFichaCompletaNpc(n);
+          return {
+            ...n,
+            cr: n.cr || cr || sheet.cr,
+            idiomas: n.idiomas || idiomas || (sheet.languages && sheet.languages[0]),
+            characterSheet: sheet
+          };
+        }
+        return n;
+      });
+      onUpdateMemory(mem => ({
+        ...mem,
+        npcs: actualizados
+      }));
+    }
+  }, [project.memory?.npcs]);
 
   // Genera o consulta la ficha canónica D&D 5e oficial para un PNJ
   const handleGenerarFichaNpc = async (n: NPC) => {

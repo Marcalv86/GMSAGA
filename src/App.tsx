@@ -53,10 +53,10 @@ import { ImportCampaignModal } from './components/ImportCampaignModal';
 import { Logger } from './components/Logger';
 import { logError, logInfo, logWarn } from './utils/logger';
 import { presionDelMinuto } from './utils/callLog';
-import { conciliarAfinidadesTrasSincronizar } from './utils/affinityProgression';
+import { conciliarAfinidadesTrasSincronizar, esPersonalidadCoquetaOEnamoradiza } from './utils/affinityProgression';
 import { aplicarEtiquetados, OrdenDeEtiquetado } from './utils/ordenesDeMesa';
 import { sanitizeProjectMemory, esNombreDeProtagonista } from './utils/sanitizers';
-import { buscarEstadisticasCanonicas, statblockAPlayerCharacter } from './utils/canonicalNpcStats';
+import { asegurarFichaCompletaNpc } from './utils/canonicalNpcStats';
 import { ExtractedCampaignResult } from './utils/campaignImporter';
 import { writeCampaignToDisk } from './utils/diskBackup';
 import {
@@ -681,6 +681,36 @@ export default function App() {
     }
   }, [currentFiles]);
 
+  // Auto-asegurar que TODOS los PNJs en memoria tengan su ficha D&D 5e con atributos, CA y PG cargados
+  useEffect(() => {
+    if (!currentProject?.memory?.npcs?.length) return;
+    const npcs = currentProject.memory.npcs;
+    const faltanFichas = npcs.some(
+      n => !n.characterSheet?.attributes || typeof n.characterSheet?.ac !== 'number' || !n.characterSheet?.hp
+    );
+    if (faltanFichas) {
+      const actualizados = npcs.map(n => {
+        if (!n.characterSheet?.attributes || typeof n.characterSheet?.ac !== 'number' || !n.characterSheet?.hp) {
+          const { sheet, cr, idiomas } = asegurarFichaCompletaNpc(n);
+          return {
+            ...n,
+            cr: n.cr || cr || sheet.cr,
+            idiomas: n.idiomas || idiomas || (sheet.languages && sheet.languages[0]),
+            characterSheet: sheet
+          };
+        }
+        return n;
+      });
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === currentProject.id
+            ? { ...p, memory: { ...(p.memory || {}), npcs: actualizados } }
+            : p
+        )
+      );
+    }
+  }, [currentProject?.id, currentProject?.memory?.npcs]);
+
   // Project Management
   const handleCreateProject = () => {
     setPromptValue('');
@@ -1236,17 +1266,17 @@ export default function App() {
       if (t.vinculos.some(v => coincidenNombresNpc(v.nombre, limpio))) return; // ese lo crea el vínculo, con más datos
       if (coincidenNombresNpc(limpio, mem.player_character?.name || '')) return;
 
-      const canonico = buscarEstadisticasCanonicas(limpio);
+      const { sheet, cr, idiomas } = asegurarFichaCompletaNpc({ name: limpio });
 
       nuevosNpcs.push({
         id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        name: canonico?.name || limpio,
+        name: sheet.name || limpio,
         relation: 'Neutral',
         status: 'Vivo',
-        notes: canonico ? `Lugarteniente / Personaje de los Reinos Olvidados (${canonico.source || 'D&D 5e'}).` : 'Apareció en escena.',
-        cr: canonico?.cr,
-        idiomas: canonico?.languages,
-        characterSheet: canonico ? statblockAPlayerCharacter(canonico) : undefined,
+        notes: sheet.title ? `${sheet.title} (${sheet.cr || 'D&D 5e'}).` : 'Apareció en escena.',
+        cr: cr || sheet.cr,
+        idiomas: idiomas || (sheet.languages && sheet.languages[0]),
+        characterSheet: sheet,
         diasVistos: [marca]
       });
     });
@@ -1262,44 +1292,42 @@ export default function App() {
         !nuevosNpcs.some(n => coincidenNombresNpc(n.name, v.nombre))
       ) {
         const relInfo = obtenerInfoRelacion(v.vinculo || '');
-        const canonico = buscarEstadisticasCanonicas(v.nombre);
-        /*
-         * La atracción nace en 0, aunque el Narrador la estrene en 7.
-         *
-         * Este era el segundo agujero por el que se colaba: la ficha de un PNJ
-         * se crea aquí la primera vez que sale en un [VÍNCULO:], y hasta ahora
-         * adoptaba tal cual la puntuación que trajera la etiqueta. Los
-         * protocolos dicen que ATR empieza en cero para todos sin excepción, y
-         * el primer encuentro era justo el momento en que nadie lo comprobaba:
-         * medio elenco entraba en la campaña ya con química. Que suba después,
-         * jugando, un punto por día como todo lo demás.
-         */
-        /*
-         * Y LO MISMO VALE PARA EL VÍNCULO Y LA CONFIANZA.
-         *
-         * El arreglo de la atracción se quedó a medias: `atr` se forzaba a cero
-         * y los otros dos ejes seguían adoptando lo que trajera la etiqueta.
-         * Pero la confianza es justo la que peor se aguanta de regalo: un
-         * oficial que acaba de encadenarla salía del primer encuentro con
-         * CON 12/20. Los tres ejes son lo mismo y se ganan igual, jugando.
-         */
-        const atrInicial = 0;
+        const { sheet, cr, idiomas } = asegurarFichaCompletaNpc({
+          name: v.nombre,
+          idiomas: v.idiomas,
+          cr: v.cr,
+          notes: v.oculta || v.aparenta
+        });
+
+        // ATR (Atracción & Flechazo):
+        // Permite flechazo espontáneo o atracción inicial según la personalidad coqueta/enamoradiza o lo reportado
+        const esCoqueto = esPersonalidadCoquetaOEnamoradiza({
+          name: v.nombre,
+          notes: v.oculta || v.aparenta,
+          aparenta: v.aparenta,
+          oculta: v.oculta,
+          vinculo: v.vinculo,
+          relation: v.vinculo
+        });
+        const atrInicial = typeof v.atr === 'number'
+          ? Math.max(0, Math.min(20, Math.round(v.atr)))
+          : (esCoqueto ? 6 : 0);
         const vinInicial = v.vin !== undefined ? 0 : undefined;
         const conInicial = v.con !== undefined ? 0 : undefined;
 
         nuevosNpcs.push({
           id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          name: canonico?.name || v.nombre,
+          name: sheet.name || v.nombre,
           relation: `${relInfo.icono} ${relInfo.label}`,
           status: 'Vivo',
           description: v.aparenta ? `Aparenta: ${v.aparenta}` : undefined,
-          notes: v.oculta ? `Oculta: ${v.oculta}` : (canonico ? `Lugarteniente / Personaje oficial (${canonico.source || 'D&D 5e'}).` : 'Vínculo establecido durante la narración.'),
+          notes: v.oculta ? `Oculta: ${v.oculta}` : (sheet.title ? `${sheet.title} (${sheet.cr || 'D&D 5e'}).` : 'Vínculo establecido durante la narración.'),
           aparenta: v.aparenta,
           oculta: v.oculta,
           vinculo: v.vinculo,
-          idiomas: v.idiomas || canonico?.languages,
-          cr: canonico?.cr,
-          characterSheet: canonico ? statblockAPlayerCharacter(canonico) : undefined,
+          idiomas: v.idiomas || idiomas || (sheet.languages && sheet.languages[0]),
+          cr: v.cr || cr || sheet.cr,
+          characterSheet: sheet,
           atr: atrInicial,
           vin: vinInicial,
           con: conInicial,
@@ -1757,44 +1785,67 @@ export default function App() {
               ...(v.orientacion ? { orientacion: v.orientacion } : {}),
               ...actualizarAfinidadNpc(n, v, n.diasVistos || [], marca)
             };
-            if (v.race || v.class) {
-              updatedNpc.characterSheet = {
-                ...(n.characterSheet || { name: updatedNpc.name }),
-                ...(v.race ? { race: v.race } : {}),
-                ...(v.class ? { class: v.class } : {})
-              };
+            if (v.race || v.class || !updatedNpc.characterSheet?.attributes) {
+              const { sheet, cr, idiomas } = asegurarFichaCompletaNpc({
+                ...updatedNpc,
+                race: v.race || updatedNpc.characterSheet?.race,
+                class: v.class || updatedNpc.characterSheet?.class
+              });
+              updatedNpc.characterSheet = sheet;
+              if (!updatedNpc.cr) updatedNpc.cr = cr || sheet.cr;
+              if (!updatedNpc.idiomas) updatedNpc.idiomas = idiomas;
             }
             npcsActualizados[index] = updatedNpc;
           } else {
-            // Si el PNJ no existía previamente en la lista, se registra con los datos provistos
+            // Si el PNJ no existía previamente en la lista, se registra con su ficha completa D&D 5e oficial
+            const nombreFinal = v.nuevoNombre || v.nombre;
+            const { sheet, cr, idiomas } = asegurarFichaCompletaNpc({
+              name: nombreFinal,
+              race: v.race,
+              class: v.class,
+              notes: v.notes || v.description || v.aparenta,
+              description: v.description,
+              appearance: v.appearance,
+              alias: v.alias,
+              trueIdentity: v.trueIdentity,
+              idiomas: v.idiomas,
+              cr: v.cr
+            });
+
+            const esCoqueto = esPersonalidadCoquetaOEnamoradiza({
+              name: nombreFinal,
+              notes: v.notes || v.description || v.aparenta,
+              aparenta: v.aparenta,
+              oculta: v.oculta,
+              vinculo: v.vinculo,
+              relation: v.relation || v.vinculo
+            });
+            const atrInicial = typeof v.atr === 'number'
+              ? Math.max(0, Math.min(20, Math.round(v.atr)))
+              : (esCoqueto ? 6 : undefined);
+
             const nuevoNpc: NPC = {
               id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-              name: v.nuevoNombre || v.nombre,
+              name: sheet.name || nombreFinal,
               relation: v.relation || v.vinculo || 'Conocido',
               status: v.status || 'Activo',
-              notes: v.notes || v.description || v.aparenta || '',
+              notes: v.notes || v.description || v.aparenta || (sheet.title ? `${sheet.title} (${sheet.cr || 'D&D 5e'}).` : ''),
               description: v.description || v.notes || '',
               appearance: v.appearance || '',
               alias: v.alias,
               trueIdentity: v.trueIdentity,
-              idiomas: v.idiomas,
-              cr: v.cr,
+              idiomas: v.idiomas || idiomas || (sheet.languages && sheet.languages[0]),
+              cr: v.cr || cr || sheet.cr,
               aparenta: v.aparenta,
               oculta: v.oculta,
               vinculo: v.vinculo,
               orientacion: v.orientacion,
-              diasVistos: marca ? [marca] : []
+              diasVistos: marca ? [marca] : [],
+              characterSheet: sheet
             };
-            if (typeof v.atr === 'number') nuevoNpc.atr = v.atr;
+            if (atrInicial !== undefined) nuevoNpc.atr = atrInicial;
             if (typeof v.vin === 'number') nuevoNpc.vin = v.vin;
             if (typeof v.con === 'number') nuevoNpc.con = v.con;
-            if (v.race || v.class) {
-              nuevoNpc.characterSheet = {
-                name: nuevoNpc.name,
-                race: v.race,
-                class: v.class
-              };
-            }
             npcsActualizados.push(nuevoNpc);
           }
         }

@@ -95,14 +95,42 @@ export function calcularProgresoEje(
 }
 
 /**
- * Actualiza los tres ejes de afinidad (ATR, VÍN, CON) de un PNJ aplicando las reglas de nivel,
- * requisitos de días y límite diario de calendario.
+ * Detecta si la personalidad, rol o trasfondo del PNJ sugiere ser coqueto, seductor,
+ * enamoradizo o hedonista, propiciando un flechazo o atracción inicial espontánea.
+ */
+export function esPersonalidadCoquetaOEnamoradiza(npc: Partial<NPC>): boolean {
+  const texto = [
+    npc.name || '',
+    npc.notes || '',
+    npc.description || '',
+    npc.aparenta || '',
+    npc.oculta || '',
+    npc.vinculo || '',
+    npc.relation || ''
+  ].join(' ').toLowerCase();
+
+  const terminos = [
+    'coquet', 'seductor', 'seducid', 'enamoradiz', 'galán', 'galan', 'donjuán', 'donjuan',
+    'bribón', 'bribon', 'hedonista', 'pícaro', 'picaro', 'fascinad', 'atractiv', 'encantador',
+    'jarlaxle', 'flechazo', 'sensual', 'carismátic', 'carismatic'
+  ];
+
+  return terminos.some(t => texto.includes(t));
+}
+
+/**
+ * Actualiza los tres ejes de afinidad (ATR, VÍN, CON) de un PNJ.
  *
- * La atracción tiene además un candado propio: si la ficha del PNJ lo lleva
- * puesto —porque su orientación o su disponibilidad no dan para ello—, ninguna
- * subida que mande el Narrador entra. Pedírselo por escrito no bastaba: si la
- * decisión de que alguien no siente nada por ella depende de que el modelo se
- * acuerde, un turno cualquiera se le olvida y la barra ya no baja sola.
+ * 1. ATR (Atracción & Flechazo):
+ *    Representa el magnetismo, la química y el flechazo del PNJ hacia la protagonista.
+ *    Depende de la personalidad coqueta o enamoradiza del PNJ y de la química en escena.
+ *    No es un contador burocrático lento: fluctúa dinámicamente según el flirteo,
+ *    la audacia y los momentos compartidos, permitiendo chispa o flechazo inicial desde el primer encuentro.
+ *    Si la orientación no es compatible (atrBloqueada), permanece bloqueada en 0.
+ *
+ * 2. VÍN (Vínculo Afectivo) y CON (Confianza en Secretos):
+ *    Representan la lealtad forjada y la confianza ganada con el tiempo y las acciones,
+ *    por lo que aplican progresión escalonada protegida por días de trato acumulados.
  */
 export function actualizarAfinidadNpc(
   npc: NPC,
@@ -113,20 +141,32 @@ export function actualizarAfinidadNpc(
   const totalDias = diasActualizados.length;
   const ultimosDias = npc.ultimoDiaSubida || {};
 
-  const progresoAtr = npc.atrBloqueada
-    ? { nuevoValor: 0, diaSubida: ultimosDias.atr }
-    : calcularProgresoEje(npc.atr, reportado.atr, totalDias, diaActual, ultimosDias.atr);
+  // ATR (Atracción & Flechazo)
+  let nuevoAtr = npc.atr;
+  let diaSubidaAtr = ultimosDias.atr;
+
+  if (npc.atrBloqueada) {
+    nuevoAtr = 0;
+  } else if (reportado.atr !== undefined && reportado.atr !== null) {
+    nuevoAtr = Math.max(0, Math.min(20, Math.round(reportado.atr)));
+    diaSubidaAtr = diaActual;
+  } else if ((nuevoAtr === undefined || nuevoAtr === 0) && esPersonalidadCoquetaOEnamoradiza({ ...npc, ...reportado })) {
+    nuevoAtr = 6;
+    diaSubidaAtr = diaActual;
+  }
+
+  // VÍN y CON (Lealtad y Confianza escalonadas)
   const progresoVin = calcularProgresoEje(npc.vin, reportado.vin, totalDias, diaActual, ultimosDias.vin);
   const progresoCon = calcularProgresoEje(npc.con, reportado.con, totalDias, diaActual, ultimosDias.con);
 
   const nuevoUltimoDiaSubida = {
-    atr: progresoAtr.diaSubida ?? ultimosDias.atr,
+    atr: diaSubidaAtr ?? ultimosDias.atr,
     vin: progresoVin.diaSubida ?? ultimosDias.vin,
     con: progresoCon.diaSubida ?? ultimosDias.con
   };
 
   return {
-    atr: progresoAtr.nuevoValor,
+    atr: nuevoAtr,
     vin: progresoVin.nuevoValor,
     con: progresoCon.nuevoValor,
     ultimoDiaSubida: nuevoUltimoDiaSubida
@@ -135,25 +175,8 @@ export function actualizarAfinidadNpc(
 
 /**
  * Devuelve la afinidad a su sitio después de una sincronización de memoria.
- *
- * ⛔ EL AGUJERO QUE TAPA ESTO, QUE ERA EL GORDO.
- *
- * La progresión estaba bien escrita y bien aplicada en las dos vías que pasan
- * por una etiqueta `[VÍNCULO:]`. Pero la sincronización de memoria no pasa por
- * ahí: es una llamada aparte que relee la crónica entera y **devuelve la lista
- * de PNJs rehecha**, y esa lista se volcaba tal cual sobre la memoria. Lo que
- * el modelo escribiera en `atr`, `vin` y `con` se firmaba sin mirar.
- *
- * Medido en la campaña: tras una sola escena con cada uno, un oficial que
- * acababa de encadenarla salía con CON 12/20 y el capitán que la había
- * capturado con ATR 18/20 y CON 15/20. Números de quince sesiones de trato,
- * puestos el primer día. Y no era el prompt desobedeciendo —el prompt lo dice
- * con todas las letras— era que por esta puerta no había portero.
- *
- * Aquí se reconcilia: de la sincronización se queda TODO lo que aporta
- * —descripciones, notas, lo que aparenta y lo que oculta— pero los tres ejes
- * vuelven a pasar por la misma progresión que todo lo demás. Lo que ve el
- * modelo pasa a ser una sugerencia, que es lo que siempre debió ser.
+ * Respeta el flechazo/atracción inicial si el PNJ es coqueto/enamoradizo o si fue reportado,
+ * mientras que VÍN y CON se construyen jugando.
  */
 export function conciliarAfinidadesTrasSincronizar<
   T extends {
@@ -161,6 +184,13 @@ export function conciliarAfinidadesTrasSincronizar<
     atr?: number;
     vin?: number;
     con?: number;
+    atrBloqueada?: boolean;
+    notes?: string;
+    description?: string;
+    aparenta?: string;
+    oculta?: string;
+    vinculo?: string;
+    relation?: string;
     diasVistos?: number[];
     ultimoDiaSubida?: { atr?: number; vin?: number; con?: number };
   }
@@ -173,12 +203,17 @@ export function conciliarAfinidadesTrasSincronizar<
   return npcsSincronizados.map(sincronizado => {
     const previo = npcsPrevios.find(p => mismoNpc(p.name, sincronizado.name));
 
-    // Alguien que la sincronización acaba de fichar entra por la puerta de
-    // siempre: los tres ejes a cero. Que suban jugando, un punto por día.
+    // Alguien nuevo fichado en la sincronización:
+    // ATR adopta su valor de flechazo / química si no está bloqueado.
+    // VÍN y CON comienzan en 0 para forjarse en juego.
     if (!previo) {
+      const atrInicial = sincronizado.atr !== undefined && !sincronizado.atrBloqueada
+        ? Math.max(0, Math.min(20, Math.round(sincronizado.atr)))
+        : (esPersonalidadCoquetaOEnamoradiza(sincronizado) ? 6 : 0);
+
       return {
         ...sincronizado,
-        atr: 0,
+        atr: atrInicial,
         vin: 0,
         con: 0,
         ultimoDiaSubida: {},
@@ -186,8 +221,7 @@ export function conciliarAfinidadesTrasSincronizar<
       };
     }
 
-    // Y a quien ya existía se le respeta lo que tenía: la sincronización no
-    // puede regalarle diez puntos por releer la misma escena.
+    // A quien ya existía se le actualiza respetando la progresión
     const dias = previo.diasVistos?.length ? previo.diasVistos : sincronizado.diasVistos || [];
     const progresado = actualizarAfinidadNpc(
       previo as any,
