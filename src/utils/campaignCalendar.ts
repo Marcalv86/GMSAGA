@@ -1559,7 +1559,7 @@ export function diaDeLaSemana(cal: CalendarConfig, diaAbs: number): string | nul
 // ---------------------------------------------------------------- presencia y vínculos
 
 const PRESENTES_RE = /\[\s*PRESENTES\s*:\s*([^\]]+)\]/gi;
-const VINCULO_RE = /\[\s*V[IÍ]NCULO\s*:\s*([^\]]+)\]/gi;
+const VINCULO_RE = /\[\s*(?:PNJ|NPC|PERSONAJE|MODIFICAR_PNJ|CORREGIR_PNJ|V[IÍ]NCULO)\s*:\s*([^\]]+)\]/gi;
 const AFINIDAD_TAG_RE = /\[\s*AFINIDAD\s*:\s*([^\]]+)\]/gi;
 const AFINIDAD_INLINE_RE = /(?:🖤|♥|❤️|🤍|💔|❤️‍🔥)\s*([^—\-\n\r]+?)\s*[-—]\s*ATR:\s*(\d{1,2})\s*\|\s*V[IÍ]N:\s*(\d{1,2})\s*\|\s*CON:\s*(\d{1,2})/gi;
 
@@ -1665,33 +1665,58 @@ export function leerRevelaciones(texto: string): RevelacionLeida[] {
 
 export interface VinculoLeido {
   nombre: string;
+  nuevoNombre?: string;
+  relation?: string;
+  status?: string;
+  notes?: string;
+  description?: string;
+  appearance?: string;
+  alias?: string;
+  trueIdentity?: string;
+  disguise?: string;
+  idiomas?: string;
+  cr?: string | number;
+  race?: string;
+  class?: string;
   aparenta?: string;
   oculta?: string;
   vinculo?: string;
-  /** Idioma racial lógico y secundario/común, indicando nivel de dominio */
-  idiomas?: string;
   atr?: number;
   vin?: number;
   con?: number;
   /** Hacia quién siente atracción, cuando la escena o sus documentos lo dejan claro. */
   orientacion?: string;
+  accion?: 'crear' | 'modificar' | 'borrar' | 'eliminar';
 }
 
 /**
- * Lee `[VÍNCULO: Kieron | aparenta: ... | oculta: ... | grado: ... | atr: 7 | vin: 3 | con: 2]`
+ * Lee `[PNJ: Kieron | relacion: ... | notas: ... | desc: ... | atr: 7 | vin: 3 | con: 2]`,
+ * `[VÍNCULO: Kieron | aparenta: ... | oculta: ... | grado: ...]`,
  * y los formatos de afinidad `🖤 Jarlaxle — ATR: 7 | VÍN: 3 | CON: 2`.
  */
 export function leerVinculos(texto: string): VinculoLeido[] {
   if (!texto) return [];
   const out: VinculoLeido[] = [];
 
-  // 1. Parsear [VÍNCULO: ...]
-  if (/V[IÍ]NCULO/i.test(texto)) {
+  // 1. Parsear [PNJ: ...], [NPC: ...], [VÍNCULO: ...], [MODIFICAR_PNJ: ...], [CORREGIR_PNJ: ...]
+  if (/(?:PNJ|NPC|PERSONAJE|MODIFICAR_PNJ|CORREGIR_PNJ|V[IÍ]NCULO)/i.test(texto)) {
     VINCULO_RE.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = VINCULO_RE.exec(texto)) !== null) {
       const partes = m[1].split('|').map(p => p.trim());
-      const nombre = (partes.shift() || '').trim();
+      const rawNombre = (partes.shift() || '').trim();
+      if (!rawNombre) continue;
+
+      // Si el primer parámetro viene como "nombre: X"
+      let nombre = rawNombre;
+      const primerCorte = rawNombre.indexOf(':');
+      if (primerCorte > 0) {
+        const campo1 = sinTildes(rawNombre.slice(0, primerCorte)).trim().toLowerCase();
+        if (campo1 === 'nombre' || campo1 === 'name' || campo1 === 'pnj' || campo1 === 'npc') {
+          nombre = rawNombre.slice(primerCorte + 1).trim();
+        }
+      }
+
       if (!nombre) continue;
 
       const v: VinculoLeido = { nombre };
@@ -1701,15 +1726,47 @@ export function leerVinculos(texto: string): VinculoLeido[] {
         const campo = sinTildes(parte.slice(0, corte)).trim().toLowerCase();
         const valor = parte.slice(corte + 1).trim();
         if (!valor) continue;
-        if (campo === 'orientacion' || campo === 'orienta') v.orientacion = valor.slice(0, 120);
-        else if (campo === 'aparenta' || campo === 'muestra') v.aparenta = valor;
-        else if (campo === 'oculta' || campo === 'calla' || campo === 'piensa') v.oculta = valor;
-        else if (campo === 'grado' || campo === 'vinculo' || campo === 'relacion') v.vinculo = valor;
-        else if (campo === 'idiomas' || campo === 'idioma' || campo === 'lenguas' || campo === 'lengua' || campo === 'habla') v.idiomas = valor;
-        else if (campo === 'atr' || campo === 'atraccion') {
+
+        if (campo === 'nuevonombre' || campo === 'newname' || campo === 'renombrar' || campo === 'cambiarnombre') {
+          v.nuevoNombre = valor;
+        } else if (campo === 'orientacion' || campo === 'orienta') {
+          v.orientacion = valor.slice(0, 120);
+        } else if (campo === 'aparenta' || campo === 'muestra') {
+          v.aparenta = valor;
+        } else if (campo === 'oculta' || campo === 'calla' || campo === 'piensa' || campo === 'secreto') {
+          v.oculta = valor;
+        } else if (campo === 'grado' || campo === 'vinculo' || campo === 'relacion' || campo === 'relation') {
+          v.vinculo = valor;
+          v.relation = valor;
+        } else if (campo === 'estado' || campo === 'status' || campo === 'situacion') {
+          v.status = valor;
+        } else if (campo === 'notas' || campo === 'notes' || campo === 'nota' || campo === 'info') {
+          v.notes = valor;
+        } else if (campo === 'descripcion' || campo === 'description' || campo === 'desc') {
+          v.description = valor;
+        } else if (campo === 'apariencia' || campo === 'appearance' || campo === 'aspecto' || campo === 'fisico') {
+          v.appearance = valor;
+        } else if (campo === 'alias' || campo === 'apodo' || campo === 'disfraz') {
+          v.alias = valor;
+        } else if (campo === 'verdaderaidentidad' || campo === 'trueidentity' || campo === 'identidad') {
+          v.trueIdentity = valor;
+        } else if (campo === 'idiomas' || campo === 'idioma' || campo === 'lenguas' || campo === 'lengua' || campo === 'habla') {
+          v.idiomas = valor;
+        } else if (campo === 'cr' || campo === 'vd' || campo === 'desafio' || campo === 'nivel' || campo === 'level') {
+          v.cr = valor;
+        } else if (campo === 'raza' || campo === 'race') {
+          v.race = valor;
+        } else if (campo === 'clase' || campo === 'class') {
+          v.class = valor;
+        } else if (campo === 'accion' || campo === 'action' || campo === 'operacion') {
+          const acc = valor.toLowerCase();
+          if (acc.includes('borr') || acc.includes('elim') || acc.includes('quit')) {
+            v.accion = 'borrar';
+          }
+        } else if (campo === 'atr' || campo === 'atraccion') {
           const num = parseInt(valor, 10);
           if (!isNaN(num)) v.atr = Math.max(0, Math.min(20, num));
-        } else if (campo === 'vin' || campo === 'afecto') {
+        } else if (campo === 'vin' || campo === 'afecto' || campo === 'lazo') {
           const num = parseInt(valor, 10);
           if (!isNaN(num)) v.vin = Math.max(0, Math.min(20, num));
         } else if (campo === 'con' || campo === 'confianza') {

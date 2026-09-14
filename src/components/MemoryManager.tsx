@@ -3029,6 +3029,23 @@ export const MemoryManager: React.FC<{
           onToggleDestaparVinculo={npcId =>
             setVinculosDestapados(prev => new Set(prev).add(npcId))
           }
+          onUpdateNpc={updatedNpc => {
+            if (onUpdateMemory) {
+              onUpdateMemory(prevMem => ({
+                ...prevMem,
+                npcs: (prevMem.npcs || []).map(n => (n.id === updatedNpc.id ? updatedNpc : n))
+              }));
+            }
+            if (onUpdateProject) {
+              onUpdateProject(prev => ({
+                memory: {
+                  ...prev.memory,
+                  npcs: (prev.memory?.npcs || []).map(n => (n.id === updatedNpc.id ? updatedNpc : n))
+                }
+              }));
+            }
+            setSelectedNpcForDossier(updatedNpc);
+          }}
           onChangePortrait={n => {
             setTargetForPortraitPicker({
               type: 'npc',

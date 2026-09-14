@@ -170,18 +170,36 @@ export function aplicarOlvidos(
     }
 
     /*
-     * 4. Personajes: solo por nombre EXACTO.
+     * 4. Personajes: por nombre exacto o sin prefijos comunes ("el pnj", "ficha de", "a", etc.).
      *
      * Aquí no vale la coincidencia parcial que se usa arriba: borrar una nota
      * de más se repone escribiéndola otra vez, pero una ficha de personaje se
-     * lleva por delante su historia, sus vínculos y sus secretos. Un «olvida a
-     * Ser» no puede cargarse a Serena.
+     * lleva por delante su historia, sus vínculos y sus secretos.
      */
     const npcs = mem.npcs || [];
-    const fuera = npcs.filter((n: NPC) => normalizar(n.name) === normalizar(orden));
+    const ordenLimpia = normalizar(orden)
+      .replace(/^(el|la|los|las)\s+/g, '')
+      .replace(/^(pnj|npc|personaje|ficha\s+de|la\s+ficha\s+de|al\s+pnj|a\s+la\s+pnj|al\s+npc|al|a)\s+/g, '')
+      .replace(/^(el|la)\s+/g, '')
+      .trim();
+
+    const coincideNpc = (n: NPC) => {
+      const nom = normalizar(n.name);
+      const alias = normalizar(n.alias || '');
+      const trueId = normalizar(n.trueIdentity || '');
+      const ord = normalizar(orden);
+      return (
+        nom === ord ||
+        nom === ordenLimpia ||
+        (alias && (alias === ord || alias === ordenLimpia)) ||
+        (trueId && (trueId === ord || trueId === ordenLimpia))
+      );
+    };
+
+    const fuera = npcs.filter(coincideNpc);
     if (fuera.length) {
       quitado.personajes.push(...fuera.map(n => n.name));
-      mem.npcs = npcs.filter((n: NPC) => normalizar(n.name) !== normalizar(orden));
+      mem.npcs = npcs.filter(n => !coincideNpc(n));
       // Y se veta el nombre, o la siguiente sincronización lo vuelve a fichar.
       const vetados = new Set([...(mem.no_son_pnj || []), ...fuera.map(n => n.name)]);
       mem.no_son_pnj = [...vetados];

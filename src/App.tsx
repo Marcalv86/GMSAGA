@@ -1691,30 +1691,83 @@ export default function App() {
         }
       }
 
-      // Correcciones sobre personajes que YA existen. Aquí no se fichan nuevos:
-      // para eso está la partida; esto es una corrección, no una escena.
+      // Correcciones sobre personajes en memoria (editar datos, relaciones, notas, renombrar o fichar si faltaba)
       if (orden.vinculos.length) {
-        mem = {
-          ...mem,
-          npcs: (mem.npcs || []).map(n => {
-            const v = orden.vinculos.find(x => coincidenNombresNpc(n.name, x.nombre, { alias: n.alias, trueIdentity: n.trueIdentity }));
-            if (!v) return n;
-            return {
+        let npcsActualizados = [...(mem.npcs || [])];
+        for (const v of orden.vinculos) {
+          if (v.accion === 'borrar' || v.accion === 'eliminar') {
+            npcsActualizados = npcsActualizados.filter(
+              n => !coincidenNombresNpc(n.name, v.nombre, { alias: n.alias, trueIdentity: n.trueIdentity })
+            );
+            continue;
+          }
+
+          const index = npcsActualizados.findIndex(n =>
+            coincidenNombresNpc(n.name, v.nombre, { alias: n.alias, trueIdentity: n.trueIdentity })
+          );
+
+          if (index >= 0) {
+            const n = npcsActualizados[index];
+            const updatedNpc: NPC = {
               ...n,
+              name: v.nuevoNombre ? v.nuevoNombre.trim() : n.name,
+              ...(v.relation ? { relation: v.relation } : (v.vinculo ? { relation: v.vinculo } : {})),
+              ...(v.status ? { status: v.status } : {}),
+              ...(v.notes ? { notes: v.notes } : {}),
+              ...(v.description ? { description: v.description } : {}),
+              ...(v.appearance ? { appearance: v.appearance } : {}),
+              ...(v.alias !== undefined ? { alias: v.alias } : {}),
+              ...(v.trueIdentity !== undefined ? { trueIdentity: v.trueIdentity } : {}),
+              ...(v.idiomas ? { idiomas: v.idiomas } : {}),
+              ...(v.cr !== undefined ? { cr: v.cr } : {}),
               ...(v.aparenta ? { aparenta: v.aparenta } : {}),
               ...(v.oculta ? { oculta: v.oculta } : {}),
               ...(v.vinculo ? { vinculo: v.vinculo } : {}),
               ...(v.orientacion ? { orientacion: v.orientacion } : {}),
-              /*
-               * Un ajuste pedido a mano sí puede BAJAR de golpe —para eso se
-               * pide—, pero no puede saltarse la progresión hacia arriba: que
-               * el Director regale afinidad porque se lo piden convertiría las
-               * barras en un ajuste más.
-               */
               ...actualizarAfinidadNpc(n, v, n.diasVistos || [], marca)
             };
-          })
-        };
+            if (v.race || v.class) {
+              updatedNpc.characterSheet = {
+                ...(n.characterSheet || { name: updatedNpc.name }),
+                ...(v.race ? { race: v.race } : {}),
+                ...(v.class ? { class: v.class } : {})
+              };
+            }
+            npcsActualizados[index] = updatedNpc;
+          } else {
+            // Si el PNJ no existía previamente en la lista, se registra con los datos provistos
+            const nuevoNpc: NPC = {
+              id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              name: v.nuevoNombre || v.nombre,
+              relation: v.relation || v.vinculo || 'Conocido',
+              status: v.status || 'Activo',
+              notes: v.notes || v.description || v.aparenta || '',
+              description: v.description || v.notes || '',
+              appearance: v.appearance || '',
+              alias: v.alias,
+              trueIdentity: v.trueIdentity,
+              idiomas: v.idiomas,
+              cr: v.cr,
+              aparenta: v.aparenta,
+              oculta: v.oculta,
+              vinculo: v.vinculo,
+              orientacion: v.orientacion,
+              diasVistos: marca ? [marca] : []
+            };
+            if (typeof v.atr === 'number') nuevoNpc.atr = v.atr;
+            if (typeof v.vin === 'number') nuevoNpc.vin = v.vin;
+            if (typeof v.con === 'number') nuevoNpc.con = v.con;
+            if (v.race || v.class) {
+              nuevoNpc.characterSheet = {
+                name: nuevoNpc.name,
+                race: v.race,
+                class: v.class
+              };
+            }
+            npcsActualizados.push(nuevoNpc);
+          }
+        }
+        mem = { ...mem, npcs: npcsActualizados };
       }
 
       if (!cambioVacio(orden.inventario)) {
