@@ -77,7 +77,7 @@ export function leerInventario(texto: string): CambioDeInventario {
        * vacía después de un registro y el Narrador dejó de ver sus cosas.
        */
       const signo = entrada.startsWith('-') ? -1 : 1;
-      const incautado = entrada.startsWith('~');
+      let incautado = entrada.startsWith('~');
       let resto = entrada.replace(/^[+~-]\s*/, '').trim();
       if (!resto) continue;
 
@@ -104,17 +104,41 @@ export function leerInventario(texto: string): CambioDeInventario {
         continue;
       }
 
-      const nombre = resto.slice(0, 120);
       const campos = leerCampos(detalles);
+
+      // Detectar si el texto o los detalles indican recuperación/devolución
+      const textoDevolucion = `${resto} ${detalles || ''}`.toLowerCase();
+      const esDevolucion =
+        /devuelt[oa]s?|recuperad[oa]s?|de vuelta|en sus manos|restituid[oa]s?|rescatad[oa]s?/i.test(textoDevolucion) ||
+        (campos.enPoderDe && /^(nadie|ninguno|ninguna|devuelto|recuperado|la protagonista|el protagonista|ella|yo)$/i.test(campos.enPoderDe.trim()));
+
+      if (esDevolucion) {
+        incautado = false;
+        campos.enPoderDe = undefined;
+        campos.dondeEsta = undefined;
+      }
+
+      // Limpiar coletillas de devolución del nombre del objeto
+      const nombreLimpio = resto
+        .replace(/\b(?:devuelt[oa]s?|recuperad[oa]s?|restituid[oa]s?|de vuelta)\b(?:\s+(?:por|de)\s+[^,)]+)?/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const nombre = (nombreLimpio || resto).slice(0, 120);
+
+      // Detectar si debe quedar equipado
+      const equipped =
+        Boolean(detalles && /equipada|equipado|puesto|puesta|empuñad|al cinto|al cuello/i.test(detalles)) ||
+        Boolean(/equipada|equipado|puesto|puesta|empuñad|al cinto|al cuello/i.test(resto));
+
       /*
        * Y una red por si el Narrador escribe la requisa como baja. Pasa: la
        * etiqueta lleva meses con dos signos y la costumbre tira. Si en el
        * paréntesis dice quién lo tiene, es una requisa aunque lleve un menos.
        */
-      if (incautado || (signo < 0 && campos.enPoderDe)) {
+      if (incautado || (!esDevolucion && signo < 0 && campos.enPoderDe)) {
         cambio.incautadas.push({ nombre, cantidad, enPoderDe: campos.enPoderDe, dondeEsta: campos.dondeEsta });
-      } else if (signo > 0) {
-        cambio.altas.push({ nombre, cantidad, ...campos });
+      } else if (signo > 0 || esDevolucion) {
+        cambio.altas.push({ nombre, cantidad, equipped: equipped || undefined, ...campos });
       } else {
         cambio.bajas.push({ nombre, cantidad });
       }
@@ -188,6 +212,174 @@ const mismaCosa = (a: string, b: string) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
+export function normalizarNombreObjeto(t: string): string {
+  return (t || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/**
+ * Comprueba si dos nombres hacen referencia al mismo objeto físico,
+ * reconociendo variaciones naturales ("Violín" vs "Violín de las Moonshae",
+ * "Daga" vs "Daga de plata", singular/plural, o coletillas).
+ */
+export function sonElMismoObjeto(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (mismaCosa(a, b)) return true;
+
+  const na = normalizarNombreObjeto(a);
+  const nb = normalizarNombreObjeto(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+
+  // Si uno contiene al otro y el más corto tiene al menos 4 caracteres
+  if ((na.includes(nb) && nb.length >= 4) || (nb.includes(na) && na.length >= 4)) {
+    // Evitar falsos positivos entre armas/armaduras de subtipos opuestos
+    const partesA = na.split(' ');
+    const partesB = nb.split(' ');
+    const opuestos = [
+      ['corto', 'largo'],
+      ['corta', 'larga'],
+      ['mayor', 'menor'],
+      ['superior', 'inferior'],
+      ['pesada', 'ligera'],
+      ['pesado', 'ligero']
+    ];
+    const hayConflicto = opuestos.some(([op1, op2]) =>
+      (partesA.includes(op1) && partesB.includes(op2)) ||
+      (partesA.includes(op2) && partesB.includes(op1))
+    );
+    if (!hayConflicto) return true;
+  }
+
+  const STOPWORDS = new Set([
+    'de', 'del', 'la', 'las', 'el', 'los', 'un', 'una', 'unos', 'unas',
+    'para', 'con', 'en', 'y', 'o', 'su', 'sus', 'mi', 'mis', 'al', 'se',
+    'devuelto', 'devuelta', 'devueltos', 'devueltas',
+    'recuperado', 'recuperada', 'recuperados', 'recuperadas',
+    'equipado', 'equipada', 'equipados', 'equipadas',
+    'portado', 'portada', 'portados', 'portadas'
+  ]);
+
+  const palabrasA = na.split(' ').filter(w => w.length >= 4 && !STOPWORDS.has(w));
+  const palabrasB = nb.split(' ').filter(w => w.length >= 4 && !STOPWORDS.has(w));
+
+  if (palabrasA.length > 0 && palabrasB.length > 0) {
+    const compartidas = palabrasA.filter(w => palabrasB.includes(w));
+    if (compartidas.length >= 2 || (compartidas.length === 1 && (palabrasA.length === 1 || palabrasB.length === 1))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Deduplica una lista de objetos de inventario combinando duplicados.
+ * REGLA FUNDAMENTAL: Si un objeto figura a la vez en manos de la jugadora
+ * (enPoderDe es undefined) y requisado (enPoderDe definido), manda que lo
+ * tiene la jugadora: el objeto se desrequisita y queda en sus manos (portado o equipado).
+ */
+export function deduplicarInventario(items: InventoryItem[]): InventoryItem[] {
+  const resultado: InventoryItem[] = [];
+
+  for (const it of items) {
+    if (!it || !it.name) continue;
+
+    const idx = resultado.findIndex(existente => sonElMismoObjeto(existente.name || '', it.name || ''));
+
+    if (idx >= 0) {
+      const existente = resultado[idx];
+      // Si cualquiera de las dos entradas lo da por recuperado / en sus manos, queda en sus manos
+      const estaEnSusManos = !it.enPoderDe || !existente.enPoderDe;
+      const enPoderDe = estaEnSusManos ? undefined : (it.enPoderDe || existente.enPoderDe);
+      const dondeEsta = enPoderDe ? (it.dondeEsta || existente.dondeEsta) : undefined;
+      const incautadoDiaAbs = enPoderDe ? (existente.incautadoDiaAbs ?? it.incautadoDiaAbs) : undefined;
+
+      const nombreMasCompleto = (existente.name?.length || 0) >= (it.name?.length || 0) ? existente.name : it.name;
+
+      resultado[idx] = {
+        ...existente,
+        ...it,
+        id: existente.id || it.id,
+        name: nombreMasCompleto,
+        quantity: Math.max(existente.quantity || 1, it.quantity || 1),
+        equipped: Boolean(existente.equipped || it.equipped),
+        enPoderDe,
+        dondeEsta,
+        incautadoDiaAbs,
+        resuelto: Boolean(existente.resuelto && it.resuelto),
+        deMision: Boolean(existente.deMision || it.deMision),
+        encargo: existente.encargo || it.encargo,
+        origen: existente.origen || it.origen,
+        description: existente.description || it.description
+      };
+    } else {
+      resultado.push({ ...it });
+    }
+  }
+
+  return resultado;
+}
+
+/**
+ * Detecta si el texto de la narración describe la devolución o recuperación
+ * de objetos que actualmente figuraban como requisados.
+ */
+export function detectarDevolucionesEnTexto(
+  texto: string,
+  requisados: InventoryItem[]
+): { nombre: string; cantidad: number; equipped?: boolean; detalles?: string }[] {
+  if (!texto || requisados.length === 0) return [];
+  const devueltos: { nombre: string; cantidad: number; equipped?: boolean; detalles?: string }[] = [];
+
+  // 1. Detección global: "te devuelve todas tus pertenencias / tus cosas / tu equipaje"
+  const patronGlobal =
+    /(?:te\s+(?:devuelve|entrega|retorna|restituye|tiende)|recuperas|recobras|tomas\s+de\s+vuelta)\s+(?:todas?\s+tus?\s+|el\s+total\s+de\s+tus?\s+|tu\s+)?(?:pertenencias|cosas|equipaje|equipo|mochila|enseres|bienes)/i;
+
+  if (patronGlobal.test(texto)) {
+    for (const r of requisados) {
+      devueltos.push({
+        nombre: r.name,
+        cantidad: r.quantity || 1,
+        equipped: r.equipped,
+        detalles: 'Devuelto voluntariamente / recuperado'
+      });
+    }
+    return devueltos;
+  }
+
+  // 2. Detección por objeto específico
+  for (const r of requisados) {
+    if (!r.name) continue;
+    const palabras = normalizarNombreObjeto(r.name)
+      .split(' ')
+      .filter(w => w.length >= 4);
+    if (palabras.length === 0) continue;
+
+    const palabraClave = palabras[0]; // ej. "violin", "diario", "daga"
+    const regexObjeto = new RegExp(
+      `(?:te\\s+(?:devuelve|entrega|restituye|retorna|tiende|alarga)|recuperas|recobras|tomas?\\s+de\\s+vuelta|desenvainas|te\\s+ciñes|te\\s+pones|te\\s+cuelgas|empuñas)\\s+(?:el|la|los|las|tu|tus|su|sus)?\\s*(?:[\\wáéíóúñ]+\\s+){0,3}${palabraClave}|${palabraClave}\\s+(?:devuelt[oa]|recuperad[oa]|de\\s+vuelta|en\\s+tus\\s+manos)`,
+      'i'
+    );
+
+    if (regexObjeto.test(texto)) {
+      const equipado = /(?:te\s+ciñes|te\s+pones|te\s+cuelgas|empuñas|desenvainas|al\s+cinto|al\s+cuello)/i.test(texto);
+      devueltos.push({
+        nombre: r.name,
+        cantidad: r.quantity || 1,
+        equipped: equipado || r.equipped,
+        detalles: 'Devuelto / recuperado en escena'
+      });
+    }
+  }
+
+  return devueltos;
+}
+
 /**
  * Aplica un cambio leído sobre la mochila que ya había.
  *
@@ -204,26 +396,57 @@ export function aplicarInventario(
   const fuera = [...(inventarioPrevio || [])];
 
   for (const alta of cambio.altas) {
-    let i = fuera.findIndex(it => it && mismaCosa(it.name || '', alta.nombre));
-    if (i < 0) {
-      i = fuera.findIndex(it => it && it.enPoderDe && (mismaCosa(it.name || '', alta.nombre) || it.name?.toLowerCase().includes(alta.nombre.toLowerCase()) || alta.nombre.toLowerCase().includes(it.name?.toLowerCase() || '')));
-    }
-    if (i >= 0) {
-      fuera[i] = {
-        ...fuera[i],
-        quantity: Math.max(0, alta.cantidad > 1 ? alta.cantidad : (fuera[i].quantity || 1)),
-        // Un objeto que vuelve a entrar deja de estar resuelto.
-        resuelto: false,
-        // Y si se lo habían quitado, recuperarlo lo devuelve a sus manos.
+    // 1. Buscar si hay algún objeto requisado que coincida
+    const iReq = fuera.findIndex(it => it && it.enPoderDe && sonElMismoObjeto(it.name || '', alta.nombre));
+    // 2. Buscar si hay algún objeto en sus manos que coincida
+    const iActivo = fuera.findIndex(it => it && !it.enPoderDe && sonElMismoObjeto(it.name || '', alta.nombre));
+
+    const estaEquipado = alta.equipped ||
+      Boolean(alta.detalles && /equipada|equipado|puesto|puesta|empuñad|al cinto|al cuello/i.test(alta.detalles)) ||
+      Boolean(/equipada|equipado|puesto|puesta|empuñad|al cinto|al cuello/i.test(alta.nombre));
+
+    if (iReq >= 0 && iActivo >= 0) {
+      // Había dos copias (una requisada y una activa). La requisada se borra y la activa se actualiza limpia.
+      fuera[iActivo] = {
+        ...fuera[iActivo],
+        quantity: Math.max(fuera[iActivo].quantity || 1, fuera[iReq].quantity || 1, alta.cantidad),
         enPoderDe: undefined,
         dondeEsta: undefined,
         incautadoDiaAbs: undefined,
-        description: fuera[i].description || alta.detalles,
-        encargo: fuera[i].encargo || alta.encargo,
-        origen: fuera[i].origen || alta.origen,
-        deMision: fuera[i].deMision || alta.deMision
+        equipped: estaEquipado || fuera[iActivo].equipped || fuera[iReq].equipped,
+        resuelto: false,
+        description: fuera[iActivo].description || fuera[iReq].description || alta.detalles
+      };
+      fuera.splice(iReq, 1);
+    } else if (iReq >= 0) {
+      // Estaba requisado: ¡se recupera y vuelve a sus manos!
+      fuera[iReq] = {
+        ...fuera[iReq],
+        quantity: Math.max(1, alta.cantidad > 1 ? alta.cantidad : (fuera[iReq].quantity || 1)),
+        resuelto: false,
+        enPoderDe: undefined,
+        dondeEsta: undefined,
+        incautadoDiaAbs: undefined,
+        equipped: estaEquipado || fuera[iReq].equipped,
+        description: fuera[iReq].description || alta.detalles,
+        encargo: fuera[iReq].encargo || alta.encargo,
+        origen: fuera[iReq].origen || alta.origen,
+        deMision: fuera[iReq].deMision || alta.deMision
+      };
+    } else if (iActivo >= 0) {
+      // Ya estaba en sus manos: actualizar cantidad y detalles
+      fuera[iActivo] = {
+        ...fuera[iActivo],
+        quantity: Math.max(1, alta.cantidad > 1 ? alta.cantidad : (fuera[iActivo].quantity || 1)),
+        resuelto: false,
+        equipped: estaEquipado || fuera[iActivo].equipped,
+        description: fuera[iActivo].description || alta.detalles,
+        encargo: fuera[iActivo].encargo || alta.encargo,
+        origen: fuera[iActivo].origen || alta.origen,
+        deMision: fuera[iActivo].deMision || alta.deMision
       };
     } else {
+      // Nuevo objeto que entra
       fuera.push({
         id: `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
         name: alta.nombre,
@@ -232,6 +455,7 @@ export function aplicarInventario(
         encargo: alta.encargo,
         origen: alta.origen,
         deMision: alta.deMision,
+        equipped: estaEquipado,
         diaAbs
       });
     }
@@ -246,14 +470,15 @@ export function aplicarInventario(
    * requisen algo es justo cuando la aplicación se entera de que lo tenía.
    */
   for (const quitado of cambio.incautadas) {
-    const i = fuera.findIndex(it => it && mismaCosa(it.name || '', quitado.nombre));
+    const i = fuera.findIndex(it => it && sonElMismoObjeto(it.name || '', quitado.nombre));
     if (i >= 0) {
       fuera[i] = {
         ...fuera[i],
         quantity: Math.max(fuera[i].quantity || 0, quitado.cantidad),
         enPoderDe: quitado.enPoderDe || fuera[i].enPoderDe || 'sin saber quién',
         dondeEsta: quitado.dondeEsta || fuera[i].dondeEsta,
-        incautadoDiaAbs: fuera[i].incautadoDiaAbs ?? diaAbs
+        incautadoDiaAbs: fuera[i].incautadoDiaAbs ?? diaAbs,
+        equipped: false // Un objeto requisado deja de estar equipado
       };
     } else {
       fuera.push({
@@ -263,13 +488,14 @@ export function aplicarInventario(
         enPoderDe: quitado.enPoderDe || 'sin saber quién',
         dondeEsta: quitado.dondeEsta,
         incautadoDiaAbs: diaAbs,
+        equipped: false,
         diaAbs
       });
     }
   }
 
   for (const baja of cambio.bajas) {
-    const i = fuera.findIndex(it => it && mismaCosa(it.name || '', baja.nombre));
+    const i = fuera.findIndex(it => it && sonElMismoObjeto(it.name || '', baja.nombre));
     if (i < 0) continue;
     const restante = Math.max(0, (fuera[i].quantity || 0) - baja.cantidad);
     if (restante > 0) {
@@ -282,27 +508,7 @@ export function aplicarInventario(
     }
   }
 
-  // Deduplicate items to prevent duplicate active/requisitioned entries
-  const mapaUnico = new Map<string, InventoryItem>();
-  for (const it of fuera) {
-    if (!it || !it.name) continue;
-    const key = it.name.toLowerCase().trim();
-    if (mapaUnico.has(key)) {
-      const existente = mapaUnico.get(key)!;
-      const enPoderDe = !it.enPoderDe ? undefined : (!existente.enPoderDe ? undefined : (it.enPoderDe || existente.enPoderDe));
-      mapaUnico.set(key, {
-        ...existente,
-        quantity: Math.max(existente.quantity || 1, it.quantity || 1),
-        enPoderDe,
-        dondeEsta: enPoderDe ? (it.dondeEsta || existente.dondeEsta) : undefined,
-        resuelto: existente.resuelto && it.resuelto
-      });
-    } else {
-      mapaUnico.set(key, it);
-    }
-  }
-
-  return Array.from(mapaUnico.values());
+  return deduplicarInventario(fuera);
 }
 
 /** Suma o resta monedas sin dejar que ninguna baje de cero. */
@@ -357,6 +563,23 @@ export function reconstruirInventario(
   for (const m of mensajes) {
     if (!m || m.role === 'user' || !m.content) continue;
     const cambio = leerInventario(m.content);
+
+    // Detección de devolución o recuperación en el texto narrativo si había objetos requisados
+    const requisadosActuales = inventario.filter(i => i.enPoderDe);
+    if (requisadosActuales.length > 0) {
+      const devueltos = detectarDevolucionesEnTexto(m.content, requisadosActuales);
+      for (const d of devueltos) {
+        if (!cambio.altas.some(a => sonElMismoObjeto(a.nombre, d.nombre))) {
+          cambio.altas.push({
+            nombre: d.nombre,
+            cantidad: d.cantidad || 1,
+            equipped: d.equipped,
+            detalles: d.detalles
+          });
+        }
+      }
+    }
+
     if (cambioVacio(cambio)) continue;
     objetosVistos += cambio.altas.length + cambio.incautadas.length;
     inventario = aplicarInventario(inventario, cambio);
@@ -365,10 +588,15 @@ export function reconstruirInventario(
     }
   }
 
-  // Lo escrito a mano vuelve, y lo reconstruido no lo pisa.
-  const nombres = new Set(inventario.map(i => (i.name || '').toLowerCase()));
+  // Si algo de aMano fue modificado o devuelto en inventario, manda inventario
+  const aManoFiltrado = aMano.filter(m => {
+    const enInv = inventario.find(inv => sonElMismoObjeto(inv.name || '', m.name || ''));
+    if (!enInv) return true;
+    return false;
+  });
+
   return {
-    inventario: [...aMano.filter(i => !nombres.has((i.name || '').toLowerCase())), ...inventario],
+    inventario: deduplicarInventario([...aManoFiltrado, ...inventario]),
     netoDeMonedas: neto,
     objetosVistos
   };

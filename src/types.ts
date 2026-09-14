@@ -215,7 +215,7 @@ export interface InventoryItem {
 /** Un cambio de inventario leído de la etiqueta `[INVENTARIO: ...]` de un turno. */
 export interface CambioDeInventario {
   /** Objetos que entran, con su cantidad. */
-  altas: { nombre: string; cantidad: number; detalles?: string; encargo?: string; origen?: string; deMision?: boolean }[];
+  altas: { nombre: string; cantidad: number; detalles?: string; encargo?: string; origen?: string; deMision?: boolean; equipped?: boolean }[];
   /** Objetos que salen, con su cantidad. */
   bajas: { nombre: string; cantidad: number }[];
   /** Objetos que siguen siendo suyos pero los tiene otro: requisados, robados, empeñados. */

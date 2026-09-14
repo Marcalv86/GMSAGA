@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { esNombreDeProtagonista } from '../utils/sanitizers';
 import { obtenerOGenerarFichaNpc, asegurarFichaCompletaNpc } from '../utils/canonicalNpcStats';
+import { deduplicarInventario, sonElMismoObjeto } from '../utils/inventoryTag';
 
 export function getAtrInfo(val?: number) {
   const v = val !== undefined && val !== null ? Math.max(0, Math.min(20, Math.round(val))) : 0;
@@ -2546,7 +2547,8 @@ export const MemoryManager: React.FC<{
 
       {/* Tab: Inventario (la mochila del OC) */}
       {activeTab === 'inventario' && (() => {
-        const todo = memory.player_character?.inventory || [];
+        const rawItems = memory.player_character?.inventory || [];
+        const todo = deduplicarInventario(rawItems);
         const monedas = memory.player_character?.currencies;
 
         /*
@@ -2622,8 +2624,14 @@ export const MemoryManager: React.FC<{
           otro: 'otro'
         };
 
-        const requisados = todo.filter(i => i.enPoderDe);
-        const enSusManos = todo.filter(i => !i.enPoderDe);
+        const esRequisado = (i: InventoryItem) => {
+          if (!i.enPoderDe) return false;
+          const p = i.enPoderDe.trim().toLowerCase();
+          return !/^(nadie|ningun|ninguno|ninguna|devuelto|recuperado|la protagonista|el protagonista|ella|el|yo|en sus manos)$/i.test(p);
+        };
+
+        const requisados = todo.filter(i => esRequisado(i));
+        const enSusManos = todo.filter(i => !esRequisado(i));
         const deMision = enSusManos.filter(i => i.deMision && !i.resuelto);
         const resueltos = enSusManos.filter(i => i.deMision && i.resuelto);
         const propios = enSusManos.filter(i => !i.deMision);
@@ -2664,17 +2672,21 @@ export const MemoryManager: React.FC<{
                     ×{item.quantity}
                   </span>
                 )}
-                {item.equipped && (
+                {item.equipped ? (
                   <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
                     equipado
                   </span>
-                )}
+                ) : !esRequisado(item) ? (
+                  <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--glass-border)]">
+                    portado
+                  </span>
+                ) : null}
                 {item.durationNote && (
                   <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]">
                     ⏳ {item.durationNote}
                   </span>
                 )}
-                {item.enPoderDe && (
+                {esRequisado(item) && (
                   <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
                     lo tiene {item.enPoderDe}
                   </span>
@@ -2703,20 +2715,41 @@ export const MemoryManager: React.FC<{
               </p>
             )}
 
-            {/*
-              Sin botones de editar ni de borrar, a propósito.
-
-              La mochila la lleva el juego: lo que hay dentro entró jugando, y
-              si algo está mal se le dice al Director en el Chat con el GM —él
-              lo quita, lo cambia de sitio o lo marca por cumplido, y encima
-              puede preguntar antes si le chirría—. Poder tacharlo aquí
-              convertía la lista en una sugerencia.
-            */}
             {item.mision && (
               <div className="flex items-center gap-2 flex-wrap pt-0.5">
                 <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
                   {item.mision}
                 </span>
+              </div>
+            )}
+
+            {tono === 'requisado' && onUpdateMemory && (
+              <div className="pt-1.5">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await onUpdateMemory(prev => {
+                      if (!prev.player_character) return prev;
+                      const act = (list?: InventoryItem[]) =>
+                        (list || []).map(it =>
+                          sonElMismoObjeto(it.name || '', item.name || '')
+                            ? { ...it, enPoderDe: undefined, dondeEsta: undefined, incautadoDiaAbs: undefined }
+                            : it
+                        );
+                      return {
+                        ...prev,
+                        player_character: {
+                          ...prev.player_character,
+                          inventory: act(prev.player_character.inventory)
+                        }
+                      };
+                    });
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-cinzel font-medium px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 transition-colors cursor-pointer"
+                  title="Devolver o recuperar este objeto (pasa a portado/equipado en sus manos)"
+                >
+                  <PackageCheck className="w-3.5 h-3.5" /> Devolver a sus manos
+                </button>
               </div>
             )}
             </div>
