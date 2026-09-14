@@ -1428,7 +1428,11 @@ export function estimarCargaDelTurno({
    */
   const viajaEntero = (f: ProjectFile) =>
     esTexto(f) &&
-    (!f.onDemand || f.category === 'oracle' || f.category === 'roster' || f.category === 'index');
+    (!f.onDemand ||
+      f.category === 'oracle' ||
+      f.category === 'roster' ||
+      f.category === 'index' ||
+      f.category === 'sheet_npc');
   const archivos = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
 
   const deConsulta = files.filter(
@@ -1437,7 +1441,8 @@ export function estimarCargaDelTurno({
       Boolean(f.onDemand) &&
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
-      f.category !== 'index'
+      f.category !== 'index' &&
+      f.category !== 'sheet_npc'
   );
   const archivosDeConsulta = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
   const medios = files.filter(f => f.isImage || f.isAudio).length;
@@ -2572,7 +2577,7 @@ ${allPreviousHistory}`
   })();
 
 
-  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos, elencos, índices, fichas de PJ y familiares)
+  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos, elencos, índices, fichas de PJ, familiares y fichas de PNJs)
   const deConsulta = files.filter(
     f =>
       esTexto(f) &&
@@ -2581,7 +2586,8 @@ ${allPreviousHistory}`
       !companionIds.has(f.id) &&
       f.category !== 'oracle' &&
       f.category !== 'roster' &&
-      f.category !== 'index'
+      f.category !== 'index' &&
+      f.category !== 'sheet_npc'
   );
   const deConsultaIds = new Set(deConsulta.map(f => f.id));
 
