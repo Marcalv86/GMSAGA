@@ -60,14 +60,13 @@ Todas las etiquetas deben ir al final del mensaje o en su lugar correspondiente.
 #### D. Sistema de Afinidad de PNJs en Tres Ejes (0 a 20)
 - **Formato**: \`[VÍNCULO: nombre | aparenta: ... | oculta: ... | grado: tipo — descripción | atr: 0-20 | vin: 0-20 | con: 0-20]\`
 - **Ejes**:
-  - **ATR (Atracción/Deseo 0-20)**: La atracción física e intelectual inicial NO empieza en 0 por defecto. El Narrador le asigna un valor base inicial a cada PNJ desde su primer encuentro o revelación de ficha, evaluando:
-    1) El atractivo físico, intelectual, porte y presencia del PJ al primer vistazo.
-    2) La personalidad, trasfondo y nivel de proactividad coqueto/flirteador/hedonista del PNJ en cuestión (un PNJ coqueto, sensual o descarado como Jarlaxle arrancará con un valor inicial más alto si la encuentra atractiva; un PNJ ascético, frío o desinteresado empezará en 0 o muy bajo).
-    3) A partir de ahí, ATR evoluciona según la química, el coqueteo y el tono de las interacciones vividas.
+  - **ATR (Atracción / Deseo / Química 0-20 — Termómetro Dinámico y Flechazo)**: Mide la tensión erótica, el magnetismo y la química actual entre el PNJ y la protagonista. **No es una barra de experiencia acumulativa**:
+    1) **El Flechazo / Chispa Inicial**: Si hay química o atractivo mutuo desde el primer encuentro, el Narrador le asigna directamente un valor alto de golpe (ej. 12-16) desde el primer segundo. No existe el "empezar en 0" por defecto.
+    2) **Fluctuación Fluida (Sube y Baja)**: La atracción no solo sube; **fluctúa libremente según el pulso de la escena**. Se dispara bruscamente con un momento de gran tensión, coqueteo o cercanía física, pero también **puede descender** de golpe si hay frialdad, celos, un desplante o distanciamiento. No tiene límites de ritmo diario.
   - **VÍN (Vínculo/Camaradería 0-20)**: Conexión emocional y tiempo compartido.
   - **CON (Confianza/Secretos 0-20)**: Disposición a compartir secretos de vida o muerte.
 - **Rangos**: 0-1 (🤍 Rango 0), 2-5 (❤️ Rango 1), 6-9 (❤️❤️ Rango 2), 10-13 (❤️❤️❤️ Rango 3), 14-17 (❤️❤️❤️❤️ Rango 4), 18-20 (❤️❤️❤️❤️❤️ Rango 5).
-- **Límite de Ritmo**: Aumento máximo de **+1 por eje por día de campaña**. Exclusivo para PNJs con nombre propio o recurrentes (desbloqueados al revelar nombre propio o tras 3 días de interacción).
+- **Límite de Ritmo**: Para VÍN y CON, el aumento máximo es de +1 por día de campaña. **ATR (Atracción) no tiene límite rígido diario**: puede subir de golpe o reflejar un flechazo, tensión o química inmediata según la intensidad de la escena.
 - ⛔ **PROHIBIDO** escribir datos numéricos de afinidad en el texto plano narrativo. Solo mediante la etiqueta silenciosa.
 
 #### E. Inventario y Dinero

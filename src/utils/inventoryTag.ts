@@ -204,11 +204,14 @@ export function aplicarInventario(
   const fuera = [...(inventarioPrevio || [])];
 
   for (const alta of cambio.altas) {
-    const i = fuera.findIndex(it => it && mismaCosa(it.name || '', alta.nombre));
+    let i = fuera.findIndex(it => it && mismaCosa(it.name || '', alta.nombre));
+    if (i < 0) {
+      i = fuera.findIndex(it => it && it.enPoderDe && (mismaCosa(it.name || '', alta.nombre) || it.name?.toLowerCase().includes(alta.nombre.toLowerCase()) || alta.nombre.toLowerCase().includes(it.name?.toLowerCase() || '')));
+    }
     if (i >= 0) {
       fuera[i] = {
         ...fuera[i],
-        quantity: Math.max(0, (fuera[i].quantity || 0) + alta.cantidad),
+        quantity: Math.max(0, alta.cantidad > 1 ? alta.cantidad : (fuera[i].quantity || 1)),
         // Un objeto que vuelve a entrar deja de estar resuelto.
         resuelto: false,
         // Y si se lo habían quitado, recuperarlo lo devuelve a sus manos.
@@ -279,7 +282,27 @@ export function aplicarInventario(
     }
   }
 
-  return fuera;
+  // Deduplicate items to prevent duplicate active/requisitioned entries
+  const mapaUnico = new Map<string, InventoryItem>();
+  for (const it of fuera) {
+    if (!it || !it.name) continue;
+    const key = it.name.toLowerCase().trim();
+    if (mapaUnico.has(key)) {
+      const existente = mapaUnico.get(key)!;
+      const enPoderDe = !it.enPoderDe ? undefined : (!existente.enPoderDe ? undefined : (it.enPoderDe || existente.enPoderDe));
+      mapaUnico.set(key, {
+        ...existente,
+        quantity: Math.max(existente.quantity || 1, it.quantity || 1),
+        enPoderDe,
+        dondeEsta: enPoderDe ? (it.dondeEsta || existente.dondeEsta) : undefined,
+        resuelto: existente.resuelto && it.resuelto
+      });
+    } else {
+      mapaUnico.set(key, it);
+    }
+  }
+
+  return Array.from(mapaUnico.values());
 }
 
 /** Suma o resta monedas sin dejar que ninguna baje de cero. */
