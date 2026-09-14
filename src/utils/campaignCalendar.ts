@@ -1475,6 +1475,20 @@ export function leerHilos(texto: string): HiloLeido[] {
   return out;
 }
 
+const COMENTARIO_DM_RE = /\[(?:COMENTARIO_DM|MESA_OOC):\s*[\s\S]*?\]/gi;
+
+/** Lee los comentarios OOC que el DM haya dejado espontáneamente al final del turno. */
+export function leerComentariosDM(texto: string): string[] {
+  if (!texto || !texto.includes('[')) return [];
+  const matches = texto.matchAll(/\[(?:COMENTARIO_DM|MESA_OOC):\s*([\s\S]*?)\]/gi);
+  const out: string[] = [];
+  for (const m of matches) {
+    const c = m[1]?.trim();
+    if (c) out.push(c);
+  }
+  return out;
+}
+
 /** Quita las etiquetas de tiempo del texto que lee el jugador. */
 export function limpiarEtiquetasDeTiempo(texto: string): string {
   if (!texto || !texto.includes('[')) return texto;
@@ -1484,6 +1498,7 @@ export function limpiarEtiquetasDeTiempo(texto: string): string {
     .replace(HILO_RE, '')
     .replace(AVANCE_RE, '')
     .replace(NIVEL_RE, '')
+    .replace(COMENTARIO_DM_RE, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -1848,6 +1863,7 @@ export function limpiarEtiquetasDePnj(texto: string): string {
     .replace(VIAJE_RE, '')
     .replace(ESTAMOS_RE, '')
     .replace(LUGAR_RE, '')
+    .replace(COMENTARIO_DM_RE, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')

@@ -12,6 +12,8 @@ export interface MensajeDeMesa {
   role: 'user' | 'model';
   content: string;
   timestamp?: string;
+  /** Si fue una reacción espontánea del DM a lo ocurrido en un turno de juego. */
+  origen?: 'escena' | 'charla';
   /** Lo que el Director apuntó en la memoria en ese mensaje, para poder verlo. */
   memorias?: string[];
   /**
@@ -36,6 +38,7 @@ export interface MensajeDeMesa {
 }
 
 const CLAVE_MESA = 'gmstudio_mesa_';
+const CLAVE_MESA_LEIDA = 'gmstudio_mesa_leida_';
 /**
  * Un tope generoso pero real. La conversación de mesa vive en localStorage
  * junto a todo lo demás, y una charla sin fin acabaría compitiendo por el sitio
@@ -61,9 +64,63 @@ export function guardarMesa(projectId: string, mensajes: MensajeDeMesa[]): void 
   }
 }
 
+export function marcarMesaLeida(projectId: string): void {
+  try {
+    localStorage.setItem(CLAVE_MESA_LEIDA + projectId, Date.now().toString());
+  } catch {
+    /* nada que hacer */
+  }
+}
+
+export function hayMensajesSinLeerEnMesa(projectId: string): boolean {
+  try {
+    const rawLeida = localStorage.getItem(CLAVE_MESA_LEIDA + projectId);
+    const ultimaLeida = rawLeida ? parseInt(rawLeida, 10) : 0;
+    const msgs = leerMesa(projectId);
+    if (!msgs || msgs.length === 0) return false;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i];
+      if (m.role === 'model') {
+        const msgTime = m.timestamp ? new Date(m.timestamp).getTime() : 0;
+        if (msgTime > ultimaLeida) return true;
+        if (!m.timestamp && ultimaLeida === 0) return true;
+        if (msgTime <= ultimaLeida && msgTime > 0) break;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function contarMensajesSinLeerEnMesa(projectId: string): number {
+  try {
+    const rawLeida = localStorage.getItem(CLAVE_MESA_LEIDA + projectId);
+    const ultimaLeida = rawLeida ? parseInt(rawLeida, 10) : 0;
+    const msgs = leerMesa(projectId);
+    if (!msgs || msgs.length === 0) return 0;
+    let count = 0;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i];
+      if (m.role === 'model') {
+        const msgTime = m.timestamp ? new Date(m.timestamp).getTime() : 0;
+        if (msgTime > ultimaLeida) {
+          count++;
+        } else if (msgTime <= ultimaLeida && msgTime > 0) {
+          break;
+        }
+      }
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
 export function borrarMesa(projectId: string): void {
   try {
     localStorage.removeItem(CLAVE_MESA + projectId);
+    localStorage.removeItem(CLAVE_MESA_LEIDA + projectId);
   } catch {
     /* nada que hacer */
   }

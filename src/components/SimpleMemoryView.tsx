@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Project, Memory, ProjectMemoryEdit, Chat, ProjectFile } from '../types';
 import {
   ScrollText,
   Trash2,
-  Edit2,
   Check,
   RefreshCw,
   Sparkles,
@@ -14,7 +13,6 @@ import {
   RotateCcw,
   Copy,
   Sliders,
-  FileText,
   User,
   VenetianMask,
   Lock as LockIcon
@@ -22,8 +20,7 @@ import {
 import { MemoryManager } from './MemoryManager';
 import {
   generateClaudeProjectMemory,
-  extractAiDirectives,
-  TOPE_MEMORIA_PROYECTO_CARACTERES
+  extractAiDirectives
 } from '../utils/geminiHelper';
 
 interface SimpleMemoryViewProps {
@@ -53,8 +50,8 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
     locations: []
   };
 
-  // Sub-view: 'view' | 'edit' | 'manage_edits'
-  const [memorySubView, setMemorySubView] = useState<'view' | 'edit' | 'manage_edits'>('view');
+  // Sub-view: 'view' | 'manage_edits'
+  const [memorySubView, setMemorySubView] = useState<'view' | 'manage_edits'>('view');
   
   // Top-level memory mode: 'character' (Protagonista & Entidades) vs 'project' (Memoria Persistente de Proyecto)
   const [memoryMode, setMemoryMode] = useState<'character' | 'gm' | 'project'>(() => {
@@ -126,19 +123,14 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
     }
   };
 
-  // Raw text editor state
+  // Raw text memory state (read-only for player, synthesized by AI or instructed via GM OOC)
   const rawMemoryText = memory.raw_project_memory || '';
-  const [editableMemoryText, setEditableMemoryText] = useState(rawMemoryText);
 
   // Directive inputs ("Dile a la IA qué recordar u olvidar...")
   const [directiveInput, setDirectiveInput] = useState('');
   const [newManualEditInput, setNewManualEditInput] = useState('');
 
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setEditableMemoryText(memory.raw_project_memory || '');
-  }, [memory.raw_project_memory]);
 
   const handleFieldChange = (field: keyof Memory, val: any) => {
     onUpdateMemory(prev => ({
@@ -147,11 +139,6 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
     }));
     setIsSavedRecently(true);
     setTimeout(() => setIsSavedRecently(false), 2000);
-  };
-
-  const handleSaveEditableMemory = () => {
-    handleFieldChange('raw_project_memory', editableMemoryText);
-    setMemorySubView('view');
   };
 
   const handleCopyToClipboard = async () => {
@@ -212,7 +199,6 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           memory_edits: updatedEdits
         }));
         await onUpdateProject?.({ lastMemoryUpdate: Date.now() });
-        setEditableMemoryText(newRawMem);
       }
       setIsSavedRecently(true);
       setTimeout(() => setIsSavedRecently(false), 2000);
@@ -268,7 +254,6 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           raw_project_memory: newRawMem
         }));
         await onUpdateProject?.({ lastMemoryUpdate: Date.now() });
-        setEditableMemoryText(newRawMem);
       }
       setIsSavedRecently(true);
       setTimeout(() => setIsSavedRecently(false), 2000);
@@ -616,60 +601,6 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                   </button>
                 </div>
               </div>
-            ) : memorySubView === 'edit' ? (
-              /* Subview: RAW MARKDOWN EDITOR */
-              <div className="flex-1 flex flex-col p-4 md:p-6 space-y-3 overflow-hidden">
-                <div className="flex items-center justify-between border-b border-[var(--glass-border)] pb-2">
-                  <span className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
-                    <FileText className="w-4 h-4" />
-                    <span>Editor de Memoria (Markdown)</span>
-                    {/*
-                      El tamaño, a la vista mientras se escribe.
-
-                      Este documento es el único canal de memoria que llega al
-                      Narrador durante la partida, y viaja ENTERO en cada turno.
-                      Lo que se añada aquí se paga en todas las peticiones, y sin
-                      un contador no hay manera de notarlo hasta que la cuota
-                      empieza a fallar. Lo escrito a mano no se recorta —es tuyo—
-                      pero sí se avisa.
-                    */}
-                    <span
-                      className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                        editableMemoryText.length > TOPE_MEMORIA_PROYECTO_CARACTERES
-                          ? 'bg-amber-500/20 text-amber-950 dark:text-amber-100 border-amber-700/50'
-                          : 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 border-emerald-700/40'
-                      }`}
-                      title={`Esta memoria viaja entera al Narrador en cada turno. Recomendado: hasta ${TOPE_MEMORIA_PROYECTO_CARACTERES.toLocaleString('es-ES')} caracteres (~${Math.round(TOPE_MEMORIA_PROYECTO_CARACTERES / 3.8 / 100) / 10} mil tokens por turno).`}
-                    >
-                      {editableMemoryText.length.toLocaleString('es-ES')} /{' '}
-                      {TOPE_MEMORIA_PROYECTO_CARACTERES.toLocaleString('es-ES')} car.
-                    </span>
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setMemorySubView('view')}
-                      className="px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--glass)] rounded-lg cursor-pointer"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      id="btn-save-markdown-memory"
-                      onClick={handleSaveEditableMemory}
-                      className="px-3.5 py-1.5 bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-semibold rounded-lg hover:opacity-90 transition-all cursor-pointer shadow-xs"
-                    >
-                      Guardar cambios
-                    </button>
-                  </div>
-                </div>
-
-                <textarea
-                  id="textarea-memory-markdown"
-                  value={editableMemoryText}
-                  onChange={e => setEditableMemoryText(e.target.value)}
-                  placeholder="Redacta las secciones Purpose & context, Current state y Tools & resources..."
-                  className="flex-1 w-full bg-[color-mix(in_srgb,var(--bg-color)_50%,transparent)] border border-[var(--glass-border)] rounded-xl p-4 text-xs md:text-sm text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent)] resize-none leading-relaxed"
-                />
-              </div>
             ) : (
               /* Subview: NORMAL CLAUDE MEMORY VIEW */
               <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -723,19 +654,6 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                     )}
 
                     <button
-                      id="btn-edit-memory"
-                      onClick={() => {
-                        setEditableMemoryText(rawMemoryText);
-                        setMemorySubView('edit');
-                      }}
-                      className="px-2.5 py-1 text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] rounded-md transition-colors flex items-center gap-1 cursor-pointer"
-                      title="Editar memoria manualmente"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Editar</span>
-                    </button>
-
-                    <button
                       id="btn-manage-directives-top"
                       onClick={() => setMemorySubView('manage_edits')}
                       className="px-2.5 py-1 text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -770,17 +688,6 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                       >
                         <RefreshCw className={`w-4 h-4 ${isCurrentlyWorking ? 'animate-spin' : ''}`} />
                         <span>Sintetizar memoria ahora</span>
-                      </button>
-                      <button
-                        id="btn-write-manual-empty-state"
-                        onClick={() => {
-                          setEditableMemoryText('');
-                          setMemorySubView('edit');
-                        }}
-                        className="px-4 py-2.5 rounded-xl bg-[color-mix(in_srgb,var(--bg-color)_60%,transparent)] border border-[var(--glass-border)] text-[var(--text-primary)] font-cinzel text-xs hover:border-[var(--accent)] transition-all flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        <span>Escribir manualmente</span>
                       </button>
                     </div>
                   </div>

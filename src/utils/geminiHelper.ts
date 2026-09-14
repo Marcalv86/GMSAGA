@@ -53,6 +53,7 @@ import {
   deducirViajeInicialDeTextos,
   EntradaDeAgenda,
   leerHilos,
+  leerComentariosDM,
   limpiarEtiquetasDeTiempo,
   limpiarEtiquetasDePnj,
   leerPresentes,
@@ -3070,6 +3071,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
    - [FACCIÓN: Nombre | es: qué es | quiere: su objetivo ahora | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra facción (rival); Tercera (guerra) | oculto: lo que ella no sabe | conocida: no] — la ficha de un bando. Emítela la primera vez que un grupo con intereses propios aparece o se menciona, y cuando su objetivo o su postura CAMBIEN. Una facción no es la suma de su gente: su objetivo sigue vivo aunque muera quien lo llevaba. ⛔ No la uses para grupos de paso ni para una pareja de matones: solo para lo que va a estar ahí toda la campaña.
    - [PREPARADO: Título | tipo: escena/encuentro/complicacion/revelacion/pnj | detalle: qué pasa | cuando: en qué momento encaja | hilo: de qué cuelga] — guarda algo listo para usar más adelante, que es lo que hace un director antes de sentarse. Emítelo cuando se te ocurra algo bueno que AHORA no toca: así no se pierde y no acabas improvisándolo en caliente. Y cuando lo uses, ciérralo con [PREPARADO: el mismo título | usada: sí]. ⛔ Nada de esto se narra: es tu material.
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
+    - [COMENTARIO_DM: comentario breve, simpático, sincero o ingenioso del DM fuera de personaje] — OPCIONAL (1-2 frases). Emítelo solo cuando ocurra algo genuinamente divertido, una pifia o éxito crítico épico, una jugarreta memorable del PJ a un PNJ (o viceversa), o un momento de rol memorable. Este comentario se envía automáticamente al chat OOC de la Mesa como un mensaje del DM, con tu personalidad entusiasta, cómica, sincera y rolera de colega de mesa. Si el turno es rutinario, formal o solemne, OMITE totalmente esta etiqueta.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
 
@@ -4049,6 +4051,8 @@ export interface TiempoReportado {
   facciones?: Faccion[];
   /** Material preparado para usar más adelante. */
   preparado?: CartaPreparada[];
+  /** Comentarios OOC espontáneos del DM generados en la escena. */
+  comentariosDM?: string[];
 }
 
 async function saveStreamedMessage(
@@ -4105,6 +4109,7 @@ async function saveStreamedMessage(
   const relojes = leerRelojes(cleanedText);
   const facciones = leerFacciones(cleanedText);
   const preparado = leerPreparado(cleanedText);
+  const comentariosDM = leerComentariosDM(fullText);
   cleanedText = limpiarEtiquetasDePnj(limpiarEtiquetasDeTiempo(cleanedText));
 
   if (definitivo && hilos.length > 0) {
@@ -4129,6 +4134,7 @@ async function saveStreamedMessage(
       hudDeEsteTurno?.fechaTexto ||
       hudDeEsteTurno?.lugar ||
       avanceDeNivel ||
+      comentariosDM.length ||
       !nadaAprendido(aprendido) ||
       !cuadernoQuieto(bambalinas, relojes) ||
       !sinNovedadDeMesa(facciones, preparado) ||
@@ -4155,7 +4161,8 @@ async function saveStreamedMessage(
         bambalinas,
         relojes,
         facciones,
-        preparado
+        preparado,
+        comentariosDM
       });
     } catch (err) {
       logError('threads', 'Error al procesar el reporte de tiempo e hilos de la escena', err, {
@@ -7592,9 +7599,9 @@ export function parseStateTag(text: string): {
 export function limpiarParaMostrar(texto: string): string {
   if (!texto || !texto.includes('[')) return texto;
   return texto
-    .replace(/\[(?:ESTADO|TIEMPO|AGENDA|HILO|CHAPTER|PRESENTES|VINCULO|AFINIDAD|AVANCE|NIVEL)\b[^\]]*\]/gi, '')
+    .replace(/\[(?:ESTADO|TIEMPO|AGENDA|HILO|CHAPTER|PRESENTES|VINCULO|AFINIDAD|AVANCE|NIVEL|COMENTARIO_DM|MESA_OOC)\b[^\]]*\]/gi, '')
     // Una etiqueta a medio llegar: se esconde hasta que se sepa cómo acaba.
-    .replace(/\[(?:E(?:S(?:T(?:A(?:D(?:O)?)?)?)?)?|T(?:I(?:E(?:M(?:P(?:O)?)?)?)?)?|A(?:G(?:E(?:N(?:D(?:A)?)?)?)?)?|H(?:I(?:L(?:O)?)?)?|C(?:H(?:A(?:P(?:T(?:E(?:R)?)?)?)?)?)?|P(?:R(?:E(?:S(?:E(?:N(?:T(?:E(?:S)?)?)?)?)?)?)?)?|V(?:I(?:N(?:C(?:U(?:L(?:O)?)?)?)?)?)?)[^\]]*$/i, '')
+    .replace(/\[(?:E(?:S(?:T(?:A(?:D(?:O)?)?)?)?)?|T(?:I(?:E(?:M(?:P(?:O)?)?)?)?)?|A(?:G(?:E(?:N(?:D(?:A)?)?)?)?)?|H(?:I(?:L(?:O)?)?)?|C(?:H(?:A(?:P(?:T(?:E(?:R)?)?)?)?)?|O(?:M(?:E(?:N(?:T(?:A(?:R(?:I(?:O(?:_(?:D(?:M)?)?)?)?)?)?)?)?)?)?)?)?|M(?:E(?:S(?:A(?:_(?:O(?:O(?:C)?)?)?)?)?)?)?|P(?:R(?:E(?:S(?:E(?:N(?:T(?:E(?:S)?)?)?)?)?)?)?)?|V(?:I(?:N(?:C(?:U(?:L(?:O)?)?)?)?)?)?)[^\]]*$/i, '')
     .replace(/[ \t]{2,}/g, ' ');
 }
 

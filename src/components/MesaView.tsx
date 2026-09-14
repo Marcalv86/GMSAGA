@@ -10,6 +10,8 @@ import ReactMarkdown from 'react-markdown';
 import {
   BookmarkPlus,
   BookOpen,
+  Check,
+  Copy,
   Eye,
   EyeOff,
   Film,
@@ -17,12 +19,14 @@ import {
   Loader,
   Lock,
   MessageSquare,
+  RefreshCw,
   Send,
   Swords,
   Trash2,
   Pencil,
   Globe,
   Plus,
+  Sparkles,
   Users
 } from 'lucide-react';
 import { Chat, Project, ProjectFile } from '../types';
@@ -38,6 +42,13 @@ import {
 } from '../utils/youtube';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
+
+function dataUrlAImagenDeMesa(dataUrl: string): ImagenDeMesa {
+  const [header, base64] = dataUrl.split(',');
+  const mimeMatch = header?.match(/data:([^;]+)/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  return { data: base64 || '', mimeType };
+}
 
 /** Ancho máximo al que se reduce una imagen antes de guardarla y enviarla. */
 const ANCHO_MAX_ADJUNTO = 1024;
@@ -177,6 +188,104 @@ export const MesaView: React.FC<{
     }
   };
 
+  const [copiadoIndex, setCopiadoIndex] = useState<number | null>(null);
+
+  const copiarAlPortapapeles = async (txt: string, idx: number) => {
+    if (!txt) return;
+    try {
+      await navigator.clipboard.writeText(txt);
+      setCopiadoIndex(idx);
+      setTimeout(() => setCopiadoIndex(null), 2000);
+    } catch {
+      // Fallback si el navegador no permite el portapapeles
+    }
+  };
+
+  const ejecutarConsultaDirector = async ({
+    historialParaContexto,
+    mensajesHastaPregunta,
+    preguntaTexto,
+    imagenes,
+    videos
+  }: {
+    historialParaContexto: MensajeDeMesa[];
+    mensajesHastaPregunta: MensajeDeMesa[];
+    preguntaTexto: string;
+    imagenes: ImagenDeMesa[];
+    videos: VideoDeMesa[];
+  }) => {
+    setMensajes(mensajesHastaPregunta);
+    guardarMesa(project.id, mensajesHastaPregunta);
+    setPensando(true);
+    setError('');
+
+    try {
+      const respuesta = await preguntarAlDirectorOOC({
+        project,
+        chats,
+        currentChatId,
+        files,
+        buscarEnLaWeb,
+        historial: historialParaContexto,
+        pregunta:
+          preguntaTexto ||
+          (imagenes.length ? '(sin texto: mira la imagen adjunta)' : '(sin texto: mira el vídeo)'),
+        imagenes,
+        videos,
+        modelo
+      });
+
+      const completo: MensajeDeMesa[] = [
+        ...mensajesHastaPregunta,
+        {
+          role: 'model',
+          content: respuesta.texto,
+          memorias: respuesta.memorias.length ? respuesta.memorias : undefined,
+          secretos: respuesta.secretos.length ? respuesta.secretos.map(x => x.titulo) : undefined,
+          fichasDeEntrada: respuesta.fichasDeEntrada,
+          timestamp: new Date().toISOString()
+        }
+      ];
+      setMensajes(completo);
+      guardarMesa(project.id, completo);
+
+      // Lo que haya pedido apuntar va a la memoria de la campaña, y se ve.
+      if (respuesta.memorias.length && onAnotarEnMemoria) {
+        onAnotarEnMemoria(respuesta.memorias);
+      }
+      // Los giros van a los secretos de campaña
+      if (respuesta.secretos.length && onPlantarSecretos) {
+        onPlantarSecretos(respuesta.secretos);
+      }
+      // Y lo que haya corregido se aplica de verdad
+      if (onCorregirDesdeLaMesa) {
+        await onCorregirDesdeLaMesa({
+          olvidos: respuesta.olvidos,
+          etiquetados: respuesta.etiquetados,
+          vinculos: respuesta.vinculos,
+          inventario: respuesta.inventario,
+          aprendido: respuesta.aprendido,
+          estamos: respuesta.estamos,
+          estado: respuesta.estado,
+          viaje: respuesta.viaje,
+          bambalinas: respuesta.bambalinas,
+          relojes: respuesta.relojes,
+          facciones: respuesta.facciones,
+          preparado: respuesta.preparado
+        });
+      }
+    } catch (err) {
+      const base = describeApiError(err);
+      setError(
+        videos.length
+          ? `${base}\n\nAl mandar un vídeo suele fallar por una de tres: el vídeo es privado o no está disponible en tu región, el tramo pedido no cabe en un envío (prueba «Primeros 5 min»), o el modelo de tareas de fondo no admite vídeo. Puedes desmarcar «No lo mires» para mandar solo el enlace.`
+          : base
+      );
+    } finally {
+      setPensando(false);
+    }
+  };
+
   const enviar = async () => {
     const pregunta = texto.trim();
     if ((!pregunta && adjuntos.length === 0) || pensando) return;
@@ -203,89 +312,18 @@ export const MesaView: React.FC<{
         timestamp: new Date().toISOString()
       }
     ];
-    setMensajes(conLaPregunta);
-    guardarMesa(project.id, conLaPregunta);
+
+    const imagenesAdjuntas = adjuntos.map(a => a.imagen);
     setTexto('');
     setAdjuntos([]);
-    setPensando(true);
-    setError('');
 
-    try {
-      const respuesta = await preguntarAlDirectorOOC({
-        project,
-        chats,
-        currentChatId,
-        files,
-        buscarEnLaWeb,
-        historial: mensajes,
-        pregunta:
-          pregunta ||
-          (adjuntos.length ? '(sin texto: mira la imagen adjunta)' : '(sin texto: mira el vídeo)'),
-        imagenes: adjuntos.map(a => a.imagen),
-        videos,
-        modelo
-      });
-      const completo: MensajeDeMesa[] = [
-        ...conLaPregunta,
-        {
-          role: 'model',
-          content: respuesta.texto,
-          memorias: respuesta.memorias.length ? respuesta.memorias : undefined,
-          secretos: respuesta.secretos.length ? respuesta.secretos.map(x => x.titulo) : undefined,
-          fichasDeEntrada: respuesta.fichasDeEntrada,
-          timestamp: new Date().toISOString()
-        }
-      ];
-      setMensajes(completo);
-      guardarMesa(project.id, completo);
-      // Lo que haya pedido apuntar va a la memoria de la campaña, y se ve.
-      if (respuesta.memorias.length && onAnotarEnMemoria) {
-        onAnotarEnMemoria(respuesta.memorias);
-      }
-      // Los giros van a los secretos de campaña, no a la memoria: la memoria la
-      // lee la jugadora en cada turno, y un giro ahí es un giro destripado.
-      if (respuesta.secretos.length && onPlantarSecretos) {
-        onPlantarSecretos(respuesta.secretos);
-      }
-      /*
-       * Y lo que haya corregido se aplica de verdad.
-       *
-       * Es lo que convierte esta pestaña en la herramienta que dice ser: se le
-       * pide al Director que arregle algo, y lo arregla ÉL. La alternativa era
-       * que la jugadora fuese a la pantalla de Memoria a tocarlo con las manos,
-       * que es como entrar en casa del Director y tacharle el cuaderno.
-       */
-      if (onCorregirDesdeLaMesa) {
-        await onCorregirDesdeLaMesa({
-          olvidos: respuesta.olvidos,
-          etiquetados: respuesta.etiquetados,
-          vinculos: respuesta.vinculos,
-          inventario: respuesta.inventario,
-          aprendido: respuesta.aprendido,
-          estamos: respuesta.estamos,
-          estado: respuesta.estado,
-          viaje: respuesta.viaje,
-          bambalinas: respuesta.bambalinas,
-          relojes: respuesta.relojes,
-          facciones: respuesta.facciones,
-          preparado: respuesta.preparado
-        });
-      }
-    } catch (err) {
-      /*
-       * Un fallo con vídeo delante casi nunca es «la API va mal»: o el vídeo es
-       * privado o restringido, o el tramo pedido es más largo de lo que cabe.
-       * Decirlo ahorra media hora de probar a ciegas con la cuota del día.
-       */
-      const base = describeApiError(err);
-      setError(
-        videos.length
-          ? `${base}\n\nAl mandar un vídeo suele fallar por una de tres: el vídeo es privado o no está disponible en tu región, el tramo pedido no cabe en un envío (prueba «Primeros 5 min»), o el modelo de tareas de fondo no admite vídeo. Puedes desmarcar «No lo mires» para mandar solo el enlace.`
-          : base
-      );
-    } finally {
-      setPensando(false);
-    }
+    await ejecutarConsultaDirector({
+      historialParaContexto: mensajes,
+      mensajesHastaPregunta: conLaPregunta,
+      preguntaTexto: pregunta,
+      imagenes: imagenesAdjuntas,
+      videos
+    });
   };
 
   const limpiar = () => {
@@ -317,19 +355,90 @@ export const MesaView: React.FC<{
     setBorrador(mensajes[i]?.content || '');
   };
 
-  const guardarEdicion = () => {
-    if (editando === null) return;
-    const texto = borrador.trim();
-    const i = editando;
+  /**
+   * Guarda solo el texto editado sin volver a lanzar la consulta a la IA.
+   */
+  const guardarEdicionSoloTexto = (i: number) => {
+    const textoNuevo = borrador.trim();
     setEditando(null);
     setBorrador('');
-    // Vaciarlo del todo es borrarlo: es lo que espera cualquiera que se deja
-    // el campo en blanco, y ahorra tener que ir a buscar la papelera.
-    if (!texto) {
+    if (!textoNuevo) {
       guardarMensajes(mensajes.filter((_, k) => k !== i));
       return;
     }
-    guardarMensajes(mensajes.map((m, k) => (k === i ? { ...m, content: texto } : m)));
+    guardarMensajes(mensajes.map((m, k) => (k === i ? { ...m, content: textoNuevo } : m)));
+  };
+
+  /**
+   * Guarda el texto editado del usuario y relanza la consulta al Director,
+   * reemplazando la respuesta anterior si existía.
+   */
+  const guardarEdicionYRelanzar = async (i: number) => {
+    const textoNuevo = borrador.trim();
+    setEditando(null);
+    setBorrador('');
+
+    if (!textoNuevo) {
+      guardarMensajes(mensajes.filter((_, k) => k !== i));
+      return;
+    }
+
+    const mensajeOriginal = mensajes[i];
+    const mensajeActualizado: MensajeDeMesa = {
+      ...mensajeOriginal,
+      content: textoNuevo,
+      timestamp: new Date().toISOString()
+    };
+
+    const historialPrevio = mensajes.slice(0, i);
+    const mensajesHastaPregunta = [...historialPrevio, mensajeActualizado];
+
+    // Detectar enlaces de YouTube en el nuevo texto si estaban configurados
+    const aMirar = mirarElVideo ? leerEnlacesDeYouTube(textoNuevo).slice(0, 1) : [];
+    const segundos = TRAMOS_DE_VIDEO[tramo].segundos;
+    const videos: VideoDeMesa[] = aMirar.map(v => ({
+      url: v.url,
+      ...(segundos ? { hastaSegundo: segundos } : {})
+    }));
+
+    const imagenes: ImagenDeMesa[] = (mensajeOriginal.adjuntos || []).map(dataUrlAImagenDeMesa);
+
+    await ejecutarConsultaDirector({
+      historialParaContexto: historialPrevio,
+      mensajesHastaPregunta,
+      preguntaTexto: textoNuevo,
+      imagenes,
+      videos
+    });
+  };
+
+  /**
+   * Vuelve a consultar al Director sobre un mensaje de usuario anterior.
+   */
+  const regenerarDesdeMensajeUsuario = async (indiceUsuario: number) => {
+    if (pensando) return;
+    const msg = mensajes[indiceUsuario];
+    if (!msg || msg.role !== 'user') return;
+
+    const historialPrevio = mensajes.slice(0, indiceUsuario);
+    const mensajesHastaPregunta = [...historialPrevio, msg];
+
+    const aMirar = mirarElVideo ? leerEnlacesDeYouTube(msg.content).slice(0, 1) : [];
+    const segundos = TRAMOS_DE_VIDEO[tramo].segundos;
+    const videos: VideoDeMesa[] = aMirar.map(v => ({
+      url: v.url,
+      ...(segundos ? { hastaSegundo: segundos } : {})
+    }));
+
+    const imagenes: ImagenDeMesa[] = (msg.adjuntos || []).map(dataUrlAImagenDeMesa);
+
+    await ejecutarConsultaDirector({
+      historialParaContexto: historialPrevio,
+      mensajesHastaPregunta,
+      preguntaTexto: msg.content,
+      imagenes,
+      videos
+    });
   };
 
   const borrarMensaje = (i: number) => {
@@ -510,6 +619,11 @@ export const MesaView: React.FC<{
                   <Eye className="w-3 h-3 shrink-0" /> Lo vio · {m.videoVisto}
                 </div>
               ) : null}
+              {m.origen === 'escena' ? (
+                <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-md bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-cinzel text-amber-700 dark:text-amber-400">
+                  <Sparkles className="w-3 h-3 shrink-0" /> Comentario espontáneo de la escena
+                </div>
+              ) : null}
               {editando === i ? (
                 <div className="flex flex-col gap-2">
                   <textarea
@@ -520,27 +634,51 @@ export const MesaView: React.FC<{
                         setEditando(null);
                         setBorrador('');
                       }
-                      // Ctrl/Cmd+Enter guarda, como en cualquier editor. Enter
-                      // a secas hace salto de línea: aquí se escriben párrafos.
-                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) guardarEdicion();
+                      // Ctrl/Cmd+Enter guarda y relanza si es usuario, o guarda si es modelo
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        if (m.role === 'user') {
+                          guardarEdicionYRelanzar(i);
+                        } else {
+                          guardarEdicionSoloTexto(i);
+                        }
+                      }
                     }}
                     autoFocus
                     rows={Math.min(12, Math.max(3, borrador.split('\n').length + 1))}
                     className="w-full resize-y rounded-lg border border-[var(--accent)]/50 bg-[var(--surface)] px-2.5 py-2 text-sm font-lora text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                   />
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={guardarEdicion}
-                      className="rounded-md bg-[var(--accent)] px-2.5 py-1 font-cinzel text-[11px] font-bold text-[var(--on-accent)] cursor-pointer"
-                    >
-                      Guardar
-                    </button>
+                    {m.role === 'user' ? (
+                      <>
+                        <button
+                          onClick={() => guardarEdicionYRelanzar(i)}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1 font-cinzel text-[11px] font-bold text-[var(--on-accent)] cursor-pointer hover:opacity-90 shadow-xs"
+                          title="Guardar el nuevo texto y pedirle al Director que responda a esta nueva versión."
+                        >
+                          <RefreshCw className="w-3 h-3" /> Guardar y Relanzar al GM
+                        </button>
+                        <button
+                          onClick={() => guardarEdicionSoloTexto(i)}
+                          className="inline-flex items-center gap-1 rounded-md border border-[var(--user-border)] bg-[var(--surface)] px-2.5 py-1 font-cinzel text-[11px] cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]/40"
+                          title="Guardar el texto corregido sin volver a consultar al Director."
+                        >
+                          <Check className="w-3 h-3" /> Solo Guardar Texto
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => guardarEdicionSoloTexto(i)}
+                        className="rounded-md bg-[var(--accent)] px-3 py-1 font-cinzel text-[11px] font-bold text-[var(--on-accent)] cursor-pointer"
+                      >
+                        Guardar Corrección
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setEditando(null);
                         setBorrador('');
                       }}
-                      className="rounded-md border border-[var(--user-border)] px-2.5 py-1 font-cinzel text-[11px] cursor-pointer text-[var(--text-secondary)]"
+                      className="rounded-md border border-[var(--user-border)] px-2.5 py-1 font-cinzel text-[11px] cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--glass)]"
                     >
                       Cancelar
                     </button>
@@ -620,14 +758,52 @@ export const MesaView: React.FC<{
                 siempre puestos, y se marcan al pasar por encima en escritorio.
               */}
               {editando !== i && (
-                <div className="mt-1.5 flex items-center gap-2.5 opacity-50 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                <div className="mt-1.5 flex items-center gap-2.5 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-wrap pt-1">
                   <button
                     onClick={() => empezarAEditar(i)}
                     className="flex items-center gap-1 font-cinzel text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
-                    title="Corregir lo que dice este mensaje. Lo que quede escrito es lo que verá el Director en las siguientes preguntas."
+                    title="Corregir lo que dice este mensaje."
                   >
                     <Pencil className="w-3 h-3" /> Editar
                   </button>
+
+                  {m.role === 'user' && (
+                    <button
+                      onClick={() => regenerarDesdeMensajeUsuario(i)}
+                      className="flex items-center gap-1 font-cinzel text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+                      title="Volver a consultar al Director con esta misma pregunta."
+                    >
+                      <RefreshCw className="w-3 h-3" /> Relanzar al GM
+                    </button>
+                  )}
+
+                  {m.role === 'model' && i > 0 && mensajes[i - 1]?.role === 'user' && (
+                    <button
+                      onClick={() => regenerarDesdeMensajeUsuario(i - 1)}
+                      className="flex items-center gap-1 font-cinzel text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+                      title="Pedirle al Director que vuelva a responder a la pregunta anterior."
+                    >
+                      <RefreshCw className="w-3 h-3" /> Regenerar
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => copiarAlPortapapeles(m.content, i)}
+                    className="flex items-center gap-1 font-cinzel text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+                    title="Copiar texto al portapapeles"
+                  >
+                    {copiadoIndex === i ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-500" />
+                        <span className="text-emerald-500">¡Copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" /> Copiar
+                      </>
+                    )}
+                  </button>
+
                   <button
                     onClick={() => borrarMensaje(i)}
                     className="flex items-center gap-1 font-cinzel text-[10px] text-[var(--text-secondary)] hover:text-red-500 cursor-pointer"
@@ -635,6 +811,7 @@ export const MesaView: React.FC<{
                   >
                     <Trash2 className="w-3 h-3" /> Borrar
                   </button>
+
                   {m.role === 'user' && mensajes[i + 1]?.role === 'model' && (
                     <button
                       onClick={() => borrarConSuRespuesta(i)}

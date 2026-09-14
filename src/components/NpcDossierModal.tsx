@@ -14,10 +14,7 @@ import {
   Calendar,
   BookOpen,
   VenetianMask,
-  Languages,
-  Pencil,
-  Save,
-  Check
+  Languages
 } from 'lucide-react';
 
 interface NpcDossierModalProps {
@@ -36,79 +33,15 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
   vinculosDestapados,
   onToggleDestaparVinculo,
   onChangePortrait,
-  onUpdateNpc,
   onClose
 }) => {
   const [npc, setNpc] = useState<NPC>(initialNpc);
-  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'sheet' | 'edit'>('overview');
-
-  // Formulario de edición
-  const [editForm, setEditForm] = useState({
-    name: initialNpc.name || '',
-    alias: initialNpc.alias || '',
-    trueIdentity: initialNpc.trueIdentity || '',
-    relation: initialNpc.relation || '',
-    status: initialNpc.status || 'Activo',
-    idiomas: initialNpc.idiomas || '',
-    orientacion: initialNpc.orientacion || '',
-    appearance: initialNpc.appearance || '',
-    notes: initialNpc.notes || '',
-    description: initialNpc.description || '',
-    atr: initialNpc.atr ?? 0,
-    vin: initialNpc.vin ?? 0,
-    con: initialNpc.con ?? 0
-  });
-
-  const [guardadoMsg, setGuardadoMsg] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'sheet'>('overview');
 
   // Sincronizar si cambia initialNpc
   React.useEffect(() => {
     setNpc(initialNpc);
-    setEditForm({
-      name: initialNpc.name || '',
-      alias: initialNpc.alias || '',
-      trueIdentity: initialNpc.trueIdentity || '',
-      relation: initialNpc.relation || '',
-      status: initialNpc.status || 'Activo',
-      idiomas: initialNpc.idiomas || '',
-      orientacion: initialNpc.orientacion || '',
-      appearance: initialNpc.appearance || '',
-      notes: initialNpc.notes || '',
-      description: initialNpc.description || '',
-      atr: initialNpc.atr ?? 0,
-      vin: initialNpc.vin ?? 0,
-      con: initialNpc.con ?? 0
-    });
   }, [initialNpc]);
-
-  const handleGuardarEdicion = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updated: NPC = {
-      ...npc,
-      name: editForm.name.trim() || npc.name,
-      alias: editForm.alias.trim() || undefined,
-      trueIdentity: editForm.trueIdentity.trim() || undefined,
-      relation: editForm.relation.trim() || npc.relation || '',
-      status: editForm.status.trim() || npc.status || 'Activo',
-      idiomas: editForm.idiomas.trim() || undefined,
-      orientacion: editForm.orientacion.trim() || undefined,
-      appearance: editForm.appearance.trim() || undefined,
-      notes: editForm.notes.trim() || npc.notes || '',
-      description: editForm.description.trim() || undefined,
-      atr: Math.max(0, Math.min(20, editForm.atr)),
-      vin: Math.max(0, Math.min(20, editForm.vin)),
-      con: Math.max(0, Math.min(20, editForm.con))
-    };
-    setNpc(updated);
-    if (onUpdateNpc) {
-      onUpdateNpc(updated);
-    }
-    setGuardadoMsg(true);
-    setTimeout(() => {
-      setGuardadoMsg(false);
-      setActiveTab('overview');
-    }, 800);
-  };
 
   // Match portrait file
   const matchingFile = npc.portrait
@@ -316,209 +249,10 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
               <span>Estadísticas D&D</span>
             </button>
           )}
-
-          <button
-            onClick={() => setActiveTab('edit')}
-            className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all shrink-0 whitespace-nowrap ${
-              activeTab === 'edit'
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            <Pencil className="w-4 h-4 text-emerald-500" />
-            <span>Editar Datos</span>
-          </button>
         </div>
 
         {/* Modal Body / Tab Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-          {/* TAB 4: Edición Directa de Datos */}
-          {activeTab === 'edit' && (
-            <form onSubmit={handleGuardarEdicion} className="space-y-4">
-              <div className="bg-[var(--surface-soft)] p-4 rounded-xl border border-[var(--user-border)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-cinzel text-xs font-bold text-[var(--accent)] uppercase tracking-wider flex items-center gap-1.5">
-                    <Pencil className="w-4 h-4" /> Editar Datos del Personaje en Memoria
-                  </span>
-                  {guardadoMsg && (
-                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-cinzel font-bold flex items-center gap-1">
-                      <Check className="w-4 h-4" /> ¡Guardado con éxito!
-                    </span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">Nombre</label>
-                    <input
-                      type="text"
-                      value={editForm.name}
-                      onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                      className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">Relación con el PJ</label>
-                    <input
-                      type="text"
-                      value={editForm.relation}
-                      onChange={e => setEditForm({ ...editForm, relation: e.target.value })}
-                      placeholder="Ej: Aliado, Corsario, Capitán..."
-                      className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">Alias Conocido</label>
-                    <input
-                      type="text"
-                      value={editForm.alias}
-                      onChange={e => setEditForm({ ...editForm, alias: e.target.value })}
-                      placeholder="Ej: El Capitán, Sombralarga..."
-                      className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">Estado</label>
-                    <input
-                      type="text"
-                      value={editForm.status}
-                      onChange={e => setEditForm({ ...editForm, status: e.target.value })}
-                      placeholder="Ej: Vivo, Fallecido, Desconocido..."
-                      className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">Idiomas & Dominio</label>
-                    <input
-                      type="text"
-                      value={editForm.idiomas}
-                      onChange={e => setEditForm({ ...editForm, idiomas: e.target.value })}
-                      placeholder="Ej: Drow (nativo), Común (chapurreado)..."
-                      className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">Orientación / Interés</label>
-                    <input
-                      type="text"
-                      value={editForm.orientacion}
-                      onChange={e => setEditForm({ ...editForm, orientacion: e.target.value })}
-                      placeholder="Ej: Hacia mujeres élficas..."
-                      className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">Apariencia Física</label>
-                  <textarea
-                    value={editForm.appearance}
-                    onChange={e => setEditForm({ ...editForm, appearance: e.target.value })}
-                    rows={2}
-                    placeholder="Descripción física, ropajes, cicatrices, rasgos visuales..."
-                    className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] resize-y"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">Notas & Datos de Memoria</label>
-                  <textarea
-                    value={editForm.notes}
-                    onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
-                    rows={3}
-                    placeholder="Hechos conocidos, notas del personaje, origen..."
-                    className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] resize-y"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-cinzel text-[var(--text-secondary)] mb-1">Descripción / Trasfondo</label>
-                  <textarea
-                    value={editForm.description}
-                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                    rows={2}
-                    placeholder="Biografía breve, afiliación, papel en la campaña..."
-                    className="w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] resize-y"
-                  />
-                </div>
-
-                <div className="border-t border-[var(--glass-border)] pt-3">
-                  <span className="font-cinzel text-xs font-bold text-[var(--accent)] block mb-2">
-                    Barras de Afinidad (0 a 20)
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs text-rose-700 dark:text-rose-400 font-cinzel mb-1 flex items-center justify-between">
-                        <span>Atracción (ATR)</span>
-                        <span className="font-mono font-bold">{editForm.atr}/20</span>
-                      </label>
-                      <input
-                        type="range"
-                        min={0}
-                        max={20}
-                        value={editForm.atr}
-                        onChange={e => setEditForm({ ...editForm, atr: parseInt(e.target.value, 10) || 0 })}
-                        className="w-full accent-rose-500 cursor-pointer"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-teal-700 dark:text-teal-400 font-cinzel mb-1 flex items-center justify-between">
-                        <span>Vínculo (VÍN)</span>
-                        <span className="font-mono font-bold">{editForm.vin}/20</span>
-                      </label>
-                      <input
-                        type="range"
-                        min={0}
-                        max={20}
-                        value={editForm.vin}
-                        onChange={e => setEditForm({ ...editForm, vin: parseInt(e.target.value, 10) || 0 })}
-                        className="w-full accent-teal-500 cursor-pointer"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-amber-700 dark:text-amber-400 font-cinzel mb-1 flex items-center justify-between">
-                        <span>Confianza (CON)</span>
-                        <span className="font-mono font-bold">{editForm.con}/20</span>
-                      </label>
-                      <input
-                        type="range"
-                        min={0}
-                        max={20}
-                        value={editForm.con}
-                        onChange={e => setEditForm({ ...editForm, con: parseInt(e.target.value, 10) || 0 })}
-                        className="w-full accent-amber-500 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('overview')}
-                    className="px-3.5 py-1.5 text-xs font-cinzel rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 text-xs font-cinzel font-bold rounded-lg bg-[var(--accent)] text-[var(--on-accent)] hover:opacity-90 cursor-pointer flex items-center gap-1.5 shadow-sm"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>Guardar Cambios</span>
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
           {/* TAB 1: Overview, Physical Appearance & Affinity */}
           {activeTab === 'overview' && (
             <div className="space-y-4">

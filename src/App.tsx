@@ -121,7 +121,7 @@ import {
 } from './utils/geminiHelper';
 import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo } from './utils/chapterArchiver';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
-import { guardarMesa } from './utils/mesaStorage';
+import { guardarMesa, leerMesa, hayMensajesSinLeerEnMesa, marcarMesaLeida, MensajeDeMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
@@ -201,6 +201,20 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<
     'chat' | 'files' | 'memory' | 'instructions' | 'novel' | 'mesa'
   >('chat');
+  const [tieneNovedadMesa, setTieneNovedadMesa] = useState(false);
+
+  useEffect(() => {
+    if (currentPId) {
+      if (activeTab === 'mesa') {
+        marcarMesaLeida(currentPId);
+        setTieneNovedadMesa(false);
+      } else {
+        setTieneNovedadMesa(hayMensajesSinLeerEnMesa(currentPId));
+      }
+    } else {
+      setTieneNovedadMesa(false);
+    }
+  }, [currentPId, activeTab]);
   /*
    * Aviso de versión nueva.
    *
@@ -750,6 +764,19 @@ export default function App() {
 
   const handleTimeReported = async (t: TiempoReportado, msgInfo?: { msgId?: string; msgIndex?: number }) => {
     reporteActual.current = t;
+    if (t.comentariosDM && t.comentariosDM.length > 0 && currentPId) {
+      const msgsPrevios = leerMesa(currentPId);
+      const nuevosMsgs: MensajeDeMesa[] = t.comentariosDM.map(com => ({
+        role: 'model',
+        content: com,
+        timestamp: new Date().toISOString(),
+        origen: 'escena'
+      }));
+      guardarMesa(currentPId, [...msgsPrevios, ...nuevosMsgs]);
+      if (activeTab !== 'mesa') {
+        setTieneNovedadMesa(true);
+      }
+    }
     await handleUpdateProjectField(p => {
       const cal = p.calendar;
       const fecha = p.currentDate;
@@ -4902,6 +4929,12 @@ export default function App() {
                 >
                   <TabIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="hidden sm:inline">{tab.label}</span>
+                  {tab.id === 'chat' && tieneNovedadMesa && activeTab !== 'mesa' && (
+                    <span className="relative flex h-2 w-2 ml-0.5" title="Nuevo comentario del Director en la Mesa">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-xs shadow-emerald-500/50"></span>
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -4962,6 +4995,7 @@ export default function App() {
               onCreateNewChat={handleCreateChat}
               onArchiveChatAsFile={handleArchiveChatAsFile}
               onOpenMesa={() => setActiveTab('mesa')}
+              tieneNovedadMesa={tieneNovedadMesa}
               estaCerrado={
                 currentChats.length > 1 &&
                 currentChats.findIndex(c => c.id === currentChatId) < currentChats.length - 1

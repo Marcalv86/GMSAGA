@@ -677,6 +677,8 @@ export const ChatView: React.FC<{
   onCreateNewChat?: () => void;
   onArchiveChatAsFile?: () => void;
   onOpenMesa?: () => void;
+  /** Si hay mensajes nuevos o reacciones espontáneas del DM sin leer en la Mesa. */
+  tieneNovedadMesa?: boolean;
   /** Si este capítulo ya está cerrado, es decir, si hay otro después. */
   estaCerrado?: boolean;
 }> = ({
@@ -711,6 +713,7 @@ export const ChatView: React.FC<{
   onCreateNewChat,
   onArchiveChatAsFile,
   onOpenMesa,
+  tieneNovedadMesa,
   estaCerrado
 }) => {
   const [inputText, setInputText] = useState('');
@@ -1199,11 +1202,17 @@ export const ChatView: React.FC<{
             {onOpenMesa && (
               <button
                 onClick={onOpenMesa}
-                className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all"
+                className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] cursor-pointer transition-all relative"
                 title="Hablar con el Director fuera de personaje: dudas de reglas, aclaraciones, ritmo. No narra ni hace pasar el tiempo."
                 aria-label="Hablar con el Director fuera de personaje"
               >
                 <Users className="w-3.5 h-3.5" /> <span>GM</span>
+                {tieneNovedadMesa && (
+                  <span className="relative flex h-2 w-2 ml-0.5" title="Nuevo comentario del Director en la Mesa">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-xs shadow-emerald-500/50"></span>
+                  </span>
+                )}
               </button>
             )}
           </div>
