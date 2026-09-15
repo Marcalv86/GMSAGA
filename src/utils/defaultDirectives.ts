@@ -78,9 +78,10 @@ Todas las etiquetas deben ir al final del mensaje o en su lugar correspondiente.
 
 #### F. Tiempo y Viajes
 - **Tiempo**: \`[TIEMPO: +Xh]\` o \`[TIEMPO: +Yd]\` o \`[TIEMPO: +Zm]\` para registrar el tiempo que ocupa la escena actual.
-  - ⛔ **El Narrador NUNCA fuerza saltos de días arbitrarios** en la prosa sin que el jugador use sus controles de salto temporal.
-- **Viajes**: \`[VIAJE: destino | jornadas: N]\` — Emitir al iniciar o continuar travesías marítimas o terrestres.
+  - ⛔ **El Narrador NUNCA fuerza saltos de días arbitrarios** en la prosa sin que el jugador use sus controles de salto temporal o se declare un descanso.
+- **Viajes y Travesías**: \`[VIAJE: destino | jornadas: N]\` — Emitir al iniciar o continuar travesías marítimas o terrestres.
   - Las jornadas se consumen día a día. Hasta consumir N jornadas, NO se llega a destino.
+  - ⚡ **Mini-Eventos e Impulso Narrativo de Travesía**: Cada jornada jugada debe contener un estímulo activo (rumores, incidentes de navegación, órdenes de oficiales, encuentros o decisiones con la tripulación). Prohibido encadenar turnos de rutina pasiva o silencio sin acción de los PNJs.
   - Al llegar a destino, emitir \`[VIAJE: fin]\`.
 
 #### G. Agenda y Diario de Campaña

@@ -2700,7 +2700,7 @@ export default function App() {
     );
 
     let continuePrompt =
-      '[Continúa la narración de forma fluida, profundizando en la escena, las reacciones del entorno y las consecuencias de lo ocurrido.]';
+      '[SISTEMA - IMPULSO NARRATIVO]: La jugadora aguarda, guarda silencio o la escena ha llegado a un punto de pausa. HAZ QUE EL MUNDO Y LOS PNJS ACTÚEN PROACTIVAMENTE: introduce el siguiente acontecimiento, mini-evento de travesía, orden o complicación de peso. Mueve la trama hacia adelante con un estímulo activo y jugable al que responder, prohibido quedarte atascado en descripciones pasivas, frío o rutinas del entorno.';
 
     let options: { appendToMessageIndex?: number; initialPrefix?: string } | undefined = undefined;
 

@@ -2424,8 +2424,12 @@ Cerraste el viaje a ${viaje.destino} cuando todavía ${faltan === 1 ? 'queda 1 j
 ${
   faltan > 0
     ? `**⛔ NO SE LLEGA TODAVÍA.** Hasta que se consuman esas ${faltan} ${faltan === 1 ? 'jornada' : 'jornadas'} no hay puerto, ni muelle, ni tierra a la vista, ni «al cabo de unos días llegaron». Da igual lo que apetezca a la escena: el trayecto se paga día a día. Un descanso largo a bordo avanza **una** jornada, nunca el viaje entero.
-- **Y esas jornadas hay que VIVIRLAS, no saltarlas de golpe.** Cada una es una escena o media: quién hace guardia, qué se come, qué se oye por la noche, una conversación que solo pasa porque hay tiempo muerto. Un viaje largo es de las mejores cosas que le pueden pasar a una campaña —es donde la gente se conoce— y también el sitio natural de las escenas fuera de cámara (§3).
-- Para adelantar de verdad varias jornadas de una vez, hace falta un salto declarado con \`[TIEMPO: +Nd]\`, y entonces cuentas lo que pasó en esos días, no los borras.
+- **⚡ MINI-EVENTOS OBLIGATORIOS POR JORNADA (CERO MONOTONÍA O PASIVIDAD)**: Cada jornada que se viva o se avance DEBE traer un **acontecimiento o estímulo jugable**, no un simple reporte de frío, comida y silencio:
+  1. *Intriga y PNJs*: Un marinero, custodio u oficial con intereses propios habla, interroga, deja caer un rumor de puerto sobre Luskan/el Norte o desafía una orden. Si la protagonista está retenida, los captores la ponen a prueba, le exigen explicaciones sobre sus pertenencias o la conducen a presencia del capitán/oficiales.
+  2. *Incidentes Náuticos / de Ruta*: Calma chicha que enerva a la tripulación, marejada repentina que rompe aparejos, niebla espesa con ecos de campanas lejanas, avistamiento de velas en el horizonte (patrulla de Aguasprofundas, corsarios rivales o monstruo marino acechando la quilla).
+  3. *Oportunidades de Agencia*: Un descuido táctico de un guardia, un objeto útil que queda a la vista, un polizón o aliado inesperado, o la necesidad de tomar una decisión que afecte a la relación con la tripulación.
+- **⛔ PROHIBIDO EL BUCLE DE ATREZZO ESTÁTICO**: Queda terminantemente prohibido encadenar turnos describiendo cómo se apaga la linterna, cómo se enfría el guiso o el frío de las tablas sin que los PNJs actúen o el mundo plantee un dilema activo. Si la jugadora calla o pulsa continuar, los PNJs actúan y la trama avanza.
+- Para adelantar varias jornadas de golpe, hace falta un salto declarado con \`[TIEMPO: +Nd]\`, y entonces se narran los hitos clave ocurridos en ese tramo.
 - Cuando por fin se llegue, cierra con \`[VIAJE: fin]\` en ese mismo turno.`
     : `Ya se puede tocar puerto. Cuando se llegue, cierra con \`[VIAJE: fin]\`.`
 }
