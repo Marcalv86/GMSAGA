@@ -349,7 +349,7 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud, project }) => {
     : pc?.levelProgress ?? 0;
 
   return (
-    <div className="w-full mb-3 select-none transition-all duration-200">
+    <div className="w-full mb-2 select-none transition-all duration-200">
       <div className="rounded-lg border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] shadow-xs overflow-hidden backdrop-blur-xs">
         {/* Cabecera / Barra principal del Cintillo */}
         <div

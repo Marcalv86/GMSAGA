@@ -202,6 +202,10 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
     <div
       id={`msg-${idx}`}
       className={`flex flex-col group/msg ${
+        // El respiro de arriba abre turno: va en la acción de la jugadora, y
+        // no en la primera de todas, que no tiene nada de lo que separarse.
+        !isModel && idx > 0 ? 'mt-5 md:mt-7 ' : ''
+      }${
         m.role === 'user' ? 'items-end' : 'items-start'
       } animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out relative ${
         isSearchHit
@@ -301,7 +305,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
           {segments.map((seg, sIdx) => {
             if (seg.type === 'roll') {
               return (
-                <div key={`${idx}-seg-${sIdx}`} className="my-2.5">
+                <div key={`${idx}-seg-${sIdx}`} className="my-2">
                   <RollBadgeCard roll={seg.roll} />
                 </div>
               );
@@ -335,7 +339,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
           })}
 
           {invitaciones.length > 0 && isLastMessage && !isGenerating && (
-            <div className="mt-4 flex flex-col gap-1.5">
+            <div className="mt-3 flex flex-col gap-1.5">
               {invitaciones.map((pregunta, iIdx) => (
                 <button
                   key={`${idx}-orac-${iIdx}`}
@@ -356,7 +360,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
           )}
 
           {rollRequests.length > 0 && (
-            <div className="mt-4 flex flex-col gap-2.5">
+            <div className="mt-3 flex flex-col gap-2">
               {rollRequests.map((req, rIdx) => {
                 let dcBadgeClass = 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300';
                 let dcDifficulty = 'Moderada';
@@ -458,7 +462,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
           pasar por encima, y en el móvil se toca el punteado.
         */}
         {!isEditing && (
-          <div className="mt-2 flex items-center gap-2 min-h-6">
+          <div className="mt-1.5 flex items-center gap-2">
             {turnNumber !== undefined && (
               <span
                 className="text-[10px] font-cinzel font-semibold tracking-wider text-[var(--text-secondary)] opacity-60 px-1 select-none shrink-0"
@@ -1365,7 +1369,20 @@ export const ChatView: React.FC<{
           </div>
 
           {/* Message List */}
-          <div className="flex flex-col gap-6 md:gap-8 pb-4">
+          {/*
+            EL HUECO GRANDE SEPARA TURNOS, NO MENSAJES.
+
+            Antes había 24-32 px entre CADA mensaje, y eso trata igual a dos
+            cosas que no lo son: la acción de la jugadora y la narración que la
+            contesta son un mismo latido, y separarlas tanto como se separa un
+            turno del siguiente deja la crónica desarmada —sobre todo cuando
+            entre medias caen tarjetas de escena y de tirada, que traen su
+            propio aire—.
+
+            Ahora el ritmo base es corto y el respiro va delante de cada
+            intervención de la jugadora, que es donde de verdad empieza algo.
+          */}
+          <div className="flex flex-col gap-2.5 md:gap-3 pb-4">
             {!chat?.messages || chat.messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center py-6 sm:py-10 px-4 max-w-md mx-auto">
                 <div className="w-12 h-12 rounded-full border border-[var(--accent)]/30 bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] flex items-center justify-center mb-3 shadow-2xs">
