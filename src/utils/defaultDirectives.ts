@@ -96,7 +96,7 @@ Todas las etiquetas deben ir al final del mensaje o en su lugar correspondiente.
 - **Hilos / Relojes**: \`[HILO: título | vence en Nd | consecuencia | oculto]\` (para planes o eventos con fecha límite).
 - **Detalle de Lugares**: \`[LUGAR: nombre del sitio | detalle fijado que queda en el canon del sitio]\`.
 - **Secretos y Giros**: \`[SECRETO: título | la verdad | se descubre: ...]\` (registrar cualquier pregunta o misterio planteado en escena fuera de cámara).
-- **Revelaciones**: \`[RELEVADO: Nombre del secreto — cómo se ha sabido]\` (cuando el secreto sale a la luz en la escena).
+- **Revelaciones**: \`[REVELADO: Nombre del secreto — cómo se ha sabido]\` (cuando el secreto sale a la luz en la escena).
 
 #### I. Progreso y Nivel
 - **Avance**: \`[AVANCE: X/Y hacia Nivel N | hito anotado]\`
