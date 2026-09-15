@@ -13,7 +13,8 @@ import {
   CampaignDate,
   TimelineEntry,
   ScheduledThread,
-  Message
+  Message,
+  viajaSiemprePorCategoria
 } from '../types';
 import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, InventoryItem, MovimientoOculto, PlayerCurrencies, RelojOculto } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
@@ -1435,28 +1436,10 @@ export function estimarCargaDelTurno({
    * son listas de nombres que valen justo para que el buscador encuentre a
    * quién buscar.
    */
-  const viajaEntero = (f: ProjectFile) =>
-    esTexto(f) &&
-    (!f.onDemand ||
-      f.category === 'oracle' ||
-      f.category === 'roster' ||
-      f.category === 'index' ||
-      f.category === 'sheet_npc' ||
-      f.category === 'mecanica' ||
-      f.category === 'cantera');
+  const viajaEntero = (f: ProjectFile) => esTexto(f) && (!f.onDemand || viajaSiemprePorCategoria(f.category));
   const archivos = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
 
-  const deConsulta = files.filter(
-    f =>
-      esTexto(f) &&
-      Boolean(f.onDemand) &&
-      f.category !== 'oracle' &&
-      f.category !== 'roster' &&
-      f.category !== 'index' &&
-      f.category !== 'sheet_npc' &&
-      f.category !== 'mecanica' &&
-      f.category !== 'cantera'
-  );
+  const deConsulta = files.filter(f => esTexto(f) && Boolean(f.onDemand) && !viajaSiemprePorCategoria(f.category));
   const archivosDeConsulta = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
   const medios = files.filter(f => f.isImage || f.isAudio).length;
 
@@ -2599,19 +2582,16 @@ ${allPreviousHistory}`
   })();
 
 
-  // Documentos marcados como "De consulta" (onDemand: true, salvo oráculos, elencos, índices, fichas de PJ, familiares, PNJs, mecánicas y canteras)
+  // Documentos marcados como "De consulta": todos los que lo estén, salvo las
+  // fichas del PJ y del familiar (que se formatean aparte) y las tres
+  // categorías que por naturaleza no se pueden pedir (ver types.ts).
   const deConsulta = files.filter(
     f =>
       esTexto(f) &&
       Boolean(f.onDemand) &&
       !pjSheetIds.has(f.id) &&
       !companionIds.has(f.id) &&
-      f.category !== 'oracle' &&
-      f.category !== 'roster' &&
-      f.category !== 'index' &&
-      f.category !== 'sheet_npc' &&
-      f.category !== 'mecanica' &&
-      f.category !== 'cantera'
+      !viajaSiemprePorCategoria(f.category)
   );
   const deConsultaIds = new Set(deConsulta.map(f => f.id));
 
@@ -3828,7 +3808,7 @@ export async function generateStoryTurnStream({
           if (uso) {
             const huboBusqueda =
               getStoredBusquedaLocal() &&
-              files.some(f => !f.isImage && !f.isAudio && f.onDemand && f.category !== 'oracle');
+              files.some(f => !f.isImage && !f.isAudio && f.onDemand && !viajaSiemprePorCategoria(f.category));
             registrarUso(
               currentModel,
               {

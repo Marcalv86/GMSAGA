@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, ProjectFile, FileCategory } from '../types';
+import { Project, ProjectFile, FileCategory, viajaSiemprePorCategoria } from '../types';
 import { classifyFileAuto } from '../utils/geminiHelper';
 import { recuperar } from '../utils/localSearch';
 
@@ -158,10 +158,11 @@ export const FilesView: React.FC<{
     !f.isImage &&
     !f.isAudio &&
     f.category !== 'style_sample' &&
-    // Las fichas dejaron de ser intocables: si están de consulta, no cuentan
-    // como peso fijo. Solo siguen viajando siempre los oráculos, el roster y
-    // el índice, que son lo que no tiene sentido tener que pedir.
-    (!f.onDemand || f.category === 'oracle' || f.category === 'roster' || f.category === 'index');
+    // La lista de excepciones vive en un solo sitio (types.ts). Tenerla
+    // duplicada aquí es lo que hizo que esta pantalla contara tres categorías
+    // y el motor aplicara seis: se marcaba media biblioteca de consulta, aquí
+    // salía verde, y el motor la seguía mandando entera.
+    (!f.onDemand || viajaSiemprePorCategoria(f.category));
   const textChars = files.reduce((acc, f) => acc + (countsAsContext(f) ? f.length || 0 : 0), 0);
   const budgetShare = (textChars / CONTEXT_BUDGET_CHARS) * 100;
   const budgetLevel = budgetShare < 25 ? 'holgado' : budgetShare < 50 ? 'ajustado' : 'excesivo';
@@ -176,9 +177,7 @@ export const FilesView: React.FC<{
           !f.isImage &&
           !f.isAudio &&
           f.onDemand &&
-          f.category !== 'oracle' &&
-          f.category !== 'roster' &&
-          f.category !== 'index'
+          !viajaSiemprePorCategoria(f.category)
       ),
     [files]
   );

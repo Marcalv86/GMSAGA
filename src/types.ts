@@ -935,3 +935,31 @@ export interface AppState {
   globalGrimorios: GlobalGrimorio[];
   globalStyles: GlobalStyle[];
 }
+
+
+/**
+ * Las ÚNICAS categorías que siguen viajando enteras aunque estén de consulta.
+ *
+ * Había tres copias de esta lista y dos decían cosas distintas: la pantalla de
+ * Archivos contaba tres excepciones y el motor aplicaba seis —añadía canteras,
+ * mecánicas y fichas de PNJ—. Así que se marcaba media biblioteca de consulta,
+ * la pantalla daba el visto bueno, y el motor las seguía mandando enteras en
+ * cada turno. Doscientos mil caracteres por turno que la interfaz juraba que
+ * no se estaban enviando.
+ *
+ * Se quedan solo estas tres, y por un motivo cada una:
+ * - `oracle`: un oráculo que hay que pedir no sirve de nada, se tira sobre él.
+ * - `roster` e `index`: son listas de nombres, y son justo lo que permite al
+ *   buscador saber a quién buscar. Pesan poco y sin ellas el resto no se
+ *   encuentra.
+ *
+ * Canteras, mecánicas y fichas de PNJ salen de la lista: son lo más grande de
+ * una biblioteca y lo que mejor se recupera por búsqueda —un subsistema de
+ * persecución solo importa durante una persecución—. Si la jugadora las manda
+ * a consulta, van a consulta.
+ */
+export const CATEGORIAS_QUE_VIAJAN_SIEMPRE = ['oracle', 'roster', 'index'] as const;
+
+/** ¿Esta categoría ignora el «de consulta»? */
+export const viajaSiemprePorCategoria = (categoria?: string): boolean =>
+  (CATEGORIAS_QUE_VIAJAN_SIEMPRE as readonly string[]).includes(categoria || '');
