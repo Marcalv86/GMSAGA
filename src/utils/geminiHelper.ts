@@ -3107,6 +3107,37 @@ ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: l
 
   // Todo lo que cambia de un turno a otro. Va detrás para no romper el prefijo
   // cacheado, y de paso queda pegado a la escena, que es donde mejor se atiende.
+  /*
+   * EL PRIMER TURNO DE UN CAPÍTULO SIEMPRE ABRE CON HUD.
+   *
+   * La regla del HUD decía «se muestra al cambiar de lugar, al avanzar el día
+   * o cuando cambian salud o recursos». Al empezar capítulo no ha cambiado
+   * nada todavía, así que el Narrador lo omitía con toda la razón… y con eso
+   * se caían cuatro cosas de golpe: el contador de jornadas del capítulo se
+   * quedaba a cero (y con él desaparecía el botón que lo enseña), el diario no
+   * recibía entrada de ese día, el lugar no se refrescaba —que es de donde
+   * sale la detección de travesía— y el capítulo exportado empezaba sin
+   * ninguna ancla de dónde y cuándo.
+   *
+   * Un capítulo nuevo es exactamente el momento en que hay que decir dónde y
+   * cuándo estamos. Y no se le pide que lo deduzca: se le dice el turno que
+   * es, que es lo que no puede discutir.
+   */
+  const turnosJugados = (currentChat.messages || []).filter(
+    m => m.role === 'model' && m.content && m.content !== 'Pensando...' && m.content !== 'Tirando dados...'
+  ).length;
+  const aperturaDeCapitulo =
+    turnosJugados === 0
+      ? `
+
+⭐ **ESTE ES EL PRIMER TURNO DEL CAPÍTULO, ASÍ QUE ABRE CON EL BLOQUE DE HUD.** No es opcional aquí aunque no haya cambiado nada desde el capítulo anterior: un capítulo que empieza sin decir dónde ni cuándo deja a la aplicación sin fecha que contar, al diario sin entrada de hoy y al lugar sin refrescar. Las dos primeras líneas, tal cual:
+\`\`\`
+📍 [Lugar exacto] · [contenedor] · [región] — [fecha del calendario], [momento del día]
+🌤 [Clima] · [luz] · 👥 [quién está en escena]
+\`\`\`
+⚠️ La fecha va DESPUÉS del guion largo y es obligatoria: sin ella la aplicación no puede contar la jornada. Y el lugar tiene que ser dónde se está AHORA —si se sigue a bordo, se dice el barco y el mar, no el puerto al que se va—.`
+      : '';
+
   const bloqueVivo = `
 ${fragmentosConsultaText ? `${fragmentosConsultaText}\n\n` : ''}${pjSection}
 ${companionSection ? `\n${companionSection}\n` : ''}
@@ -3142,7 +3173,7 @@ ${
     : ''
 }
 
-Narra la escena respetando las DIRECTIVAS DE RESPUESTA CRÍTICAS de más arriba, y ciérrala con los registros internos que correspondan según el punto 7 (solo los que hayan cambiado de verdad en este turno).`;
+Narra la escena respetando las DIRECTIVAS DE RESPUESTA CRÍTICAS de más arriba, y ciérrala con los registros internos que correspondan según el punto 7 (solo los que hayan cambiado de verdad en este turno).${aperturaDeCapitulo}`;
 
   const sys = `${bloqueEstable}
 ${bloqueVivo}`;
