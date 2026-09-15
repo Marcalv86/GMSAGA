@@ -50,7 +50,7 @@ const PATRONES = {
    *   [Tirada: 14 natural + 3 = 17 vs CD 13 | Éxito]
    *   [Tirada (Perspicacia): 14 vs CD 13]
    */
-  tiradaGenerica: String.raw`\[\s*Tirada\b([^\]]+)\]`,
+  tiradaGenerica: String.raw`(?:\x60|[*_]{1,2})?\[\s*Tirada\b([^\]]+)\](?:\x60|[*_]{1,2})?`,
   /**
    * Resolución sin corchetes o fuga al inicio de párrafo:
    *   14 natural frente a CD 13:
