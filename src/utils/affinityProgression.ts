@@ -1,4 +1,4 @@
-import { deseaALaProtagonista, NPC } from '../types';
+import { interesPorLaProtagonista, NPC } from '../types';
 
 /**
  * Número mínimo de días/encuentros distintos requeridos para alcanzar cada puntuación en la escala 1-20.
@@ -128,7 +128,7 @@ export function calcularProgresoEje(
 export function actualizarAfinidadNpc(
   npc: NPC,
   reportado: {
-    atraccion?: 'si' | 'no';
+    atraccion?: 'desea' | 'interes';
     vin?: number;
     con?: number;
     vinculo?: string;
@@ -183,7 +183,7 @@ export function actualizarAfinidadNpc(
 export function conciliarAfinidadesTrasSincronizar<
   T extends {
     name: string;
-    atraccion?: 'si' | 'no';
+    atraccion?: 'desea' | 'interes';
     /** ⚠️ LEGADO, solo para migrar campañas anteriores al interruptor. */
     atr?: number;
     vin?: number;
@@ -218,7 +218,7 @@ export function conciliarAfinidadesTrasSincronizar<
     if (!previo) {
       return {
         ...sincronizado,
-        atraccion: deseaALaProtagonista(sincronizado),
+        atraccion: interesPorLaProtagonista(sincronizado),
         vin: 0,
         con: 0,
         ultimoDiaSubida: {},
@@ -230,7 +230,7 @@ export function conciliarAfinidadesTrasSincronizar<
     const dias = previo.diasVistos?.length ? previo.diasVistos : sincronizado.diasVistos || [];
     const progresado = actualizarAfinidadNpc(
       previo as any,
-      { atraccion: deseaALaProtagonista(sincronizado), vin: sincronizado.vin, con: sincronizado.con },
+      { atraccion: interesPorLaProtagonista(sincronizado), vin: sincronizado.vin, con: sincronizado.con },
       dias,
       diaActual
     );

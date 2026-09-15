@@ -805,31 +805,32 @@ export interface NPC {
    */
   atrBloqueada?: boolean;
   /**
-   * ¿Este personaje la desea?
+   * Qué siente este personaje por la protagonista, si es que siente algo.
    *
    * Era un 0-20 y no servía: NADA en el código miraba su magnitud —solo se
    * pintaban corazones y se le devolvía el número al modelo escrito—, y los
    * seis tramos de la escala no eran seis conductas sino tres. Peor: el número
    * empujaba al Narrador a promediar hacia un flirteo genérico en vez de
    * interpretar a quien tenía delante. La intensidad no la da una cifra, la da
-   * la ficha: Jarlaxle con esto encendido corteja de frente y bromea en el
-   * filo; un herrero tímido no sabe dónde poner las manos. Mismo bit, dos
-   * escenas que no se parecen en nada.
+   * la ficha: uno corteja de frente y bromea en el filo; otro no sabe dónde
+   * poner las manos. Mismo valor, dos escenas que no se parecen en nada.
    *
-   * - `'si'`       la desea. Cómo se le nota es cosa de quién es él.
-   * - `'no'`       ⛔ CANDADO, y es RARO. Solo cuando no existe ninguna
-   *                posibilidad: orientación incompatible, un compromiso que
-   *                no se toca, repulsión real. NO es para «todavía no».
-   * - `undefined`  el estado normal de casi todo el reparto. No la desea
-   *                HOY. Sigue teniendo ojos y puede reconocer que es guapa;
-   *                simplemente no va por ahí. Y puede cambiar: hay quien se
-   *                enamora por el vínculo y la confianza, y la atracción le
-   *                llega después. Kimmuriel es justo eso —psiónico, reconoce
-   *                la belleza y le importan más el intelecto y los lazos—, y
-   *                ponerle candado sería cerrarle una puerta que su
-   *                personaje tiene abierta.
+   * - `'desea'`    la desea. Cómo se le nota es cosa de quién es él.
+   * - `'interes'`  hay algo, y todavía no es deseo. Alguien que la mira más de
+   *                lo que haría falta, que busca su conversación, que se
+   *                interesa por su cabeza antes que por su cara. Hay quien
+   *                llega al deseo por aquí —por el vínculo y la confianza— y
+   *                no al revés.
+   * - ausente      **el estado normal de casi todo el reparto, y NO SE ESCRIBE
+   *                EN NINGÚN SITIO.** Cubre por igual al que no está
+   *                interesado y a aquel con quien no va a pasar nunca. No
+   *                hace falta decirle al Narrador que alguien no la desea:
+   *                es lo que se da por hecho, y decirlo solo invita a
+   *                detenerse en ello. Cuando una puerta está cerrada de
+   *                verdad —un compromiso, una orientación— eso ya viaja por
+   *                `orientacion`, que lo dice mejor y dice por qué.
    */
-  atraccion?: 'si' | 'no';
+  atraccion?: 'desea' | 'interes';
   /** ⚠️ LEGADO — la atracción ya no se puntúa. Solo para migrar. Ver `atraccion`. */
   atr?: number;
   /** Eje de Vínculo afectivo / Camaradería y lealtad (escala 0 - 20) */
@@ -998,21 +999,28 @@ export const viajaSiemprePorCategoria = (categoria?: string): boolean =>
 
 
 /**
- * Si este personaje la desea, leyendo también las campañas viejas.
+ * Qué siente este personaje por ella, leyendo también las campañas viejas.
  *
- * El campo nuevo manda. Si no está —campaña anterior al cambio—, se deduce de
- * lo que había: el candado viejo era un «no», y de la escala 0-20 solo contaba
- * como deseo lo que la propia interfaz llamaba «química evidente» de 10 para
- * arriba. Un 6 era «chispa leve», que es precisamente el «todavía no» que
- * ahora se escribe sin valor.
+ * El campo nuevo manda. Si no está —campaña anterior al cambio—, se traduce la
+ * escala 0-20 con los cortes que la propia interfaz usaba para nombrar sus
+ * tramos, que es la única lectura defendible de un número que ya nadie va a
+ * escribir.
  */
-export function deseaALaProtagonista(npc: {
-  atraccion?: 'si' | 'no';
+export function interesPorLaProtagonista(npc: {
+  atraccion?: 'desea' | 'interes';
   atr?: number;
   atrBloqueada?: boolean;
-}): 'si' | 'no' | undefined {
+}): 'desea' | 'interes' | undefined {
   if (npc.atraccion) return npc.atraccion;
-  if (npc.atrBloqueada) return 'no';
-  if (typeof npc.atr === 'number' && npc.atr >= 10) return 'si';
+  // El candado viejo pasa a no decir nada: si esa puerta está cerrada de
+  // verdad, quien lo explica es `orientacion`, y lo explica mejor.
+  if (npc.atrBloqueada) return undefined;
+  if (typeof npc.atr === 'number') {
+    // Los cortes son los que usaba la propia interfaz para etiquetar la
+    // escala: de 10 arriba era «química evidente», y 6-9 «chispa leve /
+    // interés incipiente».
+    if (npc.atr >= 10) return 'desea';
+    if (npc.atr >= 6) return 'interes';
+  }
   return undefined;
 }

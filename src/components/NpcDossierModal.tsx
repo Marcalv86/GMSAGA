@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { deseaALaProtagonista, NPC, ProjectFile } from '../types';
+import { interesPorLaProtagonista, NPC, ProjectFile } from '../types';
 import {
   X,
   User,
@@ -318,32 +318,31 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                   nota lo dice su ficha.
                 */}
                 {(() => {
-                  const desea = deseaALaProtagonista(npc);
-                  const estilo =
-                    desea === 'si'
-                      ? 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
-                      : desea === 'no'
-                      ? 'border-[var(--user-border)] bg-[var(--surface-soft)] text-[var(--text-secondary)]'
-                      : 'border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-secondary)]';
+                  const interes = interesPorLaProtagonista(npc);
+                  if (!interes) return null;
+                  const desea = interes === 'desea';
                   return (
-                    <div className={`space-y-1 p-3 rounded-lg border ${estilo}`}>
-                      <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
-                        <span className="font-cinzel font-bold flex items-center gap-1.5">
-                          <Heart
-                            className={`w-4 h-4 ${desea === 'si' ? 'fill-rose-500 text-rose-500' : 'text-[var(--text-secondary)] opacity-50'}`}
-                          />
-                          <span>Atracción</span>
-                        </span>
-                        <span className="font-cinzel text-xs font-bold">
-                          {desea === 'si' ? 'La desea' : desea === 'no' ? 'No, y no va a pasar' : 'No por ahora'}
+                    <div
+                      className={`space-y-1 p-3 rounded-lg border ${
+                        desea
+                          ? 'border-rose-500/30 bg-rose-500/10'
+                          : 'border-amber-500/25 bg-amber-500/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm font-cinzel font-bold">
+                        <Heart
+                          className={`w-4 h-4 ${
+                            desea ? 'fill-rose-500 text-rose-500' : 'text-amber-500'
+                          }`}
+                        />
+                        <span className={desea ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}>
+                          {desea ? 'La desea' : 'Interés'}
                         </span>
                       </div>
                       <p className="text-[11px] text-[var(--text-secondary)] italic m-0 leading-snug">
-                        {desea === 'si'
+                        {desea
                           ? 'Cómo se le nota es cosa de quién es él, no de una intensidad. Y desear no le da derecho a nada.'
-                          : desea === 'no'
-                          ? 'Candado puesto: no existe esa posibilidad. El vínculo y la confianza sí pueden llegar a lo más alto.'
-                          : 'Lo normal. No va por ahí hoy — que no es lo mismo que no tener ojos. Hay quien llega al deseo por el vínculo, y entonces cambia.'}
+                          : 'Hay algo y todavía no es deseo: la mira más de lo que haría falta, busca su conversación. Hay quien llega al deseo por aquí, por el vínculo, y no al revés.'}
                       </p>
                     </div>
                   );

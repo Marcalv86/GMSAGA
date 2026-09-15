@@ -15,7 +15,7 @@ import {
   RefreshCw,
   FolderPlus
 } from 'lucide-react';
-import { deseaALaProtagonista, Project } from '../types';
+import { interesPorLaProtagonista, Project } from '../types';
 import {
   readRawFileText,
   importCampaignWithGemini,
@@ -465,7 +465,7 @@ export const ImportCampaignModal: React.FC<ImportCampaignModalProps> = ({
                           </div>
                           {(npc.atraccion !== undefined || npc.atr !== undefined || npc.vin !== undefined || npc.con !== undefined) && (
                             <div className="flex items-center gap-2 text-[9px] font-mono font-bold pt-1 border-t border-[var(--user-border)]/50">
-                              {deseaALaProtagonista(npc) === 'si' && (
+                              {interesPorLaProtagonista(npc) === 'desea' && (
                                 <span className="text-rose-600 dark:text-rose-400 flex items-center gap-0.5" title="La desea">
                                   <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" /> La desea
                                 </span>

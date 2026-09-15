@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { deseaALaProtagonista, Project, Memory, NPC, Location, ProjectFile, TimelineEntry, InventoryItem } from '../types';
+import { interesPorLaProtagonista, Project, Memory, NPC, Location, ProjectFile, TimelineEntry, InventoryItem } from '../types';
 import {
   obtenerInfoRelacion,
   CALENDARIO_FANTASTICO,
@@ -2415,7 +2415,7 @@ export const MemoryManager: React.FC<{
                               {n.orientacion}
                             </span>
                           )}
-                          {deseaALaProtagonista(n) === 'si' && (
+                          {interesPorLaProtagonista(n) === 'desea' && (
                             <span
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 text-[10px] font-cinzel font-bold"
                               title="La desea. Cómo se le nota es cosa de quién es él, no de una intensidad."

@@ -1697,7 +1697,7 @@ export interface VinculoLeido {
   oculta?: string;
   vinculo?: string;
   /** Si desea a la protagonista. Ya no es una puntuación. */
-  atraccion?: 'si' | 'no';
+  atraccion?: 'desea' | 'interes';
   /** ⚠️ LEGADO: la atracción numérica. Solo la escriben campañas viejas. */
   atr?: number;
   vin?: number;
@@ -1713,25 +1713,28 @@ export interface VinculoLeido {
  * y los formatos de afinidad `🖤 Jarlaxle — ATR: 7 | VÍN: 3 | CON: 2`.
  */
 /**
- * Lee si un personaje desea a la protagonista, dicho como palabra o como número.
+ * Lee qué siente un personaje por la protagonista, dicho como palabra o número.
  *
  * ⚠️ La forma con número es de las campañas viejas y del Narrador que todavía
- * arrastre el formato antiguo. Se traduce con el mismo corte que usaba la
- * interfaz: de 10 para arriba era «química evidente» —eso es un sí—; por
- * debajo era curiosidad o chispa leve, que es justamente el «todavía no» que
- * ahora no lleva valor.
+ * arrastre el formato antiguo. Se traduce con los mismos cortes con los que la
+ * interfaz nombraba sus tramos: de 10 arriba era «química evidente» —eso es
+ * deseo—, y 6-9 «chispa leve / interés incipiente».
+ *
+ * Todo lo que signifique «no» devuelve `undefined` a propósito: que alguien no
+ * la desee no es un dato que haya que escribir en ningún sitio.
  */
-export function leerAtraccion(valor: string): 'si' | 'no' | undefined {
+export function leerAtraccion(valor: string): 'desea' | 'interes' | undefined {
   const v = (valor || '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .trim();
   if (!v) return undefined;
-  if (/^(si|sii|true|1|x|v|deseo|atraida?|atraido?|encaprichad)/.test(v)) return 'si';
-  if (/^(no|false|0|nunca|jamas|bloquead|candado|imposible)/.test(v)) return 'no';
+  if (/^(interes|interesad|curios|atenci|intrig)/.test(v)) return 'interes';
+  if (/^(si|sii|true|1|x|v|deseo|desea|atraid|encaprichad|quiere)/.test(v)) return 'desea';
+  if (/^(no|false|0|nunca|jamas|bloquead|candado|imposible|nada)/.test(v)) return undefined;
   const num = parseInt(v, 10);
-  if (!isNaN(num)) return num >= 10 ? 'si' : undefined;
+  if (!isNaN(num)) return num >= 10 ? 'desea' : num >= 6 ? 'interes' : undefined;
   return undefined;
 }
 
