@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NPC, ProjectFile } from '../types';
+import { deseaALaProtagonista, NPC, ProjectFile } from '../types';
 import {
   X,
   User,
@@ -52,15 +52,7 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
   const portraitSrc = npc.portrait || matchingFile?.content;
 
   // Helpers for affinity
-  const getAtrInfo = (val: number = 0) => {
-    const clamped = Math.max(0, Math.min(20, val));
-    if (clamped <= 3) return { label: 'Frialdad / Distancia cortés', corazones: 0, gradient: 'from-zinc-500 to-zinc-400' };
-    if (clamped <= 7) return { label: 'Curiosidad / Chispa leve', corazones: 1, gradient: 'from-rose-400 to-pink-400' };
-    if (clamped <= 12) return { label: 'Tensión evidente / Atracción mutua', corazones: 2, gradient: 'from-rose-500 to-pink-500' };
-    if (clamped <= 16) return { label: 'Deseo confesado / Magnetismo intenso', corazones: 3, gradient: 'from-rose-600 to-red-500' };
-    if (clamped <= 19) return { label: 'Pasión profunda / Devoción', corazones: 4, gradient: 'from-rose-600 to-purple-600' };
-    return { label: 'Vínculo supremo / Amor inquebrantable', corazones: 5, gradient: 'from-purple-600 to-amber-500' };
-  };
+  // La escala de atracción se retiró: el deseo es un interruptor, no una barra.
 
   const getVinInfo = (val: number = 0) => {
     const clamped = Math.max(0, Math.min(20, val));
@@ -315,44 +307,44 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                   )}
                 </div>
 
-                {/* 1. ATR */}
+                {/*
+                  EL DESEO: UN INTERRUPTOR, NO UNA BARRA.
+
+                  Había aquí cinco corazones y una barra de progreso sobre un
+                  0-20, y esa escala no la consumía nadie: ni una regla miraba
+                  su magnitud. Peor, prometía una precisión que no existe —entre
+                  un 11 y un 13 no hay ninguna escena distinta— y empujaba al
+                  Narrador a promediar. Ahora se dice si la desea, y cómo se le
+                  nota lo dice su ficha.
+                */}
                 {(() => {
-                  const atrInfo = getAtrInfo(npc.atr);
-                  const val = npc.atr ?? 0;
+                  const desea = deseaALaProtagonista(npc);
+                  const estilo =
+                    desea === 'si'
+                      ? 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
+                      : desea === 'no'
+                      ? 'border-[var(--user-border)] bg-[var(--surface-soft)] text-[var(--text-secondary)]'
+                      : 'border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-secondary)]';
                   return (
-                    <div className="space-y-1.5 bg-[var(--surface)] p-3 rounded-lg border border-[var(--user-border)]">
-                      <div className="flex items-center justify-between text-xs sm:text-sm">
-                        <span className="font-cinzel font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
-                          <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
-                          <span>ATR (Atracción & Química)</span>
+                    <div className={`space-y-1 p-3 rounded-lg border ${estilo}`}>
+                      <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
+                        <span className="font-cinzel font-bold flex items-center gap-1.5">
+                          <Heart
+                            className={`w-4 h-4 ${desea === 'si' ? 'fill-rose-500 text-rose-500' : 'text-[var(--text-secondary)] opacity-50'}`}
+                          />
+                          <span>Atracción</span>
                         </span>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-0.5 text-rose-500" title={`Rango de Atracción: ${atrInfo.corazones}/5`}>
-                            {Array.from({ length: 5 }).map((_, idx) => (
-                              <Heart
-                                key={idx}
-                                className={`w-3.5 h-3.5 ${
-                                  idx < atrInfo.corazones
-                                    ? 'fill-rose-500 text-rose-500 drop-shadow-xs'
-                                    : 'text-rose-400/30'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
-                            {val}/20
-                          </span>
-                        </div>
+                        <span className="font-cinzel text-xs font-bold">
+                          {desea === 'si' ? 'La desea' : desea === 'no' ? 'No, y no va a pasar' : 'No por ahora'}
+                        </span>
                       </div>
-                      <div className="text-xs text-[var(--text-secondary)] italic">
-                        {atrInfo.label}
-                      </div>
-                      <div className="h-2.5 w-full bg-black/10 dark:bg-black/40 rounded-full overflow-hidden p-0.5 border border-rose-500/20">
-                        <div
-                          className={`h-full rounded-full bg-gradient-to-r ${atrInfo.gradient} transition-all duration-500`}
-                          style={{ width: `${Math.max(4, (val / 20) * 100)}%` }}
-                        />
-                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] italic m-0 leading-snug">
+                        {desea === 'si'
+                          ? 'Cómo se le nota es cosa de quién es él, no de una intensidad. Y desear no le da derecho a nada.'
+                          : desea === 'no'
+                          ? 'Candado puesto: no existe esa posibilidad. El vínculo y la confianza sí pueden llegar a lo más alto.'
+                          : 'Lo normal. No va por ahí hoy — que no es lo mismo que no tener ojos. Hay quien llega al deseo por el vínculo, y entonces cambia.'}
+                      </p>
                     </div>
                   );
                 })()}

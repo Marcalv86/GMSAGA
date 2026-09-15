@@ -1,4 +1,4 @@
-import { NPC } from '../types';
+import { deseaALaProtagonista, NPC } from '../types';
 
 /**
  * Número mínimo de días/encuentros distintos requeridos para alcanzar cada puntuación en la escala 1-20.
@@ -94,29 +94,22 @@ export function calcularProgresoEje(
   return { nuevoValor: valorActual, diaSubida: ultimoDiaSubidaEje };
 }
 
-/**
- * Detecta si la personalidad, rol o trasfondo del PNJ sugiere ser coqueto, seductor,
- * enamoradizo o hedonista, propiciando un flechazo o atracción inicial espontánea.
+/*
+ * ⛔ AQUÍ VIVÍA `esPersonalidadCoquetaOEnamoradiza`, y se ha ido con el 0-20.
+ *
+ * Buscaba por subcadena en siete campos del personaje —nombre, notas,
+ * descripción, lo que aparenta, lo que oculta, el vínculo y la relación— una
+ * lista de términos entre los que estaban «atractiv», «carismátic» y el nombre
+ * propio de un PNJ concreto de una campaña. Al que acertara le concedía 6 de
+ * 20 de atracción sin que nadie lo hubiera pedido.
+ *
+ * Eso ponía en dos corazones a media taberna: a cualquiera descrito como
+ * atractivo o carismático, y al lugarteniente de alguien coqueto por llevar el
+ * nombre de su jefe en las notas. Y era plano además: el drow más encantador
+ * de la Costa y un tabernero simpático valían exactamente lo mismo.
+ *
+ * El deseo lo pone ahora quien tiene la ficha delante y sabe de quién habla.
  */
-export function esPersonalidadCoquetaOEnamoradiza(npc: Partial<NPC>): boolean {
-  const texto = [
-    npc.name || '',
-    npc.notes || '',
-    npc.description || '',
-    npc.aparenta || '',
-    npc.oculta || '',
-    npc.vinculo || '',
-    npc.relation || ''
-  ].join(' ').toLowerCase();
-
-  const terminos = [
-    'coquet', 'seductor', 'seducid', 'enamoradiz', 'galán', 'galan', 'donjuán', 'donjuan',
-    'bribón', 'bribon', 'hedonista', 'pícaro', 'picaro', 'fascinad', 'atractiv', 'encantador',
-    'jarlaxle', 'flechazo', 'sensual', 'carismátic', 'carismatic'
-  ];
-
-  return terminos.some(t => texto.includes(t));
-}
 
 /**
  * Actualiza los tres ejes de afinidad (ATR, VÍN, CON) de un PNJ.
@@ -134,39 +127,48 @@ export function esPersonalidadCoquetaOEnamoradiza(npc: Partial<NPC>): boolean {
  */
 export function actualizarAfinidadNpc(
   npc: NPC,
-  reportado: { atr?: number; vin?: number; con?: number; vinculo?: string; aparenta?: string; oculta?: string },
+  reportado: {
+    atraccion?: 'si' | 'no';
+    vin?: number;
+    con?: number;
+    vinculo?: string;
+    aparenta?: string;
+    oculta?: string;
+  },
   diasActualizados: number[],
   diaActual: number
 ): Partial<NPC> {
   const totalDias = diasActualizados.length;
   const ultimosDias = npc.ultimoDiaSubida || {};
 
-  // ATR (Atracción & Flechazo)
-  let nuevoAtr = npc.atr;
-  let diaSubidaAtr = ultimosDias.atr;
-
-  if (npc.atrBloqueada) {
-    nuevoAtr = 0;
-  } else if (reportado.atr !== undefined && reportado.atr !== null) {
-    nuevoAtr = Math.max(0, Math.min(20, Math.round(reportado.atr)));
-    diaSubidaAtr = diaActual;
-  } else if ((nuevoAtr === undefined || nuevoAtr === 0) && esPersonalidadCoquetaOEnamoradiza({ ...npc, ...reportado })) {
-    nuevoAtr = 6;
-    diaSubidaAtr = diaActual;
-  }
+  /*
+   * EL DESEO NO PASA POR AQUÍ.
+   *
+   * Aquí había una escala 0-20 con dos atajos que se contradecían: aceptaba
+   * tal cual el número que pusiera el Narrador —saltándose el tope diario que
+   * el propio prompt le prometía— y, si no decía nada, concedía un 6 de salida
+   * a quien «sonara» coqueto. Ese 6 era plano (Jarlaxle y un tabernero
+   * encantador valían lo mismo) y se disparaba por subcadena en siete campos,
+   * así que el lugarteniente de alguien coqueto heredaba su puntuación.
+   *
+   * Ahora el deseo es un interruptor y lo pone quien corresponde: el Narrador,
+   * que tiene la ficha del personaje delante. Lo único que se hace aquí es
+   * respetarlo. Y no se apaga solo: que no venga nada en este turno no
+   * significa que haya dejado de desearla.
+   */
+  const nuevaAtraccion = reportado.atraccion ?? npc.atraccion;
 
   // VÍN y CON (Lealtad y Confianza escalonadas)
   const progresoVin = calcularProgresoEje(npc.vin, reportado.vin, totalDias, diaActual, ultimosDias.vin);
   const progresoCon = calcularProgresoEje(npc.con, reportado.con, totalDias, diaActual, ultimosDias.con);
 
   const nuevoUltimoDiaSubida = {
-    atr: diaSubidaAtr ?? ultimosDias.atr,
     vin: progresoVin.diaSubida ?? ultimosDias.vin,
     con: progresoCon.diaSubida ?? ultimosDias.con
   };
 
   return {
-    atr: nuevoAtr,
+    atraccion: nuevaAtraccion,
     vin: progresoVin.nuevoValor,
     con: progresoCon.nuevoValor,
     ultimoDiaSubida: nuevoUltimoDiaSubida
@@ -181,9 +183,12 @@ export function actualizarAfinidadNpc(
 export function conciliarAfinidadesTrasSincronizar<
   T extends {
     name: string;
+    atraccion?: 'si' | 'no';
+    /** ⚠️ LEGADO, solo para migrar campañas anteriores al interruptor. */
     atr?: number;
     vin?: number;
     con?: number;
+    /** ⚠️ LEGADO. */
     atrBloqueada?: boolean;
     notes?: string;
     description?: string;
@@ -203,17 +208,17 @@ export function conciliarAfinidadesTrasSincronizar<
   return npcsSincronizados.map(sincronizado => {
     const previo = npcsPrevios.find(p => mismoNpc(p.name, sincronizado.name));
 
-    // Alguien nuevo fichado en la sincronización:
-    // ATR adopta su valor de flechazo / química si no está bloqueado.
-    // VÍN y CON comienzan en 0 para forjarse en juego.
+    /*
+     * Alguien nuevo fichado en la sincronización.
+     *
+     * El deseo se respeta tal cual venga —es un interruptor, no algo que se
+     * acumule, así que puede estar encendido desde el primer encuentro—.
+     * VÍN y CON empiezan en 0 y se forjan jugando: eso es lo que se gana.
+     */
     if (!previo) {
-      const atrInicial = sincronizado.atr !== undefined && !sincronizado.atrBloqueada
-        ? Math.max(0, Math.min(20, Math.round(sincronizado.atr)))
-        : (esPersonalidadCoquetaOEnamoradiza(sincronizado) ? 6 : 0);
-
       return {
         ...sincronizado,
-        atr: atrInicial,
+        atraccion: deseaALaProtagonista(sincronizado),
         vin: 0,
         con: 0,
         ultimoDiaSubida: {},
@@ -225,7 +230,7 @@ export function conciliarAfinidadesTrasSincronizar<
     const dias = previo.diasVistos?.length ? previo.diasVistos : sincronizado.diasVistos || [];
     const progresado = actualizarAfinidadNpc(
       previo as any,
-      { atr: sincronizado.atr, vin: sincronizado.vin, con: sincronizado.con },
+      { atraccion: deseaALaProtagonista(sincronizado), vin: sincronizado.vin, con: sincronizado.con },
       dias,
       diaActual
     );

@@ -53,7 +53,7 @@ import { ImportCampaignModal } from './components/ImportCampaignModal';
 import { Logger } from './components/Logger';
 import { logError, logInfo, logWarn } from './utils/logger';
 import { presionDelMinuto } from './utils/callLog';
-import { conciliarAfinidadesTrasSincronizar, esPersonalidadCoquetaOEnamoradiza } from './utils/affinityProgression';
+import { conciliarAfinidadesTrasSincronizar } from './utils/affinityProgression';
 import { aplicarEtiquetados, OrdenDeEtiquetado } from './utils/ordenesDeMesa';
 import { sanitizeProjectMemory, esNombreDeProtagonista } from './utils/sanitizers';
 import { asegurarFichaCompletaNpc } from './utils/canonicalNpcStats';
@@ -1302,17 +1302,17 @@ export default function App() {
 
         // ATR (Atracción & Flechazo):
         // Permite flechazo espontáneo o atracción inicial según la personalidad coqueta/enamoradiza o lo reportado
-        const esCoqueto = esPersonalidadCoquetaOEnamoradiza({
-          name: v.nombre,
-          notes: v.oculta || v.aparenta,
-          aparenta: v.aparenta,
-          oculta: v.oculta,
-          vinculo: v.vinculo,
-          relation: v.vinculo
-        });
-        const atrInicial = typeof v.atr === 'number'
-          ? Math.max(0, Math.min(20, Math.round(v.atr)))
-          : (esCoqueto ? 6 : 0);
+        /*
+         * El deseo lo dice el Narrador o no lo dice nadie.
+         *
+         * Aquí se adivinaba por subcadena: si el nombre o las notas
+         * «sonaban» coquetos, seis de veinte de salida. Eso fichaba con
+         * química al lugarteniente de alguien coqueto por llevarlo en las
+         * notas, y a cualquiera cuya descripción dijera «atractiva». Ahora
+         * no se inventa — y no llevar nada NO es ser ciego, es no ir por
+         * ahí hoy.
+         */
+        const atraccionInicial = v.atraccion;
         const vinInicial = v.vin !== undefined ? 0 : undefined;
         const conInicial = v.con !== undefined ? 0 : undefined;
 
@@ -1329,7 +1329,7 @@ export default function App() {
           idiomas: v.idiomas || idiomas || (sheet.languages && sheet.languages[0]),
           cr: v.cr || cr || sheet.cr,
           characterSheet: sheet,
-          atr: atrInicial,
+          atraccion: atraccionInicial,
           vin: vinInicial,
           con: conInicial,
           orientacion: v.orientacion,
@@ -1813,17 +1813,17 @@ export default function App() {
               cr: v.cr
             });
 
-            const esCoqueto = esPersonalidadCoquetaOEnamoradiza({
-              name: nombreFinal,
-              notes: v.notes || v.description || v.aparenta,
-              aparenta: v.aparenta,
-              oculta: v.oculta,
-              vinculo: v.vinculo,
-              relation: v.relation || v.vinculo
-            });
-            const atrInicial = typeof v.atr === 'number'
-              ? Math.max(0, Math.min(20, Math.round(v.atr)))
-              : (esCoqueto ? 6 : undefined);
+            /*
+             * El deseo lo dice el Narrador o no lo dice nadie.
+             *
+             * Aquí se adivinaba por subcadena: si el nombre o las notas
+             * «sonaban» coquetos, seis de veinte de salida. Eso fichaba con
+             * química al lugarteniente de alguien coqueto por llevarlo en las
+             * notas, y a cualquiera cuya descripción dijera «atractiva». Ahora
+             * no se inventa — y no llevar nada NO es ser ciego, es no ir por
+             * ahí hoy.
+             */
+            const atraccionInicial = v.atraccion;
 
             const nuevoNpc: NPC = {
               id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -1844,7 +1844,7 @@ export default function App() {
               diasVistos: marca ? [marca] : [],
               characterSheet: sheet
             };
-            if (atrInicial !== undefined) nuevoNpc.atr = atrInicial;
+            if (atraccionInicial) nuevoNpc.atraccion = atraccionInicial;
             if (typeof v.vin === 'number') nuevoNpc.vin = v.vin;
             if (typeof v.con === 'number') nuevoNpc.con = v.con;
             npcsActualizados.push(nuevoNpc);

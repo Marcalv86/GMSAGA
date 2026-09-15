@@ -797,8 +797,40 @@ export interface NPC {
    * descarta cualquier subida de ATR que llegue del Narrador, venga como venga
    * y por muy bien que la haya justificado la escena.
    */
+  /**
+   * ⚠️ LEGADO. La atracción ya no es una puntuación: ver `atraccion`.
+   *
+   * Se conserva solo para poder migrar las campañas que ya existían. Nada
+   * nuevo debería escribir aquí.
+   */
   atrBloqueada?: boolean;
-  /** Eje de Atracción / Química romántica y tensión (escala 0 - 20) */
+  /**
+   * ¿Este personaje la desea?
+   *
+   * Era un 0-20 y no servía: NADA en el código miraba su magnitud —solo se
+   * pintaban corazones y se le devolvía el número al modelo escrito—, y los
+   * seis tramos de la escala no eran seis conductas sino tres. Peor: el número
+   * empujaba al Narrador a promediar hacia un flirteo genérico en vez de
+   * interpretar a quien tenía delante. La intensidad no la da una cifra, la da
+   * la ficha: Jarlaxle con esto encendido corteja de frente y bromea en el
+   * filo; un herrero tímido no sabe dónde poner las manos. Mismo bit, dos
+   * escenas que no se parecen en nada.
+   *
+   * - `'si'`       la desea. Cómo se le nota es cosa de quién es él.
+   * - `'no'`       ⛔ CANDADO, y es RARO. Solo cuando no existe ninguna
+   *                posibilidad: orientación incompatible, un compromiso que
+   *                no se toca, repulsión real. NO es para «todavía no».
+   * - `undefined`  el estado normal de casi todo el reparto. No la desea
+   *                HOY. Sigue teniendo ojos y puede reconocer que es guapa;
+   *                simplemente no va por ahí. Y puede cambiar: hay quien se
+   *                enamora por el vínculo y la confianza, y la atracción le
+   *                llega después. Kimmuriel es justo eso —psiónico, reconoce
+   *                la belleza y le importan más el intelecto y los lazos—, y
+   *                ponerle candado sería cerrarle una puerta que su
+   *                personaje tiene abierta.
+   */
+  atraccion?: 'si' | 'no';
+  /** ⚠️ LEGADO — la atracción ya no se puntúa. Solo para migrar. Ver `atraccion`. */
   atr?: number;
   /** Eje de Vínculo afectivo / Camaradería y lealtad (escala 0 - 20) */
   vin?: number;
@@ -963,3 +995,24 @@ export const CATEGORIAS_QUE_VIAJAN_SIEMPRE = ['oracle', 'roster', 'index'] as co
 /** ¿Esta categoría ignora el «de consulta»? */
 export const viajaSiemprePorCategoria = (categoria?: string): boolean =>
   (CATEGORIAS_QUE_VIAJAN_SIEMPRE as readonly string[]).includes(categoria || '');
+
+
+/**
+ * Si este personaje la desea, leyendo también las campañas viejas.
+ *
+ * El campo nuevo manda. Si no está —campaña anterior al cambio—, se deduce de
+ * lo que había: el candado viejo era un «no», y de la escala 0-20 solo contaba
+ * como deseo lo que la propia interfaz llamaba «química evidente» de 10 para
+ * arriba. Un 6 era «chispa leve», que es precisamente el «todavía no» que
+ * ahora se escribe sin valor.
+ */
+export function deseaALaProtagonista(npc: {
+  atraccion?: 'si' | 'no';
+  atr?: number;
+  atrBloqueada?: boolean;
+}): 'si' | 'no' | undefined {
+  if (npc.atraccion) return npc.atraccion;
+  if (npc.atrBloqueada) return 'no';
+  if (typeof npc.atr === 'number' && npc.atr >= 10) return 'si';
+  return undefined;
+}

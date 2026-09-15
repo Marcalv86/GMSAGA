@@ -1696,6 +1696,9 @@ export interface VinculoLeido {
   aparenta?: string;
   oculta?: string;
   vinculo?: string;
+  /** Si desea a la protagonista. Ya no es una puntuación. */
+  atraccion?: 'si' | 'no';
+  /** ⚠️ LEGADO: la atracción numérica. Solo la escriben campañas viejas. */
   atr?: number;
   vin?: number;
   con?: number;
@@ -1709,6 +1712,29 @@ export interface VinculoLeido {
  * `[VÍNCULO: Kieron | aparenta: ... | oculta: ... | grado: ...]`,
  * y los formatos de afinidad `🖤 Jarlaxle — ATR: 7 | VÍN: 3 | CON: 2`.
  */
+/**
+ * Lee si un personaje desea a la protagonista, dicho como palabra o como número.
+ *
+ * ⚠️ La forma con número es de las campañas viejas y del Narrador que todavía
+ * arrastre el formato antiguo. Se traduce con el mismo corte que usaba la
+ * interfaz: de 10 para arriba era «química evidente» —eso es un sí—; por
+ * debajo era curiosidad o chispa leve, que es justamente el «todavía no» que
+ * ahora no lleva valor.
+ */
+export function leerAtraccion(valor: string): 'si' | 'no' | undefined {
+  const v = (valor || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim();
+  if (!v) return undefined;
+  if (/^(si|sii|true|1|x|v|deseo|atraida?|atraido?|encaprichad)/.test(v)) return 'si';
+  if (/^(no|false|0|nunca|jamas|bloquead|candado|imposible)/.test(v)) return 'no';
+  const num = parseInt(v, 10);
+  if (!isNaN(num)) return num >= 10 ? 'si' : undefined;
+  return undefined;
+}
+
 export function leerVinculos(texto: string): VinculoLeido[] {
   if (!texto) return [];
   const out: VinculoLeido[] = [];
@@ -1778,9 +1804,9 @@ export function leerVinculos(texto: string): VinculoLeido[] {
           if (acc.includes('borr') || acc.includes('elim') || acc.includes('quit')) {
             v.accion = 'borrar';
           }
-        } else if (campo === 'atr' || campo === 'atraccion') {
-          const num = parseInt(valor, 10);
-          if (!isNaN(num)) v.atr = Math.max(0, Math.min(20, num));
+        } else if (campo === 'atr' || campo === 'atraccion' || campo === 'desea') {
+          const leido = leerAtraccion(valor);
+          if (leido) v.atraccion = leido;
         } else if (campo === 'vin' || campo === 'afecto' || campo === 'lazo') {
           const num = parseInt(valor, 10);
           if (!isNaN(num)) v.vin = Math.max(0, Math.min(20, num));
@@ -1817,7 +1843,7 @@ export function leerVinculos(texto: string): VinculoLeido[] {
         const campo = sinTildes(parte.slice(0, corte)).trim().toLowerCase();
         const num = parseInt(parte.slice(corte + 1).trim(), 10);
         if (isNaN(num)) continue;
-        if (campo === 'atr' || campo === 'atraccion') existing.atr = Math.max(0, Math.min(20, num));
+        if (campo === 'atr' || campo === 'atraccion') continue; // la atracción ya no se puntúa
         else if (campo === 'vin' || campo === 'afecto') existing.vin = Math.max(0, Math.min(20, num));
         else if (campo === 'con' || campo === 'confianza') existing.con = Math.max(0, Math.min(20, num));
       }
@@ -1841,7 +1867,8 @@ export function leerVinculos(texto: string): VinculoLeido[] {
     } else if (nombre.length > existing.nombre.length) {
       existing.nombre = nombre;
     }
-    if (!isNaN(atrNum)) existing.atr = Math.max(0, Math.min(20, atrNum));
+    // La atracción ya no viaja como número: ver `leerAtraccion`.
+    void atrNum;
     if (!isNaN(vinNum)) existing.vin = Math.max(0, Math.min(20, vinNum));
     if (!isNaN(conNum)) existing.con = Math.max(0, Math.min(20, conNum));
   }

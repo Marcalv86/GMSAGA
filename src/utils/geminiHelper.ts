@@ -14,7 +14,8 @@ import {
   TimelineEntry,
   ScheduledThread,
   Message,
-  viajaSiemprePorCategoria
+  viajaSiemprePorCategoria,
+  deseaALaProtagonista
 } from '../types';
 import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, InventoryItem, MovimientoOculto, PlayerCurrencies, RelojOculto } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
@@ -1695,8 +1696,27 @@ ${bloqueElenco}
           : `- 💤 LLEVA ${ausencia} SIN SALIR. Podría entrar ADEMÁS de los de siempre, si la escena le da un motivo.`
       );
     }
-    if (typeof n.atr === 'number' || typeof n.vin === 'number' || typeof n.con === 'number') {
-      lineas.push(`- Afinidad: atracción ${n.atr ?? 0}/20 · vínculo ${n.vin ?? 0}/20 · confianza ${n.con ?? 0}/20`);
+    if (typeof n.vin === 'number' || typeof n.con === 'number') {
+      lineas.push(`- Afinidad: vínculo ${n.vin ?? 0}/20 · confianza ${n.con ?? 0}/20`);
+    }
+    /*
+     * EL DESEO NO ES UN NÚMERO, ES UN INTERRUPTOR.
+     *
+     * Iba como «atracción 12/20» junto a los otros dos ejes, y eso hacía dos
+     * daños: invitaba al modelo a promediar hacia un flirteo genérico de
+     * intensidad media, y ponía el deseo en la misma escala que el vínculo,
+     * que sí se acumula. Ahora se dice si la desea o no, y CÓMO se le nota lo
+     * saca de su ficha, que para eso está.
+     */
+    const desea = deseaALaProtagonista(n);
+    if (desea === 'si') {
+      lineas.push(
+        `- 💘 LA DESEA. Cómo se le nota es cosa de quién es él —uno corteja de frente y bromea en el filo, otro no sabe dónde poner las manos—, no de una intensidad media. ⛔ Y desear no da derecho a nada: lo que haga con ese deseo lo marcan su código y sus líneas.`
+      );
+    } else if (desea === 'no') {
+      lineas.push(
+        `- 🚫 NO LA DESEA NI VA A DESEARLA${n.orientacion ? ` (${corta(n.orientacion, 120)})` : ''}. Trátalo con todo el afecto y la confianza que la relación dé de sí —eso es vínculo y confianza, y pueden llegar a lo más alto—, pero de química, nada.`
+      );
     }
     /*
      * A quién mira este personaje, dicho aquí y no dejado a la deducción.
@@ -1707,11 +1727,9 @@ ${bloqueElenco}
      * en el primer capítulo se perdía en el segundo. Puesto junto a las barras,
      * es lo que el modelo tiene delante justo cuando le toca moverlas.
      */
-    if (n.atrBloqueada) {
-      lineas.push(
-        `- ⛔ NO SIENTE NI VA A SENTIR ATRACCIÓN POR ELLA${n.orientacion ? ` (${corta(n.orientacion, 120)})` : ''}. Trátalo con todo el afecto y la confianza que la relación dé de sí —eso es VÍN y CON, y pueden llegar a lo más alto—, pero de química, nada: ni tensión, ni miradas que se sostienen, ni un roce que signifique algo. No es frialdad, es que esa puerta no existe.`
-      );
-    } else if (n.orientacion) {
+    // El candado ya se dice arriba, con el resto del deseo. Aquí queda solo
+    // el dato de a quién mira este personaje, que es otra cosa.
+    if (n.orientacion) {
       lineas.push(`- Orientación / disponibilidad: ${corta(n.orientacion, 120)}. Mándalo por encima de cualquier química que pida la escena.`);
     }
     if (n.notes) lineas.push(`- Notas: ${corta(n.notes, 400)}`);
@@ -3062,7 +3080,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
 7. [REGISTROS INTERNOS - ACTUALIZACIÓN ESTRICTAMENTE ESENCIAL Y CONDICIONAL]:
    Después de la narración, añade las siguientes líneas según corresponda. Son registros internos de la aplicación que el jugador no ve. REGLA FUNDAMENTAL DE SINCRONIZACIÓN ACTIVA: Mantén siempre sincronizadas las fichas, estados y relaciones de los PNJs presentes mediante [VÍNCULO: ...] en cada turno, asegurando que los paneles nunca queden vacíos ni requieran acciones manuales.
    - [PRESENTES: nombres separados por comas] — quién ha estado en escena de forma reconocible, con nombre propio. No incluyas figurantes sin nombre («un marinero», «la multitud»). Sirve para saber quién vuelve: alguien que reaparece deja de ser un extra y se le abre una ficha de vínculo con el protagonista.
-   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | orientacion: hacia quién le tira, si consta | atr: 0-20 | vin: 0-20 | con: 0-20] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea.
+   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | orientacion: hacia quién le tira, si consta | atr: sí/no | vin: 0-20 | con: 0-20] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea.
      «aparenta» es lo que el protagonista podría percibir observándolo. «oculta» es lo que hay debajo: sus reservas, sus intenciones, lo que calla.
      «grado» debe comenzar indicando el tipo para que la interfaz muestre el icono adecuado:
        - ⚔️ Rivalidad: «grado: rivalidad — ...»
@@ -3071,9 +3089,9 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
        - 💀 Enemistad: «grado: enemistad — ...»
        - 🤝 Alianza: «grado: alianza — ...»
        - 🛡️ Mentor: «grado: mentor — ...»
-     «atr» (0-20), «vin» (0-20) y «con» (0-20) representan la Atracción/Romance, Vínculo y Confianza que el PNJ siente hacia el protagonista. El Narrador los actualiza de forma autónoma según las vivencias y la química; son de solo lectura para el jugador.
+     «vin» (0-20) y «con» (0-20) representan el Vínculo y la Confianza que el PNJ siente hacia el protagonista. **«atr» NO es un número: es «sí» o «no»** —si la desea o no—. El Narrador los actualiza de forma autónoma según las vivencias y la química; son de solo lectura para el jugador.
      «orientacion» es OPCIONAL y se manda UNA VEZ, la primera, cuando sus documentos lo digan o el juego lo haya dejado claro: «hombres», «mujeres», «le da igual», «asexual», «casado y va en serio», «no le interesa nadie ahora mismo». Se queda guardado en su ficha y vuelve a ti en todos los turnos siguientes, así que **no hace falta repetirlo** y NO te lo inventes para rellenar: si no consta, lo dejas fuera, y sin que conste la atracción no sube (ver el protocolo de la atracción).
-     ⚠️ Y un aviso sobre «atr»: la aplicación NO acepta puntuaciones de salida. Un personaje que aparece por primera vez entra con la atracción a 0 y sube como mucho un punto por día de trato, así que escribir «atr: 8» en un primer encuentro no consigue un 8: consigue un 0 o un 1. La química se juega, no se declara.
+     ⚠️ **Sobre «atr»: se dice «sí» o «no», nunca un número.** El deseo no se acumula como el vínculo —o está o no está—, así que aquí no hay escala ni progresión: si ese personaje la desea, \`atr: sí\`, y **CÓMO se le nota lo dice su ficha, no una intensidad**. Uno corteja de frente y bromea en el filo; otro no sabe dónde poner las manos; un tercero lo esconde y se le escapa una vez. ⛔ **\`atr: no\` es el CANDADO y es RARO**: solo cuando no existe ninguna posibilidad —orientación incompatible, un compromiso que no se toca, repulsión real—. **No lo uses para «todavía no»**: la mayoría del reparto simplemente no lleva nada escrito, que es lo normal, y eso NO significa que sea ciego —puede reconocer perfectamente que es guapa sin desearla—. ⭐ Y puede cambiar con el tiempo: hay quien llega al deseo por el vínculo y la confianza, no al revés. Cuando eso pase de verdad en escena, emite \`atr: sí\` y ya está. ✅ Lo que SÍ se gana día a día son «vin» y «con»: ahí manda el trato acumulado y suben despacio.
     - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, ~Z Nombre (en poder de: Quién | donde: Dónde), +Z PO, -W PO] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda, consuma o LE QUITEN objetos o dinero durante la escena. **«+» entra o RECUPERA · «-» se acabó (consumido, gastado, entregado para siempre) · «~» SE LO HAN QUITADO pero sigue siendo suyo.** ⛔ El signo «~» es obligatorio cuando la requisan, la detienen, la registran, la roban o deja algo en prenda: esas cosas NO se borran de su ficha, cambian de manos, y hay que apuntar quién las tiene. Ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)]; si come 3: [INVENTARIO: -3 Buenas Bayas]; si gasta 15 de oro: [INVENTARIO: +Disfraz noble, -15 PO]; **si le requisan el equipaje al capturarla: [INVENTARIO: ~1 Violín (en poder de: la tripulación | donde: la bodega), ~1 Diario ilustrado (en poder de: la tripulación | donde: la bodega)]**; ⭐ **Y CUANDO SE LO DEVUELVEN O LO RECUPERA**: es IMPRESCINDIBLE emitir [INVENTARIO: +1 Violín, +1 Diario ilustrado] (o con «(equipado)» si lo empuña/viste). Al registrar la entrada con «+», la aplicación ELIMINA automáticamente el objeto de la lista de requisados y lo devuelve a su inventario activo (en sus manos / portado / equipado). Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
    - [APRENDE: +Nombre (tipo, detalle opcional), +Otro (tipo)] — OBLIGATORIO en el turno en que el protagonista GANA una capacidad nueva: al subir de nivel, al aprender un conjuro, al recibir adiestramiento, al desbloquear un rasgo o al ganar una competencia o un idioma. **Este registro es el único sitio donde queda constancia**: su ficha se subió una vez y está congelada en el nivel que tuviera aquel día, así que lo que no se apunte aquí se pierde y dentro de tres niveles nadie sabrá que lo tiene. El tipo va dentro del paréntesis y es uno de: conjuro, rasgo, competencia, mejora. Ejemplos: [APRENDE: +Rayo de escarcha (conjuro, truco de evocación)]; [APRENDE: +Sentido salvaje (rasgo), +Competencia en Supervivencia (competencia)]; [APRENDE: +2 a Sabiduría (mejora, al subir a nivel 4)]; [APRENDE: +Infracomún (competencia, se lo enseña un compañero)]. ⛔ Y no lo uses para objetos —eso es [INVENTARIO:]— ni para apuntar lo que YA figura en su ficha: solo lo nuevo. Si en este turno no ha aprendido nada, OMITE la línea.
    - [BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama cuelga] — TU CUADERNO, que ella NO lee. Se emite cuando ha pasado tiempo (un descanso largo, un salto, un viaje) y alguien con algo entre manos se ha movido **aunque no aparezca en escena**. Uno por cada quien se mueva. Ejemplo: [BAMBALINAS: Braelin | hizo: pregunta por el violín en los muelles | donde: el puerto | con: un marinero que hace la ruta de las islas | resultado: sabe qué es el instrumento y de dónde viene | hilo: el origen del violín]. ⛔ Esto NO se narra ni se insinúa: es memoria del mundo, no información para la jugadora. ⭐ Y lo que se registra aquí es lo que luego permite que alguien vuelva con algo de verdad en vez de volver con las manos vacías.

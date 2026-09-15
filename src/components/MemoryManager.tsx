@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, Memory, NPC, Location, ProjectFile, TimelineEntry, InventoryItem } from '../types';
+import { deseaALaProtagonista, Project, Memory, NPC, Location, ProjectFile, TimelineEntry, InventoryItem } from '../types';
 import {
   obtenerInfoRelacion,
   CALENDARIO_FANTASTICO,
@@ -58,36 +58,8 @@ import { esNombreDeProtagonista } from '../utils/sanitizers';
 import { obtenerOGenerarFichaNpc, asegurarFichaCompletaNpc } from '../utils/canonicalNpcStats';
 import { deduplicarInventario, sonElMismoObjeto } from '../utils/inventoryTag';
 
-export function getAtrInfo(val?: number) {
-  const v = val !== undefined && val !== null ? Math.max(0, Math.min(20, Math.round(val))) : 0;
-  let label = 'Frialdad / Distancia cortés';
-  let corazones = 0;
-  if (v >= 18) {
-    label = 'Atracción desbordante / Pasión viva';
-    corazones = 5;
-  } else if (v >= 14) {
-    label = 'Fascinación / Tensión romántica viva';
-    corazones = 4;
-  } else if (v >= 10) {
-    label = 'Química mutua / Flirteo evidente';
-    corazones = 3;
-  } else if (v >= 6) {
-    label = 'Chispa leve / Interés incipiente';
-    corazones = 2;
-  } else if (v >= 2) {
-    label = 'Curiosidad / Trato formal con gracia';
-    corazones = 1;
-  }
-  return {
-    val: v,
-    corazones,
-    label,
-    gradient: 'from-rose-500 via-pink-500 to-rose-600',
-    border: 'border-rose-400/40',
-    bg: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
-    hasScore: val !== undefined && val !== null
-  };
-}
+// `getAtrInfo` se retiró con la escala 0-20: el deseo ya no tiene tramos —
+// ni los seis de esta función eran seis conductas, sino tres.
 
 export function getVinInfo(val?: number) {
   const v = val !== undefined && val !== null ? Math.max(0, Math.min(20, Math.round(val))) : 0;
@@ -2443,12 +2415,12 @@ export const MemoryManager: React.FC<{
                               {n.orientacion}
                             </span>
                           )}
-                          {!n.atrBloqueada && (n.atr ?? 0) > 0 && (
+                          {deseaALaProtagonista(n) === 'si' && (
                             <span
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 text-[10px] font-mono font-bold"
-                              title={`Atracción: ${getAtrInfo(n.atr).label}`}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 text-[10px] font-cinzel font-bold"
+                              title="La desea. Cómo se le nota es cosa de quién es él, no de una intensidad."
                             >
-                              <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" /> ATR {n.atr}/20
+                              <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" /> La desea
                             </span>
                           )}
                           <span
