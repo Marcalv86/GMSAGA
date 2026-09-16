@@ -872,6 +872,8 @@ export interface ApiFailure {
   isAborted: boolean;
   /** Si volver a intentarlo tiene alguna posibilidad de salir mejor. */
   isTransient: boolean;
+  /** Un error de esta aplicación, no de Google: no se reintenta con nadie. */
+  esFalloDelCodigo: boolean;
   /** Lo que Google pide esperar (RetryInfo), en milisegundos. 0 si no lo dice. */
   retryAfterMs: number;
   /** El mensaje humano de Google, ya desenterrado del JSON. */
@@ -1000,9 +1002,30 @@ export function classifyApiError(err: unknown): ApiFailure {
   // Cortes de streaming a mitad: la conexión se fue, no la petición. Merece otra oportunidad.
   const streamCortado = /incomplete json|unexpected end|terminated|premature close|stream|closed/i.test(lower);
 
-  const isTransient = isRateLimit || isOverloaded || isNetwork || streamCortado;
+  /*
+   * ⛔ UN FALLO DE LA PROPIA APLICACIÓN NO SE REINTENTA JAMÁS.
+   *
+   * Un `ReferenceError` o un `TypeError` no vienen de Google: son un error de
+   * este código. No tienen `status`, no mejoran esperando y no mejoran con
+   * otra clave. Y aun así la cadena los trataba como cualquier otro fallo: un
+   * turno con cinco modelos y seis claves se reintentaba TREINTA veces contra
+   * el mismo bug, tardaba medio minuto en rendirse y dejaba el registro con
+   * treinta avisos idénticos que escondían el único que importaba.
+   *
+   * Se marca como fatal para que se rinda a la primera y el mensaje llegue
+   * limpio.
+   */
+  const esFalloDelCodigo =
+    status === 0 &&
+    (e instanceof ReferenceError ||
+      e instanceof TypeError ||
+      e instanceof SyntaxError ||
+      /^(ReferenceError|TypeError|SyntaxError):/.test(String(e?.stack || '')));
+
+  const isTransient = !esFalloDelCodigo && (isRateLimit || isOverloaded || isNetwork || streamCortado);
 
   return {
+    esFalloDelCodigo,
     status,
     googleStatus,
     isRateLimit,
@@ -2433,6 +2456,24 @@ Esto NO es una lista de bajas: es la escena mejor servida que tienes. Quien lo g
     .pop()?.lugar;
   const marcoActual = marcoDeLugar(lugarApuntado);
 
+  /*
+   * ⚠️ LA FICHA, DECLARADA ARRIBA DEL TODO Y NO A MEDIA FUNCIÓN.
+   *
+   * Vivía noventa líneas MÁS ABAJO, y el bloque de travesía la usa dentro de
+   * un `(() => { ... })()` que se ejecuta al instante:
+   *
+   *     Si ${pc?.name || 'el protagonista'} está retenido o vigilado…
+   *
+   * Zona muerta temporal: el turno entero reventaba con «Cannot access 'pc'
+   * before initialization» antes de llegar a mandar nada. Y no saltaba nunca
+   * porque esa rama solo se pisa cuando hay un VIAJE ABIERTO con jornadas
+   * pendientes — que hasta que la aplicación no empezó a rechazar las llegadas
+   * prematuras, no llegaba a ocurrir.
+   *
+   * Aquí arriba no depende de nada: solo de `project`, que es un parámetro.
+   */
+  const pc = project.memory?.player_character;
+
   const bloqueViaje = (() => {
     if (!viaje?.destino || !viaje.jornadas) {
       /*
@@ -2601,8 +2642,7 @@ ${allPreviousHistory}`
   // Clasificación de documentos: "Siempre presentes" vs "De consulta inteligente (On-Demand)"
   const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
 
-  // Fichas específicas del protagonista que viajan íntegras (las fichas de PJ viajan SIEMPRE completas para evitar alucinaciones)
-  const pc = project.memory?.player_character;
+  // (`pc` se declara arriba del todo: lo usan bloques anteriores a este.)
 
   /*
    * LAS FICHAS DE SUS COMPAÑEROS, EN SU PROPIO SITIO.
@@ -4018,6 +4058,17 @@ export async function generateStoryTurnStream({
             return;
           }
 
+          /*
+           * ⛔ UN BUG DE ESTA APLICACIÓN NO SE REINTENTA CON NADIE.
+           *
+           * Un turno con cinco modelos y seis claves se estrellaba TREINTA
+           * veces contra el mismo `ReferenceError`, tardaba medio minuto en
+           * rendirse y dejaba el registro con treinta avisos idénticos que
+           * escondían el único que servía para algo. Ni otra clave ni otro
+           * modelo arreglan un error de código.
+           */
+          if (fallo.esFalloDelCodigo) throw e;
+
           if (fallo.isModelMissing) {
             // Ese modelo no existe para estas claves. Ninguna otra clave lo va a
             // hacer aparecer: al siguiente de la cadena.
@@ -4630,6 +4681,11 @@ export async function generateContentWithFailover({
             fallo.detail || err
           );
 
+          /*
+           * Si es un fallo de ESTA aplicación, no hay nada que reintentar: ni
+           * otra clave ni otro modelo van a arreglar un bug. Se sale ya.
+           */
+          if (fallo.esFalloDelCodigo) throw err;
           if (vencioElPlazo) {
             saltarAlSiguienteModelo = true;
             break;
