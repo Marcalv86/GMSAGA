@@ -2447,15 +2447,19 @@ export const MemoryManager: React.FC<{
                           })()}
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 text-[10px] font-mono font-bold"
-                            title={`Vínculo: ${getVinInfo(n.vin).label}`}
+                            title={typeof n.vin === 'number' ? `Vínculo: ${getVinInfo(n.vin).label}` : 'Vínculo sin fijar todavía. No es cero: es que nadie lo ha establecido. El Narrador lo pondrá jugando, o la sincronización al leer la crónica.'}
                           >
-                            <Sparkles className="w-2.5 h-2.5 text-teal-500" /> VÍN {n.vin ?? 0}/20
+                            {/* Sin fijar NO es cero. Pintar «0/20» donde no hay
+                                dato hacía leer como un hecho —«se llevan fatal»—
+                                lo que en realidad era un hueco que nadie había
+                                rellenado todavía. */}
+                            <Sparkles className="w-2.5 h-2.5 text-teal-500" /> VÍN {typeof n.vin === 'number' ? `${n.vin}/20` : '—'}
                           </span>
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-[10px] font-mono font-bold"
-                            title={`Confianza: ${getConInfo(n.con).label}`}
+                            title={typeof n.con === 'number' ? `Confianza: ${getConInfo(n.con).label}` : 'Confianza sin fijar todavía. No es cero: es que nadie la ha establecido.'}
                           >
-                            <Shield className="w-2.5 h-2.5 text-amber-500" /> CON {n.con ?? 0}/20
+                            <Shield className="w-2.5 h-2.5 text-amber-500" /> CON {typeof n.con === 'number' ? `${n.con}/20` : '—'}
                           </span>
                           {n.oculta && n.secretoRevelado ? (
                             <span

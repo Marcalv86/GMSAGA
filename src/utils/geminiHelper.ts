@@ -5414,11 +5414,13 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
       "aparenta": "Lo que muestra o finge",
       "oculta": "Intenciones ocultas, secretos o debilidades si se conocen",
       "vinculo": "Tipo de vínculo social/emocional (solo para PNJs nombrados/recurrentes)",
-      "atr": 10,
+      "previo": true,
+      "atraccion": "desea",
       "vin": 5,
       "con": 4
     }
   ],
+  "_nota_afinidad": "CÓMO SE RELLENAN 'previo', 'atraccion', 'vin' y 'con'. ⭐ 'previo' es LO MÁS IMPORTANTE y lo que más se olvida: ponlo en true si esa relación YA EXISTÍA ANTES de que empezara la crónica —la crió, la formó, es su padre, su madre, su maestra, llevan veinte años cruzándose—. Esa gente NO empieza en cero: un padre que la ha criado entra arriba del todo en 'vin' y 'con' desde el primer día, y ponerlo a 1 porque la crónica acaba de empezar es tratarlo como a un desconocido. Con 'previo': false (se conocieron jugando) los dos ejes salen de lo que de verdad se hayan ganado en el texto, y empiezan bajos. · 'vin' 0-20 es vínculo afectivo y lealtad; 'con' 0-20 es confianza táctica y secretos compartidos. · ⛔ 'atraccion' NO ES UN NÚMERO y no hay escala: son dos palabras y solo si el texto las respalda. \"desea\" = la desea de verdad; \"interes\" = hay algo y todavía no es deseo. Si no siente nada, OMITE EL CAMPO. ⛔ Y si hay parentesco o tutela —padre, madre, hermano, quien la crió— no lo pongas NUNCA: ahí lo que hay es 'vin' y 'con' altos, que es otra cosa entera. ⭐ Y el fallo que más se comete: NADIE ES DEMISEXUAL POR DEFECTO. Si en la crónica alguien le recorre el cuerpo con la mirada, le baja la voz, le invade el espacio o la corteja con descaro, eso es \"desea\" —esté dicho con elegancia o no—, y dejarlo en blanco porque el texto es sutil es borrar lo único que pasó en esa escena. Léelo por lo que HACEN, no por si lo declaran.",
   "locations": [
     { "id": "id existente o nuevo", "name": "Nombre del lugar", "desc": "Descripción del lugar y relevancia", "notes": "LO CONCRETO QUE YA SE HA VISTO DE ESE SITIO EN LA PARTIDA y que tiene que seguir siendo verdad la próxima vez que se entre: cómo se cierran sus puertas, qué tecnología o magia usa, a qué huele, qué se oye desde dentro, quién guarda la entrada, cómo se cobra, qué está prohibido allí. Rescátalo del texto de los capítulos, literal si hace falta. Esto NO es ambientación bonita: es lo que impide que un local cuyas puertas abrían con una runa de custodia acabe abriéndose con una llave corriente dos escenas después. Déjalo vacío solo si de verdad no se ha establecido nada." }
   ],

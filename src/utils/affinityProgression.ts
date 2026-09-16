@@ -210,12 +210,20 @@ export function actualizarAfinidadNpc(
  * Respeta el flechazo/atracción inicial si el PNJ es coqueto/enamoradizo o si fue reportado,
  * mientras que VÍN y CON se construyen jugando.
  */
+/** Un eje siempre dentro de 0-20, y sin valor si no vino ninguno. */
+function acotarEje(v: number | undefined): number {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(20, Math.round(v)));
+}
+
 export function conciliarAfinidadesTrasSincronizar<
   T extends {
     name: string;
     atraccion?: 'desea' | 'interes';
     /** Ya se decidió, aunque saliera «nada». Ver `NPC.atrEvaluada`. */
     atrEvaluada?: boolean;
+    /** La relación ya existía antes de la crónica: no empieza en cero. */
+    previo?: boolean;
     /** ⚠️ LEGADO, solo para migrar campañas anteriores al interruptor. */
     atr?: number;
     vin?: number;
@@ -248,11 +256,32 @@ export function conciliarAfinidadesTrasSincronizar<
      * VÍN y CON empiezan en 0 y se forjan jugando: eso es lo que se gana.
      */
     if (!previo) {
+      /*
+       * EL PORTERO SE ESTABA COMIENDO TAMBIÉN LO QUE NO ERA PROGRESO.
+       *
+       * Aquí había un `vin: 0, con: 0` a pelo, sin excepción. El motivo era
+       * bueno —la sincronización no debe regalar quince sesiones de avance el
+       * primer día— pero metía en el mismo saco dos cosas distintas: lo que se
+       * gana jugando, que efectivamente empieza en cero, y lo que YA ESTABA
+       * AHÍ antes de la primera escena, que no se gana porque ya estaba ganado.
+       *
+       * El resultado era que sincronizar no servía de nada por diseño: se
+       * borrara la campaña o no, todo el reparto salía a 0/20, incluido el
+       * padre que crió a la protagonista durante dos siglos y acababa de
+       * traspasarle su marca. Y desde el cero, el tope diario impide que
+       * vuelva a subir en condiciones nunca.
+       *
+       * Ahora la relación anterior a la crónica entra donde está; la que se
+       * forjó jugando sigue naciendo en cero, que es lo que se quería proteger.
+       */
+      const vieneDeAntes = Boolean((sincronizado as { previo?: boolean }).previo);
+      const deseo = interesPorLaProtagonista(sincronizado);
       return {
         ...sincronizado,
-        atraccion: interesPorLaProtagonista(sincronizado),
-        vin: 0,
-        con: 0,
+        atraccion: deseo,
+        atrEvaluada: deseo ? true : sincronizado.atrEvaluada,
+        vin: vieneDeAntes ? acotarEje(sincronizado.vin) : 0,
+        con: vieneDeAntes ? acotarEje(sincronizado.con) : 0,
         ultimoDiaSubida: {},
         diasVistos: sincronizado.diasVistos?.length ? sincronizado.diasVistos : [diaActual]
       };
@@ -262,7 +291,14 @@ export function conciliarAfinidadesTrasSincronizar<
     const dias = previo.diasVistos?.length ? previo.diasVistos : sincronizado.diasVistos || [];
     const progresado = actualizarAfinidadNpc(
       previo as any,
-      { atraccion: interesPorLaProtagonista(sincronizado), vin: sincronizado.vin, con: sincronizado.con },
+      {
+        atraccion: interesPorLaProtagonista(sincronizado),
+        // Una relación que viene de antes de la crónica tampoco se gana a
+        // plazos cuando el eje aún está sin fijar: ya estaba donde está.
+        previo: Boolean((sincronizado as { previo?: boolean }).previo),
+        vin: sincronizado.vin,
+        con: sincronizado.con
+      },
       dias,
       diaActual
     );
