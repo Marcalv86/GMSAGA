@@ -2508,10 +2508,38 @@ Esto NO es una lista de bajas: es la escena mejor servida que tienes. Quien lo g
     if (c.afinidadMinima?.pnj) {
       const { pnj, eje, valor } = c.afinidadMinima;
       const ficha = (project.memory?.npcs || []).find(n => plegarTexto(n.name) === plegarTexto(pnj));
-      const actual = Number(ficha?.[eje]) || 0;
+      /*
+       * UN GIRO ATADO AL DESEO NO SE ABRÍA NUNCA.
+       *
+       * `ficha[eje]` con eje = 'atr' leía la escala 0-20 que ya no escribe
+       * nadie: salía `undefined`, se redondeaba a 0 y el umbral no se alcanzaba
+       * jamás. Cualquier secreto condicionado a que alguien la desee se quedaba
+       * cerrado para siempre —en silencio, que es lo peor: la aplicación
+       * informaba de que «falta que la atracción llegue a 12» de alguien que la
+       * desea desde el primer capítulo—.
+       *
+       * El deseo ya no es una escala, así que el umbral se traduce: quien la
+       * desea cumple cualquier listón, el interés cumple los moderados.
+       */
+      const deseo = interesPorLaProtagonista(ficha || { });
+      const actual =
+        eje === 'atr'
+          ? deseo === 'desea'
+            ? 20
+            : deseo === 'interes'
+            ? 10
+            : 0
+          : Number(ficha?.[eje]) || 0;
       if (actual < valor) {
-        const comoSeLlama = eje === 'atr' ? 'la atracción' : eje === 'vin' ? 'el vínculo' : 'la confianza';
-        faltan.push(`que ${comoSeLlama} con ${pnj} llegue a ${valor} (va por ${actual})`);
+        const comoSeLlama =
+          eje === 'atr'
+            ? valor > 10
+              ? `que ${pnj} la desee`
+              : `que ${pnj} sienta al menos interés`
+            : eje === 'vin'
+            ? `que el vínculo con ${pnj} llegue a ${valor} (va por ${actual})`
+            : `que la confianza con ${pnj} llegue a ${valor} (va por ${actual})`;
+        faltan.push(comoSeLlama);
       }
     }
     return faltan;
@@ -7364,7 +7392,7 @@ Un giro puede necesitar que algo se cumpla antes de poder destaparse. Si es el c
 - \`trasSecreto\`: el TÍTULO EXACTO de otro secreto que tiene que destaparse antes. Es lo que hace que las capas salgan en orden en vez de de golpe.
 - \`misionCompletada\`: el TÍTULO EXACTO de una trama que tiene que estar cerrada antes.
 - \`conPnj\`: el nombre de un personaje al que hay que haberse cruzado en escena. Para los giros que no tienen sentido antes de conocer a quien los sostiene.
-- \`afinidadMinima\`: **lo que ata un hilo al ritmo de OTRO**, que es de las cosas más útiles que puedes hacer. Un umbral de relación con alguien —\`{ "pnj": "Nombre", "eje": "atr" | "vin" | "con", "valor": 0-20 }\`— para que algo no llegue hasta que esa relación esté donde tiene que estar. Ejemplo: la carta de casa con una mala noticia no aparece hasta que la relación con cierta persona ha avanzado de verdad, porque la noticia duele mucho más cuando hay algo que perder. No mide el hecho concreto; mide que la relación esté en el punto en que ese hecho ya podría haber pasado. Lo concreto va en \`nota\`.
+- \`afinidadMinima\`: **lo que ata un hilo al ritmo de OTRO**, que es de las cosas más útiles que puedes hacer. Un umbral de relación con alguien —\`{ "pnj": "Nombre", "eje": "atr" | "vin" | "con", "valor": 0-20 }\`; ojo con \`atr\`, que ya no es una escala: pon 11 o más para exigir que la desee y 10 o menos para que baste con que haya interés— para que algo no llegue hasta que esa relación esté donde tiene que estar. Ejemplo: la carta de casa con una mala noticia no aparece hasta que la relación con cierta persona ha avanzado de verdad, porque la noticia duele mucho más cuando hay algo que perder. No mide el hecho concreto; mide que la relación esté en el punto en que ese hecho ya podría haber pasado. Lo concreto va en \`nota\`.
 - **TODAS las condiciones que pongas se exigen A LA VEZ.** Puedes combinar nivel + trama cerrada + haber conocido a alguien, y no se abrirá hasta que se cumplan todas. Eso es lo que permite ajustar la dificultad y el ritmo: una pista que llega demasiado pronto se desperdicia, y una que llega tarde ya no importa.
 - \`diaAbsMinimo\`: solo si algo necesita que pase un tiempo real de campaña.
 - \`nota\`: la condición que no se puede medir —«cuando ya confíe en ella», «si llega a ver el mar del norte»—. La aplicación no la comprueba, pero el Narrador la lee.
