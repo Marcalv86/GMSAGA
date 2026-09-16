@@ -3347,6 +3347,21 @@ export default function App() {
         }
         if (id.appearance && !actual?.appearance) { nuevo.appearance = id.appearance; puestos.push('rasgos físicos'); }
         /*
+         * ⭐ SUS RASGOS ACTIVOS — lo que hasta ahora no salía de la ficha.
+         *
+         * Un rasgo como «Belleza Exótica: imán de miradas, y atrae también la
+         * atención que no se pide» vivía dentro del documento, a cuarenta mil
+         * caracteres, entre los conjuros y el equipo. Estaba en el envío y el
+         * Narrador lo leía como ambientación: la gente que debía fijarse en
+         * ella no se fijaba, y el peligro que ese rasgo arrastra no salía
+         * nunca. Aquí sube a la ficha, y de la ficha va al bloque que él lee
+         * justo antes de escribir.
+         */
+        if (id.featuresAndTraits && !actual?.featuresAndTraits) {
+          nuevo.featuresAndTraits = id.featuresAndTraits;
+          puestos.push('rasgos activos');
+        }
+        /*
          * Y SU EQUIPO, QUE SE QUEDABA FUERA.
          *
          * La lectura automática rellenaba los cinco datos de identidad y tiraba
@@ -4129,6 +4144,11 @@ export default function App() {
                   ? { languages: fichaLeida.languages }
                   : {}),
                 ...(fichaLeida?.appearance && !base.appearance ? { appearance: fichaLeida.appearance } : {}),
+                // Y los rasgos activos, que es lo que hacía falta para que
+                // «Belleza Exótica» dejara de ser una frase enterrada.
+                ...(fichaLeida?.featuresAndTraits && !base.featuresAndTraits
+                  ? { featuresAndTraits: fichaLeida.featuresAndTraits }
+                  : {}),
                 ...(fichaLeida?.currencies && !Object.values(base.currencies || {}).some(v => v)
                   ? { currencies: fichaLeida.currencies }
                   : {}),

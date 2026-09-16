@@ -6831,6 +6831,14 @@ export interface IdentidadLeida {
   class?: string;
   languages?: string[];
   appearance?: string;
+  /**
+   * Sus rasgos ACTIVOS, ya en una línea por rasgo.
+   *
+   * Lo que cambia lo que pasa en una escena —cómo la mira la gente, qué se
+   * atreve a intentar alguien, qué le pesa— frente a lo que solo adorna la
+   * ficha. Iba dentro del documento y no llegaba nunca a donde se decide.
+   */
+  featuresAndTraits?: string;
   /*
    * SU EQUIPO, QUE ES LA MITAD DE QUIÉN ES.
    *
@@ -6900,7 +6908,7 @@ Estos cuatro datos viajan al Narrador en cada turno como hechos fijos, así que 
 - "languages": ARRAY con los idiomas que HABLA O ENTIENDE. Solo los que el documento le atribuya de verdad: no añadas el común «porque sí» si no consta, ni metas idiomas que solo se mencionan de pasada hablando de otros.
 - "appearance": los rasgos por los que se la reconoce al verla, en 2-4 frases. Céntrate en lo PERMANENTE y distintivo —color y forma de ojos, pelo, piel, marcas, tatuajes, cicatrices, estatura, porte— y deja fuera la ropa cambiante y el equipo. Si un rasgo depende de algo (la luz, el momento), dilo con su condición: «ojos que van de verde agua a magenta según la luz sea fría o cálida». USA LAS PALABRAS DEL DOCUMENTO, no sinónimos tuyos: si dice un color concreto, ese color va.
 
-- "inventory": ARRAY CON LO QUE LLEVA ENCIMA. ⭐ Este es el campo que más cambia la partida, porque sus cosas no son decoración de ficha: son material de escena. Un cuaderno se lee, se compara, se enseña y se roba; una herramienta se usa; un instrumento se toca y alguien lo oye; una reliquia la reconoce quien sabe lo que es.
+- "rasgos": ARRAY CON SUS RASGOS ACTIVOS — los que cambian lo que PASA en una escena, no los que adornan la ficha. ⭐ Este es el campo que más se ignoraba, porque estos rasgos viven enterrados en mitad de un documento larguísimo y se leen como ambientación. Saca sobre todo:\n  - **Los que dicen cómo reacciona el mundo ante ella**: un aspecto que llama la atención, una reputación, una marca visible, una presencia que impone o incomoda, pertenecer a algo que da miedo o respeto. Con su efecto, y con su CARA MALA si el documento la menciona —lo que atrae la atención buena atrae también la que no se pide—.\n  - **Las complicaciones y los límites**: maldiciones, dependencias, algo que empeora con el tiempo, una rutina que tiene que cumplir para no perder algo, una desventaja cultural o social.\n  - **Los dones raros que no son un conjuro**: transformaciones, sentidos especiales, vínculos con criaturas o espíritus, suerte que interviene.\n  - Cada uno: \`{ "nombre": "...", "efecto": "qué produce EN ESCENA, en una o dos frases, incluida la parte incómoda si la hay" }\`.\n  - ⛔ Nada de rasgos de clase corrientes, competencias sueltas ni conjuros: eso ya está en la ficha y no decide escenas. Máximo ocho, y si hay que elegir, manda el que más cambia lo que la gente hace delante de ella.\n- "inventory": ARRAY CON LO QUE LLEVA ENCIMA. ⭐ Este es el campo que más cambia la partida, porque sus cosas no son decoración de ficha: son material de escena. Un cuaderno se lee, se compara, se enseña y se roba; una herramienta se usa; un instrumento se toca y alguien lo oye; una reliquia la reconoce quien sabe lo que es.
   - Saca **todo lo que el documento le atribuya**: armas, armadura, ropa señalada, instrumentos, herramientas de su oficio, libros, cuadernos, diarios, cartas, mapas, amuletos, objetos de culto, reliquias, componentes, provisiones con nombre propio y regalos.
   - **Prioriza lo distintivo sobre lo genérico.** Entre «mochila» y «el cuaderno donde copia inscripciones», el segundo importa diez veces más: es lo que solo tiene ella. Lo corriente —cuerda, yesca, raciones— ponlo al final o agrúpalo.
   - Cada objeto: \`{ "name": "...", "quantity": 1, "notas": "qué es y por qué importa, en una frase", "deMision": false, "origen": "de quién salió, si consta" }\`.
@@ -6914,7 +6922,7 @@ DOCUMENTOS:
 ${texto}
 
 Responde ÚNICAMENTE con el JSON, sin nada más:
-{ "name": "...", "race": "...", "class": "...", "languages": ["..."], "appearance": "...", "inventory": [{ "name": "...", "quantity": 1, "notas": "...", "deMision": false, "encargo": "", "origen": "" }], "currencies": { "gp": 0, "sp": 0, "cp": 0, "ep": 0, "pp": 0 } }`;
+{ "name": "...", "race": "...", "class": "...", "languages": ["..."], "appearance": "...", "rasgos": [{ "nombre": "...", "efecto": "..." }], "inventory": [{ "name": "...", "quantity": 1, "notas": "...", "deMision": false, "encargo": "", "origen": "" }], "currencies": { "gp": 0, "sp": 0, "cp": 0, "ep": 0, "pp": 0 } }`;
 
   const modelo = getBackgroundTaskModel();
   const respuesta = await generateContentWithFailover({
@@ -6990,6 +6998,27 @@ Responde ÚNICAMENTE con el JSON, sin nada más:
     class: txt(p?.class, 80),
     languages: idiomas?.length ? idiomas : undefined,
     appearance: txt(p?.appearance, 1200),
+    /*
+     * Los rasgos, que llevaban existiendo en el tipo y no los rellenaba nadie.
+     *
+     * `featuresAndTraits` estaba declarado en `PlayerCharacter` desde el
+     * principio y NINGÚN sitio lo escribía. Y no es un detalle: es la
+     * diferencia entre que «Belleza Exótica — imán de miradas, y atrae también
+     * la atención que no se pide» sea una mecánica que el Narrador tiene
+     * delante cada turno, o una frase perdida a cuarenta mil caracteres dentro
+     * del documento de la ficha, entre los conjuros y el equipo.
+     */
+    featuresAndTraits: Array.isArray(p?.rasgos)
+      ? p.rasgos
+          .map((r: any) => {
+            const nombre = txt(r?.nombre || r?.name, 80);
+            const efecto = txt(r?.efecto || r?.description, 400);
+            return nombre && efecto ? `${nombre}: ${efecto}` : nombre || '';
+          })
+          .filter(Boolean)
+          .slice(0, 8)
+          .join('\n  · ')
+      : undefined,
     inventory: equipo.length ? equipo : undefined,
     currencies: monedas && Object.keys(monedas).length ? monedas : undefined
   };
