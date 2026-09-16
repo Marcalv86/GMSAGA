@@ -381,6 +381,24 @@ export function setStoredAutoFailover(enabled: boolean): void {
   localStorage.setItem('gmstudio_auto_failover', enabled ? 'on' : 'off');
 }
 
+/**
+ * ¿Revincular la biblioteca sola al subir documentos?
+ *
+ * Por defecto SÍ: un documento sin etiquetas cruzadas es medio invisible para
+ * el buscador, y esperar a que alguien pulse un botón es esperar sentado.
+ *
+ * Se puede apagar porque cuesta una petición del cupo diario —veinte al día
+ * por clave en la capa gratuita—, y quien esté apurado de cuota prefiere
+ * gastarlas jugando y vincular a mano cuando le venga bien.
+ */
+export function getStoredAutoVincular(): boolean {
+  return localStorage.getItem('gmstudio_auto_vincular') !== 'off';
+}
+
+export function setStoredAutoVincular(enabled: boolean): void {
+  localStorage.setItem('gmstudio_auto_vincular', enabled ? 'on' : 'off');
+}
+
 export function getStoredAutoNovelize(): boolean {
   // Por defecto 'off' para proteger la cuota de tokens por minuto (TPM) en la capa gratuita.
   return localStorage.getItem('gmstudio_auto_novelize') === 'on';

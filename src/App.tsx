@@ -111,6 +111,7 @@ import {
   extraerMecanicasDeDocumento,
   generarEtiquetasDeBusqueda,
   relacionarBibliotecaInteligente,
+  getStoredAutoVincular,
   elencoDeLaCampana,
   fusionarTrama,
   isNarrativeIncomplete,
@@ -281,6 +282,15 @@ export default function App() {
   const [currentActiveModel, setCurrentActiveModel] = useState<string>(() => getStoredModel());
   const [isLocalStorageModalOpen, setIsLocalStorageModalOpen] = useState(false);
   const [isImportCampaignModalOpen, setIsImportCampaignModalOpen] = useState(false);
+  /**
+   * Cuánto se espera desde el último archivo antes de revincular la biblioteca.
+   *
+   * Lo bastante para que una subida de varios documentos cuente como una sola,
+   * y lo bastante poco para que ya esté hecho cuando se vaya a jugar.
+   */
+  const ESPERA_ANTES_DE_REVINCULAR = 20000;
+  const relacionarPendiente = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [topProgress, setTopProgress] = useState<{
     active: boolean;
     percent?: number;
@@ -2994,6 +3004,26 @@ export default function App() {
         title: 'Archivos Guardados',
         message: `Se han añadido ${newFilesList.length} documento(s) a los Archivos del Tomo.`
       });
+
+      /*
+       * 🗺️ REVINCULAR LA BIBLIOTECA SOLA, EN CUANTO SE ASIENTE LA SUBIDA.
+       *
+       * Un documento recién subido entra SIN etiquetas cruzadas, así que para
+       * el buscador es medio invisible hasta que a alguien se le ocurre pulsar
+       * el botón de vincular. Y nadie se acuerda de pulsarlo — que es la misma
+       * historia de siempre: una función que existe, funciona, y no se dispara
+       * cuando hace falta.
+       *
+       * ⚠️ Pero esto GASTA UNA PETICIÓN del cupo diario, que en la capa
+       * gratuita son veinte por clave. Así que no salta por archivo: salta UNA
+       * vez, cuando han pasado unos segundos sin que llegue nada más. Subir
+       * seis documentos de golpe cuesta una petición, no seis.
+       */
+      if (relacionarPendiente.current) clearTimeout(relacionarPendiente.current);
+      relacionarPendiente.current = setTimeout(() => {
+        relacionarPendiente.current = null;
+        if (getStoredAutoVincular()) void handleRelacionarBiblioteca({ silencioso: true });
+      }, ESPERA_ANTES_DE_REVINCULAR);
     } catch (error) {
       console.error('Error handling files upload:', error);
       setAlertConfig({ isOpen: true, title: 'Error', message: 'Hubo un problema al procesar los archivos.' });
@@ -3470,7 +3500,8 @@ export default function App() {
 
   const [isRelacionandoBiblioteca, setIsRelacionandoBiblioteca] = useState(false);
 
-  const handleRelacionarBiblioteca = async () => {
+  const handleRelacionarBiblioteca = async (opciones?: { silencioso?: boolean }) => {
+    const silencioso = Boolean(opciones?.silencioso);
     if (!currentPId || !currentProject) return;
     if (isRelacionandoBiblioteca) return;
 
@@ -3480,11 +3511,13 @@ export default function App() {
     );
 
     if (candidatos.length < 2) {
-      setAlertConfig({
-        isOpen: true,
-        title: 'Documentos insuficientes',
-        message: 'Se necesitan al menos 2 documentos de texto o compendios en la biblioteca para que la IA pueda tejer relaciones inteligentes entre ellos.'
-      });
+      if (!silencioso) {
+        setAlertConfig({
+          isOpen: true,
+          title: 'Documentos insuficientes',
+          message: 'Se necesitan al menos 2 documentos de texto o compendios en la biblioteca para que la IA pueda tejer relaciones inteligentes entre ellos.'
+        });
+      }
       return;
     }
 
@@ -3532,6 +3565,20 @@ export default function App() {
       setCurrentFiles(actualizados);
       await saveFilesToDB(currentPId, actualizados);
 
+      if (silencioso) {
+        /*
+         * Se avisa sin robar el foco: estaba subiendo archivos, no esperando un
+         * informe. Un modal encima de una subida de seis documentos es justo lo
+         * que hace que la gente apague las cosas automáticas.
+         */
+        setTopProgress({
+          active: true,
+          label: `🗺️ Biblioteca revinculada: ${resultado.totalConexiones} término(s) puente nuevos`,
+          type: 'analysis'
+        });
+        setTimeout(() => setTopProgress({ active: false }), 4000);
+        return;
+      }
       setAlertConfig({
         isOpen: true,
         title: 'Biblioteca Vinculada con Éxito',

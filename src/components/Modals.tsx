@@ -16,7 +16,9 @@ import {
   getStoredAutoFailover,
   setStoredAutoFailover,
   getStoredAutoNovelize,
+  getStoredAutoVincular,
   setStoredAutoNovelize,
+  setStoredAutoVincular,
   getStoredBackgroundModel,
   setStoredBackgroundModel,
   getStoredApiKeys,
@@ -38,7 +40,7 @@ import {
 } from '../utils/geminiHelper';
 import { ResumenUso, borrarUso, resumirUso } from '../utils/usageStats';
 
-import {
+import { Link2,
   Brain,
   Cpu,
   Check,
@@ -142,6 +144,7 @@ export const ApiKeyModal: React.FC<{
   const [topP, setTopP] = useState<number>(getStoredTopP());
   const [autoFailover, setAutoFailover] = useState<boolean>(getStoredAutoFailover());
   const [autoNovelize, setAutoNovelize] = useState<boolean>(getStoredAutoNovelize());
+  const [autoVincular, setAutoVincular] = useState<boolean>(getStoredAutoVincular());
   const [historyWindow, setHistoryWindow] = useState<HistoryWindowSetting>(getStoredHistoryWindow());
   const [keyRotationMode, setKeyRotationMode] = useState<KeyRotationMode>(getStoredKeyRotationMode());
   const [apiKeysList, setApiKeysList] = useState<string[]>(getStoredApiKeys());
@@ -382,6 +385,7 @@ export const ApiKeyModal: React.FC<{
     setStoredTopP(topP);
     setStoredAutoFailover(autoFailover);
     setStoredAutoNovelize(autoNovelize);
+    setStoredAutoVincular(autoVincular);
     setStoredHistoryWindow(historyWindow);
     setSavedSuccess(true);
     setTimeout(() => {
@@ -740,6 +744,45 @@ export const ApiKeyModal: React.FC<{
                       type="checkbox"
                       checked={autoNovelize}
                       onChange={e => setAutoNovelize(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[var(--glass-border)]">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--glass-border)] p-3 rounded-lg flex items-start justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <label
+                        onClick={() => setAutoVincular(!autoVincular)}
+                        className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Link2 className="w-3.5 h-3.5 text-[var(--accent)]" />
+                        Vincular la Biblioteca al Subir Documentos
+                      </label>
+                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
+                        autoVincular
+                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                          : 'bg-stone-500/10 text-stone-600 dark:text-stone-300 border-stone-500/20'
+                      }`}>
+                        {autoVincular ? 'Activa (Recomendado)' : 'Desactivada'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
+                      Un documento recién subido entra <strong>sin etiquetas cruzadas</strong>, así que para el buscador
+                      es medio invisible hasta que alguien pulsa «Vincular biblioteca». Con esto activo se teje solo,
+                      una vez, veinte segundos después del último archivo — así subir seis documentos de golpe cuesta
+                      una petición y no seis. ⚠️ Gasta <strong>una petición del cupo diario</strong>; si vas apurado de
+                      cuota, apágalo y vincula a mano cuando te venga bien.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={autoVincular}
+                      onChange={e => setAutoVincular(e.target.checked)}
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
