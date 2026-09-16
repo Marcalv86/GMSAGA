@@ -3646,12 +3646,11 @@ export default function App() {
        * biblioteca no puede borrar los comodines que alguien puso porque el
        * vinculador no los había visto.
        */
+      // 2. Creamos o actualizamos el archivo "🗺️ Red Semántica y Mapa de Relaciones.md"
+      const nombreMapa = '🗺️ Red Semántica y Mapa de Relaciones.md';
       const mapaPrevio = frescos.find(f => f.name === nombreMapa);
       const puentesFusionados = fusionarPuentes(leerPuentesDelMapa(mapaPrevio?.content), resultado.puentes);
       const contenidoDelMapa = escribirPuentesEnMapa(resultado.mapaMarkdown, puentesFusionados);
-
-      // 2. Creamos o actualizamos el archivo "🗺️ Red Semántica y Mapa de Relaciones.md"
-      const nombreMapa = '🗺️ Red Semántica y Mapa de Relaciones.md';
       const existeMapa = actualizados.find(f => f.name === nombreMapa);
       const fileId = existeMapa?.id || `file_${Date.now()}_maparelaciones`;
 
