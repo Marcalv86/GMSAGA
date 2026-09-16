@@ -846,6 +846,19 @@ export interface NPC {
    *                `orientacion`, que lo dice mejor y dice por qué.
    */
   atraccion?: 'desea' | 'interes';
+  /**
+   * Ya se decidió, aunque la respuesta fuera «no siente nada».
+   *
+   * Sin esto, «no la desea» y «nadie se lo ha preguntado todavía» se ven
+   * exactamente igual desde el prompt: un campo vacío. Y como el dosier del
+   * turno callaba en los dos casos, el Narrador no tenía forma de saber que le
+   * quedaba una decisión pendiente, así que nunca la tomaba. El deseo no
+   * aparecía porque el turno no lo pedía nunca.
+   *
+   * Se marca con CUALQUIER valor explícito —`desea`, `interés` y también
+   * `ninguna`—, porque decir «aquí no hay nada» es haberlo decidido.
+   */
+  atrEvaluada?: boolean;
   /** ⚠️ LEGADO — la atracción ya no se puntúa. Solo para migrar. Ver `atraccion`. */
   atr?: number;
   /** Eje de Vínculo afectivo / Camaradería y lealtad (escala 0 - 20) */

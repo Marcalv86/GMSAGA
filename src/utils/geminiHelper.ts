@@ -1824,6 +1824,31 @@ ${bloqueElenco}
     // da por hecho: escribirlo solo invita al Narrador a detenerse en ello, y
     // cuando una puerta está cerrada de verdad ya lo explica «orientación».
     /*
+     * PERO «NADIE LO HA DECIDIDO TODAVÍA» NO ES «NO SIENTE NADA».
+     *
+     * Las reglas del deseo estaban escritas, y bien, en el manual de etiquetas:
+     * tres mil caracteres de instrucciones correctas en un sitio que el modelo
+     * consulta cuando ya sabe que quiere emitir algo. El problema es que nunca
+     * llegaba a querer. Al escribir la escena tenía delante este dosier, y
+     * aquí un personaje sin atracción decidida se veía idéntico a uno con la
+     * puerta cerrada: una línea que no existe. Silencio es «no hay nada que
+     * mirar», así que no miraba, y la pregunta no se hacía jamás.
+     *
+     * Se pide SOLO de quien está en escena ahora —es cuando toca decidirlo, y
+     * es quien se está escribiendo— y desaparece en cuanto responde, sea lo
+     * que sea lo que responda.
+     */
+    else if (!n.atrEvaluada && ausencia === 0) {
+      lineas.push(
+        `- ❓ ATRACCIÓN SIN DECIDIR: nadie ha establecido todavía qué siente por la protagonista, y eso NO significa que no sienta nada. ` +
+          `Decídelo ESTE TURNO y dilo con \`atr:\` dentro de su \`[VÍNCULO:]\`. ` +
+          `**(1)** ¿La crió, es familia o la tuvo de aprendiza? → la atracción queda descartada, y lo que toca es \`previo: sí\` con \`vin\` y \`con\` ALTOS. ` +
+          `**(2)** Si no, decídelo por SU personalidad tal y como la pintan los documentos —a quien es seductor, mundano o hedonista el deseo se le enciende en el acto, y rebajarlo a «curiosidad profesional» es contradecir su ficha— y MIRANDO LOS RASGOS DE ELLA que dicen cómo reacciona el mundo ante ella. ` +
+          `**(3)** Si te lo acabas de inventar y no hay documento que lo describa, tira 1d20: 1-14 nada · 15-18 \`atr: interés\` · 19-20 \`atr: desea\`. ` +
+          `⭐ Y si la respuesta es que no siente nada, emite \`atr: ninguna\` igualmente: así queda decidido y no se te vuelve a preguntar.`
+      );
+    }
+    /*
      * A quién mira este personaje, dicho aquí y no dejado a la deducción.
      *
      * El protocolo ya decía que la orientación es de cada uno y no se da por
@@ -6400,7 +6425,7 @@ QUÉ SÍ PUEDES HACER AQUÍ:
 
 🔧 Y ARREGLAR LO QUE ESTÉ MAL, QUE ES LA RAZÓN DE SER DE ESTA PESTAÑA.
 La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: **te lo pide a ti y lo arreglas tú**, igual que en una mesa de verdad nadie le abre el cuaderno al Director. Así que cuando te digan que algo está mal, no contestes «entra en Memoria y bórralo»: **hazlo**, emite la etiqueta correspondiente y dilo en palabras.
-- \`[PNJ: Nombre | nuevoNombre: ... | relacion: ... | estado: ... | notas: ... | desc: ... | apariencia: ... | alias: ... | idiomas: ... | orientacion: ... | aparenta: ... | oculta: ... | atr: N | vin: N | con: N]\` o \`[VÍNCULO: Nombre | ...]\` — **EDITA / CORRIGE / REGISTRA UN PNJ EN LA MEMORIA**. Si la jugadora te dice que un PNJ está mal en la lista de memoria (su nombre, ocupación, notas, relación, descripción, estado, etc.), **DEBES EMITIR SIEMPRE esta etiqueta con los datos corregidos para que se aplique en la memoria**.
+- \`[PNJ: Nombre | nuevoNombre: ... | relacion: ... | estado: ... | notas: ... | desc: ... | apariencia: ... | alias: ... | idiomas: ... | orientacion: ... | aparenta: ... | oculta: ... | atr: desea/inter\u00e9s/ninguna | previo: s\u00ed | vin: 0-20 | con: 0-20]\` o \`[VÍNCULO: Nombre | ...]\` — **EDITA / CORRIGE / REGISTRA UN PNJ EN LA MEMORIA**. Si la jugadora te dice que un PNJ está mal en la lista de memoria (su nombre, ocupación, notas, relación, descripción, estado, etc.), **DEBES EMITIR SIEMPRE esta etiqueta con los datos corregidos para que se aplique en la memoria**. ⚠️ **\`atr\` NO es un número.** Es \`desea\`, \`interés\` o \`ninguna\` —y \`ninguna\` es lo que APAGA a quien quedó marcado por error—. Si escribes una cifra ahí estás usando una escala que ya no existe.
   - ⚠️ **Si solo dices «Ok, lo hago» con texto pero no emites la etiqueta \`[PNJ: ...]\` o \`[VÍNCULO: ...]\`, la aplicación NO puede modificar la ficha y todo seguirá igual.**
   - Para renombrar: \`[PNJ: NombreViejo | nuevoNombre: NombreNuevo]\`
   - Para corregir notas, datos o descripción: \`[PNJ: Nombre | notas: texto corregido | relacion: Aliado/Enemigo/etc.]\`

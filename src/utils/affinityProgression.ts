@@ -195,6 +195,10 @@ export function actualizarAfinidadNpc(
 
   return {
     atraccion: nuevaAtraccion,
+    // Cualquier valor explícito cierra la pregunta, «ninguna» incluida: decir
+    // que aquí no hay nada también es haberlo decidido, y es lo que hace que
+    // el turno deje de reclamarlo.
+    atrEvaluada: reportado.atraccion ? true : npc.atrEvaluada,
     vin: progresoVin.nuevoValor,
     con: progresoCon.nuevoValor,
     ultimoDiaSubida: nuevoUltimoDiaSubida
@@ -210,6 +214,8 @@ export function conciliarAfinidadesTrasSincronizar<
   T extends {
     name: string;
     atraccion?: 'desea' | 'interes';
+    /** Ya se decidió, aunque saliera «nada». Ver `NPC.atrEvaluada`. */
+    atrEvaluada?: boolean;
     /** ⚠️ LEGADO, solo para migrar campañas anteriores al interruptor. */
     atr?: number;
     vin?: number;

@@ -100,10 +100,11 @@ REQUISITOS DE EXTRACCIÓN:
    - notes: Quién es, qué quiere y qué rol desempeña.
    - aparenta: Cómo se muestra en público hacia el protagonista.
    - oculta: Qué intenciones secretas, sospechas o cartas ocultas guarda.
-   - **REGLA DE AFINIDAD (atr, vin, con, vinculo):**
-     - **SOLO** asigna campos de afinidad (atr: 0-20, vin: 0-20, con: 0-20, vinculo) si el PNJ tiene un **Nombre Propio real** (ej: Jarlaxle, Kieron, Valas, Braelin), es un personaje canónico o un acompañante principal con peso dramático.
-     - Para **figurantes / extras anónimos** sin nombre propio (ej: 'Corsario del estoque', 'Guardia de la puerta', 'Ballestero', 'Tabernero'), **NO** incluyas 'atr', 'vin', 'con' ni 'vinculo' (deben quedar como simples figurantes sin barras).
-     - Escala D20 (0 a 20): 0-1 Desconocido/Recelo, 2-5 Curiosidad/Trato formal, 6-9 Interés/Camaradería, 10-13 Química/Flirteo, 14-17 Fascinación/Lealtad, 18-20 Devoción/Amor. Progresión slow-burn estricta.
+   - **REGLA DE AFINIDAD (atraccion, vin, con, vinculo):**
+     - **SOLO** asigna campos de afinidad (atraccion, vin: 0-20, con: 0-20, vinculo) si el PNJ tiene un **Nombre Propio real** (ej: Jarlaxle, Kieron, Valas, Braelin), es un personaje canónico o un acompañante principal con peso dramático.
+     - Para **figurantes / extras anónimos** sin nombre propio (ej: 'Corsario del estoque', 'Guardia de la puerta', 'Ballestero', 'Tabernero'), **NO** incluyas 'atraccion', 'vin', 'con' ni 'vinculo' (deben quedar como simples figurantes sin barras).
+     - 'vin' (vínculo afectivo) y 'con' (confianza) sí son escala 0-20: 0-1 Desconocido/Recelo, 2-5 Trato formal, 6-9 Camaradería, 10-13 Complicidad, 14-17 Lealtad, 18-20 Devoción. Progresión slow-burn estricta. ⚠️ Salvo que la relación **ya existiera antes de la campaña** —un padre, una maestra, alguien que la crió—: eso no empieza en cero y va alto desde el principio.
+     - **'atraccion' NO es un número y casi nunca se pone.** Solo dos valores, y solo si el texto lo respalda: \`"desea"\` (la desea de verdad) o \`"interes"\` (hay algo y todavía no es deseo). Si no siente nada, **omite el campo**. ⛔ Y si hay parentesco o tutela —padre, madre, hermano, quien la crió— **no lo pongas nunca**: ahí lo que hay es 'vin' y 'con' altos, que es otra cosa entera.
 6. **quests**: Lista de misiones, contratos, misterios o encargos activos o resueltos:
    - title: Nombre de la misión.
    - origin: Quién la encomendó o dónde se originó.
@@ -157,7 +158,7 @@ RESPONDE EXCLUSIVAMENTE UN OBJETO JSON VÁLIDO CON ESTA ESTRUCTURA:
       "aparenta": "...",
       "oculta": "...",
       "vinculo": "...",
-      "atr": 5,
+      "atraccion": "desea",
       "vin": 4,
       "con": 3
     }
@@ -372,7 +373,14 @@ function formatParsedDataToCampaign(
         aparenta: n.aparenta || '',
         oculta: n.oculta || '',
         vinculo: n.vinculo || '',
-        atr: typeof n.atr === 'number' ? Math.max(0, Math.min(20, Math.round(n.atr))) : undefined,
+        /*
+         * El importador seguía rellenando la escala 0-20 que ya no lee nadie.
+         * Escribía en `atr` —campo muerto— así que toda campaña importada
+         * entraba con el deseo en blanco, y encima el prompt le pedía cifras,
+         * contradiciendo al resto de la aplicación.
+         */
+        atraccion: n.atraccion === 'desea' || n.atraccion === 'interes' ? n.atraccion : undefined,
+        atrEvaluada: n.atraccion ? true : undefined,
         vin: typeof n.vin === 'number' ? Math.max(0, Math.min(20, Math.round(n.vin))) : undefined,
         con: typeof n.con === 'number' ? Math.max(0, Math.min(20, Math.round(n.con))) : undefined,
         recurrente: Boolean(n.vinculo || n.aparenta || n.oculta || (n.vin !== undefined && n.vin >= 4))
@@ -563,7 +571,6 @@ function extractNpcsDeterministically(lines: string[]): NPC[] {
           notes: desc,
           vinculo: 'Trato cordial',
           recurrente: true,
-          atr: 3,
           vin: 3,
           con: 3
         });

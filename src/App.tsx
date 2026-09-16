@@ -1350,6 +1350,9 @@ export default function App() {
           cr: v.cr || cr || sheet.cr,
           characterSheet: sheet,
           atraccion: atraccionInicial,
+          // Decidido queda decidido, aunque lo decidido sea «nada»: con esto el
+          // dosier del turno deja de reclamarlo.
+          atrEvaluada: v.atraccion ? true : undefined,
           vin: vinInicial,
           con: conInicial,
           orientacion: v.orientacion,
@@ -1914,6 +1917,7 @@ export default function App() {
               characterSheet: sheet
             };
             if (atraccionInicial) nuevoNpc.atraccion = atraccionInicial;
+            if (v.atraccion) nuevoNpc.atrEvaluada = true;
             if (typeof v.vin === 'number') nuevoNpc.vin = v.vin;
             if (typeof v.con === 'number') nuevoNpc.con = v.con;
             npcsActualizados.push(nuevoNpc);
