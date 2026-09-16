@@ -57,17 +57,19 @@ Todas las etiquetas deben ir al final del mensaje o en su lugar correspondiente.
 - \`[PRESENTES: nombre1, nombre2]\` — Lista de PNJs con nombre propio presentes en escena.
   - ⛔ **NUNCA incluyas al personaje protagonista principal** en esta lista. Tampoco a extras genéricos ("los guardias").
 
-#### D. Sistema de Afinidad de PNJs en Tres Ejes (0 a 20)
-- **Formato**: \`[VÍNCULO: nombre | aparenta: ... | oculta: ... | grado: tipo — descripción | atr: 0-20 | vin: 0-20 | con: 0-20]\`
-- **Ejes**:
-  - **ATR (Atracción / Deseo / Química 0-20 — Termómetro Dinámico y Flechazo)**: Mide la tensión erótica, el magnetismo y la química actual entre el PNJ y la protagonista. **No es una barra de experiencia acumulativa**:
-    1) **El Flechazo / Chispa Inicial**: Si hay química o atractivo mutuo desde el primer encuentro, el Narrador le asigna directamente un valor alto de golpe (ej. 12-16) desde el primer segundo. No existe el "empezar en 0" por defecto.
-    2) **Fluctuación Fluida (Sube y Baja)**: La atracción no solo sube; **fluctúa libremente según el pulso de la escena**. Se dispara bruscamente con un momento de gran tensión, coqueteo o cercanía física, pero también **puede descender** de golpe si hay frialdad, celos, un desplante o distanciamiento. No tiene límites de ritmo diario.
-  - **VÍN (Vínculo/Camaradería 0-20)**: Conexión emocional y tiempo compartido.
-  - **CON (Confianza/Secretos 0-20)**: Disposición a compartir secretos de vida o muerte.
-- **Rangos**: 0-1 (🤍 Rango 0), 2-5 (❤️ Rango 1), 6-9 (❤️❤️ Rango 2), 10-13 (❤️❤️❤️ Rango 3), 14-17 (❤️❤️❤️❤️ Rango 4), 18-20 (❤️❤️❤️❤️❤️ Rango 5).
-- **Límite de Ritmo**: Para VÍN y CON, el aumento máximo es de +1 por día de campaña. **ATR (Atracción) no tiene límite rígido diario**: puede subir de golpe o reflejar un flechazo, tensión o química inmediata según la intensidad de la escena.
-- ⛔ **PROHIBIDO** escribir datos numéricos de afinidad en el texto plano narrativo. Solo mediante la etiqueta silenciosa.
+#### D. Sistema de Afinidad de PNJs en Tres Ejes
+- **Formato**: \`[VÍNCULO: nombre | aparenta: ... | oculta: ... | grado: tipo — descripción | orientacion: hacia quién le tira | atr: desea / interes / ninguna | vin: 0-20 | con: 0-20]\`
+- **Ejes y Naturaleza Psicológica**:
+  - **ATR (Atracción Física, Deseo Carnal y Química — \`desea\` | \`interes\` | \`ninguna\`)**:
+    1) **Deseo Sexual Inmediato vs. Vínculo Emocional**: Hay personas y PNJs que **no necesitan un vínculo emocional profundo para sentir atracción física o deseo sexual**. Ante alguien con carisma, magnetismo o belleza peligrosa, el deseo carnal o la atracción estética (\`atr: desea\` o \`atr: interes\`) se enciende en el acto (desde la primera noche, primera mirada o primera charla con química). El afecto o enamoramiento puede llegar después (o nunca) con el trato.
+    2) **Perfiles y Arquetipos**:
+       - *Perfil de Deseo Directo / Seductor / Mundano (ej. Jarlaxle, corsarios, bribones, hedonistas)*: Sienten y expresan atracción física, deseo y tensión sensual de inmediato ante un estímulo atrayente, sin requerir semanas de confianza previa.
+       - *Perfil Reservado / Demisexual*: Requieren intimidad, respeto o confianza emocional antes de que surja la chispa física.
+       - ⛔ **PROHIBIDO castrar a los PNJs del primer perfil** forzándolos a un puritanismo artificial o exigiendo meses de amistad para admitir deseo físico.
+    3) **Valores**: \`atr: desea\` (siente atracción/deseo físico real), \`atr: interes\` (curiosidad estética/atracción incipiente), o se omite si es indiferente/neutro. \`atr: ninguna\` se usa únicamente para apagar o corregir un valor previo que se haya extinguido.
+  - **VÍN (Vínculo Afectivo / Camaradería / Lealtad 0-20)**: Conexión emocional y tiempo compartido (progresión escalonada, máximo +1/día).
+  - **CON (Confianza / Secretos 0-20)**: Disposición a compartir secretos íntimos o de vida o muerte (progresión escalonada, máximo +1/día).
+- ⛔ **PROHIBIDO** escribir datos de afinidad en el texto narrativo literario. Solo mediante la etiqueta corcheteada silenciosa.
 
 #### E. Inventario y Dinero
 - **Formato**: \`[INVENTARIO: +X Objeto, -Y Objeto, +Z PO, -W PO, +A PP, -B PC]\`
