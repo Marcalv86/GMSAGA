@@ -4113,12 +4113,36 @@ export default function App() {
              * puerta de las tres que no tenía portero, y por ahí entraban
              * números de quince sesiones el primer día.
              */
-            npcs: conciliarAfinidadesTrasSincronizar(
-              p.memory?.npcs || [],
-              memoriaSincronizada.npcs || [],
-              diaDeHoy,
-              (a, b) => coincidenNombresNpc(a, b)
-            ),
+            npcs: (() => {
+              const conciliados = conciliarAfinidadesTrasSincronizar(
+                p.memory?.npcs || [],
+                memoriaSincronizada.npcs || [],
+                diaDeHoy,
+                (a, b) => coincidenNombresNpc(a, b)
+              );
+              /*
+               * Los retratos que sobrevivieron a un vaciado vuelven a su sitio.
+               *
+               * Vaciar la memoria y resincronizar es una forma legítima de
+               * trabajar —la crónica lo cuenta todo y la IA lo relee—, pero las
+               * caras no están escritas en ningún mensaje. Se guardaron por
+               * nombre al vaciar; aquí se vuelven a pegar en cuanto esa persona
+               * es fichada de nuevo.
+               */
+              const guardados = p.memory?.retratos_guardados || [];
+              if (!guardados.length) return conciliados;
+              return conciliados.map(n =>
+                n.portrait
+                  ? n
+                  : {
+                      ...n,
+                      portrait:
+                        guardados.find(r => coincidenNombresNpc(r.nombre, n.name))?.portrait ??
+                        n.portrait
+                    }
+              );
+            })(),
+            retratos_guardados: p.memory?.retratos_guardados,
             gm_bambalinas: cuaderno.movimientos.length ? cuaderno.movimientos : memoriaSincronizada.gm_bambalinas,
             gm_relojes: cuaderno.relojes.length ? cuaderno.relojes : memoriaSincronizada.gm_relojes,
             gm_facciones: mesa.facciones.length ? mesa.facciones : memoriaSincronizada.gm_facciones,

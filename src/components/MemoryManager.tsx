@@ -620,13 +620,35 @@ export const MemoryManager: React.FC<{
       isOpen: true,
       title: 'Restablecer Toda la Memoria',
       message:
-        '¿Deseas vaciar y restablecer completamente toda la memoria de la campaña? Esta acción borrará los datos de todas las pestañas: el resumen e hitos del Protagonista, la cronología e hilos de la Agenda, la lista de PNJs y sus afinidades, los Lugares y mapas, las Tramas y misiones activas, el Resumen acumulado, el Estado de la compañía y las Notas del tomo.',
+        'Vacía del todo la memoria de la campaña: Protagonista, cronología e hilos, PNJs y sus afinidades, Lugares, Tramas, Resumen, Estado y Notas.\n\n' +
+        '✅ TU CRÓNICA Y TUS DOCUMENTOS NO SE TOCAN. Por eso esto se puede deshacer: dale luego a «Sincronizar Memoria Completa con IA» y lo reconstruye leyendo el chat entero —gente, lugares, tramas, diario, mochila y afinidades—.\n\n' +
+        '🖼️ Los retratos de los PNJs se guardan aparte y se vuelven a pegar solos cuando la sincronización los fiche de nuevo. Tu retrato y tu memoria visual se conservan.\n\n' +
+        '⚠️ LO QUE SÍ SE PIERDE DE VERDAD es lo que nunca estuvo escrito en el chat: los secretos del Director, el plan de campaña y la lista de «esto no es un PNJ». Eso no hay crónica que lo devuelva.',
       onConfirm: async () => {
         setExpandedLocIds(new Set());
         setExpandedQuestIds(new Set());
         setSelectedNpcForDossier(null);
         setSelectedLocForDossier(null);
         setVinculosDestapados(new Set());
+
+        /*
+         * Los retratos no están contados en ninguna parte del chat.
+         *
+         * Todo lo demás que se borra aquí vuelve con una sincronización, porque
+         * la crónica lo cuenta. Una imagen no: nadie la ha escrito, así que
+         * reconstruir la memoria la borraba para siempre y empezar de cero
+         * costaba todas las caras de la campaña. Se guardan por nombre y se
+         * vuelven a pegar cuando esa persona sea fichada otra vez.
+         */
+        const retratosPrevios = [
+          ...(project.memory?.retratos_guardados || []),
+          ...(project.memory?.npcs || [])
+            .filter(n => n.portrait && n.name?.trim())
+            .map(n => ({ nombre: n.name.trim(), portrait: n.portrait as string }))
+        ].filter(
+          (r, i, todos) =>
+            todos.findIndex(o => o.nombre.toLowerCase() === r.nombre.toLowerCase()) === i
+        );
 
         const emptyMemory: Memory = {
           story: '',
@@ -635,7 +657,10 @@ export const MemoryManager: React.FC<{
           npcs: [],
           companions: [],
           locations: [],
-          visual_memory: [],
+          retratos_guardados: retratosPrevios,
+          // La memoria visual son imágenes generadas, no estado de campaña:
+          // no se reconstruye leyendo el chat, así que no se tira.
+          visual_memory: project.memory?.visual_memory || [],
           player_character: {
             /*
              * Vaciar la memoria conserva QUIÉN eres, no inventa a otra.

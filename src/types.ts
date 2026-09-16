@@ -707,6 +707,19 @@ export interface Memory {
    * implicado. Barato —corre en el navegador, no gasta petición— y es justo lo
    * que le faltaba a un motor que solo sabe contar palabras.
    */
+  /**
+   * Los retratos de quien ya no está en la lista, esperando a que vuelva.
+   *
+   * Vaciar la memoria para que la IA relea la crónica entera es una forma
+   * legítima de trabajar, y casi todo lo que se borra vuelve: los PNJs, los
+   * lugares, las tramas y el diario están contados en el chat. Los retratos no.
+   * Nadie los ha escrito en ninguna parte, así que la reconstrucción no podía
+   * devolverlos y se perdían para siempre en cada reinicio.
+   *
+   * Se guardan por nombre al vaciar y se vuelven a pegar cuando la
+   * sincronización ficha otra vez a esa persona.
+   */
+  retratos_guardados?: { nombre: string; portrait: string }[];
   puentes_de_busqueda?: { termino: string; relacionados: string[] }[];
   no_son_pnj?: string[];
   gm_secrets?: SecretoDeCampana[];
