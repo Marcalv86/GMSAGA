@@ -1324,8 +1324,17 @@ export default function App() {
          * ahí hoy.
          */
         const atraccionInicial = v.atraccion === 'ninguna' ? undefined : v.atraccion;
-        const vinInicial = v.vin !== undefined ? 0 : undefined;
-        const conInicial = v.con !== undefined ? 0 : undefined;
+        /*
+         * Un vínculo que viene de ANTES de la campaña no empieza en cero.
+         *
+         * La regla de «vin y con nacen a 0 y se ganan jugando» es para
+         * desconocidos, y aplicada a todos convertía en desconocido a quien no
+         * lo es: el padre que la crió durante dos siglos entraba igual que el
+         * tabernero que acaba de servirle un vino. Cuando el Narrador declara
+         * que la relación ya existía, entra donde de verdad está.
+         */
+        const vinInicial = v.previo ? v.vin : v.vin !== undefined ? 0 : undefined;
+        const conInicial = v.previo ? v.con : v.con !== undefined ? 0 : undefined;
 
         nuevosNpcs.push({
           id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,

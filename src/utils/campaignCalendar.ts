@@ -1698,6 +1698,8 @@ export interface VinculoLeido {
   vinculo?: string;
   /** Qué siente por ella. `'ninguna'` apaga lo que hubiera; ausente = no se ha dicho. */
   atraccion?: 'desea' | 'interes' | 'ninguna';
+  /** La relación viene de antes de la campaña: padre, maestro, hermana, amigo de años. */
+  previo?: boolean;
   /** ⚠️ LEGADO: la atracción numérica. Solo la escriben campañas viejas. */
   atr?: number;
   vin?: number;
@@ -1815,6 +1817,10 @@ export function leerVinculos(texto: string): VinculoLeido[] {
           if (acc.includes('borr') || acc.includes('elim') || acc.includes('quit')) {
             v.accion = 'borrar';
           }
+        } else if (campo === 'previo' || campo === 'previa' || campo === 'deantes') {
+          v.previo = /^(si|s|true|1|x|v)/.test(
+            valor.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim()
+          );
         } else if (campo === 'atr' || campo === 'atraccion' || campo === 'desea') {
           const leido = leerAtraccion(valor);
           if (leido) v.atraccion = leido;

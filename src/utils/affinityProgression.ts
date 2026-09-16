@@ -50,7 +50,24 @@ export function calcularProgresoEje(
   valorReportado: number | undefined,
   totalDiasVistos: number,
   diaActual: number,
-  ultimoDiaSubidaEje: number | undefined
+  ultimoDiaSubidaEje: number | undefined,
+  /**
+   * ¿La relación YA EXISTÍA antes de la campaña?
+   *
+   * ⛔ ESTE ERA EL AGUJERO, y era de diseño. La progresión escalonada se
+   * escribió para lo que se forja jugando: dos desconocidos que van ganándose
+   * el trato día a día. Aplicada a TODO el mundo convierte en desconocido a
+   * quien no lo es — el padre adoptivo que la crió durante dos siglos
+   * empezaba en 0 y subía de uno en uno, como el tabernero que acaba de
+   * servirle un vino.
+   *
+   * Un vínculo previo no se gana en escena: ya estaba ganado. Así que cuando
+   * el Narrador declara uno —y SOLO la primera vez, cuando el eje aún no
+   * tiene valor—, se acepta el número que digan los documentos. A partir de
+   * ahí vuelven a mandar las reglas de siempre: lo que ya existía se respeta,
+   * lo que venga después se gana.
+   */
+  relacionPrevia = false
 ): { nuevoValor: number | undefined; diaSubida: number | undefined } {
   if (valorReportado === undefined || valorReportado === null) {
     return { nuevoValor: valorActual, diaSubida: ultimoDiaSubidaEje };
@@ -64,6 +81,9 @@ export function calcularProgresoEje(
   // Un primer encuentro puede dejarlo en 1 como mucho, nunca en el número que
   // le apetezca al Narrador.
   if (valorActual === undefined || valorActual === null) {
+    // Un vínculo que viene de antes entra donde de verdad está. Solo aquí, en
+    // el estreno del eje: después ya no hay atajo.
+    if (relacionPrevia) return { nuevoValor: sugerido, diaSubida: diaActual };
     if (sugerido <= 0) return { nuevoValor: 0, diaSubida: ultimoDiaSubidaEje };
     return { nuevoValor: 1, diaSubida: diaActual };
   }
@@ -129,6 +149,8 @@ export function actualizarAfinidadNpc(
   npc: NPC,
   reportado: {
     atraccion?: 'desea' | 'interes' | 'ninguna';
+    /** La relación ya existía antes de la campaña: padre, maestro, hermana… */
+    previo?: boolean;
     vin?: number;
     con?: number;
     vinculo?: string;
@@ -162,8 +184,9 @@ export function actualizarAfinidadNpc(
       : reportado.atraccion ?? npc.atraccion;
 
   // VÍN y CON (Lealtad y Confianza escalonadas)
-  const progresoVin = calcularProgresoEje(npc.vin, reportado.vin, totalDias, diaActual, ultimosDias.vin);
-  const progresoCon = calcularProgresoEje(npc.con, reportado.con, totalDias, diaActual, ultimosDias.con);
+  const previo = Boolean(reportado.previo);
+  const progresoVin = calcularProgresoEje(npc.vin, reportado.vin, totalDias, diaActual, ultimosDias.vin, previo);
+  const progresoCon = calcularProgresoEje(npc.con, reportado.con, totalDias, diaActual, ultimosDias.con, previo);
 
   const nuevoUltimoDiaSubida = {
     vin: progresoVin.diaSubida ?? ultimosDias.vin,
