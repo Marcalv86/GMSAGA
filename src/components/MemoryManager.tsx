@@ -2415,14 +2415,36 @@ export const MemoryManager: React.FC<{
                               {n.orientacion}
                             </span>
                           )}
-                          {interesPorLaProtagonista(n) === 'desea' && (
-                            <span
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 text-[10px] font-cinzel font-bold"
-                              title="La desea. Cómo se le nota es cosa de quién es él, no de una intensidad."
-                            >
-                              <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" /> La desea
-                            </span>
-                          )}
+                          {/*
+                            Los DOS estados se ven. Enseñar solo «la desea»
+                            dejaba el interés invisible, y entonces un PNJ con
+                            algo empezando parecía no tener nada — que es
+                            justo lo contrario de lo que dice su ficha.
+                          */}
+                          {(() => {
+                            const interes = interesPorLaProtagonista(n);
+                            if (!interes) return null;
+                            const desea = interes === 'desea';
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-cinzel font-bold ${
+                                  desea
+                                    ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20'
+                                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+                                }`}
+                                title={
+                                  desea
+                                    ? 'La desea. Cómo se le nota es cosa de quién es él, no de una intensidad.'
+                                    : 'Le interesa, y todavía no es deseo. Puede quedarse ahí o llegar a más por el vínculo.'
+                                }
+                              >
+                                <Heart
+                                  className={`w-2.5 h-2.5 ${desea ? 'fill-rose-500 text-rose-500' : 'text-amber-500'}`}
+                                />{' '}
+                                {desea ? 'La desea' : 'Interés'}
+                              </span>
+                            );
+                          })()}
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 text-[10px] font-mono font-bold"
                             title={`Vínculo: ${getVinInfo(n.vin).label}`}
