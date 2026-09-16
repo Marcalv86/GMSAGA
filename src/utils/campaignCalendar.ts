@@ -1696,8 +1696,8 @@ export interface VinculoLeido {
   aparenta?: string;
   oculta?: string;
   vinculo?: string;
-  /** Si desea a la protagonista. Ya no es una puntuación. */
-  atraccion?: 'desea' | 'interes';
+  /** Qué siente por ella. `'ninguna'` apaga lo que hubiera; ausente = no se ha dicho. */
+  atraccion?: 'desea' | 'interes' | 'ninguna';
   /** ⚠️ LEGADO: la atracción numérica. Solo la escriben campañas viejas. */
   atr?: number;
   vin?: number;
@@ -1723,7 +1723,7 @@ export interface VinculoLeido {
  * Todo lo que signifique «no» devuelve `undefined` a propósito: que alguien no
  * la desee no es un dato que haya que escribir en ningún sitio.
  */
-export function leerAtraccion(valor: string): 'desea' | 'interes' | undefined {
+export function leerAtraccion(valor: string): 'desea' | 'interes' | 'ninguna' | undefined {
   const v = (valor || '')
     .toLowerCase()
     .normalize('NFD')
@@ -1732,9 +1732,17 @@ export function leerAtraccion(valor: string): 'desea' | 'interes' | undefined {
   if (!v) return undefined;
   if (/^(interes|interesad|curios|atenci|intrig)/.test(v)) return 'interes';
   if (/^(si|sii|true|1|x|v|deseo|desea|atraid|encaprichad|quiere)/.test(v)) return 'desea';
-  if (/^(no|false|0|nunca|jamas|bloquead|candado|imposible|nada)/.test(v)) return undefined;
+  /*
+   * «ninguna» APAGA, y no es lo mismo que no decir nada.
+   *
+   * Sin esto el Director podía encender la atracción y no apagarla: si se
+   * equivocaba —o si venía mal heredada del 0-20 viejo— no había forma de
+   * deshacerlo desde la mesa, y como la jugadora no debe tocar la afinidad a
+   * mano, el error se quedaba para siempre.
+   */
+  if (/^(no|false|0|nunca|jamas|bloquead|candado|imposible|nada|ninguna|ningun)/.test(v)) return 'ninguna';
   const num = parseInt(v, 10);
-  if (!isNaN(num)) return num >= 10 ? 'desea' : num >= 6 ? 'interes' : undefined;
+  if (!isNaN(num)) return num >= 10 ? 'desea' : num >= 6 ? 'interes' : 'ninguna';
   return undefined;
 }
 

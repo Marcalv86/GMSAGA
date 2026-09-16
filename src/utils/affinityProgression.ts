@@ -128,7 +128,7 @@ export function calcularProgresoEje(
 export function actualizarAfinidadNpc(
   npc: NPC,
   reportado: {
-    atraccion?: 'desea' | 'interes';
+    atraccion?: 'desea' | 'interes' | 'ninguna';
     vin?: number;
     con?: number;
     vinculo?: string;
@@ -156,7 +156,10 @@ export function actualizarAfinidadNpc(
    * respetarlo. Y no se apaga solo: que no venga nada en este turno no
    * significa que haya dejado de desearla.
    */
-  const nuevaAtraccion = reportado.atraccion ?? npc.atraccion;
+  const nuevaAtraccion =
+    reportado.atraccion === 'ninguna'
+      ? undefined // apagarla es decir algo, y ese algo es «ya no»
+      : reportado.atraccion ?? npc.atraccion;
 
   // VÍN y CON (Lealtad y Confianza escalonadas)
   const progresoVin = calcularProgresoEje(npc.vin, reportado.vin, totalDias, diaActual, ultimosDias.vin);

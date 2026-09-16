@@ -1323,7 +1323,7 @@ export default function App() {
          * no se inventa — y no llevar nada NO es ser ciego, es no ir por
          * ahí hoy.
          */
-        const atraccionInicial = v.atraccion;
+        const atraccionInicial = v.atraccion === 'ninguna' ? undefined : v.atraccion;
         const vinInicial = v.vin !== undefined ? 0 : undefined;
         const conInicial = v.con !== undefined ? 0 : undefined;
 
@@ -1867,7 +1867,7 @@ export default function App() {
              * no se inventa — y no llevar nada NO es ser ciego, es no ir por
              * ahí hoy.
              */
-            const atraccionInicial = v.atraccion;
+            const atraccionInicial = v.atraccion === 'ninguna' ? undefined : v.atraccion;
 
             const nuevoNpc: NPC = {
               id: `npc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,

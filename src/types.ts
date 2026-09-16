@@ -1014,28 +1014,24 @@ export const viajaSiemprePorCategoria = (categoria?: string): boolean =>
 
 
 /**
- * Qué siente este personaje por ella, leyendo también las campañas viejas.
+ * Qué siente este personaje por ella.
  *
- * El campo nuevo manda. Si no está —campaña anterior al cambio—, se traduce la
- * escala 0-20 con los cortes que la propia interfaz usaba para nombrar sus
- * tramos, que es la única lectura defendible de un número que ya nadie va a
- * escribir.
+ * ⛔ NO se deduce del viejo 0-20, y es a propósito. Esa escala la repartía un
+ * detector por subcadena que daba 6 a cualquiera cuya descripción dijera
+ * «atractiva» —o que llevara en las notas el nombre de alguien coqueto—, y por
+ * encima de eso aceptaba tal cual el número que escribiera el Narrador, sin
+ * tope ni progresión. Era basura: por eso se sustituyó.
+ *
+ * Arrastrarla habría propagado exactamente el error que se quería quitar. De
+ * hecho lo hizo durante unas horas, y dejó al padre adoptivo de la
+ * protagonista marcado como que la desea.
+ *
+ * Así que las campañas viejas empiezan limpias y el Narrador vuelve a
+ * establecerlo jugando, con las reglas nuevas: la personalidad si el personaje
+ * está en los documentos, un d20 si se lo acaba de inventar.
  */
 export function interesPorLaProtagonista(npc: {
-  atraccion?: 'desea' | 'interes';
-  atr?: number;
-  atrBloqueada?: boolean;
+  atraccion?: 'desea' | 'interes' | 'ninguna';
 }): 'desea' | 'interes' | undefined {
-  if (npc.atraccion) return npc.atraccion;
-  // El candado viejo pasa a no decir nada: si esa puerta está cerrada de
-  // verdad, quien lo explica es `orientacion`, y lo explica mejor.
-  if (npc.atrBloqueada) return undefined;
-  if (typeof npc.atr === 'number') {
-    // Los cortes son los que usaba la propia interfaz para etiquetar la
-    // escala: de 10 arriba era «química evidente», y 6-9 «chispa leve /
-    // interés incipiente».
-    if (npc.atr >= 10) return 'desea';
-    if (npc.atr >= 6) return 'interes';
-  }
-  return undefined;
+  return npc.atraccion === 'desea' || npc.atraccion === 'interes' ? npc.atraccion : undefined;
 }

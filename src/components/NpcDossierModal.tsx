@@ -32,7 +32,6 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
   allImageFiles,
   vinculosDestapados,
   onToggleDestaparVinculo,
-  onUpdateNpc,
   onChangePortrait,
   onClose
 }) => {
@@ -319,82 +318,42 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                   nota lo dice su ficha.
                 */}
                 {/*
-                  EL DESEO, Y LA FORMA DE CORREGIRLO.
+                  EL DESEO SE MIRA, NO SE TOCA.
 
-                  Se veía y no se podía tocar, que es lo peor de los dos
-                  mundos: la migración del viejo 0-20 dejó a gente con deseo
-                  que no lo tenía —el padre adoptivo de la protagonista, sin ir
-                  más lejos— y no había dónde arreglarlo. El Narrador lo pone
-                  jugando; aquí se corrige cuando se equivoca.
+                  Aquí hubo un momento tres botones para corregirlo a mano, y
+                  estaban de más: la afinidad es del Narrador, «de solo lectura
+                  para el jugador» como dice su propio protocolo. Si se puede
+                  poner a dedo deja de significar nada — es el mismo motivo por
+                  el que las tiradas no se editan.
+
+                  Cuando esté mal, se le dice al Director en la mesa y lo
+                  corrige él. Eso sí queda registrado y sí tiene que
+                  justificarse.
                 */}
                 {(() => {
                   const interes = interesPorLaProtagonista(npc);
-                  const opciones: { valor: 'desea' | 'interes' | undefined; texto: string; nota: string }[] = [
-                    {
-                      valor: undefined,
-                      texto: 'Nada',
-                      nota: 'Lo normal. No va por ahí hoy — que no es lo mismo que no tener ojos. Puede cambiar con el tiempo y el vínculo.'
-                    },
-                    {
-                      valor: 'interes',
-                      texto: 'Interés',
-                      nota: 'Hay algo y todavía no es deseo: la mira más de lo que haría falta, busca su conversación. Hay quien llega al deseo por aquí.'
-                    },
-                    {
-                      valor: 'desea',
-                      texto: 'La desea',
-                      nota: 'Cómo se le nota es cosa de quién es él, no de una intensidad. Y desear no le da derecho a nada.'
-                    }
-                  ];
-                  const actual = opciones.find(o => o.valor === interes)!;
+                  if (!interes) return null;
+                  const desea = interes === 'desea';
                   return (
-                    <div className="space-y-2 bg-[var(--surface)] p-3 rounded-lg border border-[var(--user-border)]">
-                      <div className="flex items-center gap-1.5 text-xs sm:text-sm font-cinzel font-bold text-[var(--text-primary)]">
-                        <Heart
-                          className={`w-4 h-4 ${
-                            interes === 'desea'
-                              ? 'fill-rose-500 text-rose-500'
-                              : interes === 'interes'
-                              ? 'text-amber-500'
-                              : 'text-[var(--text-secondary)] opacity-40'
-                          }`}
-                        />
-                        <span>Atracción</span>
+                    <div
+                      className={`space-y-1 p-3 rounded-lg border ${
+                        desea ? 'border-rose-500/30 bg-rose-500/10' : 'border-amber-500/25 bg-amber-500/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm font-cinzel font-bold">
+                        <Heart className={`w-4 h-4 ${desea ? 'fill-rose-500 text-rose-500' : 'text-amber-500'}`} />
+                        <span className={desea ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}>
+                          {desea ? 'La desea' : 'Interés'}
+                        </span>
                       </div>
-                      {onUpdateNpc ? (
-                        <div className="flex gap-1">
-                          {opciones.map(o => {
-                            const activa = o.valor === interes;
-                            return (
-                              <button
-                                key={o.texto}
-                                onClick={() =>
-                                  onUpdateNpc({
-                                    ...npc,
-                                    atraccion: o.valor,
-                                    // Se limpia el 0-20 viejo: si se queda, la
-                                    // próxima lectura volvería a deducir de él.
-                                    atr: undefined,
-                                    atrBloqueada: undefined
-                                  })
-                                }
-                                className={`flex-1 px-2 py-1.5 rounded border text-[11px] font-cinzel font-bold transition-colors cursor-pointer ${
-                                  activa
-                                    ? o.valor === 'desea'
-                                      ? 'bg-rose-500/15 border-rose-500/40 text-rose-700 dark:text-rose-300'
-                                      : o.valor === 'interes'
-                                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300'
-                                      : 'bg-[var(--surface-soft)] border-[var(--user-border)] text-[var(--text-primary)]'
-                                    : 'border-[var(--glass-border)] text-[var(--text-secondary)] hover:border-[var(--user-border)]'
-                                }`}
-                              >
-                                {o.texto}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                      <p className="text-[11px] text-[var(--text-secondary)] italic m-0 leading-snug">{actual.nota}</p>
+                      <p className="text-[11px] text-[var(--text-secondary)] italic m-0 leading-snug">
+                        {desea
+                          ? 'Cómo se le nota es cosa de quién es él, no de una intensidad. Y desear no le da derecho a nada.'
+                          : 'Hay algo y todavía no es deseo: la mira más de lo que haría falta, busca su conversación.'}
+                      </p>
+                      <p className="text-[10px] text-[var(--text-secondary)] m-0 pt-1 border-t border-[var(--glass-border)] leading-snug">
+                        Lo lleva el Narrador. Si crees que está mal, díselo al Director en la Mesa y lo corrige él.
+                      </p>
                     </div>
                   );
                 })()}
