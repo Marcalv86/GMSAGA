@@ -367,15 +367,36 @@ export const ContextUsageWidget: React.FC<{
                       <ChartColumn className="w-3.5 h-3.5" />
                       En qué se va el contexto
                     </span>
-                    <span className="text-xs bg-[var(--accent)] text-[var(--on-accent)] px-2 py-0.5 rounded-full font-sans">
-                      {percentage < 0.1 ? '<0,1' : percentage.toFixed(1).replace('.', ',')}% de la ventana
+                    {/*
+                      ⚠️ ESTE PORCENTAJE NO ES DE LA VENTANA, Y DECÍA QUE SÍ.
+
+                      Mide contra `MAX_TOKENS`, que es el MENOR entre la ventana
+                      del modelo y la cuota por minuto — y en la capa gratuita
+                      casi siempre manda la cuota, que es cuatro veces más
+                      pequeña. O sea que decía «66,8% de la ventana» cuando de
+                      la ventana iba por el 16%: asustaba por un techo que no
+                      era el que estaba midiendo. Ahora el rótulo dice contra
+                      cuál de los dos mide.
+                    */}
+                    <span
+                      className="text-xs bg-[var(--accent)] text-[var(--on-accent)] px-2 py-0.5 rounded-full font-sans"
+                      title={
+                        mandaLaCuota
+                          ? `Mide contra la cuota por minuto (${compact(MAX_TOKENS)} fichas), que ahora mismo corta antes que la ventana del modelo (${compact(ventana)}).`
+                          : `Mide contra la ventana del modelo: ${compact(MAX_TOKENS)} fichas por petición.`
+                      }
+                    >
+                      {percentage < 0.1 ? '<0,1' : percentage.toFixed(1).replace('.', ',')}%{' '}
+                      {mandaLaCuota ? 'del cupo por minuto' : 'de la ventana'}
                     </span>
                   </h4>
 
                   <p className="text-[11px] text-[var(--text-secondary)] m-0 mb-3">
-                    Reparto de los {compact(totalChars)} caracteres que se envían en cada turno. De los capítulos
-                    cerrados solo viaja el tramo final de cada uno; lo que hay que recordar de lo viejo vive en el
-                    diario y en la memoria.
+                    Reparto de los {compact(totalChars)} <strong>caracteres</strong> que se envían en cada turno
+                    — ⚠️ caracteres, no fichas: en castellano salen unas 3,5 letras por ficha, así que el número de
+                    abajo siempre será bastante más pequeño y no se contradicen. De los capítulos cerrados solo
+                    viaja el tramo final de cada uno; lo que hay que recordar de lo viejo vive en el diario y en la
+                    memoria.
                   </p>
 
                   <ul className="flex flex-col gap-2.5 m-0 p-0 list-none">
