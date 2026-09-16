@@ -728,3 +728,70 @@ export function leerPuentesDelMapa(contenido?: string): { termino: string; relac
   }
   return out;
 }
+
+
+/**
+ * `[PUENTE: Soluun | Eldreth Veluuthra, pistoleros, cazadores nocturnos]`
+ *
+ * El Director apuntando un comodín sobre la marcha, desde el chat de mesa. Es
+ * la vía que faltaba: el vinculador teje lo que puede deducir leyendo, pero los
+ * puentes que de verdad valen son los que solo sabe quien lleva la campaña —que
+ * Soluun caza a la Eldreth Veluuthra no se deduce del módulo, se decidió en una
+ * conversación—. Y son justo los que hacen falta en el momento en que se nota
+ * que faltan: la jugadora pregunta por algo y no sube nada.
+ */
+const PUENTE_RE = /\[\s*PUENTE\s*:\s*([^\]]+)\]/gi;
+
+export function leerPuentes(texto: string): { termino: string; relacionados: string[] }[] {
+  if (!texto || !/PUENTE/i.test(texto)) return [];
+  PUENTE_RE.lastIndex = 0;
+  const out: { termino: string; relacionados: string[] }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = PUENTE_RE.exec(texto)) !== null) {
+    const partes = m[1].split(/\||→|->/);
+    if (partes.length < 2) continue;
+    const termino = partes[0].trim().slice(0, 60);
+    const relacionados = [
+      ...new Set(
+        partes
+          .slice(1)
+          .join(',')
+          .split(',')
+          .map(r => r.trim().slice(0, 60))
+          .filter(r => r.length >= 3)
+      )
+    ].slice(0, 8);
+    if (termino.length >= 3 && relacionados.length) out.push({ termino, relacionados });
+  }
+  return out;
+}
+
+/**
+ * Añade puentes a los que ya había, sin repetir y sin perder lo anterior.
+ *
+ * Un término que ya existía se ENRIQUECE —se le suman los relacionados nuevos—
+ * en vez de reemplazarse: corregir sobre la marcha no puede borrar lo que tejió
+ * el vinculador, igual que el vinculador no borra lo que se escribió a mano.
+ */
+export function fusionarPuentes(
+  previos: { termino: string; relacionados: string[] }[],
+  nuevos: { termino: string; relacionados: string[] }[]
+): { termino: string; relacionados: string[] }[] {
+  const out = previos.map(p => ({ termino: p.termino, relacionados: [...p.relacionados] }));
+  for (const n of nuevos) {
+    const existente = out.find(p => p.termino.toLowerCase() === n.termino.toLowerCase());
+    if (!existente) {
+      out.push({ termino: n.termino, relacionados: [...n.relacionados] });
+      continue;
+    }
+    const yaEsta = new Set(existente.relacionados.map(r => r.toLowerCase()));
+    for (const r of n.relacionados) {
+      if (!yaEsta.has(r.toLowerCase())) {
+        existente.relacionados.push(r);
+        yaEsta.add(r.toLowerCase());
+      }
+    }
+    existente.relacionados = existente.relacionados.slice(0, 8);
+  }
+  return out.slice(0, 200);
+}

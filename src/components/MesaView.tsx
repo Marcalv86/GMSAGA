@@ -114,6 +114,7 @@ export const MesaView: React.FC<{
     aprendido?: Aprendizaje[];
     estamos?: string | null;
     estado?: string | null;
+    puentes?: { termino: string; relacionados: string[] }[];
     viaje?: ViajeLeido | null;
     bambalinas?: MovimientoOculto[];
     relojes?: RelojOculto[];
@@ -269,6 +270,7 @@ export const MesaView: React.FC<{
           aprendido: respuesta.aprendido,
           estamos: respuesta.estamos,
           estado: respuesta.estado,
+          puentes: respuesta.puentes,
           viaje: respuesta.viaje,
           bambalinas: respuesta.bambalinas,
           relojes: respuesta.relojes,

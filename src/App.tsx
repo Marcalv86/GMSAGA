@@ -128,7 +128,7 @@ import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario }
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
 import { aplicarOlvidos, fijarEstadoEnMemoria } from './utils/ordenesDeMesa';
-import { escribirPuentesEnMapa } from './utils/localSearch';
+import { escribirPuentesEnMapa, fusionarPuentes, leerPuentesDelMapa } from './utils/localSearch';
 import type { ViajeLeido, VinculoLeido } from './utils/campaignCalendar';
 import type { Aprendizaje, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from './types';
 import type { CambioDeInventario } from './types';
@@ -1648,6 +1648,7 @@ export default function App() {
     etiquetados?: OrdenDeEtiquetado[];
     estamos?: string | null;
     estado?: string | null;
+    puentes?: { termino: string; relacionados: string[] }[];
     viaje?: ViajeLeido | null;
     vinculos: VinculoLeido[];
     inventario: CambioDeInventario;
@@ -1663,6 +1664,37 @@ export default function App() {
      * Las etiquetas de búsqueda viven en los archivos, no en el proyecto, así
      * que se aplican aparte y antes: `handleUpdateProjectField` no los toca.
      */
+    /*
+     * 🃏 Los comodines que apunta el Director sobre la marcha.
+     *
+     * Van al mismo sitio que los del vinculador —dentro del mapa de
+     * relaciones—, porque tener dos listas de puentes en dos sitios distintos
+     * es exactamente la clase de cosa que luego no cuadra. Se SUMAN a los que
+     * hubiera: apuntar uno nuevo no puede borrar los demás.
+     */
+    if (orden.puentes?.length && currentPId) {
+      const frescos = await loadFilesFromDB(currentPId);
+      const mapa = frescos.find(f => f.name?.includes('Red Semántica'));
+      if (mapa) {
+        const fusionados = fusionarPuentes(leerPuentesDelMapa(mapa.content), orden.puentes);
+        const contenido = escribirPuentesEnMapa(mapa.content || '', fusionados);
+        const actualizados = frescos.map(f =>
+          f.id === mapa.id ? { ...f, content: contenido, length: contenido.length } : f
+        );
+        setCurrentFiles(actualizados);
+        await saveFilesToDB(currentPId, actualizados);
+      } else {
+        // Todavía no se ha tejido la red: se guardan en la memoria y el primer
+        // vinculado los recogerá.
+        await handleUpdateProjectField(prev => ({
+          memory: {
+            ...(prev.memory || {}),
+            puentes_de_busqueda: fusionarPuentes(prev.memory?.puentes_de_busqueda || [], orden.puentes!)
+          } as any
+        }));
+      }
+    }
+
     if (orden.etiquetados?.length && currentPId) {
       const frescos = await loadFilesFromDB(currentPId);
       const { archivos, aplicado } = aplicarEtiquetados(frescos, orden.etiquetados);
@@ -1681,6 +1713,7 @@ export default function App() {
       !sinNovedadDeMesa(orden.facciones || [], orden.preparado || []) ||
       Boolean(orden.estamos) ||
       Boolean(orden.estado) ||
+      Boolean(orden.puentes?.length) ||
       Boolean(orden.viaje) ||
       Boolean(orden.corregirCronica) ||
       Boolean(orden.rehacerUltimoTurno);
@@ -3551,7 +3584,15 @@ export default function App() {
        * de Archivos, que es lo que faltaba: un puente inventado —«Luskan»
        * tirando de media biblioteca— era invisible y por tanto inarreglable.
        */
-      const contenidoDelMapa = escribirPuentesEnMapa(resultado.mapaMarkdown, resultado.puentes);
+      /*
+       * Lo tejido por la IA se SUMA a lo que ya hubiera escrito a mano —o
+       * apuntado el Director con [PUENTE:]—, nunca lo reemplaza: revincular la
+       * biblioteca no puede borrar los comodines que alguien puso porque el
+       * vinculador no los había visto.
+       */
+      const mapaPrevio = frescos.find(f => f.name === nombreMapa);
+      const puentesFusionados = fusionarPuentes(leerPuentesDelMapa(mapaPrevio?.content), resultado.puentes);
+      const contenidoDelMapa = escribirPuentesEnMapa(resultado.mapaMarkdown, puentesFusionados);
 
       // 2. Creamos o actualizamos el archivo "🗺️ Red Semántica y Mapa de Relaciones.md"
       const nombreMapa = '🗺️ Red Semántica y Mapa de Relaciones.md';
