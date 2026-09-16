@@ -399,6 +399,34 @@ export function setStoredAutoVincular(enabled: boolean): void {
   localStorage.setItem('gmstudio_auto_vincular', enabled ? 'on' : 'off');
 }
 
+/**
+ * ¿El Narrador ve las barras de vínculo y confianza, o no?
+ *
+ * Por defecto SÍ, que es como ha funcionado siempre. El interruptor existe
+ * para poder comprobar una sospecha con la partida en vez de discutirla:
+ *
+ * `vin` y `con` no controlan NADA. No abren escenas, no bloquean nada, no
+ * tocan una tirada. Toda la maquinaria de progresión —tope diario,
+ * `ultimoDiaSubida`, el reconciliador tras sincronizar— existe para producir
+ * una línea de texto en el prompt. Y un número en una escala invita a
+ * promediar: «vínculo 12/20» no produce una relación, produce una calidez
+ * genérica de intensidad media, y encima invita al modelo a hacer aritmética
+ * en vez de a caracterizar, que es lo que sabe hacer.
+ *
+ * Apagado, los datos se siguen guardando y las barras siguen en la interfaz:
+ * lo único que cambia es que el Narrador deja de verlas y tiene que sacar la
+ * relación de lo que SÍ persiste en prosa —`vinculo`, `aparenta`, `oculta`—.
+ * Si nadie nota la diferencia jugando, sobran; si el reparto se enfría de
+ * golpe, ya sabemos qué estaban sujetando.
+ */
+export function getStoredBarrasAfinidad(): boolean {
+  return localStorage.getItem('gmstudio_barras_afinidad') !== 'off';
+}
+
+export function setStoredBarrasAfinidad(enabled: boolean): void {
+  localStorage.setItem('gmstudio_barras_afinidad', enabled ? 'on' : 'off');
+}
+
 export function getStoredAutoNovelize(): boolean {
   // Por defecto 'off' para proteger la cuota de tokens por minuto (TPM) en la capa gratuita.
   return localStorage.getItem('gmstudio_auto_novelize') === 'on';
@@ -1684,6 +1712,9 @@ export function puentesDeLaCampana(
 }
 
 function dosierDePersonajes(npcs: NPC[], marcaActual = 0): string {
+  // Apagable desde Motor. Los datos no se tocan: solo dejan de viajar en el
+  // prompt, para poder comprobar jugando si sujetaban algo o no.
+  const barrasVisibles = getStoredBarrasAfinidad();
   const conNombre = (npcs || []).filter(n => n.name && n.name.trim().length > 1);
   const habituales = conNombre
     .filter(n => n.recurrente || (n.diasVistos?.length || 0) >= 2)
@@ -1798,7 +1829,7 @@ ${bloqueElenco}
           : `- 💤 LLEVA ${ausencia} SIN SALIR. Podría entrar ADEMÁS de los de siempre, si la escena le da un motivo.`
       );
     }
-    if (typeof n.vin === 'number' || typeof n.con === 'number') {
+    if (barrasVisibles && (typeof n.vin === 'number' || typeof n.con === 'number')) {
       lineas.push(`- Afinidad: vínculo ${n.vin ?? 0}/20 · confianza ${n.con ?? 0}/20`);
     }
     /*

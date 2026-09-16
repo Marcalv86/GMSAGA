@@ -19,6 +19,8 @@ import {
   getStoredAutoVincular,
   setStoredAutoNovelize,
   setStoredAutoVincular,
+  getStoredBarrasAfinidad,
+  setStoredBarrasAfinidad,
   getStoredBackgroundModel,
   setStoredBackgroundModel,
   getStoredApiKeys,
@@ -145,6 +147,7 @@ export const ApiKeyModal: React.FC<{
   const [autoFailover, setAutoFailover] = useState<boolean>(getStoredAutoFailover());
   const [autoNovelize, setAutoNovelize] = useState<boolean>(getStoredAutoNovelize());
   const [autoVincular, setAutoVincular] = useState<boolean>(getStoredAutoVincular());
+  const [barrasAfinidad, setBarrasAfinidad] = useState<boolean>(getStoredBarrasAfinidad());
   const [historyWindow, setHistoryWindow] = useState<HistoryWindowSetting>(getStoredHistoryWindow());
   const [keyRotationMode, setKeyRotationMode] = useState<KeyRotationMode>(getStoredKeyRotationMode());
   const [apiKeysList, setApiKeysList] = useState<string[]>(getStoredApiKeys());
@@ -386,6 +389,7 @@ export const ApiKeyModal: React.FC<{
     setStoredAutoFailover(autoFailover);
     setStoredAutoNovelize(autoNovelize);
     setStoredAutoVincular(autoVincular);
+    setStoredBarrasAfinidad(barrasAfinidad);
     setStoredHistoryWindow(historyWindow);
     setSavedSuccess(true);
     setTimeout(() => {
@@ -783,6 +787,48 @@ export const ApiKeyModal: React.FC<{
                       type="checkbox"
                       checked={autoVincular}
                       onChange={e => setAutoVincular(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[var(--glass-border)]">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--glass-border)] p-3 rounded-lg flex items-start justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <label
+                        onClick={() => setBarrasAfinidad(!barrasAfinidad)}
+                        className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+                        El Narrador ve las barras de Vínculo y Confianza
+                      </label>
+                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
+                        barrasAfinidad
+                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                      }`}>
+                        {barrasAfinidad ? 'Las ve' : 'A ciegas (prueba)'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
+                      <strong>Ninguna de las dos barras controla nada</strong>: no abren escenas, no bloquean nada y no
+                      tocan una tirada. Toda la maquinaria de progresión existe para mandarle al Narrador una línea de
+                      texto —<em>«vínculo 12/20 · confianza 8/20»</em>—, y un número en una escala invita a promediar:
+                      produce una calidez genérica de intensidad media en vez de una relación. Apágalo para jugar unas
+                      sesiones a ciegas y ver si de verdad sujetaban algo. ⚠️ <strong>No se borra nada</strong>: los datos
+                      se siguen guardando y las barras siguen en la ficha de cada PNJ; lo único que cambia es que el
+                      Narrador deja de verlas y tiene que sacar la relación de lo que persiste en prosa (vínculo, lo que
+                      aparenta y lo que oculta). Se vuelve a encender aquí mismo, sin perder nada.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={barrasAfinidad}
+                      onChange={e => setBarrasAfinidad(e.target.checked)}
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
