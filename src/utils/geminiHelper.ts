@@ -1787,6 +1787,39 @@ ${bloqueElenco}
   const corta = (v: string | undefined, max: number) =>
     v && v.trim() ? v.trim().slice(0, max) : '';
 
+  /*
+   * A QUIÉN SE LE RECLAMA LA RELACIÓN ESTE TURNO.
+   *
+   * El capítulo I de una campaña entera terminó con TODO el mundo a 0/20 y sin
+   * una sola atracción puesta, con una escena en la que el corsario le comía el
+   * terreno paso a paso y el padre de la protagonista yacía en coma por haberle
+   * traspasado su marca. La prosa estaba bien. Lo que no se emitió nunca fue la
+   * etiqueta.
+   *
+   * Y el motivo era un círculo cerrado, el mismo que ya se documentó para el
+   * elenco: el turno solo pide `[VÍNCULO:]` de quien ya tiene relación
+   * registrada, y la relación se registra... con `[VÍNCULO:]`. Quien no tiene
+   * nada no aparece con un cero, aparece SIN LÍNEA: `vin` no es 0, es
+   * `undefined`, así que no se imprimía nada, no se pedía nada, y el personaje
+   * se le presentaba al Narrador como pura descripción. Otra vez el silencio
+   * justo donde hacía falta gritar.
+   *
+   * Se reclama de pocos a la vez —los que están en escena primero— para no
+   * convertir el dosier en un formulario. Converge en unos turnos y se acabó:
+   * cada uno desaparece de la lista en cuanto queda establecido.
+   */
+  const MAX_A_ESTABLECER = 4;
+  const sinEstablecer = (n: NPC) =>
+    !n.atrEvaluada || (typeof n.vin !== 'number' && typeof n.con !== 'number');
+  const porEstablecer = new Set(
+    habituales
+      .filter(sinEstablecer)
+      .map(n => ({ n, a: jornadasSinSalir(n, marcaActual) }))
+      .sort((x, y) => (x.a ?? 999) - (y.a ?? 999))
+      .slice(0, MAX_A_ESTABLECER)
+      .map(({ n }) => n.id)
+  );
+
   const fichas = habituales.map(n => {
     const lineas: string[] = [];
     const nombre = n.trueIdentity && n.trueIdentity !== n.name ? `${n.name} (en realidad ${n.trueIdentity})` : n.name;
@@ -1831,6 +1864,11 @@ ${bloqueElenco}
     }
     if (barrasVisibles && (typeof n.vin === 'number' || typeof n.con === 'number')) {
       lineas.push(`- Afinidad: vínculo ${n.vin ?? 0}/20 · confianza ${n.con ?? 0}/20`);
+    } else if (barrasVisibles && porEstablecer.has(n.id)) {
+      lineas.push(
+        `- ⚠️ RELACIÓN SIN ESTABLECER: esta persona **no tiene vínculo ni confianza fijados todavía**, y eso no es lo mismo que tenerlos a cero. Fíjalos con \`vin:\` y \`con:\` en su \`[VÍNCULO:]\`. ` +
+          `⭐ **¿Se conocían de ANTES de la campaña?** —la crió, la formó, llevan años cruzándose— entonces añade \`previo: sí\` y ponlos donde de verdad están: un padre que la ha criado entra arriba del todo desde el primer turno, no en 1 porque hoy sea la primera escena. Si acaban de conocerse, nacen bajos y se ganan jugando.`
+      );
     }
     /*
      * EL DESEO NO ES UN NÚMERO, ES UN INTERRUPTOR.
@@ -1869,7 +1907,7 @@ ${bloqueElenco}
      * es quien se está escribiendo— y desaparece en cuanto responde, sea lo
      * que sea lo que responda.
      */
-    else if (!n.atrEvaluada && ausencia === 0) {
+    else if (!n.atrEvaluada && porEstablecer.has(n.id)) {
       const dado = dadoDeAtraccion(n.id || n.name);
       const salida = dado >= 19 ? '\`atr: desea\`' : dado >= 15 ? '\`atr: interés\`' : 'nada —y entonces emite \`atr: ninguna\` para dejarlo cerrado—';
       lineas.push(
@@ -3283,7 +3321,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
 7. [REGISTROS INTERNOS - ACTUALIZACIÓN ESTRICTAMENTE ESENCIAL Y CONDICIONAL]:
    Después de la narración, añade las siguientes líneas según corresponda. Son registros internos de la aplicación que el jugador no ve. REGLA FUNDAMENTAL DE SINCRONIZACIÓN ACTIVA: Mantén siempre sincronizadas las fichas, estados y relaciones de los PNJs presentes mediante [VÍNCULO: ...] en cada turno, asegurando que los paneles nunca queden vacíos ni requieran acciones manuales.
    - [PRESENTES: nombres separados por comas] — quién ha estado en escena de forma reconocible, con nombre propio. No incluyas figurantes sin nombre («un marinero», «la multitud»). Sirve para saber quién vuelve: alguien que reaparece deja de ser un extra y se le abre una ficha de vínculo con el protagonista.
-   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | orientacion: hacia quién le tira, si consta | atr: desea/interés/ninguna | previo: sí | vin: 0-20 | con: 0-20] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea.
+   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | orientacion: hacia quién le tira, si consta | atr: desea/interés/ninguna | previo: sí | vin: 0-20 | con: 0-20] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea. ⭐ **EXCEPCIÓN, y es la que más se incumple:** si el dosier marca a alguien con «RELACIÓN SIN ESTABLECER» o «ATRACCIÓN SIN DECIDIR», **eso ya es motivo suficiente y la emites este turno**, haya movido la escena algo o no. No estás registrando un cambio: estás rellenando un hueco que lleva vacío desde el principio. ⛔ Y ojo al fallo clásico: escribir en la prosa que un personaje la devora con la mirada y no emitir nada **no cuenta**. Lo que no lleva etiqueta no existe cuando el capítulo se cierre —la escena se olvida, la etiqueta no—.
      «aparenta» es lo que el protagonista podría percibir observándolo. «oculta» es lo que hay debajo: sus reservas, sus intenciones, lo que calla.
      «grado» debe comenzar indicando el tipo para que la interfaz muestre el icono adecuado:
        - ⚔️ Rivalidad: «grado: rivalidad — ...»
