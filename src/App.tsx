@@ -127,7 +127,7 @@ import { guardarMesa, leerMesa, hayMensajesSinLeerEnMesa, marcarMesaLeida, Mensa
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
-import { aplicarOlvidos, fijarEstadoEnMemoria } from './utils/ordenesDeMesa';
+import { aplicarOlvidos, fijarEstadoEnMemoria, nadaQueOlvidar, resumirOlvidos } from './utils/ordenesDeMesa';
 import { escribirPuentesEnMapa, fusionarPuentes, leerPuentesDelMapa } from './utils/localSearch';
 import type { ViajeLeido, VinculoLeido } from './utils/campaignCalendar';
 import type { Aprendizaje, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from './types';
@@ -1668,7 +1668,7 @@ export default function App() {
     preparado?: CartaPreparada[];
     corregirCronica?: string | null;
     rehacerUltimoTurno?: string | null;
-  }) => {
+  }): Promise<string[]> => {
     /*
      * Las etiquetas de búsqueda viven en los archivos, no en el proyecto, así
      * que se aplican aparte y antes: `handleUpdateProjectField` no los toca.
@@ -1681,7 +1681,20 @@ export default function App() {
      * es exactamente la clase de cosa que luego no cuadra. Se SUMAN a los que
      * hubiera: apuntar uno nuevo no puede borrar los demás.
      */
+    /*
+     * LO QUE SE HA APLICADO DE VERDAD, PARA PODER DECIRLO.
+     *
+     * El Director anuncia sus correcciones en prosa —«lo dejo grabado a
+     * fuego»— y luego la aplicación las hace en silencio. Si algo no casa (un
+     * nombre que no existe, una etiqueta a medias) no pasa nada y nadie se
+     * entera: queda un mensaje diciendo que sí y una ficha que sigue igual.
+     * Esto recoge lo que de verdad ha cambiado para enseñarlo debajo de su
+     * respuesta.
+     */
+    const aplicado: string[] = [];
+
     if (orden.puentes?.length && currentPId) {
+      aplicado.push(`🃏 ${orden.puentes!.length} puente(s) de búsqueda`);
       const frescos = await loadFilesFromDB(currentPId);
       const mapa = frescos.find(f => f.name?.includes('Red Semántica'));
       if (mapa) {
@@ -1726,11 +1739,11 @@ export default function App() {
       Boolean(orden.viaje) ||
       Boolean(orden.corregirCronica) ||
       Boolean(orden.rehacerUltimoTurno);
-    if (!hayAlgo) return;
+    if (!hayAlgo) return aplicado;
 
     await handleUpdateProjectField(p => {
       const marca = calendarioValido(p.calendar) && p.currentDate ? aDiaAbsoluto(p.calendar, p.currentDate) : 0;
-      const { memoria, timeline } = aplicarOlvidos(p.memory, p.timeline, orden.olvidos);
+      const { memoria, timeline, quitado } = aplicarOlvidos(p.memory, p.timeline, orden.olvidos);
       let mem = memoria;
       let diario = timeline;
 
@@ -1748,6 +1761,7 @@ export default function App() {
        * ninguna, se apunta una en el día de hoy para que haya de dónde leerlo.
        */
       if (orden.estamos) {
+        aplicado.push(`📍 Dónde estáis: ${orden.estamos}`);
         const ordenado = [...(diario || [])].sort((a, b) =>
           a.absDay === b.absDay ? (a.minute ?? 720) - (b.minute ?? 720) : a.absDay - b.absDay
         );
@@ -1785,6 +1799,7 @@ export default function App() {
        * emitida no puede llevarse por delante meses de campaña.
        */
       if (orden.estado) {
+        aplicado.push('🧠 Memoria general actualizada');
         mem = { ...mem, raw_project_memory: fijarEstadoEnMemoria(mem?.raw_project_memory, orden.estado) };
       }
 
@@ -1806,6 +1821,7 @@ export default function App() {
 
       // Correcciones sobre personajes en memoria (editar datos, relaciones, notas, renombrar o fichar si faltaba)
       if (orden.vinculos.length) {
+        const antes = JSON.stringify(mem.npcs || []);
         let npcsActualizados = [...(mem.npcs || [])];
         for (const v of orden.vinculos) {
           if (v.accion === 'borrar' || v.accion === 'eliminar') {
@@ -1903,6 +1919,13 @@ export default function App() {
             npcsActualizados.push(nuevoNpc);
           }
         }
+        // Se compara con cómo estaba: así se distingue «lo he cambiado» de «he
+        // intentado cambiar a alguien que no existe y no ha pasado nada».
+        if (JSON.stringify(npcsActualizados) !== antes) {
+          aplicado.push(
+            `👤 Fichas corregidas: ${orden.vinculos.map(v => v.nuevoNombre || v.nombre).join(', ')}`
+          );
+        }
         mem = { ...mem, npcs: npcsActualizados };
       }
 
@@ -1966,10 +1989,13 @@ export default function App() {
         };
       }
 
+      if (!nadaQueOlvidar(quitado)) aplicado.push(`🧽 Olvidado: ${resumirOlvidos(quitado).join(', ')}`);
+      if (orden.viaje) aplicado.push(orden.viaje.fin ? '🧭 Trayecto cerrado' : '🧭 Trayecto abierto');
       return { memory: sanitizeProjectMemory(mem), timeline: diario };
     });
 
     if (orden.corregirCronica && currentChat && currentChat.messages.length > 0) {
+      aplicado.push('📝 Último turno de la crónica reescrito');
       const lastModelIdx = [...currentChat.messages]
         .map((m, i) => ({ m, i }))
         .reverse()
@@ -1992,6 +2018,8 @@ export default function App() {
         await handleRegenerateChatMessage(lastModelIdx, orden.rehacerUltimoTurno || undefined);
       }
     }
+
+    return aplicado;
   };
 
   // Chapter / Chat Management

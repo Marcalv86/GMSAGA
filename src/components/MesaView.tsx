@@ -122,7 +122,7 @@ export const MesaView: React.FC<{
     preparado?: CartaPreparada[];
     corregirCronica?: string | null;
     rehacerUltimoTurno?: string | null;
-  }) => Promise<void> | void;
+  }) => Promise<string[]> | string[];
 }> = ({ project, chats, currentChatId, files, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria, onPlantarSecretos, onCorregirDesdeLaMesa }) => {
   const [mensajes, setMensajes] = useState<MensajeDeMesa[]>(() => leerMesa(project.id));
   const [texto, setTexto] = useState('');
@@ -262,7 +262,7 @@ export const MesaView: React.FC<{
       }
       // Y lo que haya corregido se aplica de verdad
       if (onCorregirDesdeLaMesa) {
-        await onCorregirDesdeLaMesa({
+        const aplicado = await onCorregirDesdeLaMesa({
           olvidos: respuesta.olvidos,
           etiquetados: respuesta.etiquetados,
           vinculos: respuesta.vinculos,
@@ -279,6 +279,23 @@ export const MesaView: React.FC<{
           corregirCronica: respuesta.corregirCronica,
           rehacerUltimoTurno: respuesta.rehacerUltimoTurno
         });
+        /*
+         * Y se enseña lo que DE VERDAD ha cambiado.
+         *
+         * El Director anuncia sus correcciones en prosa —«lo dejo grabado a
+         * fuego»— y hasta ahora la aplicación las hacía en silencio. Si algo no
+         * casaba, no pasaba nada y nadie se enteraba: quedaba un mensaje
+         * diciendo que sí y una ficha igual que antes. Peor aún cuando la
+         * etiqueta iba dentro de un bloque de código, porque al quitarla se
+         * quedaba el bloque vacío y parecía que había fallado.
+         */
+        if (aplicado?.length) {
+          const conAviso = completo.map((m, i) =>
+            i === completo.length - 1 ? { ...m, aplicado } : m
+          );
+          setMensajes(conAviso);
+          guardarMesa(project.id, conAviso);
+        }
       }
     } catch (err) {
       const base = describeApiError(err);
@@ -739,6 +756,26 @@ export const MesaView: React.FC<{
                     >
                       <Lock className="w-3.5 h-3.5 shrink-0 mt-px" />
                       <span className="font-normal">Giro guardado: {t}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {/*
+                LO QUE DE VERDAD CAMBIÓ — que no es lo que él dice que cambió.
+                Si el Director anuncia una corrección y aquí no aparece nada,
+                es que no se aplicó: un nombre que no existe, una etiqueta a
+                medias. Antes eso se quedaba en silencio.
+              */}
+              {m.aplicado?.length ? (
+                <div className="mt-2 pt-2 border-t border-[var(--glass-border)] flex flex-col gap-1">
+                  {m.aplicado.map((linea, k) => (
+                    <span
+                      key={k}
+                      className="flex items-start gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-300 font-cinzel"
+                      title="Cambiado de verdad en la campaña, no solo dicho."
+                    >
+                      <Check className="w-3.5 h-3.5 shrink-0 mt-px" />
+                      <span className="font-normal">{linea}</span>
                     </span>
                   ))}
                 </div>

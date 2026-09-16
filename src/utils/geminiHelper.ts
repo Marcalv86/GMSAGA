@@ -6733,6 +6733,18 @@ export async function preguntarAlDirectorOOC(
     .replace(/\[\s*ETIQUETA\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*(?:CORREGIR|REESCRIBIR)_(?:CRONICA|TURNO|ULTIMO_TURNO)\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*(?:REHACER|REGENERAR)_(?:CRONICA|TURNO|ULTIMO_TURNO)\s*:[^\]]*\]/gi, '')
+    /*
+     * Y el ENVOLTORIO que dejan las etiquetas al quitarlas.
+     *
+     * El Director suele escribir la corrección dentro de un bloque de código
+     * —«le meto mano a su ficha:» y debajo el \`[VÍNCULO: ...]\`—. Se quita la
+     * etiqueta y queda el bloque vacío, así que la jugadora ve tres comillas y
+     * nada dentro y da por hecho que ha fallado… cuando en realidad se ha
+     * aplicado. Un artefacto que parece un error es peor que un error.
+     */
+    .replace(/```[a-z]*\s*```/gi, '')
+    .replace(/(^|\n)[ \t]*```[a-z]*[ \t]*\n[ \t]*```[ \t]*(?=\n|$)/gi, '$1')
+    .replace(/(?<!`)``(?!`)/g, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

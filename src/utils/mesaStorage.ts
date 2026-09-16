@@ -17,6 +17,13 @@ export interface MensajeDeMesa {
   /** Lo que el Director apuntó en la memoria en ese mensaje, para poder verlo. */
   memorias?: string[];
   /**
+   * Lo que la aplicación CAMBIÓ de verdad con ese mensaje.
+   *
+   * Distinto de lo que el Director dice que ha hecho: esto es lo que quedó
+   * escrito. Si él anuncia una corrección y aquí no sale, no se aplicó.
+   */
+  aplicado?: string[];
+  /**
    * Miniaturas de lo que se adjuntó, en `data:` para poder repintarlas.
    *
    * Se guardan reducidas a propósito: la conversación vive en localStorage y
