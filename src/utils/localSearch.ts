@@ -664,3 +664,67 @@ export function consultaDelTurno({
   ];
   return partes.filter(Boolean).join('\n');
 }
+
+
+/** El encabezado del bloque de puentes dentro del mapa de relaciones. */
+export const TITULO_PUENTES = '## 🃏 PUENTES DE BÚSQUEDA — el comodín';
+
+/**
+ * Escribe los puentes dentro del mapa, en un bloque que se puede leer y CORREGIR.
+ *
+ * Los puentes vivían solo en la memoria del proyecto: invisibles. Si el
+ * vinculador se inventaba uno malo —«Luskan» tirando de media biblioteca— no
+ * había forma de verlo, y mucho menos de arreglarlo. Puestos aquí, en el
+ * documento que ya viaja entero cada turno, se miran de un vistazo y se editan
+ * a mano desde la pantalla de Archivos.
+ *
+ * El formato es a propósito lo más tonto posible —«término → uno, dos, tres»—
+ * para que escribirlo a mano no tenga misterio y un renglón mal puesto solo se
+ * pierda a sí mismo.
+ */
+export function escribirPuentesEnMapa(
+  mapa: string,
+  puentes: { termino: string; relacionados: string[] }[]
+): string {
+  const base = (mapa || '').split(TITULO_PUENTES)[0].trimEnd();
+  if (!puentes.length) return base;
+  const lineas = puentes.map(p => `- ${p.termino} → ${p.relacionados.join(', ')}`);
+  return `${base}
+
+${TITULO_PUENTES}
+
+> Esto NO es prosa: lo lee el buscador. Cuando en una escena se dice el término
+> de la izquierda, también se busca lo de la derecha, aunque nadie lo haya
+> nombrado. Pesan la mitad que lo que sí se ha dicho, así que empujan sin mandar.
+> **Se puede editar a mano**: un renglón por puente, con la flecha \`→\` y las
+> palabras separadas por comas. Lo que esté mal escrito simplemente se ignora.
+
+${lineas.join('\n')}
+`;
+}
+
+/**
+ * Lee los puentes de vuelta del documento, para que la edición a mano cuente.
+ */
+export function leerPuentesDelMapa(contenido?: string): { termino: string; relacionados: string[] }[] {
+  if (!contenido || !contenido.includes(TITULO_PUENTES)) return [];
+  const bloque = contenido.split(TITULO_PUENTES)[1] || '';
+  const out: { termino: string; relacionados: string[] }[] = [];
+  for (const linea of bloque.split(/\r?\n/)) {
+    const l = linea.trim();
+    if (!l.startsWith('-') && !l.startsWith('*')) continue;
+    const cuerpo = l.replace(/^[-*]\s*/, '');
+    const flecha = cuerpo.split(/→|->|:/);
+    if (flecha.length < 2) continue;
+    const termino = flecha[0].trim().replace(/^\*+|\*+$/g, '').slice(0, 60);
+    const relacionados = flecha
+      .slice(1)
+      .join(' ')
+      .split(',')
+      .map(r => r.trim().replace(/^\*+|\*+$/g, '').slice(0, 60))
+      .filter(r => r.length >= 3);
+    if (termino.length >= 3 && relacionados.length) out.push({ termino, relacionados });
+    if (out.length >= 200) break;
+  }
+  return out;
+}

@@ -76,7 +76,7 @@ import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npc
 import { logError, logWarn, logInfo } from './logger';
 import { abrirLlamada, cerrarLlamada, presionDelMinuto } from './callLog';
 import { sanitizePlayerCharacter } from './sanitizers';
-import { recuperar, consultaDelTurno } from './localSearch';
+import { recuperar, consultaDelTurno, leerPuentesDelMapa } from './localSearch';
 
 // In-app API key & model management (stored locally in the user's browser)
 export interface AIModelOption {
@@ -1599,6 +1599,23 @@ function jornadasSinSalir(n: NPC, marcaActual: number): number | null {
   return Math.max(0, marcaActual - Math.max(...vistos));
 }
 
+/**
+ * Los puentes de búsqueda que valen AHORA MISMO.
+ *
+ * Manda lo que esté escrito en el mapa de relaciones, porque ese documento se
+ * puede editar a mano desde la pantalla de Archivos y sería absurdo que
+ * corregir un puente no sirviera de nada. La copia de la memoria queda de
+ * respaldo para las campañas en las que el mapa aún no lleve el bloque.
+ */
+export function puentesDeLaCampana(
+  project: Project,
+  files: ProjectFile[]
+): { termino: string; relacionados: string[] }[] {
+  const mapa = (files || []).find(f => f.name?.includes('Red Semántica'));
+  const escritos = leerPuentesDelMapa(mapa?.content);
+  return escritos.length ? escritos : project.memory?.puentes_de_busqueda || [];
+}
+
 function dosierDePersonajes(npcs: NPC[], marcaActual = 0): string {
   const conNombre = (npcs || []).filter(n => n.name && n.name.trim().length > 1);
   const habituales = conNombre
@@ -2726,6 +2743,7 @@ ${
         .filter(t => t.length > 2)
         .slice(0, 40);
 
+      const puentesVivos = puentesDeLaCampana(project, files);
       const consulta = consultaDelTurno({
         textoJugadora: userText,
         ultimaNarracion: ultimoMensajeNarrador,
@@ -2733,12 +2751,7 @@ ${
         suyo: loSuyo
       });
 
-      const rescatados = recuperar(
-        deConsulta,
-        consulta,
-        PRESUPUESTO_FRAGMENTOS_CONSULTA,
-        project.memory?.puentes_de_busqueda
-      );
+      const rescatados = recuperar(deConsulta, consulta, PRESUPUESTO_FRAGMENTOS_CONSULTA, puentesVivos);
       const conFragmento = new Set(rescatados.map(r => r.fragmento.fileName));
       documentosDelTurno = {
         fragmentos: [...conFragmento],
@@ -6072,7 +6085,7 @@ export function construirPromptOOC({
   if (deConsulta.length > 0) {
     try {
       const textoContextoBusqueda = [pregunta, (historial.slice(-2).map(m => m.content).join(' ')).slice(-800)].filter(Boolean).join(' ');
-      const rescatados = recuperar(deConsulta, textoContextoBusqueda, 6000, project.memory?.puentes_de_busqueda);
+      const rescatados = recuperar(deConsulta, textoContextoBusqueda, 6000, puentesDeLaCampana(project, files));
       if (rescatados && rescatados.length > 0) {
         deConsultaFragmentosText =
           `\n### 🔍 FRAGMENTOS RECUPERADOS DE DOCUMENTOS DE CONSULTA:\n` +

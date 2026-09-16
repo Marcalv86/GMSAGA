@@ -128,6 +128,7 @@ import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario }
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
 import { aplicarOlvidos, fijarEstadoEnMemoria } from './utils/ordenesDeMesa';
+import { escribirPuentesEnMapa } from './utils/localSearch';
 import type { ViajeLeido, VinculoLeido } from './utils/campaignCalendar';
 import type { Aprendizaje, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from './types';
 import type { CambioDeInventario } from './types';
@@ -3543,6 +3544,15 @@ export default function App() {
         return nuevas ? { ...f, etiquetasBusqueda: nuevas } : f;
       });
 
+      /*
+       * 🃏 Los puentes se escriben DENTRO del mapa, no solo en la memoria.
+       *
+       * Ahí se ven de un vistazo y se pueden corregir a mano desde la pantalla
+       * de Archivos, que es lo que faltaba: un puente inventado —«Luskan»
+       * tirando de media biblioteca— era invisible y por tanto inarreglable.
+       */
+      const contenidoDelMapa = escribirPuentesEnMapa(resultado.mapaMarkdown, resultado.puentes);
+
       // 2. Creamos o actualizamos el archivo "🗺️ Red Semántica y Mapa de Relaciones.md"
       const nombreMapa = '🗺️ Red Semántica y Mapa de Relaciones.md';
       const existeMapa = actualizados.find(f => f.name === nombreMapa);
@@ -3553,8 +3563,8 @@ export default function App() {
         name: nombreMapa,
         type: 'text/markdown',
         mime: 'text/markdown',
-        content: resultado.mapaMarkdown,
-        length: resultado.mapaMarkdown.length,
+        content: contenidoDelMapa,
+        length: contenidoDelMapa.length,
         category: 'index',
         onDemand: false,
         etiquetasBusqueda: 'mapa de relaciones, red semantica, conexiones, facciones cruzadas, vinculos, compendios, biblioteca, enlaces'

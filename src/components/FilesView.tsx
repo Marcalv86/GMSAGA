@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Project, ProjectFile, FileCategory, viajaSiemprePorCategoria } from '../types';
 import { classifyFileAuto } from '../utils/geminiHelper';
-import { recuperar } from '../utils/localSearch';
+import { leerPuentesDelMapa, recuperar } from '../utils/localSearch';
 
 import {
   BookOpen,
@@ -185,7 +185,16 @@ export const FilesView: React.FC<{
     if (pruebaBusqueda.trim().length < 3 || !archivosBuscables.length) return [];
     // Con los mismos puentes que en partida: si el probador busca distinto que
     // el juego, no sirve para probar nada.
-    return recuperar(archivosBuscables, pruebaBusqueda, 3000, project?.memory?.puentes_de_busqueda);
+    // Con los mismos puentes que en partida —y leídos del mismo sitio—: si el
+    // probador busca distinto que el juego, no sirve para probar nada.
+    const mapa = files.find(f => f.name?.includes('Red Semántica'));
+    const puentes = leerPuentesDelMapa(mapa?.content);
+    return recuperar(
+      archivosBuscables,
+      pruebaBusqueda,
+      3000,
+      puentes.length ? puentes : project?.memory?.puentes_de_busqueda
+    );
   }, [pruebaBusqueda, archivosBuscables]);
 
   const filteredFiles = useMemo(() => {
