@@ -406,7 +406,24 @@ export interface Resultado {
   aciertos: string[];
 }
 
-export function buscar(indice: Indice, consulta: string, maximo = 8): Resultado[] {
+/**
+ * Cuánto pesa un término que NADIE ha dicho, comparado con uno que sí.
+ *
+ * Los puentes tienen que empujar, no mandar. A 1 —que es lo que pasaba al
+ * pegarlos sin más al final de la consulta, porque `buscar` deduplica y no mira
+ * cuántas veces aparece un término— un puente valía tanto como el nombre que la
+ * jugadora acaba de escribir, y la escena dejaba de decidir. A 0 no sirven de
+ * nada. A la mitad, un documento que solo casa por implicación puede asomar,
+ * pero nunca por delante del que casa por lo que de verdad se ha dicho.
+ */
+const PESO_PUENTE = 0.5;
+
+export function buscar(
+  indice: Indice,
+  consulta: string,
+  maximo = 8,
+  terminosPuente?: Set<string>
+): Resultado[] {
   const terminos = [...new Set(tokenizar(consulta))];
   if (!terminos.length || !indice.fragmentos.length) return [];
 
@@ -426,7 +443,8 @@ export function buscar(indice: Indice, consulta: string, maximo = 8): Resultado[
       // manden sobre las palabras corrientes.
       const idf = Math.log(1 + (N - df + 0.5) / (df + 0.5));
       const norma = 1 - B + (B * fragmento.largo) / indice.largoMedio;
-      puntuacion += idf * ((tf * (K1 + 1)) / (tf + K1 * norma));
+      const peso = terminosPuente?.has(termino) ? PESO_PUENTE : 1;
+      puntuacion += peso * idf * ((tf * (K1 + 1)) / (tf + K1 * norma));
       aciertos.push(termino);
     }
 
@@ -464,11 +482,71 @@ export function buscar(indice: Indice, consulta: string, maximo = 8): Resultado[
  * que antes había que cortar por acaparamiento ahora se corta solo por
  * presupuesto.
  */
-export function recuperar(files: ProjectFile[], consulta: string, presupuesto = 6000): Resultado[] {
+/**
+ * 🗺️ EL COMODÍN: amplía la consulta con lo que nadie ha dicho en voz alta.
+ *
+ * El buscador es léxico y esa es su cárcel: encuentra «Braelin» porque alguien
+ * escribió «Braelin», y el compendio de la banda se queda en el estante porque
+ * en la frase no salía «Bregan D\'aerthe». Toda la semántica que hace falta
+ * —que un lugarteniente arrastra a su banda, a su jefe y a su cuartel— la tiene
+ * que poner alguien desde fuera.
+ *
+ * La pone el árbol de vinculación, una vez, offline. Aquí solo se aplica: si un
+ * puente aparece en la consulta del turno, sus términos relacionados entran
+ * también. Cuesta cero peticiones y es la diferencia entre un motor que cuenta
+ * palabras y uno que sabe de qué va la campaña.
+ *
+ * ⚠️ Con freno: los términos añadidos van AL FINAL y limitados. Una consulta
+ * ampliada sin límite deja de parecerse a la escena —y entonces el buscador
+ * rescata el mundo entero, que es igual de inútil que no rescatar nada.
+ */
+export function ampliarConPuentes(
+  consulta: string,
+  puentes?: { termino: string; relacionados: string[] }[]
+): { consulta: string; puente: Set<string> } {
+  if (!consulta || !puentes?.length) return { consulta, puente: new Set() };
+  const base = normalizarTexto(consulta);
+  const yaEsta = new Set(tokenizar(consulta));
+  const extra: string[] = [];
+
+  for (const p of puentes) {
+    if (!p.termino) continue;
+    const termino = normalizarTexto(p.termino);
+    // El puente entra solo si su término se dice DE VERDAD en el turno.
+    if (termino.length < 3 || !base.includes(termino)) continue;
+    for (const rel of p.relacionados || []) {
+      // Y de lo relacionado solo entra lo que aún no estaba: ampliar con lo que
+      // ya se ha dicho no amplía nada, solo desequilibra la puntuación.
+      const nuevos = tokenizar(rel).filter(t => !yaEsta.has(t));
+      if (!nuevos.length) continue;
+      nuevos.forEach(t => yaEsta.add(t));
+      extra.push(rel);
+      if (extra.length >= TOPE_TERMINOS_PUENTE) break;
+    }
+    if (extra.length >= TOPE_TERMINOS_PUENTE) break;
+  }
+
+  if (!extra.length) return { consulta, puente: new Set() };
+  // Los términos añadidos se marcan para que `buscar` sepa que valen menos:
+  // empujan, no mandan.
+  const puente = new Set(extra.flatMap(t => tokenizar(t)).filter(t => !tokenizar(consulta).includes(t)));
+  return { consulta: `${consulta} ${extra.join(' ')}`, puente };
+}
+
+/** Cuántos términos puente como mucho. Más que esto y la consulta deja de ser la escena. */
+const TOPE_TERMINOS_PUENTE = 12;
+
+export function recuperar(
+  files: ProjectFile[],
+  consulta: string,
+  presupuesto = 6000,
+  puentes?: { termino: string; relacionados: string[] }[]
+): Resultado[] {
+  const ampliada = ampliarConPuentes(consulta, puentes);
   const indice = construirIndice(files);
   // Se piden muchos más candidatos que huecos: con doce no había de dónde
   // diversificar, porque los doce eran del mismo puñado de documentos.
-  const candidatos = buscar(indice, consulta, 40);
+  const candidatos = buscar(indice, ampliada.consulta, 40, ampliada.puente);
   if (!candidatos.length) return [];
 
   const corte = candidatos[0].puntuacion * 0.15;

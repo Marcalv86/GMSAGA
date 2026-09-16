@@ -693,6 +693,21 @@ export interface Memory {
      */
     llegadaPrematura?: boolean;
   };
+  /**
+   * 🗺️ LOS PUENTES DE BÚSQUEDA — el comodín que refuerza al buscador.
+   *
+   * El buscador local es léxico: encuentra lo que se escribe, y nada más. Por
+   * eso una escena con Braelin no rescataba el compendio de la banda si en la
+   * frase no salía «Bregan D'aerthe», y una conversación con Jarlaxle no traía
+   * nada de Menzoberranzan aunque él sea de allí.
+   *
+   * Esto es el trabajo semántico hecho UNA VEZ, fuera del turno, por el árbol
+   * de vinculación: qué términos arrastran a qué otros. En cada turno se usa
+   * para ampliar la consulta con lo que nadie ha dicho en voz alta pero está
+   * implicado. Barato —corre en el navegador, no gasta petición— y es justo lo
+   * que le faltaba a un motor que solo sabe contar palabras.
+   */
+  puentes_de_busqueda?: { termino: string; relacionados: string[] }[];
   no_son_pnj?: string[];
   gm_secrets?: SecretoDeCampana[];
   /** Lo que pasa fuera de cámara, día a día, aunque nadie lo vea. */

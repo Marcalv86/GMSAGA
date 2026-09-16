@@ -3562,6 +3562,19 @@ export default function App() {
 
       actualizados = [...actualizados.filter(f => f.name !== nombreMapa), archivoMapa];
 
+      /*
+       * 3. Y los puentes, que es lo que de verdad refuerza las búsquedas.
+       *
+       * El mapa en Markdown orienta al Narrador; estos ordenan al BUSCADOR, en
+       * cada turno y sin gastar ninguna petición. Viven en la memoria del
+       * proyecto porque son de la campaña, no de un archivo.
+       */
+      if (resultado.puentes.length) {
+        await handleUpdateProjectField(prev => ({
+          memory: { ...(prev.memory || {}), puentes_de_busqueda: resultado.puentes } as any
+        }));
+      }
+
       setCurrentFiles(actualizados);
       await saveFilesToDB(currentPId, actualizados);
 

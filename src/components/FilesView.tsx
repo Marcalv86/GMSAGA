@@ -183,7 +183,9 @@ export const FilesView: React.FC<{
   );
   const resultadosPrueba = useMemo(() => {
     if (pruebaBusqueda.trim().length < 3 || !archivosBuscables.length) return [];
-    return recuperar(archivosBuscables, pruebaBusqueda, 3000);
+    // Con los mismos puentes que en partida: si el probador busca distinto que
+    // el juego, no sirve para probar nada.
+    return recuperar(archivosBuscables, pruebaBusqueda, 3000, project?.memory?.puentes_de_busqueda);
   }, [pruebaBusqueda, archivosBuscables]);
 
   const filteredFiles = useMemo(() => {

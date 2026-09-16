@@ -2733,7 +2733,12 @@ ${
         suyo: loSuyo
       });
 
-      const rescatados = recuperar(deConsulta, consulta, PRESUPUESTO_FRAGMENTOS_CONSULTA);
+      const rescatados = recuperar(
+        deConsulta,
+        consulta,
+        PRESUPUESTO_FRAGMENTOS_CONSULTA,
+        project.memory?.puentes_de_busqueda
+      );
       const conFragmento = new Set(rescatados.map(r => r.fragmento.fileName));
       documentosDelTurno = {
         fragmentos: [...conFragmento],
@@ -6067,7 +6072,7 @@ export function construirPromptOOC({
   if (deConsulta.length > 0) {
     try {
       const textoContextoBusqueda = [pregunta, (historial.slice(-2).map(m => m.content).join(' ')).slice(-800)].filter(Boolean).join(' ');
-      const rescatados = recuperar(deConsulta, textoContextoBusqueda, 6000);
+      const rescatados = recuperar(deConsulta, textoContextoBusqueda, 6000, project.memory?.puentes_de_busqueda);
       if (rescatados && rescatados.length > 0) {
         deConsultaFragmentosText =
           `\n### 🔍 FRAGMENTOS RECUPERADOS DE DOCUMENTOS DE CONSULTA:\n` +
@@ -10085,6 +10090,8 @@ export interface ResultadoRelacionBiblioteca {
   }[];
   mapaMarkdown: string;
   totalConexiones: number;
+  /** Qué términos arrastran a qué otros, para ampliar la búsqueda de cada turno. */
+  puentes: { termino: string; relacionados: string[] }[];
 }
 
 /**
@@ -10119,7 +10126,12 @@ export async function relacionarBibliotecaInteligente({
   // Preparamos un dossier sintético de cada documento para no saturar tokens
   const dossier = candidatos
     .map((f, idx) => {
-      const preview = (f.content || '').slice(0, 1500).replace(/\s+/g, ' ').trim();
+      /*
+       * ⚠️ ANTES eran 1.500 caracteres, y en un compendio de sesenta mil eso
+       * es el 2%: el vinculador tejía la red viendo la portada de cada libro.
+       * La mitad del elenco de un documento de PNJs no llegaba a asomar.
+       */
+      const preview = (f.content || '').slice(0, 5000).replace(/\s+/g, ' ').trim();
       const tags = (f.etiquetasBusqueda || '').trim();
       return `[DOCUMENTO ${idx + 1}] ID: "${f.id}" | ARCHIVO: "${f.name}" | CATEGORÍA: ${f.category || 'document'}\nETIQUETAS ACTUALES: ${tags || '(sin etiquetas)'}\nEXTRACTO INICIAL:\n${preview}\n`;
     })
@@ -10132,6 +10144,7 @@ Tu misión es tejer la RED DE RELACIONES SEMÁNTICAS CRUZADAS entre ellos:
 1. Detecta qué documentos comparten facciones, personajes, rutas geográficas, misterios, peligros, religiones o subsistemas de reglas.
 2. Genera ETIQUETAS CRUZADAS (Cross-Tags) para cada documento: términos clave de OTROS documentos con los que conecta íntimamente, para que cuando una escena busque por un tema, el buscador local rescate ambos documentos vinculados.
 3. Genera un MAPA DE RELACIONES en formato Markdown claro, organizado y con viñetas que resuma cómo se interconectan los compendios y documentos.
+4. Y lo más importante para el motor: destila esas relaciones en PUENTES DE BÚSQUEDA. Un puente es un término que alguien va a escribir o nombrar en una escena, junto a los OTROS términos que deberían buscarse a la vez aunque nadie los haya dicho. Ejemplo: quien nombra a un lugarteniente está nombrando también a su banda, a su jefe y a su cuartel general, aunque en la frase no aparezcan. Esos puentes se usan para ampliar la búsqueda local en cada turno, así que valen los nombres propios, los lugares, las facciones y los conceptos que de verdad se dicen en voz alta — no categorías abstractas.
 
 ELENCO Y ENTIDADES VIVAS DE LA CAMPAÑA:
 ${elenco.slice(0, 60).join(', ')}
@@ -10145,6 +10158,12 @@ RESPONDE ESTRICTAMENTE EN FORMATO JSON VÁLIDO con la siguiente estructura (sin 
     {
       "id": "ID_DEL_DOCUMENTO",
       "etiquetasCruzadas": ["termino_puente_1", "termino_puente_2", "termino_puente_3"]
+    }
+  ],
+  "puentes": [
+    {
+      "termino": "el nombre o concepto que se dice en escena",
+      "relacionados": ["lo que hay que buscar también", "y esto", "y esto otro"]
     }
   ],
   "mapaMarkdown": "# 🗺️ Red Semántica y Mapa de Relaciones de la Biblioteca\\n\\n### 🔗 Vínculos Geográficos y Facciones Compartidas\\n- ...\\n\\n### 📜 Vínculos de Trasfondo, Personajes y Magia\\n- ...\\n\\n### 🎲 Vínculos Mecánicos, Biomas y Peligros\\n- ..."
@@ -10164,6 +10183,7 @@ RESPONDE ESTRICTAMENTE EN FORMATO JSON VÁLIDO con la siguiente estructura (sin 
 
   let parsed: {
     conexiones?: { id: string; etiquetasCruzadas?: string[] }[];
+    puentes?: { termino?: string; relacionados?: string[] }[];
     mapaMarkdown?: string;
   };
 
@@ -10213,8 +10233,28 @@ RESPONDE ESTRICTAMENTE EN FORMATO JSON VÁLIDO con la siguiente estructura (sin 
     });
   }
 
+  /*
+   * Los puentes, limpiados. Se descarta lo que no sirve para buscar: términos
+   * de una letra, listas vacías y el puente que se apunta a sí mismo.
+   */
+  const puentes = (parsed.puentes || [])
+    .map(p => ({
+      termino: String(p.termino || '').trim().slice(0, 60),
+      relacionados: [
+        ...new Set(
+          (p.relacionados || [])
+            .map(r => String(r || '').trim().slice(0, 60))
+            .filter(r => r.length >= 3)
+        )
+      ].slice(0, 8)
+    }))
+    .filter(p => p.termino.length >= 3 && p.relacionados.length > 0)
+    .filter(p => !p.relacionados.every(r => r.toLowerCase() === p.termino.toLowerCase()))
+    .slice(0, 120);
+
   return {
     archivosActualizados,
+    puentes,
     mapaMarkdown,
     totalConexiones
   };
