@@ -2130,9 +2130,62 @@ export default function App() {
   };
 
   // Messaging & Turn Generation
+  /**
+   * ¿La campaña se estrena ahora mismo?
+   *
+   * Es decir: nadie ha hablado todavía con el Narrador en ningún capítulo.
+   * Ese es el único momento en que tiene sentido avisar de que no hay
+   * biblioteca o tejer la red por primera vez.
+   */
+  const esElPrimerMensajeDeLaCampana = () =>
+    (currentChats || []).every(c => !(c.messages || []).some(m => m.role === 'user'));
+
+  /*
+   * 🃏 LA BIBLIOTECA, MIRADA JUSTO ANTES DE EMPEZAR A JUGAR.
+   *
+   * La revinculación automática cubre «acabas de subir archivos». No cubre los
+   * dos casos que se dan al estrenar campaña: que los documentos llevaran ahí
+   * desde antes y nadie pulsara nunca vincular, y que no haya documentos en
+   * absoluto — que casi siempre es un olvido, no una decisión, y más vale
+   * preguntarlo antes de narrar quinientos turnos sin canon.
+   *
+   * Se hace UNA vez, en el primer mensaje de la campaña, y nunca vuelve a
+   * molestar.
+   */
+  const revisarBibliotecaAlEstrenar = async (): Promise<boolean> => {
+    if (!esElPrimerMensajeDeLaCampana()) return true;
+
+    const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
+    const documentos = (currentFiles || []).filter(f => esTexto(f) && (f.content || '').trim().length > 30);
+
+    if (documentos.length === 0) {
+      const seguir = window.confirm(
+        '📚 No hay ningún documento en la biblioteca.\n\n' +
+          'El Narrador va a jugar sin canon: sin tu ficha, sin compendios y sin mundo escrito, ' +
+          'así que se lo inventará todo y no habrá nada con lo que contrastarlo después.\n\n' +
+          '¿Empezamos igualmente?\n\n' +
+          'Cancela si se te había olvidado subirlos — es lo que suele pasar.'
+      );
+      return seguir;
+    }
+
+    /*
+     * Hay biblioteca pero nadie ha tejido la red. Se lanza en segundo plano y
+     * sin esperar: el primer turno sale YA, y los puentes estarán listos para
+     * el segundo. Hacerlo al revés sería tener a la jugadora esperando varios
+     * segundos a que se teja algo antes de escribir la primera línea.
+     */
+    const hayMapa = (currentFiles || []).some(f => f.name?.includes('Red Semántica'));
+    if (!hayMapa && documentos.length >= 2 && getStoredAutoVincular()) {
+      void handleRelacionarBiblioteca({ silencioso: true });
+    }
+    return true;
+  };
+
   const handleSendMessage = async (textToSend: string) => {
     const text = textToSend.trim();
     if (!text || !currentPId || !currentChatId || isGenerating) return;
+    if (!(await revisarBibliotecaAlEstrenar())) return;
 
     if (currentChat) {
       const updatedMessages = [...currentChat.messages, { role: 'user' as const, content: text }];
@@ -2715,6 +2768,9 @@ export default function App() {
 
   const handleContinueNarrative = async (fromIndex?: number) => {
     if (!currentPId || !currentChatId || !currentChat || isGenerating) return;
+    // «Continuar» sobre un capítulo vacío es la otra forma de estrenar campaña:
+    // el Narrador arranca él solo y la jugadora no llega a escribir nada.
+    if (!(await revisarBibliotecaAlEstrenar())) return;
 
     let baseMessages = currentChat.messages;
     const targetIdx = fromIndex !== undefined ? fromIndex : currentChat.messages.length - 1;
