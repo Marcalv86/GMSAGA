@@ -6322,13 +6322,24 @@ export function construirPromptOOC({
       npcsDeLaCampana
         .slice(0, 40)
         .map(n => {
+          /*
+           * Al Director se le seguía enseñando la escala muerta.
+           *
+           * Imprimía «atr 0» leyendo el campo 0-20 que ya no lee nadie, así que
+           * a ojos del Director TODO el reparto tenía la atracción a cero
+           * —incluida la gente que sí la desea— y encima en una escala que el
+           * resto de la aplicación ya no usa. Ahora ve el interruptor.
+           */
+          const deseo = interesPorLaProtagonista(n);
           const barras =
-            typeof n.atr === 'number' || typeof n.vin === 'number' || typeof n.con === 'number'
-              ? ` · atr ${n.atr ?? 0}/vin ${n.vin ?? 0}/con ${n.con ?? 0}`
+            deseo || typeof n.vin === 'number' || typeof n.con === 'number'
+              ? ` · ${deseo === 'desea' ? 'LA DESEA' : deseo === 'interes' ? 'le interesa' : 'sin atracción'}/vin ${n.vin ?? 0}/con ${n.con ?? 0}`
               : '';
           const extra = [
             n.orientacion ? `orientación: ${n.orientacion}` : '',
-            n.atrBloqueada ? 'sin romance (candado puesto)' : '',
+            // El candado era del sistema viejo y ya no existe: lo que cierra una
+            // puerta de verdad es «orientación», que además dice por qué.
+            !n.atrEvaluada ? 'atracción sin decidir' : '',
             n.recurrente ? 'habitual' : '',
             corta(n.aparenta || n.description, 90)
           ]
