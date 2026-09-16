@@ -766,6 +766,50 @@ export function setStoredKeyRotationMode(mode: KeyRotationMode): void {
 // Mapa en memoria para enfriamiento temporal de claves cuando devuelven 429 (Resource Exhausted)
 const keyCooldownMap = new Map<string, number>();
 
+/*
+ * ENFRIAMIENTO POR MODELO — no solo por clave.
+ *
+ * Había enfriamiento de claves y no de modelos, y son cosas distintas: un 503
+ * de Google no dice «esta clave está saturada», dice «este MODELO está
+ * saturado ahora mismo para todo el mundo». Cambiar de clave no arregla nada.
+ *
+ * Lo que hacía la aplicación era saltar al siguiente modelo dentro de ESA
+ * llamada y olvidarlo. Así que al turno siguiente volvía a empezar la cadena
+ * por el mismo modelo saturado, se comía otra espera y otro fallo, y vuelta a
+ * empezar — con la clave marcada en frío de propina, que esa sí era inocente.
+ *
+ * Ahora se recuerda unos minutos y se aparta de la cabeza de la cadena.
+ */
+const modeloEnfriando = new Map<string, number>();
+
+/** Cuánto se aparta un modelo tras un 503. Lo bastante para que se despeje. */
+const ENFRIAMIENTO_MODELO_MS = 4 * 60 * 1000;
+
+export function marcarModeloSaturado(model: string, durationMs = ENFRIAMIENTO_MODELO_MS) {
+  if (model) modeloEnfriando.set(model, Date.now() + durationMs);
+}
+
+export function modeloEnEnfriamiento(model: string): boolean {
+  const hasta = modeloEnfriando.get(model);
+  if (!hasta) return false;
+  if (Date.now() > hasta) {
+    modeloEnfriando.delete(model);
+    return false;
+  }
+  return true;
+}
+
+/** Al primer acierto se levanta el castigo: ya no está saturado. */
+export function modeloRespondeBien(model: string) {
+  modeloEnfriando.delete(model);
+}
+
+/** Cuántos segundos le quedan de castigo, para poder decirlo en el registro. */
+export function segundosDeEnfriamiento(model: string): number {
+  const hasta = modeloEnfriando.get(model);
+  return hasta ? Math.max(0, Math.round((hasta - Date.now()) / 1000)) : 0;
+}
+
 export function markKeyCooldown(key: string, durationMs: number = 60000) {
   const clean = cleanApiKey(key);
   if (clean) {
@@ -4411,9 +4455,28 @@ export async function generateContentWithFailover({
         : [''];
   const base = sanitizeModelId(primaryModel || getBackgroundTaskModel(), DEFAULT_BACKGROUND_MODEL_ID);
   const rawChain = preferredChain || getModelFailoverChain(base);
-  const chain = rawChain
+  const chainLimpia = rawChain
     .map(m => sanitizeModelId(m, DEFAULT_MODEL_ID))
     .filter((m, idx, arr) => !isModelDeprecated(m) && arr.indexOf(m) === idx);
+  /*
+   * Los que acaban de dar 503 van al FINAL, no se quitan.
+   *
+   * Apartarlos del todo dejaría la campaña sin adónde ir si estuvieran todos
+   * en frío a la vez. Puestos al final se intentan igual, pero solo cuando no
+   * queda nadie mejor — que es exactamente lo que se quiere: dejar de estrellar
+   * cada turno contra el modelo que acaba de decir que no puede.
+   */
+  const enFrio = chainLimpia.filter(m => modeloEnEnfriamiento(m));
+  const chain = enFrio.length && enFrio.length < chainLimpia.length
+    ? [...chainLimpia.filter(m => !modeloEnEnfriamiento(m)), ...enFrio]
+    : chainLimpia;
+  if (enFrio.length) {
+    logWarn(
+      'gemini_stream',
+      'Modelo saturado apartado de la cabeza de la cadena',
+      enFrio.map(m => `${m} (le quedan ${segundosDeEnfriamiento(m)}s)`).join(', ')
+    );
+  }
   if (chain.length === 0) {
     chain.push(DEFAULT_MODEL_ID, DEFAULT_BACKGROUND_MODEL_ID);
   }
@@ -4603,6 +4666,13 @@ export async function generateContentWithFailover({
             break;
           }
           if (fallo.isOverloaded) {
+            /*
+             * Un 503 es del MODELO, no de la clave: saturado lo está para todo
+             * el mundo. Se recuerda para no volver a empezar por él en los
+             * próximos turnos, que es lo que hacía que cada uno costara dos
+             * fallos antes de llegar a un modelo que sí contesta.
+             */
+            marcarModeloSaturado(model);
             const haySiguienteModelo = i < chain.length - 1;
             if (haySiguienteModelo) {
               saltarAlSiguienteModelo = true;
