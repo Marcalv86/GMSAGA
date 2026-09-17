@@ -1669,6 +1669,7 @@ export default function App() {
     relojes?: RelojOculto[];
     facciones?: Faccion[];
     preparado?: CartaPreparada[];
+    nivel?: AvanceDeNivel | null;
     corregirCronica?: string | null;
     rehacerUltimoTurno?: string | null;
   }): Promise<string[]> => {
@@ -1718,6 +1719,28 @@ export default function App() {
           } as any
         }));
       }
+    }
+
+    /*
+     * EL NIVEL, QUE ES UN NÚMERO DE LA FICHA Y NO UNA FRASE DE LA MEMORIA.
+     *
+     * El Director podía decir «te subo a nivel 5» y dejarlo apuntado en la
+     * memoria general tan tranquilo. Pero la memoria general es PROSA —la lee
+     * el Narrador, no la aplicación— y el nivel vive en la ficha, así que la
+     * corrección se quedaba a mitad de camino: una directiva diciendo «es
+     * druida de nivel 5» y una ficha que seguía poniendo Nivel 1.
+     *
+     * Se aplica con el MISMO código que la subida jugada, así que arrastra lo
+     * que arrastra siempre: la cuenta de hitos vuelve a cero al subir y el
+     * progreso se recalcula.
+     */
+    if (orden.nivel && (orden.nivel.nivelAlcanzado || orden.nivel.hitos !== undefined)) {
+      await handleUpdateProjectField(prev => ({ memory: conAvanceDeNivel(prev.memory, orden.nivel!) }));
+      aplicado.push(
+        orden.nivel.nivelAlcanzado
+          ? `⬆️ Nivel ${orden.nivel.nivelAlcanzado} en la ficha`
+          : `⬆️ Avance de nivel ${orden.nivel.hitos}/${orden.nivel.necesarios ?? '?'}`
+      );
     }
 
     if (orden.etiquetados?.length && currentPId) {

@@ -33,6 +33,7 @@ import { Chat, Project, ProjectFile } from '../types';
 import { describeApiError, ImagenDeMesa, modelosParaElDirector, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
 import { SecretoLeido, ViajeLeido, VinculoLeido } from '../utils/campaignCalendar';
 import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from '../types';
+import type { AvanceDeNivel } from '../utils/campaignCalendar';
 import {
   conMiles,
   estimarCosteDeVideo,
@@ -120,6 +121,7 @@ export const MesaView: React.FC<{
     relojes?: RelojOculto[];
     facciones?: Faccion[];
     preparado?: CartaPreparada[];
+    nivel?: AvanceDeNivel | null;
     corregirCronica?: string | null;
     rehacerUltimoTurno?: string | null;
   }) => Promise<string[]> | string[];
@@ -276,6 +278,7 @@ export const MesaView: React.FC<{
           relojes: respuesta.relojes,
           facciones: respuesta.facciones,
           preparado: respuesta.preparado,
+          nivel: respuesta.nivel,
           corregirCronica: respuesta.corregirCronica,
           rehacerUltimoTurno: respuesta.rehacerUltimoTurno
         });
