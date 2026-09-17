@@ -372,6 +372,14 @@ export function leerPreparado(texto: string): CartaPreparada[] {
       detalle: (c['detalle'] || c['que pasa'] || c['contenido'])?.slice(0, 600),
       cuando: (c['cuando'] || c['encaja'])?.slice(0, 200),
       hilo: (c['hilo'] || c['trama'])?.slice(0, 160),
+      siNadieVa: (
+        c['si nadie va'] ||
+        c['si no pasa'] ||
+        c['si no se usa'] ||
+        c['si nadie lo impide'] ||
+        c['si nadie va all'] ||
+        c['consecuencia']
+      )?.slice(0, 400),
       usada: /^(si|sí|true|ya)$/i.test(c['usada'] || '')
     });
   }
@@ -453,6 +461,7 @@ export function aplicarPreparado(
       detalle: elige(c.detalle, a.detalle),
       cuando: elige(c.cuando, a.cuando),
       hilo: elige(c.hilo, a.hilo),
+      siNadieVa: elige(c.siNadieVa, a.siNadieVa),
       // Que algo esté usado no se deshace releyendo un documento.
       usada: c.usada || a.usada,
       sugerida: c.sugerida && a.sugerida,

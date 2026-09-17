@@ -531,6 +531,20 @@ export interface CartaPreparada {
   /** Ya se ha usado: se queda como registro, no se borra. */
   usada?: boolean;
   /**
+   * Qué pasa en el mundo si esto NO llega a usarse nunca.
+   *
+   * Lo preparado solía ser una promesa que o se cumplía o no existía: si la
+   * protagonista nunca va al faro, la emboscada del faro no pasa y ya está.
+   * Pero no ir también es una decisión, y una decisión sin consecuencia no es
+   * una decisión: es que daba igual. Si nadie fue al faro, el farero sigue
+   * muerto, la señal sigue apagada y algún barco encalla —y de eso se entera
+   * el mundo, no la cámara—.
+   *
+   * Esto es el hermano de `siLoImpiden` de los secretos: aquel dice qué pasa
+   * cuando ella FRUSTRA un plan, y este qué pasa cuando ni se presenta.
+   */
+  siNadieVa?: string;
+  /**
    * El día de campaña en que se guardó.
    *
    * Sin esto no había forma de saber que una carta lleva media campaña
