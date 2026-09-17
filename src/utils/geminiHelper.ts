@@ -3988,7 +3988,26 @@ export async function generateStoryTurnStream({
   }
 
   const baseModel = getStoredModel();
-  const failoverChain = getModelFailoverChain(baseModel);
+  /*
+   * EL ENFRIAMIENTO EXISTÍA Y NO LLEGABA AQUÍ.
+   *
+   * Cuando un modelo devuelve 503 se apunta como saturado y se aparta un rato,
+   * y eso ya funcionaba... en las tareas de fondo. La NARRACIÓN —que es donde
+   * se lee el «Google saturado en el modelo anterior»— construía su cadena sin
+   * mirar el apunte, así que seguía empezando cada turno por el mismo modelo
+   * que acababa de decir que no podía. De ahi que el aviso no dejara de salir
+   * por mucho que existiera el enfriamiento: la regla estaba escrita y no
+   * llegaba al sitio donde se decide.
+   *
+   * Los que están en frío no se descartan, se van al final: si estuvieran todos
+   * saturados hay que intentarlo con alguno igualmente.
+   */
+  const cadenaCruda = getModelFailoverChain(baseModel);
+  const enFrioAhora = cadenaCruda.filter(m => modeloEnEnfriamiento(m));
+  const failoverChain =
+    enFrioAhora.length && enFrioAhora.length < cadenaCruda.length
+      ? [...cadenaCruda.filter(m => !modeloEnEnfriamiento(m)), ...enFrioAhora]
+      : cadenaCruda;
 
   const storedKeys = getStoredApiKeys();
   const numeroDeClave = (key: string, pos: number) => {
@@ -4380,6 +4399,15 @@ export async function generateStoryTurnStream({
           // Lo ya narrado no se tira. Si el corte llegó con la escena encaminada,
           // se guarda y se preserva íntegramente: la jugadora no pierde lo leído.
           if (recibioTexto && fullText.trim().length > 30) {
+            /*
+             * Y si ha ido bien, se le levanta el castigo.
+             *
+             * `modeloRespondeBien` existía y no se llamaba desde ningún sitio,
+             * así que el enfriamiento solo se levantaba por caducidad: cuatro
+             * minutos apartado aunque Google se hubiera recuperado al segundo.
+             * Un acierto es la mejor prueba de que ya no está saturado.
+             */
+            modeloRespondeBien(currentModel);
             await persistir(fullText.trim(), true);
             return;
           }
@@ -4452,6 +4480,15 @@ export async function generateStoryTurnStream({
             // están experimentando alta demanda global. Probar otras claves de usuario
             // contra el mismo modelo caído no resuelve la saturación y quema tokens TPM.
             // Si hay un modelo de respaldo disponible en la cadena, conmutamos de inmediato.
+            /*
+             * Y SE APUNTA, que es lo que faltaba.
+             *
+             * Sin este apunte el enfriamiento no se activaba nunca desde la
+             * narración: el turno siguiente volvía a empezar por el modelo que
+             * acababa de caerse, se comía otra espera y otro aviso, y así una
+             * vez por turno hasta que a Google le apeteciera.
+             */
+            marcarModeloSaturado(currentModel);
             const haySiguienteModelo = modelIndex < failoverChain.length - 1;
             if (haySiguienteModelo) {
               setLoadingText(`Google saturado en ${modelDisplayName} (503). Conmutando de inmediato a modelo de respaldo...`);
