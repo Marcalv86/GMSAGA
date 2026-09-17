@@ -493,9 +493,10 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                     onClick={() => onRegenerateMessage(idx)}
                     disabled={isGenerating}
                     className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
+                    aria-label="Rehacer esta narración"
                     title="Rehacer esta narración (vuelve a tirar y genera una respuesta diferente)"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" /> Rehacer
+                    <RefreshCw className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Rehacer</span>
                   </button>
                 </>
               )}
@@ -504,25 +505,28 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                   onClick={() => onRegenerateMessage(idx)}
                   disabled={isGenerating}
                   className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
+                  aria-label="Re-tirar esta acción"
                   title="Re-ejecutar esta acción y generar nueva respuesta"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" /> Re-tirar
+                  <RefreshCw className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Re-tirar</span>
                 </button>
               )}
               <button
                 onClick={() => handleStartEditing(idx, m.content)}
                 disabled={isGenerating}
                 className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-40"
+                aria-label="Editar el texto"
                 title="Editar texto manualmente"
               >
-                <Pencil className="w-3.5 h-3.5" /> Editar
+                <Pencil className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Editar</span>
               </button>
               <button
                 onClick={() => handleCopyMessage(idx, m.content)}
                 className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                aria-label="Copiar el texto"
                 title="Copiar texto al portapapeles"
               >
-                <Copy className="w-3.5 h-3.5" /> {copiedIndex === idx ? 'Copiado' : 'Copiar'}
+                <Copy className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">{copiedIndex === idx ? 'Copiado' : 'Copiar'}</span>
               </button>
               <button
                 onClick={() =>
