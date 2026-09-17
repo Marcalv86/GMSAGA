@@ -773,6 +773,18 @@ export interface Memory {
    * La huella incluye el tamaño y un hash del contenido, así que un documento
    * corregido vuelve a contar como «por mirar».
    */
+  /**
+   * Cuánta gente y cuántos sitios había la última vez que se tejó la red.
+   *
+   * Los puentes de búsqueda se construyen de los DOCUMENTOS, al subirlos. Pero
+   * Serena, Braelin o el Azote de las Olas aparecen JUGANDO, y nunca entraban
+   * en la red: el buscador se iba quedando ciego justo con lo más reciente,
+   * que es lo que más se consulta.
+   *
+   * Con esto se sabe cuánto ha crecido el elenco desde el último tejido y se
+   * rehace cuando de verdad compensa, en vez de por calendario.
+   */
+  elenco_al_tejer?: { npcs: number; lugares: number };
   documentos_del_tablero?: { id: string; huella: string }[];
   retratos_guardados?: { nombre: string; portrait: string }[];
   puentes_de_busqueda?: { termino: string; relacionados: string[] }[];

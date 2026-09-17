@@ -109,6 +109,7 @@ import {
   leerElTableroDeDocumentos,
   huellaDeDocumento,
   repasarEntreSesiones,
+  rescatarFichaDePnj,
   extraerIdentidadDeDocumentos,
   extraerMecanicasDeDocumento,
   generarEtiquetasDeBusqueda,
@@ -825,7 +826,22 @@ export default function App() {
         setTieneNovedadMesa(true);
       }
     }
+    /*
+     * Quién sale HOY por primera vez, para ir luego a buscar su canon.
+     *
+     * Se anota aquí porque dentro del actualizador no se puede disparar nada:
+     * eso corre en medio de un `setState` y tiene que ser puro.
+     */
+    const estrenanHoy: string[] = [];
     await handleUpdateProjectField(p => {
+      const yaEstaban = new Set(
+        (p.memory?.npcs || []).map(n => (n.name || '').toLowerCase().trim()).filter(Boolean)
+      );
+      for (const v of [...(t.vinculos || []), ...(t.presentes || [])]) {
+        const nombre = typeof v === 'string' ? v : (v as { nombre?: string }).nombre;
+        const limpio = (nombre || '').trim();
+        if (limpio.length > 2 && !yaEstaban.has(limpio.toLowerCase())) estrenanHoy.push(limpio);
+      }
       const cal = p.calendar;
       const fecha = p.currentDate;
 
@@ -1040,6 +1056,49 @@ export default function App() {
 
       return { currentDate: nuevaFecha, threads, timeline, memory: mem };
     });
+
+    // Y ahora sí, fuera del actualizador: a buscarles el canon sin prisa.
+    if (estrenanHoy.length) void rescatarFichasPendientes([...new Set(estrenanHoy)]);
+    void retejerSiLaPartidaHaCrecido();
+  };
+
+  /*
+   * 🗺️ RE-TEJER LA RED CUANDO LA PARTIDA HA MOVIDO DE VERDAD.
+   *
+   * Los puentes se construyen de los DOCUMENTOS, al subirlos. Pero la gente y
+   * los sitios que aparecen JUGANDO no entran nunca, así que el buscador se va
+   * quedando ciego justo con lo más reciente —que es lo que más se consulta—.
+   *
+   * No se rehace por calendario ni por turnos: se rehace cuando el elenco ha
+   * crecido lo bastante como para que compense. Media docena de caras nuevas
+   * cambian de verdad qué hay que saber buscar; una no.
+   */
+  const CRECIMIENTO_PARA_RETEJER = 6;
+  const retejerSiLaPartidaHaCrecido = async () => {
+    if (!getStoredAutoVincular()) return;
+    const proyecto = projectsRef.current.find(pr => pr.id === currentPIdRef.current);
+    if (!proyecto) return;
+    const hayMapa = (currentFilesRef.current || []).some(f => f.name?.includes('Red Semántica'));
+    if (!hayMapa) return; // Sin red tejida no hay nada que rehacer: de eso se encarga la subida.
+
+    const ahora = {
+      npcs: (proyecto.memory?.npcs || []).length,
+      lugares: (proyecto.memory?.locations || []).length
+    };
+    const antes = proyecto.memory?.elenco_al_tejer || { npcs: 0, lugares: 0 };
+    const crecido = ahora.npcs - antes.npcs + (ahora.lugares - antes.lugares);
+    if (crecido < CRECIMIENTO_PARA_RETEJER) return;
+
+    // Se apunta ANTES de lanzar: si falla, no se reintenta en cada turno.
+    await handleUpdateProjectField(prev => ({
+      memory: { ...(prev.memory || {}), elenco_al_tejer: ahora } as any
+    }));
+    logInfo(
+      'memory_sync',
+      'La partida ha crecido: se reteje la red de búsqueda',
+      `${crecido} caras y sitios nuevos desde el último tejido.`
+    );
+    void handleRelacionarBiblioteca({ silencioso: true });
   };
 
   /**
@@ -2312,6 +2371,64 @@ export default function App() {
       void handleArchiveChatAsFile(capituloCerrado, { silent: true });
       void handleTriggerMemorySyncWithAI();
       void repasarElCuadernoAlCerrar(capituloCerrado);
+    }
+  };
+
+  /*
+   * 📖 LA FICHA DE QUIEN ACABA DE APARECER, RESCATADA DE LOS DOCUMENTOS.
+   *
+   * El Narrador ficha a alguien con lo que cabe en una etiqueta a mitad de
+   * escena, pero de esa persona puede haber tres párrafos en un compendio que
+   * nadie fue a buscar —porque en ese momento estaba ocupado escribiendo—. Así
+   * que la segunda vez que sale, el Narrador lo trata como al desconocido que
+   * la app cree que es, teniendo su canon en la biblioteca.
+   *
+   * ⛔ Rellena HUECOS y no pisa nada: lo que ya esté escrito salió jugando o
+   * lo puso la jugadora, y eso manda sobre cualquier documento.
+   */
+  const rescatarFichasPendientes = async (nombres: string[]) => {
+    const pid = currentPIdRef.current;
+    if (!pid || !nombres.length) return;
+
+    for (const nombre of nombres.slice(0, 3)) {
+      try {
+        const proyecto = projectsRef.current.find(pr => pr.id === pid);
+        if (!proyecto) return;
+        const ficha = proyecto.memory?.npcs?.find(n => coincidenNombresNpc(n.name, nombre));
+        // Si mientras tanto se ha llenado a mano o jugando, no hay nada que hacer.
+        if (!ficha || (ficha.oculta && ficha.appearance && (ficha.notes || '').length > 120)) continue;
+
+        const leido = await rescatarFichaDePnj({
+          nombre,
+          files: currentFilesRef.current || [],
+          project: proyecto
+        });
+        if (!leido) continue;
+
+        await handleUpdateProjectField(prev => ({
+          memory: {
+            ...(prev.memory || {}),
+            npcs: (prev.memory?.npcs || []).map(n => {
+              if (!coincidenNombresNpc(n.name, nombre)) return n;
+              const vacio = (v?: string) => !v || !v.trim() || /^(apareció en escena|vínculo establecido)/i.test(v.trim());
+              return {
+                ...n,
+                notes: vacio(n.notes) && leido.notes ? leido.notes : n.notes,
+                description: vacio(n.description) && leido.description ? leido.description : n.description,
+                appearance: vacio(n.appearance) && leido.appearance ? leido.appearance : n.appearance,
+                aparenta: vacio(n.aparenta) && leido.aparenta ? leido.aparenta : n.aparenta,
+                oculta: vacio(n.oculta) && leido.oculta ? leido.oculta : n.oculta,
+                orientacion: vacio(n.orientacion) && leido.orientacion ? leido.orientacion : n.orientacion,
+                idiomas: vacio(n.idiomas) && leido.idiomas ? leido.idiomas : n.idiomas
+              };
+            })
+          } as any
+        }));
+        logInfo('memory_sync', `Ficha de ${nombre} completada con los documentos`, Object.entries(leido).filter(([, v]) => v).map(([k]) => k).join(', '));
+      } catch (err) {
+        logWarn('memory_sync', `No se pudo rescatar la ficha de ${nombre}`, describeApiError(err));
+      }
+      await new Promise(r => setTimeout(r, 2500));
     }
   };
 

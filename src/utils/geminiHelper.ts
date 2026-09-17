@@ -20,6 +20,7 @@ import {
 import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, InventoryItem, MovimientoOculto, PlayerCurrencies, RelojOculto } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { quitarEtiquetasInternas } from './etiquetasInternas';
+import { ampliarConPuentes, buscar, construirIndice } from './localSearch';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import {
   apuntarPeticion,
@@ -7406,6 +7407,104 @@ Responde ÚNICAMENTE con el JSON, sin nada más:
  * semanas lo que guardó el Narrador porque se le ocurrió jugando de lo que
  * propuso la aplicación el primer día.
  */
+/**
+ * LA FICHA DE UN PNJ, RESCATADA DE LOS DOCUMENTOS AL CONOCERLO.
+ *
+ * Cuando alguien sale por primera vez, el Narrador lo ficha con lo poco que
+ * caben en una etiqueta a mitad de escena. Pero de esa persona puede haber
+ * tres párrafos en un compendio —a qué se dedica, de quién desconfía, qué
+ * esconde— que nadie ha ido a buscar, porque en ese momento estaba ocupado
+ * escribiendo prosa.
+ *
+ * Esto lo hace después y sin prisa: busca en la biblioteca lo que se sepa de
+ * él y rellena LOS HUECOS de su ficha. Nunca pisa lo que ya hubiera: lo que
+ * está escrito salió jugando o lo puso la jugadora, y eso manda sobre un
+ * documento.
+ */
+export async function rescatarFichaDePnj({
+  nombre,
+  files,
+  project
+}: {
+  nombre: string;
+  files: ProjectFile[];
+  project: Project;
+}): Promise<{
+  notes?: string;
+  description?: string;
+  appearance?: string;
+  aparenta?: string;
+  oculta?: string;
+  orientacion?: string;
+  idiomas?: string;
+} | null> {
+  if (!nombre || nombre.trim().length < 2) return null;
+
+  // Se busca en local: no cuesta petición y evita mandar la biblioteca entera.
+  const indice = construirIndice(files || []);
+  const { consulta, puente } = ampliarConPuentes(nombre, puentesDeLaCampana(project, files));
+  const encontrados = buscar(indice, consulta, 8, puente);
+  const texto = encontrados
+    .map(r => r.fragmento.texto)
+    .join('\n\n')
+    .slice(0, 30000);
+  if (texto.trim().length < 400) return null;
+
+  const pc = project.memory?.player_character;
+  const prompt = `De los fragmentos de abajo, saca lo que se sepa de **${nombre}** y nada más.
+
+${pc?.name ? `La protagonista se llama ${pc.name}; NO la confundas con él ni le atribuyas cosas de ella.\n` : ''}
+⛔ Esto es LEER, no inventar. Si un dato no está en los fragmentos, omite el campo entero. Un campo vacío es correcto; uno inventado se convierte en canon y contradice lo que la jugadora tenga escrito.
+⛔ Si los fragmentos hablan de otra persona con un nombre parecido, devuelve todo vacío.
+
+- "notes": quién es, a qué se dedica y qué quiere. Dos o tres frases.
+- "description": su papel público y lo que se ve de él.
+- "appearance": rasgos físicos concretos, si constan.
+- "aparenta": cómo se muestra en público, la cara que enseña.
+- "oculta": lo que esconde o lo que de verdad persigue, si el documento lo distingue de lo anterior.
+- "orientacion": a quién mira o si tiene un compromiso, SOLO si consta explícitamente.
+- "idiomas": qué lenguas habla, si constan.
+
+FRAGMENTOS:
+${texto}
+
+JSON:
+{ "notes": "...", "description": "...", "appearance": "...", "aparenta": "...", "oculta": "...", "orientacion": "...", "idiomas": "..." }`;
+
+  const modelo = getBackgroundTaskModel();
+  const respuesta = await generateContentWithFailover({
+    proposito: `Rescatar la ficha de ${nombre}`,
+    primaryModel: modelo,
+    contents: prompt,
+    config: {
+      temperature: 0.2,
+      responseMimeType: 'application/json',
+      ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    } as any
+  });
+
+  let p: any = {};
+  try {
+    p = JSON.parse((respuesta.text || '{}').replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim());
+  } catch {
+    return null;
+  }
+  const txt = (v: any, max: number) => {
+    const t = typeof v === 'string' ? v.trim() : '';
+    return !t || /^(n\/?a|desconocid[oa]|no consta|ningun[oa]?|sin datos)$/i.test(t) ? undefined : t.slice(0, max);
+  };
+  const salida = {
+    notes: txt(p?.notes, 600),
+    description: txt(p?.description, 400),
+    appearance: txt(p?.appearance, 400),
+    aparenta: txt(p?.aparenta, 400),
+    oculta: txt(p?.oculta, 500),
+    orientacion: txt(p?.orientacion, 160),
+    idiomas: txt(p?.idiomas, 200)
+  };
+  return Object.values(salida).some(Boolean) ? salida : null;
+}
+
 /**
  * EL REPASO ENTRE SESIONES.
  *
