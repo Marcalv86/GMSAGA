@@ -4964,8 +4964,37 @@ export default function App() {
       const fileReader = new FileReader();
       fileReader.readAsText(file, 'UTF-8');
       fileReader.onload = async event => {
+        /*
+         * EL PARSEO, SEPARADO DEL RESTO.
+         *
+         * El `try` de abajo envolvía el JSON.parse Y las ciento sesenta líneas
+         * que vienen después —guardar proyectos, escribir documentos en
+         * IndexedDB, restaurar claves—, y cualquier fallo de ahí dentro salía
+         * por pantalla como «El archivo JSON no tiene un formato válido».
+         *
+         * O sea que quedarse sin espacio al guardar los documentos, o un
+         * campo raro en una campaña vieja, se le contaba a la jugadora como
+         * que su copia estaba corrupta. Y no lo estaba: el archivo era
+         * perfectamente válido y el problema era otro. Buscas el fallo donde
+         * no está y, peor, das por perdida una copia que estaba bien.
+         */
+        let imported: any;
         try {
-          const imported = JSON.parse(event.target?.result as string);
+          imported = JSON.parse(event.target?.result as string);
+        } catch (err) {
+          console.error('JSON inválido al importar:', err);
+          setAlertConfig({
+            isOpen: true,
+            title: 'Archivo ilegible',
+            message:
+              'Este archivo no es un JSON válido, así que ni siquiera he podido abrirlo.\n\n' +
+              'Suele pasar si se editó a mano, si la descarga se cortó a medias o si no es un archivo de GM Studio.\n\n' +
+              `Detalle: ${err instanceof Error ? err.message : String(err)}`
+          });
+          reject(err);
+          return;
+        }
+        try {
 
           // Restauración automática de API Keys y configuración del motor de IA si vienen en el archivo
           if (Array.isArray(imported.apiKeys) && imported.apiKeys.length > 0) {
@@ -5125,11 +5154,24 @@ export default function App() {
             }
           });
         } catch (err) {
-          console.error('Error importing JSON:', err);
+          /*
+           * Aquí el archivo YA se leyó bien: lo que ha fallado es meterlo.
+           * Decir «JSON no válido» aquí sería mentir, y manda a buscar el
+           * problema al sitio equivocado.
+           */
+          console.error('Error al restaurar la campaña:', err);
+          const detalle = err instanceof Error ? err.message : String(err);
+          const sinSitio = /quota|storage|space|QuotaExceeded/i.test(detalle);
           setAlertConfig({
             isOpen: true,
-            title: 'Error de Importación',
-            message: 'El archivo JSON no tiene un formato válido.'
+            title: sinSitio ? 'No cabe en este navegador' : 'No se pudo restaurar',
+            message: sinSitio
+              ? 'El archivo está bien y se ha leído entero, pero no hay sitio en el almacenamiento del navegador para guardarlo.\n\n' +
+                'Libera espacio borrando alguna campaña vieja desde la pantalla de almacenamiento y vuelve a intentarlo. Tu archivo no se ha tocado.\n\n' +
+                `Detalle: ${detalle}`
+              : 'El archivo se ha leído bien —el JSON es válido— pero algo ha fallado al meterlo en la aplicación.\n\n' +
+                'Tu archivo no se ha tocado, así que puedes volver a intentarlo.\n\n' +
+                `Detalle: ${detalle}`
           });
           reject(err);
         }

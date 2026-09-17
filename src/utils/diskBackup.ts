@@ -185,7 +185,7 @@ export async function writeCampaignToDisk(
   chats: Chat[],
   files: ProjectFile[],
   targetFileName?: string
-): Promise<{ written: boolean; fileName?: string; reason?: 'no-folder' | 'no-permission' | 'error' }> {
+): Promise<{ written: boolean; fileName?: string; reason?: 'no-folder' | 'no-permission' | 'error' | 'incompleta' }> {
   const handle = await readHandle();
   if (!handle) return { written: false, reason: 'no-folder' };
 
@@ -235,6 +235,35 @@ export async function writeCampaignToDisk(
     const writable = await target.createWritable();
     await writable.write(payload);
     await writable.close();
+
+    /*
+     * SE RELEE LO QUE SE ACABA DE ESCRIBIR.
+     *
+     * Una copia de seguridad que no se puede abrir es peor que no tener
+     * copia: crees que la tienes. Y con documentos y retratos dentro, este
+     * archivo se pone en decenas de megas, que es justo donde empiezan a
+     * pasar cosas raras —el disco lleno, una carpeta sincronizada que se
+     * mete por medio, un navegador que se queda sin memoria al serializar—.
+     *
+     * Releerlo y parsearlo cuesta un instante y convierte «he guardado»
+     * en «he guardado y lo he comprobado». Si no cuadra, se dice AHORA, que
+     * es cuando todavía se puede volver a intentar, y no dentro de un mes
+     * cuando haga falta de verdad.
+     */
+    try {
+      const comprobacion = await (await target.getFile()).text();
+      if (comprobacion.length !== payload.length) {
+        console.warn('La copia en disco salió con otro tamaño del esperado', {
+          esperado: payload.length,
+          escrito: comprobacion.length
+        });
+        return { written: false, reason: 'incompleta', fileName };
+      }
+      JSON.parse(comprobacion);
+    } catch (err) {
+      console.warn('La copia en disco se escribió pero no se puede releer:', err);
+      return { written: false, reason: 'incompleta', fileName };
+    }
 
     return { written: true, fileName };
   } catch (err) {

@@ -142,6 +142,17 @@ export const LocalStorageModal: React.FC<LocalStorageModalProps> = ({
       } else if (saveRes.reason === 'no-permission') {
         setBackupNeedsPermission(true);
         setFolderErrorMsg('El navegador requiere autorizar el permiso de escritura en la carpeta.');
+      } else if (saveRes.reason === 'incompleta') {
+        /*
+         * Se escribió, pero al releerlo no cuadra. Decir «guardada» aquí
+         * sería lo peor que puede hacer una copia de seguridad: que creas
+         * que la tienes.
+         */
+        setFolderErrorMsg(
+          `El archivo «${saveRes.fileName || 'de la campaña'}» se ha escrito, pero al releerlo no sale entero: ` +
+            'probablemente no cabe o algo se metió por medio. NO te fíes de esa copia. ' +
+            'Comprueba el espacio libre, y si la carpeta está sincronizada con la nube prueba con una local.'
+        );
       } else {
         setFolderErrorMsg('No se pudo guardar la campaña en la carpeta.');
       }
