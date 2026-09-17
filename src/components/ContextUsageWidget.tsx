@@ -170,6 +170,26 @@ export const ContextUsageWidget: React.FC<{
   const cupoApurado = peticionesHoy >= cupoDiario * 0.8;
 
   /*
+   * EL VEREDICTO, QUE ERA LO ÚNICO QUE FALTABA.
+   *
+   * Esta ventana enseñaba siete filas con barras, dos límites que se parecen y
+   * tres bloques de explicación, y de todo eso había que deducir lo único que
+   * se viene a preguntar: ¿voy bien o no, y si no, qué quito? Datos había de
+   * sobra; respuesta no había ninguna, y con un montón de datos delante la
+   * sensación es de complicación, no de control.
+   *
+   * Esto no calcula nada nuevo: solo lee lo que ya estaba y lo dice en una
+   * frase, nombrando además la pieza más gorda de las que SÍ se pueden tocar
+   * —los protocolos y la ficha no se quitan, así que señalarlos no ayuda—.
+   */
+  const loQueSePuedeTocar = [
+    { nombre: 'los archivos que viajan enteros', chars: filesChars, donde: 'En Archivos, pasa a «consulta» los que no hagan falta en cada escena.' },
+    { nombre: 'el capítulo en curso', chars: chatsChars, donde: 'En Motor → Rendimiento puedes fijar una «Ventana de Historial», o cerrar el capítulo y abrir otro.' },
+    { nombre: 'tus directivas del Narrador', chars: instructionsChars, donde: 'En Directivas, recorta lo que ya no uses.' },
+    { nombre: 'la memoria general', chars: memoryChars, donde: 'En Memoria del Proyecto, resume lo que se haya quedado viejo.' }
+  ].sort((a, b) => b.chars - a.chars)[0];
+
+  /*
    * Manda lo medido de verdad, en este orden: la medición manual del botón «medir
    * de verdad», luego los tokens de entrada que Google devolvió en el último
    * turno, y solo si no hay ninguna de las dos, la estimación por caracteres.
@@ -360,6 +380,68 @@ export const ContextUsageWidget: React.FC<{
 
               {/* Modal Body */}
               <div className="p-5 overflow-y-auto space-y-6 text-sm leading-relaxed">
+                {/*
+                  LA RESPUESTA PRIMERO. Debajo están los datos para quien los
+                  quiera, pero lo que se viene a preguntar aquí cabe en dos
+                  frases y antes no estaba escrito en ninguna parte.
+                */}
+                <div
+                  className={`rounded-lg border-2 p-4 ${
+                    pasadaDeCuota || peticionesHoy >= cupoDiario
+                      ? 'border-red-600/60 bg-red-600/10'
+                      : cercaDeCuota || cupoApurado
+                      ? 'border-amber-600/60 bg-amber-500/10'
+                      : 'border-emerald-600/50 bg-emerald-500/10'
+                  }`}
+                >
+                  <div className="font-cinzel font-bold text-base mb-1">
+                    {peticionesHoy >= cupoDiario
+                      ? '\u26d4 Se acabaron los turnos de hoy'
+                      : pasadaDeCuota
+                      ? '\u26d4 Cada turno se pasa de cuota'
+                      : cercaDeCuota
+                      ? '\u26a0\ufe0f Vas justa'
+                      : cupoApurado
+                      ? '\u26a0\ufe0f Te quedan pocos turnos hoy'
+                      : '\u2705 Vas holgada'}
+                  </div>
+                  <p className="text-[13px] m-0 leading-relaxed">
+                    {peticionesHoy >= cupoDiario ? (
+                      <>
+                        Llevas <strong>{peticionesHoy} de {cupoDiario}</strong> peticiones con {modeloDeNarracion}.
+                        No es por el tama\u00f1o de lo que mandas: es que se agot\u00f3 el cupo del d\u00eda. Cambia de modelo
+                        o espera a ma\u00f1ana.
+                      </>
+                    ) : pasadaDeCuota ? (
+                      <>
+                        Cada turno manda <strong>{compact(tokensMostrados)} fichas</strong> y el l\u00edmite por minuto
+                        est\u00e1 en {compact(TOPE_TOKENS_POR_MINUTO)}. Va a dar error <strong>aunque la clave est\u00e9 sin
+                        estrenar</strong>: no es cuota gastada, es que no cabe. Lo que m\u00e1s ocupa de lo que puedes
+                        tocar es <strong>{loQueSePuedeTocar.nombre}</strong> ({compact(loQueSePuedeTocar.chars)}).{' '}
+                        {loQueSePuedeTocar.donde}
+                      </>
+                    ) : cercaDeCuota ? (
+                      <>
+                        Vas por <strong>{compact(tokensMostrados)}</strong> de {compact(TOPE_TOKENS_POR_MINUTO)} fichas
+                        por minuto. A\u00fan cabe, pero un turno largo puede pasarse. Si quieres margen, lo m\u00e1s gordo
+                        que puedes tocar es <strong>{loQueSePuedeTocar.nombre}</strong> ({compact(loQueSePuedeTocar.chars)}).{' '}
+                        {loQueSePuedeTocar.donde}
+                      </>
+                    ) : cupoApurado ? (
+                      <>
+                        El tama\u00f1o de los turnos est\u00e1 bien, pero llevas{' '}
+                        <strong>{peticionesHoy} de {cupoDiario}</strong> peticiones de hoy con {modeloDeNarracion}.
+                        Cuando se acaben no podr\u00e1s seguir con este modelo hasta ma\u00f1ana.
+                      </>
+                    ) : (
+                      <>
+                        Cada turno manda <strong>{compact(tokensMostrados)} fichas</strong>, y caben{' '}
+                        {compact(TOPE_TOKENS_POR_MINUTO)} por minuto. No tienes que hacer nada.
+                      </>
+                    )}
+                  </p>
+                </div>
+
                 {/* Live Breakdown Box */}
                 <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] rounded-lg p-4 shadow-xs">
                   <h4 className="font-cinzel font-bold text-sm text-[var(--accent)] mb-1 flex flex-wrap items-center justify-between gap-2">
@@ -622,6 +704,21 @@ export const ContextUsageWidget: React.FC<{
                   </div>
                 </div>
 
+                {/*
+                  EL MANUAL, PLEGADO.
+
+                  Debajo había tres secciones seguidas —cómo recuerda la
+                  campaña, los dos límites que se parecen y la guía de
+                  archivos— que son buenas pero son un MANUAL, y estaban
+                  abiertas siempre. Quien abre esta ventana con un 429 delante
+                  no quiere un manual: quiere saber qué quitar. Sigue todo
+                  aquí, a un clic, para el rato en que sí apetece leerlo.
+                */}
+                <details className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)] overflow-hidden">
+                  <summary className="cursor-pointer select-none px-4 py-3 font-cinzel font-bold text-sm text-[var(--accent)] hover:bg-[var(--glass)] transition-colors">
+                    ¿Cómo funciona todo esto? · memoria, límites y archivos
+                  </summary>
+                  <div className="px-4 pb-4 pt-1 space-y-6">
                 {/* Cómo se gestiona la memoria */}
                 <div className="space-y-2">
                   <h4 className="font-cinzel font-bold text-base text-[var(--accent)] flex items-center gap-2">
@@ -725,7 +822,9 @@ export const ContextUsageWidget: React.FC<{
                       </ul>
                     </div>
                   </div>
-                </div>
+                  </div>
+                  </div>
+                </details>
               </div>
 
               {/* Modal Footer */}
