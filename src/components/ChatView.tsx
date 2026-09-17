@@ -1486,10 +1486,17 @@ export const ChatView: React.FC<{
           `flex-wrap` los apilaba uno encima del otro y se comían dos filas
           justo encima del campo de escribir, que es donde menos sitio sobra.
 
-          En pantalla estrecha se acortan los rótulos hasta que caben en una
-          sola fila; el texto completo vuelve en cuanto hay ancho. Acortar la
-          frase es mejor que dejar solo el icono: son dos acciones que no se
-          usan a cada turno y un icono suelto no se reconoce sin probarlo.
+          Primero se probó acortando los rótulos, y dejó de valer al añadir el
+          tercer botón: tres nombres cortos tampoco caben. Así que en pantalla
+          estrecha se quedan SOLO los iconos, y el texto vuelve en cuanto hay
+          ancho.
+
+          Lo que decide qué se puede quitar es qué lleva información: de los
+          tres, el único que la lleva es la píldora de jornada —qué día es y
+          dónde estás—, y esa conserva su texto. Los otros dos son acciones, y
+          una acción no necesita su nombre al lado ocupando media fila. Quedan
+          el `title` y el `aria-label`, y el de co-narrativa además se rellena
+          de color cuando está encendido, que se ve mejor que la palabra.
         */}
         {/*
           LA CAJA DE BÚSQUEDA, ENCIMA DEL COMPOSITOR Y NO EN LA CABECERA.
@@ -1888,15 +1895,16 @@ export const ChatView: React.FC<{
             <button
               onClick={handleOpenTransitionModal}
               className="shrink-0 min-h-[32px] text-xs font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              aria-label="Salto de tiempo o de escena"
               title="Avanzar el reloj (descanso largo/corto, horas, días) o cambiar de escenario"
             >
-              <FastForward className="w-3.5 h-3.5 shrink-0" />
-              <span className="sm:hidden">Salto</span>
+              <FastForward className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Salto de Tiempo / Escena</span>
             </button>
             <button
               onClick={alternarCoNarrativa}
               aria-pressed={coNarrativa}
+              aria-label="Co-narrativa: llevar también a los PNJs"
               className={`shrink-0 min-h-[32px] text-xs font-cinzel font-bold px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border ${
                 coNarrativa
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)]'
@@ -1908,8 +1916,7 @@ export const ChatView: React.FC<{
                   : 'Co-narrativa: enciéndela para llevar tú también a los PNJs —ponerles una frase en la boca, describir cómo reaccionan— y que el Narrador lo respete como canon en vez de reescribirlo a su manera.'
               }
             >
-              <Drama className="w-3.5 h-3.5 shrink-0" />
-              <span className="sm:hidden">{coNarrativa ? 'Co-narr. · ON' : 'Co-narr.'}</span>
+              <Drama className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">
                 {coNarrativa ? 'Co-narrativa activada' : 'Co-narrativa'}
               </span>
@@ -1918,10 +1925,10 @@ export const ChatView: React.FC<{
               <button
                 onClick={() => onContinueNarrative()}
                 className="shrink-0 min-h-[32px] text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--on-accent)] hover:bg-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                aria-label="Continuar la narración"
                 title="Pide al Narrador que continúe narrando la escena actual sin escribir un nuevo mensaje"
               >
-                <Play className="w-3.5 h-3.5 shrink-0" />
-                <span className="sm:hidden">Continuar</span>
+                <Play className="w-4 h-4 shrink-0" />
                 <span className="hidden sm:inline">Continuar Narración</span>
               </button>
             )}
