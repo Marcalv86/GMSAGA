@@ -866,8 +866,8 @@ export const ApiKeyModal: React.FC<{
                       Un documento recién subido entra <strong>sin etiquetas cruzadas</strong>, así que para el buscador
                       es medio invisible hasta que alguien pulsa «Vincular biblioteca». Con esto activo se teje solo,
                       una vez, veinte segundos después del último archivo — así subir seis documentos de golpe cuesta
-                      una petición y no seis. ⚠️ Gasta <strong>una petición del cupo diario</strong>; si vas apurado de
-                      cuota, apágalo y vincula a mano cuando te venga bien.
+                      una petición y no seis. Corre con el <strong>modelo de tareas auxiliares</strong>, que viene puesto
+                      en Flash Lite: con 500 peticiones por clave al día, una lectura no se nota.
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">

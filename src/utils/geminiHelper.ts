@@ -73,7 +73,7 @@ import {
 } from './campaignCalendar';
 import { cambioVacio, leerInventario } from './inventoryTag';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
-import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa } from './cuadernoOculto';
+import { aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa } from './cuadernoOculto';
 import { leerEstado, leerEtiquetados, leerOlvidos, OrdenDeEtiquetado } from './ordenesDeMesa';
 import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
@@ -391,9 +391,12 @@ export function setStoredAutoFailover(enabled: boolean): void {
  * Por defecto SÍ: un documento sin etiquetas cruzadas es medio invisible para
  * el buscador, y esperar a que alguien pulse un botón es esperar sentado.
  *
- * Se puede apagar porque cuesta una petición del cupo diario —veinte al día
- * por clave en la capa gratuita—, y quien esté apurado de cuota prefiere
- * gastarlas jugando y vincular a mano cuando le venga bien.
+ * Se puede apagar, pero el motivo que había escrito aquí —«cuesta una de las
+ * veinte peticiones del día»— ya no vale: estas tareas corren con el modelo
+ * de fondo, que viene puesto en Flash Lite, y ese tiene quinientas por clave.
+ * Con seis claves son tres mil al día; una lectura no se nota. Lo que sigue
+ * apretando es el límite por MINUTO, y para eso está la espera que agrupa
+ * varias subidas en una sola lectura.
  */
 export function getStoredAutoVincular(): boolean {
   return localStorage.getItem('gmstudio_auto_vincular') !== 'off';
@@ -7425,10 +7428,54 @@ export async function leerElTableroDeDocumentos({
    */
   soloEstos?: ProjectFile[];
 }): Promise<{ facciones: Faccion[]; preparado: CartaPreparada[]; relojes: RelojOculto[] }> {
-  const fuentes = (soloEstos && soloEstos.length ? soloEstos : files)
-    .filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200)
-    .slice(0, 8);
-  if (!fuentes.length) return { facciones: [], preparado: [], relojes: [] };
+  const todas = (soloEstos && soloEstos.length ? soloEstos : files).filter(
+    f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200
+  );
+  if (!todas.length) return { facciones: [], preparado: [], relojes: [] };
+
+  /*
+   * NINGUN DOCUMENTO SE CAE EN SILENCIO.
+   *
+   * Aquí había un `.slice(0, 8)`: con nueve documentos, el noveno no se
+   * miraba, y sin decirlo. Eso tenía sentido cuando una petición costaba un
+   * veinteavo del día; con el modelo de fondo en Flash Lite —quinientas por
+   * clave— ya no: leer en dos tandas cuesta dos peticiones de tres mil.
+   *
+   * Se leen de seis en seis y se funde el resultado. Las tandas van una tras
+   * otra, no a la vez, porque el límite que sigue apretando no es el del día
+   * sino el del MINUTO, y quince peticiones por minuto se agotan rápido si se
+   * lanzan todas de golpe.
+   */
+  const POR_TANDA = 6;
+  const MAX_TANDAS = 4;
+  if (todas.length > POR_TANDA) {
+    const tandas: ProjectFile[][] = [];
+    for (let i = 0; i < todas.length && tandas.length < MAX_TANDAS; i += POR_TANDA) {
+      tandas.push(todas.slice(i, i + POR_TANDA));
+    }
+    const juntas = { facciones: [] as Faccion[], preparado: [] as CartaPreparada[], relojes: [] as RelojOculto[] };
+    let proyectoQueCrece = project;
+    for (const tanda of tandas) {
+      // Cada tanda ve lo que sacaron las anteriores, para no repetirlo.
+      const parcial = await leerElTableroDeDocumentos({ project: proyectoQueCrece, files, soloEstos: tanda });
+      juntas.facciones = aplicarFacciones(juntas.facciones, parcial.facciones);
+      juntas.preparado = aplicarPreparado(juntas.preparado, parcial.preparado);
+      juntas.relojes = aplicarRelojes(juntas.relojes, parcial.relojes);
+      proyectoQueCrece = {
+        ...proyectoQueCrece,
+        memory: {
+          ...(proyectoQueCrece.memory || ({} as Memory)),
+          gm_facciones: aplicarFacciones(proyectoQueCrece.memory?.gm_facciones, parcial.facciones),
+          gm_relojes: aplicarRelojes(proyectoQueCrece.memory?.gm_relojes, parcial.relojes),
+          gm_preparado: aplicarPreparado(proyectoQueCrece.memory?.gm_preparado, parcial.preparado)
+        }
+      } as Project;
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    return juntas;
+  }
+
+  const fuentes = todas;
 
   const texto = fuentes
     .map(f => `=== ${f.name} ===\n${(f.content || '').slice(0, 24000)}`)
