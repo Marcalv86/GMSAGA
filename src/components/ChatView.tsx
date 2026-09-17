@@ -817,6 +817,7 @@ export const ChatView: React.FC<{
   useEffect(() => {
     setCoNarrativa(getStoredCoNarrativa(project?.id));
   }, [project?.id]);
+  const hayMensajes = Boolean(chat?.messages && chat.messages.length > 0);
   const alternarCoNarrativa = () => {
     const siguiente = !coNarrativa;
     setCoNarrativa(siguiente);
@@ -1560,7 +1561,16 @@ export const ChatView: React.FC<{
           </div>
         )}
 
-        {chat?.messages && chat.messages.length > 0 && !isGenerating && (
+        {/*
+          La fila sale aunque el capítulo esté en blanco.
+          Estaba atada a «tiene mensajes», y con eso la co-narrativa —que es un
+          MODO, no una acción sobre lo ya escrito— desaparecía justo al empezar
+          un capítulo nuevo: si quieres abrir narrando tú algo de un PNJ, que es
+          para lo que existe, el interruptor no estaba. Lo que sí depende de
+          que haya algo escrito —continuar la narración— se gestiona en su
+          propio botón, no escondiendo la fila entera.
+        */}
+        {!isGenerating && (
           // `flex-wrap`: en el móvil eran tres botones en una fila que no da de
           // sí, y el tercero se salía de la pantalla sin forma de pulsarlo.
           <div className="max-w-[900px] mx-auto mb-2 flex flex-wrap justify-between items-center gap-2">
@@ -1925,7 +1935,7 @@ export const ChatView: React.FC<{
                 {coNarrativa ? 'Co-narrativa activada' : 'Co-narrativa'}
               </span>
             </button>
-            {!isLastMessageIncomplete && (
+            {hayMensajes && !isLastMessageIncomplete && (
               <button
                 onClick={() => onContinueNarrative()}
                 className="shrink-0 min-h-[32px] text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--on-accent)] hover:bg-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
