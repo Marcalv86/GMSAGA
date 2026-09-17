@@ -7408,11 +7408,11 @@ export async function leerElTableroDeDocumentos({
 }: {
   project: Project;
   files: ProjectFile[];
-}): Promise<{ facciones: Faccion[]; preparado: CartaPreparada[] }> {
+}): Promise<{ facciones: Faccion[]; preparado: CartaPreparada[]; relojes: RelojOculto[] }> {
   const fuentes = files
     .filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200)
     .slice(0, 8);
-  if (!fuentes.length) return { facciones: [], preparado: [] };
+  if (!fuentes.length) return { facciones: [], preparado: [], relojes: [] };
 
   const texto = fuentes
     .map(f => `=== ${f.name} ===\n${(f.content || '').slice(0, 24000)}`)
@@ -7433,13 +7433,18 @@ ${pc?.name ? `La protagonista se llama ${pc.name}${pc.race ? `, ${pc.race}` : ''
    - Que sean concretas y jugables, no ideas vagas: quién aparece, qué quiere y qué pone en juego.
    - ⛔ NO inventes revelaciones sobre el pasado de la protagonista ni le atribuyas objetos, parientes o secretos que sus documentos no digan.
 
+3. "relojes": entre 1 y 3 PLANES QUE YA ESTÁN EN MARCHA antes de que empiece la primera escena.
+   - Esto es lo que separa un mundo vivo de un decorado: alguien de esos documentos lleva tiempo con algo entre manos, y va a seguir con ello vaya la protagonista o no. Una búsqueda, una deuda que vence, una sucesión que se está cocinando, alguien que la está localizando.
+   - Por cada uno: "nombre" (el plan, en una frase: «Bregan D'aerthe ata cabos sobre ella»); "segmentos" (de 4 a 8, según lo lento que sea); "llenos" (**cuánto lleva avanzado YA**, normalmente 1 o 2 —que no empiece en cero es justo lo que hace que el mundo no naciera hoy—); "alLlenarse" (qué ocurre cuando se complete, concreto y con consecuencia); "deQuien" (quién lo mueve, de los documentos); "loIntuye" (true solo si ella podría notar que algo se cuece).
+   - ⛔ Que lo mueva ALGUIEN de los documentos y que avance solo, sin necesidad de que ella lo toque. Un reloj que solo corre si ella lo empuja no es un reloj.
+
 ⛔ Si los documentos no dan para algo, devuelve la lista vacía. Es preferible una lista corta y cierta que una larga inventada: cualquier cosa que te inventes aquí se convierte en canon y contradirá lo que la jugadora tenga escrito.
 
 DOCUMENTOS:
 ${texto}
 
 Responde ÚNICAMENTE con el JSON:
-{ "facciones": [{ "name": "...", "queEs": "...", "objetivo": "...", "recursos": "...", "cabeza": "...", "conElla": "...", "relaciones": [{"faccion":"...","postura":"..."}], "oculto": "...", "conocida": true }], "preparado": [{ "titulo": "...", "tipo": "...", "detalle": "...", "cuando": "..." }] }`;
+{ "facciones": [{ "name": "...", "queEs": "...", "objetivo": "...", "recursos": "...", "cabeza": "...", "conElla": "...", "relaciones": [{"faccion":"...","postura":"..."}], "oculto": "...", "conocida": true }], "preparado": [{ "titulo": "...", "tipo": "...", "detalle": "...", "cuando": "..." }], "relojes": [{ "nombre": "...", "segmentos": 6, "llenos": 1, "alLlenarse": "...", "deQuien": "...", "loIntuye": false }] }`;
 
   const modelo = getBackgroundTaskModel();
   const respuesta = await generateContentWithFailover({
@@ -7457,7 +7462,7 @@ Responde ÚNICAMENTE con el JSON:
   try {
     p = JSON.parse((respuesta.text || '{}').replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim());
   } catch {
-    return { facciones: [], preparado: [] };
+    return { facciones: [], preparado: [], relojes: [] };
   }
 
   const txt = (v: any, max: number) => {
@@ -7515,7 +7520,35 @@ Responde ÚNICAMENTE con el JSON:
     .filter(Boolean)
     .slice(0, 4) as CartaPreparada[];
 
-  return { facciones, preparado };
+  /*
+   * Los relojes nacen YA EMPEZADOS, a propósito.
+   *
+   * Un plan que arranca en 0/6 el mismo día de la primera escena dice que el
+   * mundo nació con la protagonista. Lo que se pide arriba —y se respeta
+   * aquí— es que lleve uno o dos segmentos hechos: alguien llevaba tiempo con
+   * eso entre manos antes de que ella apareciera, que es lo que hace que el
+   * mundo no parezca un decorado montado a su alrededor.
+   */
+  const relojes: RelojOculto[] = (Array.isArray(p?.relojes) ? p.relojes : [])
+    .map((r: any) => {
+      const nombre = txt(r?.nombre, 160);
+      if (!nombre) return null;
+      const segmentos = Math.max(4, Math.min(8, Number(r?.segmentos) || 6));
+      const llenos = Math.max(0, Math.min(segmentos - 1, Number(r?.llenos) || 1));
+      return {
+        id: `rlj_ia_${hashCorto(nombre.toLowerCase())}`,
+        nombre,
+        segmentos,
+        llenos,
+        alLlenarse: txt(r?.alLlenarse, 300) || '',
+        deQuien: txt(r?.deQuien, 120),
+        loIntuye: r?.loIntuye === true
+      } as RelojOculto;
+    })
+    .filter(Boolean)
+    .slice(0, 3) as RelojOculto[];
+
+  return { facciones, preparado, relojes };
 }
 
 export async function tramarLaCampana({

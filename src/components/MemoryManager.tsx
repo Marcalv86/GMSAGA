@@ -12,7 +12,7 @@ import {
   fechaLegible
 } from '../utils/campaignCalendar';
 import { fusionarTrama, leerElTableroDeDocumentos, tramarLaCampana } from '../utils/geminiHelper';
-import { aplicarFacciones, aplicarPreparado, preparadoEnPie, relojesEnMarcha } from '../utils/cuadernoOculto';
+import { aplicarFacciones, aplicarPreparado, aplicarRelojes, preparadoEnPie, relojesEnMarcha } from '../utils/cuadernoOculto';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
 import { ImagePickerModal, ImagePickerTarget } from './ImagePickerModal';
@@ -410,7 +410,8 @@ export const MemoryManager: React.FC<{
       await onUpdateMemory(mem => ({
         ...mem,
         gm_facciones: aplicarFacciones(mem.gm_facciones, tablero.facciones),
-        gm_preparado: aplicarPreparado(mem.gm_preparado, tablero.preparado)
+        gm_preparado: aplicarPreparado(mem.gm_preparado, tablero.preparado),
+        gm_relojes: aplicarRelojes(mem.gm_relojes, tablero.relojes)
       }));
       const nuevasFac = Math.max(0, aplicarFacciones(project.memory?.gm_facciones, tablero.facciones).length - antesFac);
       const nuevasPrep = Math.max(0, aplicarPreparado(project.memory?.gm_preparado, tablero.preparado).length - antesPrep);
@@ -419,7 +420,8 @@ export const MemoryManager: React.FC<{
         title: 'Tablero Leído con Éxito',
         message:
           `· Facciones: ${tablero.facciones.length} leídas${nuevasFac ? `, ${nuevasFac} nuevas` : ' (ya las tenías todas)'}\n` +
-          `· Preparado: ${tablero.preparado.length} ideas${nuevasPrep ? `, ${nuevasPrep} nuevas` : ' (ya las tenías todas)'}\n\n` +
+          `· Preparado: ${tablero.preparado.length} ideas${nuevasPrep ? `, ${nuevasPrep} nuevas` : ' (ya las tenías todas)'}\n` +
+          `· Relojes en marcha: ${tablero.relojes.length}\n\n` +
           `Lo nuevo va marcado como «de tus documentos». Lo que ya tenías conserva lo que ganó jugando.`,
         confirmText: 'Aceptar',
         cancelText: '',

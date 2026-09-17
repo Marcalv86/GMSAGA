@@ -2391,6 +2391,61 @@ export default function App() {
     if (!hayMapa && documentos.length >= 2 && getStoredAutoVincular()) {
       void handleRelacionarBiblioteca({ silencioso: true });
     }
+
+    /*
+     * 🎬 LA SESIÓN 0, QUE NADIE ESTABA PREPARANDO.
+     *
+     * Un director no llega a la primera escena con la libreta en blanco: viene
+     * con los bandos claros, un par de cosas listas en la manga y algún plan
+     * ya en marcha desde antes. La aplicación arrancaba con las tres listas
+     * vacías y esperaba a que se llenaran jugando, así que las primeras
+     * sesiones el mundo era exactamente lo que cupiera en la escena: nadie
+     * tenía intereses, nadie se movía por su cuenta y no había nada preparado
+     * que sacar cuando hiciera falta.
+     *
+     * Se lee de los documentos, que es de donde tiene que salir —no se
+     * inventa un mundo paralelo al que la jugadora escribió—, y va en segundo
+     * plano: el primer turno sale YA y el tablero está puesto para el segundo.
+     */
+    const cuadernoVacio =
+      !(currentProject?.memory?.gm_facciones || []).length &&
+      !(currentProject?.memory?.gm_preparado || []).length &&
+      !(currentProject?.memory?.gm_relojes || []).length;
+
+    if (cuadernoVacio && documentos.length >= 1) {
+      void (async () => {
+        try {
+          const tablero = await leerElTableroDeDocumentos({
+            project: currentProject!,
+            files: currentFiles || []
+          });
+          if (!tablero.facciones.length && !tablero.preparado.length && !tablero.relojes.length) return;
+          const marca = calendarioValido(currentProject?.calendar) && currentProject?.currentDate
+            ? aDiaAbsoluto(currentProject.calendar!, currentProject.currentDate)
+            : undefined;
+          await handleUpdateProjectField(prev => ({
+            memory: {
+              ...(prev.memory || {}),
+              gm_facciones: aplicarFacciones(prev.memory?.gm_facciones, tablero.facciones),
+              gm_preparado: aplicarPreparado(prev.memory?.gm_preparado, tablero.preparado, marca),
+              gm_relojes: aplicarRelojes(prev.memory?.gm_relojes, tablero.relojes, marca)
+            } as any
+          }));
+          logInfo(
+            'memory_sync',
+            'Sesión 0 montada al estrenar campaña',
+            `${tablero.facciones.length} facciones, ${tablero.preparado.length} cartas preparadas y ${tablero.relojes.length} relojes, leídos de los documentos.`
+          );
+        } catch (err) {
+          // Que falle no puede impedir jugar: el cuaderno se llenará sobre la marcha.
+          logWarn(
+            'memory_sync',
+            'No se pudo montar la sesión 0 al estrenar campaña',
+            describeApiError(err)
+          );
+        }
+      })();
+    }
     return true;
   };
 
