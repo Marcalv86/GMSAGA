@@ -7402,14 +7402,30 @@ Responde ÚNICAMENTE con el JSON, sin nada más:
  * semanas lo que guardó el Narrador porque se le ocurrió jugando de lo que
  * propuso la aplicación el primer día.
  */
+/** La huella de un documento, para saber si ya se miró y si ha cambiado desde entonces. */
+export function huellaDeDocumento(f: ProjectFile): string {
+  const c = f.content || '';
+  return `${c.length}:${hashCorto(c.slice(0, 4000) + c.slice(-2000))}`;
+}
+
 export async function leerElTableroDeDocumentos({
   project,
-  files
+  files,
+  soloEstos
 }: {
   project: Project;
   files: ProjectFile[];
+  /**
+   * Los documentos que toca mirar AHORA; si no se pasa, se miran todos.
+   *
+   * La biblioteca no se sube de una sentada: se sube por tandas y luego se
+   * corrige un compendio. Releer los diez documentos en cada tanda gasta una
+   * petición grande para volver a sacar lo que ya estaba, así que cuando se
+   * sabe qué es lo nuevo, se lee solo eso.
+   */
+  soloEstos?: ProjectFile[];
 }): Promise<{ facciones: Faccion[]; preparado: CartaPreparada[]; relojes: RelojOculto[] }> {
-  const fuentes = files
+  const fuentes = (soloEstos && soloEstos.length ? soloEstos : files)
     .filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200)
     .slice(0, 8);
   if (!fuentes.length) return { facciones: [], preparado: [], relojes: [] };
@@ -7420,6 +7436,26 @@ export async function leerElTableroDeDocumentos({
     .slice(0, 120000);
 
   const pc = project.memory?.player_character;
+  /*
+   * Lo que YA está en la mesa, para que añada en vez de repetir.
+   *
+   * Sin esta lista, cada tanda de documentos volvía a proponer las mismas
+   * facciones con otras palabras y el tablero se llenaba de casi-duplicados
+   * que la fusión por nombre no siempre casa.
+   */
+  const yaPuesto = [
+    (project.memory?.gm_facciones || []).map(f => f.name).filter(Boolean),
+    (project.memory?.gm_relojes || []).map(r => r.nombre).filter(Boolean),
+    (project.memory?.gm_preparado || []).map(c => c.titulo).filter(Boolean)
+  ];
+  const bloqueYaPuesto = yaPuesto.some(l => l.length)
+    ? `\n⚠️ EN LA MESA YA HAY ESTO, de una lectura anterior o de lo jugado. **No lo repitas ni lo reformules con otras palabras**: añade solo lo que estos documentos traigan de NUEVO, y si algo se relaciona con lo que ya hay, nómbralo por su nombre exacto.\n${
+        yaPuesto[0].length ? `- Facciones: ${yaPuesto[0].join(', ')}\n` : ''
+      }${yaPuesto[1].length ? `- Relojes en marcha: ${yaPuesto[1].join(', ')}\n` : ''}${
+        yaPuesto[2].length ? `- Preparado: ${yaPuesto[2].join(', ')}\n` : ''
+      }`
+    : '';
+
   const prompt = `Eres el director de esta campaña y estás preparando la mesa ANTES de la primera escena. De los documentos de abajo, saca dos cosas y devuélvelas en JSON.
 
 ${pc?.name ? `La protagonista se llama ${pc.name}${pc.race ? `, ${pc.race}` : ''}${pc.class ? `, ${pc.class}` : ''}.\n` : ''}
@@ -7440,6 +7476,7 @@ ${pc?.name ? `La protagonista se llama ${pc.name}${pc.race ? `, ${pc.race}` : ''
 
 ⛔ Si los documentos no dan para algo, devuelve la lista vacía. Es preferible una lista corta y cierta que una larga inventada: cualquier cosa que te inventes aquí se convierte en canon y contradirá lo que la jugadora tenga escrito.
 
+${bloqueYaPuesto}
 DOCUMENTOS:
 ${texto}
 

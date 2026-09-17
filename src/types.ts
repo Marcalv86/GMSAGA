@@ -759,6 +759,21 @@ export interface Memory {
    * Se guardan por nombre al vaciar y se vuelven a pegar cuando la
    * sincronización ficha otra vez a esa persona.
    */
+  /**
+   * Qué documentos ya se han mirado para el tablero del Director, y en qué
+   * estado estaban.
+   *
+   * Sin esto, montar la mesa solo podía hacerse con el cuaderno vacío —la
+   * única señal de «esto no se ha leído todavía» que había—, y eso da por
+   * supuesto que la biblioteca se sube de una sentada. No se sube así: la
+   * gente tiene el material repartido en carpetas y lo va subiendo en tandas,
+   * y luego corrige un compendio y lo vuelve a subir. Con la regla vieja, la
+   * primera tanda montaba el tablero y **todo lo demás no se miraba nunca**.
+   *
+   * La huella incluye el tamaño y un hash del contenido, así que un documento
+   * corregido vuelve a contar como «por mirar».
+   */
+  documentos_del_tablero?: { id: string; huella: string }[];
   retratos_guardados?: { nombre: string; portrait: string }[];
   puentes_de_busqueda?: { termino: string; relacionados: string[] }[];
   no_son_pnj?: string[];

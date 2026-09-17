@@ -107,6 +107,7 @@ import {
   estudiarContextoInicialDeCampana,
   tramarLaCampana,
   leerElTableroDeDocumentos,
+  huellaDeDocumento,
   extraerIdentidadDeDocumentos,
   extraerMecanicasDeDocumento,
   generarEtiquetasDeBusqueda,
@@ -2381,39 +2382,67 @@ export default function App() {
    */
   const montarSesionCero = async (archivos: ProjectFile[], proyecto: Project | null) => {
     if (!proyecto) return;
-    const yaHayTablero =
-      (proyecto.memory?.gm_facciones || []).length ||
-      (proyecto.memory?.gm_preparado || []).length ||
-      (proyecto.memory?.gm_relojes || []).length;
-    if (yaHayTablero) return;
 
     const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
     const documentos = (archivos || []).filter(f => esTexto(f) && (f.content || '').trim().length > 200);
     if (!documentos.length) return;
 
+    /*
+     * QU\u00c9 HAY SIN MIRAR, QUE NO ES LO MISMO QUE \u00abEL CUADERNO EST\u00c1 VAC\u00cdO\u00bb.
+     *
+     * La primera versi\u00f3n solo montaba la mesa con el cuaderno en blanco, y esa
+     * regla da por supuesto que la biblioteca se sube de una sentada. No se
+     * sube as\u00ed: el material est\u00e1 repartido en carpetas y entra en dos o tres
+     * tandas, y m\u00e1s tarde se corrige un compendio y se vuelve a subir. Con la
+     * regla vieja, la primera tanda montaba el tablero y **todo lo dem\u00e1s no se
+     * miraba jam\u00e1s**: el resto de la biblioteca exist\u00eda para el buscador pero
+     * no para el Director.
+     *
+     * Ahora se lleva la cuenta de qu\u00e9 se ha mirado y en qu\u00e9 estado estaba, as\u00ed
+     * que una tanda nueva \u2014o un documento corregido\u2014 vuelve a ser \u00abpor mirar\u00bb
+     * y se revisa buscando lo que traiga de nuevo.
+     */
+    const vistos = new Map(
+      (proyecto.memory?.documentos_del_tablero || []).map(d => [d.id, d.huella])
+    );
+    const porMirar = documentos.filter(f => vistos.get(f.id) !== huellaDeDocumento(f));
+    if (!porMirar.length) return;
+
     try {
-      const tablero = await leerElTableroDeDocumentos({ project: proyecto, files: archivos || [] });
-      if (!tablero.facciones.length && !tablero.preparado.length && !tablero.relojes.length) return;
+      const tablero = await leerElTableroDeDocumentos({
+        project: proyecto,
+        files: archivos || [],
+        soloEstos: porMirar
+      });
       const marca =
         calendarioValido(proyecto.calendar) && proyecto.currentDate
           ? aDiaAbsoluto(proyecto.calendar!, proyecto.currentDate)
           : undefined;
+      /*
+       * La cuenta se guarda AUNQUE no haya salido nada: un documento que no da
+       * para facciones ni relojes tampoco va a darlo la pr\u00f3xima vez, y sin
+       * esto se releer\u00eda en cada subida gastando una petici\u00f3n para nada.
+       */
+      const huellas = documentos.map(f => ({ id: f.id, huella: huellaDeDocumento(f) }));
       await handleUpdateProjectField(prev => ({
         memory: {
           ...(prev.memory || {}),
           gm_facciones: aplicarFacciones(prev.memory?.gm_facciones, tablero.facciones),
           gm_preparado: aplicarPreparado(prev.memory?.gm_preparado, tablero.preparado, marca),
-          gm_relojes: aplicarRelojes(prev.memory?.gm_relojes, tablero.relojes, marca)
+          gm_relojes: aplicarRelojes(prev.memory?.gm_relojes, tablero.relojes, marca),
+          documentos_del_tablero: huellas
         } as any
       }));
+      const total = tablero.facciones.length + tablero.preparado.length + tablero.relojes.length;
       logInfo(
         'memory_sync',
-        'Sesión 0 montada de los documentos',
-        `${tablero.facciones.length} facciones, ${tablero.preparado.length} cartas preparadas y ${tablero.relojes.length} relojes en marcha.`
+        total ? 'Mesa actualizada con los documentos nuevos' : 'Documentos nuevos revisados, sin novedad',
+        `${porMirar.length} documento(s) por mirar \u2192 ${tablero.facciones.length} facciones, ${tablero.preparado.length} cartas preparadas y ${tablero.relojes.length} relojes.`
       );
     } catch (err) {
-      // Que falle no puede impedir nada: el cuaderno se llenará jugando.
-      logWarn('memory_sync', 'No se pudo montar la sesión 0 de los documentos', describeApiError(err));
+      // Que falle no puede impedir nada, y NO se apunta la huella: as\u00ed se
+      // reintenta en la siguiente subida en vez de darlo por mirado.
+      logWarn('memory_sync', 'No se pudieron revisar los documentos para la mesa', describeApiError(err));
     }
   };
 
@@ -2446,9 +2475,10 @@ export default function App() {
     }
 
     /*
-     * Red de seguridad: si los documentos ya estaban ahí de antes de que esto
-     * existiera, nadie ha subido nada desde entonces y el cuaderno sigue en
-     * blanco. Se monta ahora, en segundo plano, y el primer turno sale igual.
+     * Red de seguridad para las campañas cuyos documentos ya estaban ahí antes
+     * de que esto existiera: nadie va a volver a subir nada, así que la subida
+     * no llega a dispararlo nunca. Aquí dentro ya se comprueba qué falta por
+     * mirar, así que si está todo visto no gasta nada.
      */
     void montarSesionCero(currentFiles || [], currentProject || null);
 
