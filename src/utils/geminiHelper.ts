@@ -19,6 +19,7 @@ import {
 } from '../types';
 import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, InventoryItem, MovimientoOculto, PlayerCurrencies, RelojOculto } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
+import { quitarEtiquetasInternas } from './etiquetasInternas';
 import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
 import {
   apuntarPeticion,
@@ -7405,6 +7406,156 @@ Responde ÚNICAMENTE con el JSON, sin nada más:
  * semanas lo que guardó el Narrador porque se le ocurrió jugando de lo que
  * propuso la aplicación el primer día.
  */
+/**
+ * EL REPASO ENTRE SESIONES.
+ *
+ * Lo que hace un director el domingo por la noche: sentarse con el cuaderno y
+ * el capítulo que acaba de terminar y ponerse al día. Quién se movió mientras
+ * ella no miraba, qué planes han avanzado, qué se quedó sin sitio.
+ *
+ * Existe porque el Narrador NO PUEDE hacerlo: ve un turno cada vez y está
+ * ocupado escribiendo prosa, así que nunca va a notar que un plan lleva doce
+ * jornadas parado —no tiene la vista de conjunto—. Con el capítulo entero
+ * delante y sin nada que narrar, sí.
+ *
+ * Solo propone: mueve relojes y apunta bambalinas, que son del cuaderno del
+ * Director y la jugadora no ve. No toca la ficha, ni el inventario, ni la
+ * memoria, ni nada que ella pudiera haber escrito a mano.
+ */
+export async function repasarEntreSesiones({
+  project,
+  chat
+}: {
+  project: Project;
+  chat: Chat;
+}): Promise<{ relojes: RelojOculto[]; bambalinas: MovimientoOculto[]; reubicadas: CartaPreparada[]; nota: string }> {
+  const vacio = { relojes: [], bambalinas: [], reubicadas: [], nota: '' };
+  const relojes = relojesEnMarcha(project.memory?.gm_relojes);
+  const preparado = preparadoEnPie(project.memory?.gm_preparado);
+  const facciones = project.memory?.gm_facciones || [];
+  if (!relojes.length && !preparado.length && !facciones.length) return vacio;
+
+  const mensajes = (chat.messages || []).filter(m => m.content?.trim());
+  if (mensajes.length < 4) return vacio;
+
+  const cal = calendarioValido(project.calendar) ? project.calendar! : CALENDARIO_HARPTOS;
+  const hoyAbs = project.currentDate ? aDiaAbsoluto(cal, project.currentDate) : 0;
+
+  // El capítulo recortado: interesa lo que PASÓ, no la prosa entera.
+  const resumenDelCapitulo = mensajes
+    .slice(-40)
+    .map(m => `${m.role === 'user' ? '[Jugadora]' : '[Narrador]'} ${quitarEtiquetasInternas(m.content).slice(0, 700)}`)
+    .join('\n')
+    .slice(0, 60000);
+
+  const prompt = `Eres el director de esta campaña y acaba de terminar un capítulo. Te sientas con tu cuaderno a ponerte al día ANTES de la próxima sesión. Nadie va a leer esto: es tu trabajo interno.
+
+Hoy es el día ${hoyAbs} de campaña.
+
+TUS RELOJES (planes que corren por detrás, avancen o no con ella delante):
+${relojes.map(r => `- "${r.nombre}" — ${r.llenos}/${r.segmentos}${r.deQuien ? `, lo mueve ${r.deQuien}` : ''}${r.alLlenarse ? `. Al llenarse: ${r.alLlenarse}` : ''}`).join('\n') || '- (ninguno)'}
+
+TUS FACCIONES:
+${facciones.map(f => `- ${f.name}${f.objetivo ? ` — va a por: ${f.objetivo}` : ''}`).join('\n') || '- (ninguna)'}
+
+LO QUE TIENES PREPARADO Y NO HAS USADO:
+${preparado.map(c => `- "${c.titulo}"${c.cuando ? ` — encajaba ${c.cuando}` : ''}`).join('\n') || '- (nada)'}
+
+EL CAPÍTULO QUE ACABA DE PASAR:
+${resumenDelCapitulo}
+
+Devuelve JSON con tres listas. **Cortas o vacías es una respuesta correcta**: si en este capítulo el mundo de fuera no se movió, no te lo inventes.
+
+1. "relojes": los que este capítulo ha EMPUJADO de verdad. Por cada uno: "nombre" (el título EXACTO de arriba), "avance" (1 o 2, cuánto sube) y "porque" (qué del capítulo lo empujó, en una frase).
+   - ⛔ No los muevas por calendario ni «porque toca»: un plan puede pasar un capítulo entero parado porque a su dueño le surgió otra cosa, y eso es un dato bueno.
+   - ⭐ Pero sí muevas los que ella ha EMPUJADO SIN QUERER: alguien preguntó por ella, dejó un rastro, gastó un favor. Ahí está la mitad de la gracia.
+
+2. "bambalinas": de 1 a 3 cosas que han hecho OTROS mientras ella estaba a lo suyo, durante este capítulo. Por cada una: "quien", "que", "donde" (si importa), "resultado" (qué saca en claro) y "hilo" (de qué trama cuelga).
+   - Solo gente con algo entre manos —de tus facciones o de tus relojes—, no el reparto entero.
+   - ⛔ Nada de «sigue buscando»: si no ha cambiado nada, no lo apuntes.
+   - ⛔ Y esto NO se le cuenta a la jugadora: es memoria del mundo, y se pagará en detalles más adelante.
+
+3. "reubicadas": las cartas preparadas cuyo momento ya no va a llegar, con un sitio nuevo. Por cada una: "titulo" (EXACTO) y "cuando" (el momento nuevo, donde ella SÍ va a estar).
+   - Si su sitio era un lugar al que no fue y no va a ir, el error es del sitio, no de la idea.
+
+4. "nota": UNA frase para ti, con lo más importante que dejas pendiente para la próxima sesión.
+
+JSON:
+{ "relojes": [{"nombre":"...","avance":1,"porque":"..."}], "bambalinas": [{"quien":"...","que":"...","donde":"...","resultado":"...","hilo":"..."}], "reubicadas": [{"titulo":"...","cuando":"..."}], "nota": "..." }`;
+
+  const modelo = getBackgroundTaskModel();
+  const respuesta = await generateContentWithFailover({
+    proposito: 'Repaso del Director entre sesiones',
+    primaryModel: modelo,
+    contents: prompt,
+    config: {
+      temperature: 0.4,
+      responseMimeType: 'application/json',
+      ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    } as any
+  });
+
+  let p: any = {};
+  try {
+    p = JSON.parse((respuesta.text || '{}').replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim());
+  } catch {
+    return vacio;
+  }
+
+  const txt = (v: any, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+
+  /*
+   * Los relojes se buscan por NOMBRE EXACTO y se avanza el que ya existe.
+   * Inventarse uno aquí sería dejar que el repaso cree amenazas nuevas por su
+   * cuenta, y este trabajo es ponerse al día, no diseñar la campaña.
+   */
+  const movidos: RelojOculto[] = (Array.isArray(p?.relojes) ? p.relojes : [])
+    .map((r: any) => {
+      const nombre = txt(r?.nombre, 160);
+      if (!nombre) return null;
+      const actual = relojes.find(x => x.nombre.toLowerCase().trim() === nombre.toLowerCase().trim());
+      if (!actual) return null;
+      const avance = Math.max(1, Math.min(2, Number(r?.avance) || 1));
+      const llenos = Math.min(actual.segmentos, actual.llenos + avance);
+      if (llenos === actual.llenos) return null;
+      return { ...actual, llenos };
+    })
+    .filter(Boolean)
+    .slice(0, 4) as RelojOculto[];
+
+  const bambalinas: MovimientoOculto[] = (Array.isArray(p?.bambalinas) ? p.bambalinas : [])
+    .map((b: any) => {
+      const quien = txt(b?.quien, 120);
+      const que = txt(b?.que, 400);
+      if (!quien || !que) return null;
+      return {
+        id: `bam_rep_${hashCorto(`${quien}|${que}`.toLowerCase())}`,
+        diaAbs: hoyAbs,
+        quien,
+        que,
+        donde: txt(b?.donde, 120),
+        resultado: txt(b?.resultado, 300),
+        hilo: txt(b?.hilo, 160)
+      } as MovimientoOculto;
+    })
+    .filter(Boolean)
+    .slice(0, 3) as MovimientoOculto[];
+
+  const reubicadas: CartaPreparada[] = (Array.isArray(p?.reubicadas) ? p.reubicadas : [])
+    .map((c: any) => {
+      const titulo = txt(c?.titulo, 160);
+      const cuando = txt(c?.cuando, 200);
+      if (!titulo || !cuando) return null;
+      const actual = preparado.find(x => x.titulo.toLowerCase().trim() === titulo.toLowerCase().trim());
+      if (!actual) return null;
+      return { ...actual, cuando };
+    })
+    .filter(Boolean)
+    .slice(0, 3) as CartaPreparada[];
+
+  return { relojes: movidos, bambalinas, reubicadas, nota: txt(p?.nota, 300) || '' };
+}
+
 /** La huella de un documento, para saber si ya se miró y si ha cambiado desde entonces. */
 export function huellaDeDocumento(f: ProjectFile): string {
   const c = f.content || '';

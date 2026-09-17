@@ -108,6 +108,7 @@ import {
   tramarLaCampana,
   leerElTableroDeDocumentos,
   huellaDeDocumento,
+  repasarEntreSesiones,
   extraerIdentidadDeDocumentos,
   extraerMecanicasDeDocumento,
   generarEtiquetasDeBusqueda,
@@ -2310,6 +2311,81 @@ export default function App() {
     if (tieneMensajes) {
       void handleArchiveChatAsFile(capituloCerrado, { silent: true });
       void handleTriggerMemorySyncWithAI();
+      void repasarElCuadernoAlCerrar(capituloCerrado);
+    }
+  };
+
+  /*
+   * 🕯️ EL REPASO DEL DIRECTOR AL CERRAR CAPÍTULO.
+   *
+   * Lo que hace un director el domingo por la noche: sentarse con el cuaderno
+   * y el capítulo recién terminado, y ponerse al día. El Narrador no puede
+   * hacerlo —ve un turno cada vez y está ocupado escribiendo— así que nunca
+   * nota que un plan lleva doce jornadas parado: no tiene la vista de
+   * conjunto. Con el capítulo entero delante y sin nada que narrar, sí.
+   *
+   * ⭐ Y NO lo hace en silencio. Todo lo que toque queda escrito en la nota de
+   * la mesa: cada cosa que escribe el ordenador sin que se la pidan es algo
+   * que luego hay que revisar, y revisar a ciegas no se puede.
+   */
+  const repasarElCuadernoAlCerrar = async (capitulo: Chat) => {
+    const proyecto = projectsRef.current.find(pr => pr.id === currentPIdRef.current);
+    if (!proyecto) return;
+    try {
+      const repaso = await repasarEntreSesiones({ project: proyecto, chat: capitulo });
+      const algo =
+        repaso.relojes.length || repaso.bambalinas.length || repaso.reubicadas.length;
+      if (!algo) return;
+
+      const marca =
+        calendarioValido(proyecto.calendar) && proyecto.currentDate
+          ? aDiaAbsoluto(proyecto.calendar!, proyecto.currentDate)
+          : undefined;
+
+      await handleUpdateProjectField(prev => ({
+        memory: {
+          ...(prev.memory || {}),
+          gm_relojes: repaso.relojes.length
+            ? aplicarRelojes(prev.memory?.gm_relojes, repaso.relojes, marca)
+            : prev.memory?.gm_relojes,
+          gm_bambalinas: repaso.bambalinas.length
+            ? aplicarBambalinas(prev.memory?.gm_bambalinas, repaso.bambalinas)
+            : prev.memory?.gm_bambalinas,
+          gm_preparado: repaso.reubicadas.length
+            ? aplicarPreparado(prev.memory?.gm_preparado, repaso.reubicadas, marca)
+            : prev.memory?.gm_preparado
+        } as any
+      }));
+
+      const partes = [
+        repaso.relojes.length
+          ? `⏳ ${repaso.relojes.map(r => `${r.nombre} (${r.llenos}/${r.segmentos})`).join(', ')}`
+          : '',
+        repaso.bambalinas.length
+          ? `🕯️ ${repaso.bambalinas.map(b => `${b.quien}: ${b.que}`).join(' · ')}`
+          : '',
+        repaso.reubicadas.length
+          ? `🃏 Reubicado: ${repaso.reubicadas.map(c => `${c.titulo} → ${c.cuando}`).join(' · ')}`
+          : '',
+        repaso.nota ? `📝 ${repaso.nota}` : ''
+      ].filter(Boolean);
+
+      logInfo(
+        'memory_sync',
+        `Repaso del Director tras ${capitulo.name || 'el capítulo'}`,
+        partes.join('\n')
+      );
+      setAlertConfig({
+        isOpen: true,
+        title: '🕯️ El Director se ha puesto al día',
+        message:
+          'Mientras cerrabas el capítulo, el mundo de fuera ha seguido girando. Esto es lo que ha movido en su cuaderno —tu personaje no sabe nada de ello—:\n\n' +
+          partes.join('\n\n') +
+          '\n\nLo tienes entero en Memoria → Director.'
+      });
+    } catch (err) {
+      // Si falla, el capítulo se cierra igual: esto es un extra, no un paso.
+      logWarn('memory_sync', 'No se pudo hacer el repaso del Director al cerrar capítulo', describeApiError(err));
     }
   };
 
@@ -3417,6 +3493,20 @@ export default function App() {
         relacionarPendiente.current = null;
         if (getStoredAutoVincular()) void handleRelacionarBiblioteca({ silencioso: true });
         /*
+         * 🏷️ Y se etiquetan los documentos recién subidos.
+         *
+         * El etiquetado existía, pero solo saltaba al pasar un documento a
+         * «consulta». Un documento que se sube y se deja siempre-presente no se
+         * etiquetaba nunca, así que el día que se pasaba a consulta se pagaba
+         * entonces —y mientras tanto el buscador estaba medio ciego con él—.
+         *
+         * Etiquetar al entrar hace que la búsqueda funcione bien desde el
+         * primer turno en vez de desde que uno se acuerda de configurarlo. Van
+         * de una en una y espaciadas: son baratas de cupo diario, pero el
+         * límite por minuto sigue ahí.
+         */
+        void etiquetarLosQueLleguenSinEtiquetas();
+        /*
          * Y de paso se monta la mesa: los bandos, lo preparado y los planes
          * que ya corren. Va en el MISMO temporizador que la red semántica
          * porque el motivo es el mismo —subir seis documentos de golpe tiene
@@ -3703,6 +3793,45 @@ export default function App() {
     await saveFilesToDB(currentPId, updated);
     // Marcar un documento como ficha del OC es decir quién es: se lee solo.
     if (category === 'sheet_pj') void completarFichaDesdeDocumento(updated);
+  };
+
+  /*
+   * Etiqueta los documentos de texto que aún no tengan etiquetas de búsqueda.
+   *
+   * De uno en uno y con pausa: el cupo diario da de sobra con el modelo de
+   * fondo, pero quince peticiones por minuto se agotan rápido si se lanzan
+   * diez de golpe —y el turno de partida tiene preferencia sobre esto—.
+   */
+  const etiquetarLosQueLleguenSinEtiquetas = async () => {
+    const pid = currentPIdRef.current;
+    if (!pid) return;
+    const proyecto = projectsRef.current.find(pr => pr.id === pid);
+    if (!proyecto) return;
+
+    const pendientes = (currentFilesRef.current || []).filter(
+      f =>
+        !f.isImage &&
+        !f.isAudio &&
+        f.category !== 'style_sample' &&
+        !f.etiquetasBusqueda &&
+        (f.content || '').trim().length > 200
+    );
+    if (!pendientes.length) return;
+
+    for (const doc of pendientes.slice(0, 8)) {
+      try {
+        const etiquetas = await generarEtiquetasDeBusqueda(doc, elencoDeLaCampana(proyecto));
+        if (!etiquetas) continue;
+        const frescos = await loadFilesFromDB(pid);
+        const conEtiquetas = frescos.map(f => (f.id === doc.id ? { ...f, etiquetasBusqueda: etiquetas } : f));
+        setCurrentFiles(conEtiquetas);
+        await saveFilesToDB(pid, conEtiquetas);
+      } catch (err) {
+        // Uno que falle no puede parar a los demás, y siempre queda el botón.
+        logWarn('storage', `No se pudo etiquetar "${doc.name}" al subirlo`, describeApiError(err));
+      }
+      await new Promise(r => setTimeout(r, 2500));
+    }
   };
 
   const handleToggleOnDemand = async (fileId: string, onDemand: boolean) => {
