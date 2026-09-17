@@ -323,8 +323,39 @@ export default function App() {
         saveLocalChats(currentPId, currentChats);
         await saveFilesToDB(currentPId, currentFiles);
       }
+      /*
+       * EL TIC DE «GUARDADO» NO PUEDE SALIR SI EL DISCO HA FALLADO.
+       *
+       * Aquí había un `.catch(() => {})` y justo debajo el tic verde, sin
+       * mirar el resultado. Así que la copia en la carpeta podía fallar —y
+       * dejar un archivo de cero bytes, que es lo que pasaba— mientras la
+       * pantalla decía que todo había ido bien. Descubrirlo el día que hace
+       * falta la copia es exactamente el peor momento posible.
+       */
+      let falloEnDisco: string | null = null;
       if (currentProject) {
-        await writeCampaignToDisk(currentProject, currentChats, currentFiles).catch(() => {});
+        const res = await writeCampaignToDisk(currentProject, currentChats, currentFiles).catch(() => ({
+          written: false,
+          reason: 'error' as const
+        }));
+        if (!res.written && res.reason !== 'no-folder') {
+          falloEnDisco =
+            res.reason === 'no-permission'
+              ? 'El navegador ha dejado de tener permiso para escribir en esa carpeta. Vuelve a elegirla en la pantalla de almacenamiento.'
+              : res.reason === 'incompleta'
+              ? 'La copia se escribió pero al releerla no sale entera. NO te fíes de ese archivo.'
+              : 'No se ha podido escribir la copia en la carpeta. El archivo vacío que hubiera quedado se ha borrado para que no parezca una copia buena.';
+        }
+      }
+      if (falloEnDisco) {
+        setAlertConfig({
+          isOpen: true,
+          title: 'Guardado en el navegador, NO en la carpeta',
+          message:
+            `Tu partida está a salvo en este navegador; lo que ha fallado es la copia en la carpeta.\n\n${falloEnDisco}\n\n` +
+            'Mira el registro de errores para el detalle.'
+        });
+        return;
       }
       setIsManuallySaved(true);
       setTimeout(() => {

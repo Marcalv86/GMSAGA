@@ -12,6 +12,7 @@ import {
   getStoredAutoFailover
 } from './geminiHelper';
 import { leerMesa } from './mesaStorage';
+import { logError } from './logger';
 
 /**
  * Copia automática de la campaña a una carpeta real del disco.
@@ -256,12 +257,44 @@ async function escribirCampanaAhora(
       ? (targetFileName.endsWith('.json') ? targetFileName.trim() : `${targetFileName.trim()}.json`)
       : `${safeName(project.name)}.gmstudio.json`;
 
-    // createWritable() ya escribe a un fichero de intercambio y lo sustituye al
-    // cerrar, así que un corte a mitad no deja la copia truncada.
+    /*
+     * ⚠️ EL ARCHIVO DE 0 BYTES.
+     *
+     * `getFileHandle({ create: true })` CREA el fichero vacío antes de que se
+     * escriba un solo byte. Si a partir de ahí algo falla —y en un móvil falla:
+     * el navegador manda la pestaña a segundo plano, la carpeta está
+     * sincronizada y se mete por medio, se acaba el espacio— lo que queda en
+     * disco es un archivo con el nombre correcto, la fecha de hoy y NADA
+     * dentro. Y eso es lo peor que puede pasar con una copia de seguridad: no
+     * que falle, sino que parezca que está.
+     *
+     * Antes el fallo solo iba a `console.warn`, que en un móvil no lo ve nadie.
+     */
+    if (!payload || payload.length < 2) {
+      return { written: false, reason: 'error' };
+    }
+
     const target = await handle.getFileHandle(fileName, { create: true });
-    const writable = await target.createWritable();
-    await writable.write(payload);
-    await writable.close();
+    try {
+      const writable = await target.createWritable();
+      await writable.write(payload);
+      await writable.close();
+    } catch (err) {
+      /*
+       * Si no se pudo escribir, el hueco vacío que dejó `create: true` se
+       * borra: un archivo de cero bytes con cara de copia es una trampa.
+       */
+      try {
+        await (handle as any).removeEntry(fileName);
+      } catch {
+        /* Si tampoco se puede borrar, al menos se avisa abajo. */
+      }
+      logError('storage', 'No se pudo escribir la copia de la campaña en la carpeta', err, {
+        projectName: project.name,
+        details: `Archivo: ${fileName} · ${(payload.length / 1048576).toFixed(1)} MB`
+      });
+      return { written: false, reason: 'error', fileName };
+    }
 
     /*
      * SE RELEE LO QUE SE ACABA DE ESCRIBIR.
@@ -280,21 +313,33 @@ async function escribirCampanaAhora(
     try {
       const comprobacion = await (await target.getFile()).text();
       if (comprobacion.length !== payload.length) {
-        console.warn('La copia en disco salió con otro tamaño del esperado', {
-          esperado: payload.length,
-          escrito: comprobacion.length
-        });
+        logError(
+          'storage',
+          'La copia en disco salió incompleta',
+          new Error(`Esperados ${payload.length} caracteres, escritos ${comprobacion.length}`),
+          {
+            projectName: project.name,
+            details: `Archivo: ${fileName} · esperado ${(payload.length / 1048576).toFixed(1)} MB · escrito ${(
+              comprobacion.length / 1048576
+            ).toFixed(1)} MB`
+          }
+        );
         return { written: false, reason: 'incompleta', fileName };
       }
       JSON.parse(comprobacion);
     } catch (err) {
-      console.warn('La copia en disco se escribió pero no se puede releer:', err);
+      logError('storage', 'La copia se escribió pero no se puede releer', err, {
+        projectName: project.name,
+        details: `Archivo: ${fileName}`
+      });
       return { written: false, reason: 'incompleta', fileName };
     }
 
     return { written: true, fileName };
   } catch (err) {
-    console.warn('No se pudo escribir la copia en disco:', err);
+    logError('storage', 'Falló el guardado de la campaña en la carpeta', err, {
+      projectName: project.name
+    });
     return { written: false, reason: 'error' };
   }
 }
