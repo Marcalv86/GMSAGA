@@ -2461,7 +2461,7 @@ ${(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro'] as const)
               ? Math.max(0, marcaDeHoy - c.creadaDiaAbs)
               : null;
           const rancia = espera !== null && espera >= JORNADAS_PARA_RANCIA;
-          return `- **${c.titulo}**${c.tipo && c.tipo !== 'otro' ? ` [${c.tipo}]` : ''}${
+          return `- ${c.deLaJugadora ? '🃏 ' : ''}**${c.titulo}**${c.deLaJugadora ? ' — **LA HA PEDIDO ELLA**' : ''}${c.tipo && c.tipo !== 'otro' ? ` [${c.tipo}]` : ''}${
             c.cuando ? ` — encaja ${c.cuando}` : ''
           }${espera !== null && espera > 0 ? ` · lleva ${espera} jornada(s) esperando` : ''}${
             rancia
@@ -2477,7 +2477,11 @@ ${(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro'] as const)
               : ''
           }${c.detalle ? `\n  · ${String(c.detalle).slice(0, 300)}` : ''}${c.hilo ? ` [hilo: ${c.hilo}]` : ''}`;
         })
-        .join('\n')}\n⭐ Si una de estas encaja en la escena de hoy, **úsala**: está preparada justo para no tener que improvisar. Y al usarla, apúntalo con \`[PREPARADO: su título | usada: sí]\` para que no te vuelva cada turno.`
+        .join('\n')}\n⭐ Si una de estas encaja en la escena de hoy, **úsala**: está preparada justo para no tener que improvisar. Y al usarla, apúntalo con \`[PREPARADO: su título | usada: sí]\` para que no te vuelva cada turno.${
+          preparadoVivo.some(c => c.deLaJugadora)
+            ? `\n🃏 **Las marcadas con 🃏 las ha escrito ELLA, no tú.** Eso no es una sugerencia que puedas dejar en el cajón: es la jugadora diciéndote por dónde quiere que vaya esto. Tráela a la primera escena donde encaje aunque tengas otra cosa mejor pensada, y si de verdad no encaja en un buen rato, muévela a un momento que SÍ vaya a llegar en vez de dejarla ahí. ⛔ Y no le digas que estás usando su idea: se le nota igual, y decirlo la convierte en un favor en vez de en una escena.`
+            : ''
+        }`
     : '';
 
   /*

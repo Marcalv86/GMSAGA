@@ -556,6 +556,26 @@ export interface CartaPreparada {
    */
   creadaDiaAbs?: number;
   /**
+   * La escribió la jugadora, no el Narrador ni una lectura de documentos.
+   *
+   * El Narrador tenía dónde guardar sus ideas y la jugadora no: si se le
+   * ocurría algo, su única salida era contárselo al Director en la Mesa y
+   * confiar en que emitiera la etiqueta. Y es SU campaña.
+   *
+   * Se marca porque cambia el peso: una idea suya no es una sugerencia que el
+   * Narrador pueda dejar en el cajón, es lo que quiere que pase.
+   */
+  deLaJugadora?: boolean;
+  /**
+   * No me la recuerdes: quiérola olvidar hasta que ocurra.
+   *
+   * Apuntar una idea y luego verla en su pestaña cada vez que la abre le
+   * arruina la sorpresa a quien juega sola. Con esto la carta sigue viajando
+   * al Narrador entera, pero en la pantalla de la jugadora se muestra tapada
+   * hasta que ella decida mirarla.
+   */
+  aSorpresa?: boolean;
+  /**
    * La propuso la aplicación al arrancar leyendo los documentos, no salió jugando.
    *
    * Se marca a propósito: en dos semanas hay que poder distinguir lo que el

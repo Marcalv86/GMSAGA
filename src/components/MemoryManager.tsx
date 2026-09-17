@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { interesPorLaProtagonista, Project, Memory, NPC, Location, ProjectFile, TimelineEntry, InventoryItem } from '../types';
+import { interesPorLaProtagonista, Project, Memory, NPC, Location, ProjectFile, TimelineEntry, InventoryItem, CartaPreparada } from '../types';
 import {
   obtenerInfoRelacion,
   CALENDARIO_FANTASTICO,
@@ -183,6 +183,44 @@ export const MemoryManager: React.FC<{
     : ['character', 'inventario', 'diary', 'npcs', 'locs', 'quests', 'story', 'status'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
+  /*
+   * 🃏 LA JUGADORA TAMBIÉN PREPARA COSAS.
+   *
+   * El Narrador tenía dónde guardar sus ideas —la etiqueta [PREPARADO:]— y
+   * ella no tenía ninguna: si se le ocurría algo en la ducha, su única salida
+   * era abrir la Mesa, contárselo al Director y confiar en que emitiera la
+   * etiqueta bien. Es su campaña, y estaba al revés.
+   */
+  const [cartaNueva, setCartaNueva] = useState<{
+    abierto: boolean;
+    titulo: string;
+    tipo: CartaPreparada['tipo'];
+    detalle: string;
+    cuando: string;
+    siNadieVa: string;
+    aSorpresa: boolean;
+  }>({ abierto: false, titulo: '', tipo: 'escena', detalle: '', cuando: '', siNadieVa: '', aSorpresa: false });
+  const [destapadas, setDestapadas] = useState<Set<string>>(new Set());
+
+  const guardarCartaNueva = async () => {
+    const titulo = cartaNueva.titulo.trim();
+    if (!titulo) return;
+    const carta: CartaPreparada = {
+      id: `prep_mia_${Date.now().toString(36)}`,
+      titulo: titulo.slice(0, 160),
+      tipo: cartaNueva.tipo,
+      detalle: cartaNueva.detalle.trim().slice(0, 600) || undefined,
+      cuando: cartaNueva.cuando.trim().slice(0, 200) || undefined,
+      siNadieVa: cartaNueva.siNadieVa.trim().slice(0, 400) || undefined,
+      deLaJugadora: true,
+      aSorpresa: cartaNueva.aSorpresa
+    };
+    await onUpdateMemory(mem => ({
+      ...mem,
+      gm_preparado: aplicarPreparado(mem.gm_preparado, [carta])
+    }));
+    setCartaNueva({ abierto: false, titulo: '', tipo: 'escena', detalle: '', cuando: '', siNadieVa: '', aSorpresa: false });
+  };
 
   // Si cambia el reparto de secciones, la pestaña activa puede quedarse fuera.
   React.useEffect(() => {
@@ -1555,12 +1593,34 @@ export const MemoryManager: React.FC<{
                   📄 sugerida al empezar
                 </span>
               )}
-              {c.cuando && (
+              {c.deLaJugadora && (
+                <span
+                  className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-teal-500/15 border border-teal-500/30 text-teal-800 dark:text-teal-200 self-start"
+                  title="La escribiste tú. El Narrador la tiene delante hasta que encuentre su momento."
+                >
+                  🃏 tuya
+                </span>
+              )}
+              {/*
+                Tapada a petición propia: la carta viaja entera al Narrador,
+                pero aquí no se enseña hasta que ella quiera. Apuntar una idea
+                y luego vérsela cada vez que abre la pestaña le arruina la
+                sorpresa a quien juega sola.
+              */}
+              {c.aSorpresa && !destapadas.has(c.id) && !hecha && (
+                <button
+                  onClick={() => setDestapadas(prev => new Set(prev).add(c.id))}
+                  className="self-start text-[11px] font-lora italic text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer underline decoration-dotted"
+                >
+                  🙈 La dejaste tapada para que te pillara por sorpresa. Toca para verla.
+                </button>
+              )}
+              {c.cuando && !(c.aSorpresa && !destapadas.has(c.id) && !hecha) && (
                 <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
                   ⏳ Encaja {c.cuando}
                 </p>
               )}
-              {c.detalle && (
+              {c.detalle && !(c.aSorpresa && !destapadas.has(c.id) && !hecha) && (
                 <p className="text-[11px] font-lora text-[var(--text-primary)] m-0 leading-relaxed whitespace-pre-wrap">
                   {c.detalle}
                 </p>
@@ -1585,7 +1645,93 @@ export const MemoryManager: React.FC<{
                 <strong className="text-teal-700 dark:text-teal-300">Es lo que evita improvisar en caliente</strong>, que es cuando salen las cosas
                 genéricas.
               </p>
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
+                🃏 <strong className="text-teal-700 dark:text-teal-300">Y tú también preparas.</strong> Si se te ocurre
+                algo —«que aparezca alguien buscando a Auron para cobrarse una deuda vieja»— apúntalo aquí y el
+                Narrador lo tendrá delante hasta que encuentre su momento. No hace falta que se lo cuentes en la Mesa.
+              </p>
             </div>
+
+            {!cartaNueva.abierto ? (
+              <button
+                onClick={() => setCartaNueva(p => ({ ...p, abierto: true }))}
+                className="self-start min-h-[36px] px-3 rounded-lg border border-teal-500/50 bg-teal-500/10 text-teal-800 dark:text-teal-200 text-xs font-cinzel font-bold hover:bg-teal-500/20 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" /> Preparar algo yo
+              </button>
+            ) : (
+              <div className="rounded-xl border border-teal-500/40 bg-[var(--surface-soft)] p-3 sm:p-4 flex flex-col gap-2.5">
+                <input
+                  autoFocus
+                  value={cartaNueva.titulo}
+                  onChange={e => setCartaNueva(p => ({ ...p, titulo: e.target.value }))}
+                  placeholder="¿Qué es? Ej: «Un cazarrecompensas pregunta por Auron»"
+                  className="w-full px-2.5 py-2 text-sm rounded border border-[var(--user-border)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {(['escena', 'encuentro', 'complicacion', 'revelacion', 'pnj'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setCartaNueva(p => ({ ...p, tipo: t }))}
+                      className={`px-2 py-1 rounded-full text-[11px] font-cinzel border transition-all cursor-pointer ${
+                        cartaNueva.tipo === t
+                          ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)]'
+                          : 'border-[var(--user-border)] text-[var(--text-secondary)] hover:border-[var(--accent)]'
+                      }`}
+                    >
+                      {EMOJI_TIPO[t]} {t}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={cartaNueva.detalle}
+                  onChange={e => setCartaNueva(p => ({ ...p, detalle: e.target.value }))}
+                  placeholder="Qué pasa, en dos o tres frases. Quién aparece, qué quiere y qué se pone en juego."
+                  rows={3}
+                  className="w-full px-2.5 py-2 text-xs rounded border border-[var(--user-border)] bg-[var(--bg-secondary)] text-[var(--text-primary)] resize-y"
+                />
+                <input
+                  value={cartaNueva.cuando}
+                  onChange={e => setCartaNueva(p => ({ ...p, cuando: e.target.value }))}
+                  placeholder="¿Cuándo encaja? Ej: «cuando lleguemos a Luskan» (opcional)"
+                  className="w-full px-2.5 py-2 text-xs rounded border border-[var(--user-border)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                />
+                <input
+                  value={cartaNueva.siNadieVa}
+                  onChange={e => setCartaNueva(p => ({ ...p, siNadieVa: e.target.value }))}
+                  placeholder="¿Y si nunca llega a pasar? Qué ocurre en el mundo igualmente (opcional)"
+                  className="w-full px-2.5 py-2 text-xs rounded border border-[var(--user-border)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                />
+                <label className="flex items-start gap-2 cursor-pointer text-[11px] text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={cartaNueva.aSorpresa}
+                    onChange={e => setCartaNueva(p => ({ ...p, aSorpresa: e.target.checked }))}
+                    className="mt-0.5 accent-[var(--accent)]"
+                  />
+                  <span>
+                    <strong className="text-[var(--text-primary)]">Que me pille por sorpresa.</strong> El Narrador la
+                    recibe entera, pero aquí te la tapo hasta que la destapes tú. Para no verte tus propias ideas cada
+                    vez que abres la pestaña.
+                  </span>
+                </label>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setCartaNueva(p => ({ ...p, abierto: false }))}
+                    className="px-3 py-1.5 rounded-lg text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={guardarCartaNueva}
+                    disabled={!cartaNueva.titulo.trim()}
+                    className="px-4 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold disabled:opacity-40 cursor-pointer"
+                  >
+                    Guardar en el cuaderno
+                  </button>
+                </div>
+              </div>
+            )}
             {enPie.length === 0 && usadas.length === 0 ? (
               <div className="text-[var(--text-secondary)] italic py-6 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs">
                 Nada guardado todavía. Se llena cuando al Narrador se le ocurre algo bueno que en ese momento no
