@@ -2410,9 +2410,36 @@ ${(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro'] as const)
         .join('\n')}\n⭐ Si una de estas encaja en la escena de hoy, **úsala**: está preparada justo para no tener que improvisar. Y al usarla, apúntalo con \`[PREPARADO: su título | usada: sí]\` para que no te vuelva cada turno.`
     : '';
 
-  const bloqueCuaderno =
-    movimientosRecientes.length || relojesVivos.length || faccionesVivas.length || preparadoVivo.length
-      ? `
+  /*
+   * UN CUADERNO VACÍO NO PEDÍA QUE LO ESCRIBIERAN: DESAPARECÍA.
+   *
+   * Todo este bloque —incluido el «QUÉ HACER CON ESTO EN ESTE TURNO», que es
+   * lo único que le dice al Narrador que emita [BAMBALINAS:] y [RELOJ:]— solo
+   * se mandaba si el cuaderno YA tenía algo dentro. En una campaña nueva no
+   * hay nada, así que no se mandaba nada, así que no se escribía nada, así que
+   * seguía sin haber nada. Un círculo cerrado, y el cuaderno se quedaba en
+   * blanco para siempre sin que fallara ni una línea de código.
+   *
+   * Es el mismo silencio que tenía el viaje cuando no había viaje abierto y el
+   * que tenían los vínculos cuando `vin` era `undefined`: la aplicación se
+   * callaba justo donde tenía que gritar. Así que cuando está vacío se manda
+   * una versión corta que lo dice y pide arrancarlo.
+   */
+  const cuadernoEnBlanco =
+    !movimientosRecientes.length && !relojesVivos.length && !faccionesVivas.length && !preparadoVivo.length;
+
+  const bloqueCuadernoVacio = `
+### 🕯️ TU CUADERNO ESTÁ EN BLANCO — Y NO DEBERÍA (⛔ ELLA NO SABE NADA DE ESTO)
+Todavía no has apuntado NADA de lo que pasa mientras ella no mira. Eso significa que ahora mismo el mundo solo existe cuando ella lo está mirando, y eso se nota: nadie vuelve con nada, nadie se le adelanta, nada ha avanzado sin ella.
+- ⏳ **Abre al menos un reloj en cuanto haya algo que pueda ir a peor.** \`[RELOJ: nombre del plan | van: 1/6 | al llenarse: qué ocurre | de: quién lo mueve]\`. Sirve para lo que la persigue, lo que alguien está investigando, un plazo que corre. Y con \`sobre: Nombre\` es el reloj de una relación: adónde va lo que hay entre ella y esa persona, y qué hará esa persona al respecto.
+- 🕒 **En cuanto pase un día o más** —una noche, un salto, una jornada de viaje— la gente con algo entre manos HA HECHO ALGO: apúntalo con \`[BAMBALINAS: Quién | hizo: qué | donde: ... | resultado: ...]\`. Uno o dos por jornada, solo de quien tiene algo en marcha.
+- ⛔ Dentro de una escena continua o en combate no ha pasado un día: ahí no se apunta nada, y no pasa nada.
+- ⛔ Nada de esto se narra ni se insinúa. Es memoria del mundo, y se paga en detalles: alguien vuelve con barro en las botas, un aviso llega tarde, una puerta que estaba abierta ya no lo está.
+`.trim();
+
+  const bloqueCuaderno = cuadernoEnBlanco
+    ? bloqueCuadernoVacio
+    : `
 ### 🕯️ TU CUADERNO: LO QUE PASA MIENTRAS ELLA NO MIRA (⛔ ELLA NO SABE NADA DE ESTO)
 Esto es tuyo, no suyo. **⛔ No lo narres, no lo insinúes y no dejes que ningún personaje se lo cuente sin que haya una razón jugada para ello.** Sirve para que el mundo tenga memoria propia.
 ${
@@ -2452,8 +2479,7 @@ ${bloqueFacciones}${bloquePreparado}
    - ⛔ **Nada de «sigue buscando».** Si no ha cambiado nada, no se apunta: que alguien lleve tres días sin mover ficha es un dato bueno, y cuando se mueva, se notará.
 2. **Mueve los relojes que algo haya empujado** con \`[RELOJ: ...]\` — no por calendario: un plan puede pasar días parado porque a su dueño le surgió otra cosa. Pero un plan que solo avanza cuando ella lo toca no es un plan, es un decorado.
 3. **✅ Y que se note por fuera.** Lo de aquí no se cuenta, pero **sí se ve**: alguien vuelve con barro en las botas, un aviso llega tarde, una puerta que estaba abierta ya no lo está. El cuaderno se paga en detalles, no en explicaciones.
-`.trim()
-      : '';
+`.trim();
 
   const bloqueMochila = inventarioVivo.length
     ? `
