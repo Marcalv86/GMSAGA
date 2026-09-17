@@ -3608,33 +3608,34 @@ export default function App() {
       if (relacionarPendiente.current) clearTimeout(relacionarPendiente.current);
       relacionarPendiente.current = setTimeout(() => {
         relacionarPendiente.current = null;
-        if (getStoredAutoVincular()) void handleRelacionarBiblioteca({ silencioso: true });
         /*
-         * 🏷️ Y se etiquetan los documentos recién subidos.
+         * LAS TRES TAREAS, UNA DETRÁS DE OTRA. NO A LA VEZ.
          *
-         * El etiquetado existía, pero solo saltaba al pasar un documento a
-         * «consulta». Un documento que se sube y se deja siempre-presente no se
-         * etiquetaba nunca, así que el día que se pasaba a consulta se pagaba
-         * entonces —y mientras tanto el buscador estaba medio ciego con él—.
+         * Aquí había tres `void` seguidos —etiquetar, tejer la red y montar la
+         * mesa—, y `void` no espera: arrancaban las tres a la vez. Cada una va
+         * espaciada por dentro, así que yo las daba por ordenadas, pero entre
+         * ellas no había ningún freno.
          *
-         * Etiquetar al entrar hace que la búsqueda funcione bien desde el
-         * primer turno en vez de desde que uno se acuerda de configurarlo. Van
-         * de una en una y espaciadas: son baratas de cupo diario, pero el
-         * límite por minuto sigue ahí.
+         * Se vio en el registro de una subida de 21 documentos: 22 llamadas en
+         * 77 segundos, con dos claves distintas trabajando en el mismo segundo.
+         * No falló ninguna, pero solo porque había seis claves absorbiéndolo;
+         * con una sola habría sido un 429 detrás de otro. El límite que aprieta
+         * no es el del día, es el del minuto, y esto lo estaba pisando.
+         *
+         * El orden tampoco es casual: primero se etiqueta, porque la red se
+         * teje mejor con los documentos ya etiquetados.
          */
-        void etiquetarLosQueLleguenSinEtiquetas();
-        /*
-         * Y de paso se monta la mesa: los bandos, lo preparado y los planes
-         * que ya corren. Va en el MISMO temporizador que la red semántica
-         * porque el motivo es el mismo —subir seis documentos de golpe tiene
-         * que costar una lectura, no seis— y porque así el tablero está
-         * puesto antes de que se escriba la primera línea, en vez de llegar a
-         * rebufo del primer turno.
-         */
-        void montarSesionCero(
-          currentFilesRef.current,
-          projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
-        );
+        void (async () => {
+          await etiquetarLosQueLleguenSinEtiquetas();
+          if (getStoredAutoVincular()) {
+            await handleRelacionarBiblioteca({ silencioso: true });
+            await new Promise(r => setTimeout(r, 2000));
+          }
+          await montarSesionCero(
+            currentFilesRef.current,
+            projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
+          );
+        })();
       }, ESPERA_ANTES_DE_REVINCULAR);
     } catch (error) {
       console.error('Error handling files upload:', error);
@@ -4801,15 +4802,40 @@ export default function App() {
             : '.')
       });
     } catch (err: any) {
-      console.error('Error al sincronizar campaña con IA:', err);
-      logError('memory_sync', 'Error al sincronizar campaña completa con IA', err, {
-        projectName: currentProject.name
-      });
-      setAlertConfig({
-        isOpen: true,
-        title: 'Error de Sincronización',
-        message: describeApiError(err) || 'No se pudo sincronizar la campaña.'
-      });
+      /*
+       * «Todavía no has jugado» NO ES UN ERROR.
+       *
+       * Sincronizar una campaña recién creada avisa de que no hay crónica que
+       * leer, y eso salía en el registro como ERROR en rojo, con su traza y
+       * todo. Quien abre el registro buscando por qué algo va mal se encuentra
+       * un error que no lo es y pierde el rato ahí — y, peor, se acostumbra a
+       * ver rojo y deja de mirarlo.
+       *
+       * Un aviso de «aún no toca» se cuenta como lo que es y se dice con
+       * calma, sin cartel de error.
+       */
+      const mensaje = String(err?.message || '');
+      const esPrematuro = /no hay mensajes en la cr[oó]nica|juega al menos un turno/i.test(mensaje);
+      if (esPrematuro) {
+        logInfo('memory_sync', 'Sincronización pedida antes de jugar', mensaje);
+        setAlertConfig({
+          isOpen: true,
+          title: 'Todavía no hay nada que sincronizar',
+          message:
+            'Esta campaña aún no tiene ni un turno jugado, así que no hay crónica que releer.\n\n' +
+            'Tus documentos sí están: el tablero del Director y las etiquetas de búsqueda se montan solos al subirlos, sin esperar a esto.'
+        });
+      } else {
+        console.error('Error al sincronizar campaña con IA:', err);
+        logError('memory_sync', 'Error al sincronizar campaña completa con IA', err, {
+          projectName: currentProject.name
+        });
+        setAlertConfig({
+          isOpen: true,
+          title: 'Error de Sincronización',
+          message: describeApiError(err) || 'No se pudo sincronizar la campaña.'
+        });
+      }
     } finally {
       setIsSyncingMemory(false);
       setTopProgress({ active: false, label: '' });
