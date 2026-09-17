@@ -3329,7 +3329,34 @@ ${enMarcha
     : ''
 }
 
-${diario.length ? `ÚLTIMOS DÍAS REGISTRADOS EN LA AGENDA:\n${diario.map(d => `- ${d.date}${d.lugar ? ` · ${d.lugar}` : ''}${d.clima ? ` · ${d.clima}` : ''}: ${d.summary || d.title || d.hito || '(sin detalle)'}${d.hito && d.summary ? ` [${d.hito}]` : ''}`).join('\n')}` : ''}
+${diario.length ? `ÚLTIMOS DÍAS REGISTRADOS EN LA AGENDA:\n${diario.map(d => {
+  /*
+   * LO QUE ESCRIBE ELLA NO ES LO MISMO QUE LO QUE APUNTA LA APLICACIÓN.
+   *
+   * El diario se puede escribir a mano, y eso no es un apaño: es un canal.
+   * La jugadora abre la agenda y escribe en primera persona —«querido diario,
+   * me gusta Kimmuriel, odio a Soluun»— contando con que el Director lo lea y
+   * juegue con ello.
+   *
+   * Y llegaba con el mismo formato que un resumen de escena, así que el
+   * Narrador lo leía como una línea más del registro: la confesión más íntima
+   * de la campaña con el mismo peso que «llovió en el puerto». El dato llegaba
+   * y lo único que lo hacía valioso —quién lo escribió— se perdía por el camino.
+   */
+  const suya = d.autoria === 'jugadora' || d.tipo === 'diario' || d.id?.startsWith('manual_');
+  const cuerpo = d.summary || d.title || d.hito || '(sin detalle)';
+  if (suya) {
+    return `- 📔 ${d.date}${d.lugar ? ` · ${d.lugar}` : ''} — **LO ESCRIBIÓ ELLA EN SU DIARIO, de su puño y letra:** «${cuerpo}»`;
+  }
+  return `- ${d.date}${d.lugar ? ` · ${d.lugar}` : ''}${d.clima ? ` · ${d.clima}` : ''}: ${cuerpo}${d.hito && d.summary ? ` [${d.hito}]` : ''}`;
+}).join('\n')}${
+  diario.some(d => d.autoria === 'jugadora' || d.tipo === 'diario' || d.id?.startsWith('manual_'))
+    ? `\n\n📔 **SOBRE LAS ENTRADAS MARCADAS CON 📔 — ESO NO ES UN RESUMEN, ES SU VOZ.** Las ha escrito la jugadora a mano, en primera persona, y te las está poniendo delante A PROPÓSITO para que las uses.
+- ✅ **Es lo que piensa cuando no la ve nadie**: lo que quiere, lo que teme, quién le gusta y quién le revuelve el estómago. Te acaba de decir por dónde quiere que vaya la historia sin decirlo en voz alta.
+- ✅ **Úsalo por debajo**: que la escena la ponga cerca de quien le importa, que aparezca quien le incomoda, que la elección que le plantees le duela porque sabes qué le duele.
+- ⛔ **Pero ella NO lo ha dicho en voz alta.** Nadie de este mundo ha leído ese diario: ningún PNJ puede citarlo, saberlo ni darse por enterado. Si alguien reacciona a algo que solo está escrito ahí, has roto la ficción y además le has quitado la gracia a que lo escribiera.`
+    : ''
+}` : ''}
 `.trim();
 
     tiempoDirectiva = `   - [TIEMPO: +Xm / +Xh / +Xd] — (Opcional) solo si transcurre un lapso apreciable de tiempo en la ficción (conversación larga, viaje o descanso).
