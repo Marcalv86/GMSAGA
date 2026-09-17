@@ -37,12 +37,13 @@ import {
   formatoConsulta
 } from '../utils/oracle';
 import { formatRollResult } from '../utils/rollRequests';
-import { TOPE_TOKENS_POR_MINUTO, isNarrativeIncomplete } from '../utils/geminiHelper';
+import { TOPE_TOKENS_POR_MINUTO, isNarrativeIncomplete, getStoredCoNarrativa, setStoredCoNarrativa } from '../utils/geminiHelper';
 
 import {
   BookCheck,
   BookOpen,
   Dices,
+  Drama,
   CalendarDays,
   FastForward,
   Sparkles,
@@ -800,6 +801,23 @@ export const ChatView: React.FC<{
    * Aquí, pegado al campo de escribir y al lado del botón de saltar el tiempo,
    * que es justo lo que se decide al mirarlo.
    */
+  /*
+   * Los roles invertidos son de ESTA campaña, no del navegador.
+   *
+   * Es un modo de juego, no una preferencia de la aplicación: en una partida
+   * apetece llevar tú a los PNJs y en otra lo que se quiere es justo lo
+   * contrario, que el reparto sorprenda. Guardarlo global haría que encenderlo
+   * en una campaña lo encendiera en todas.
+   */
+  const [coNarrativa, setCoNarrativa] = useState(() => getStoredCoNarrativa(project?.id));
+  useEffect(() => {
+    setCoNarrativa(getStoredCoNarrativa(project?.id));
+  }, [project?.id]);
+  const alternarCoNarrativa = () => {
+    const siguiente = !coNarrativa;
+    setCoNarrativa(siguiente);
+    setStoredCoNarrativa(siguiente, project?.id);
+  };
   const [tiempoAbierto, setTiempoAbierto] = useState(false);
   const [destinoViajeInput, setDestinoViajeInput] = useState('');
   const [jornadasViajeInput, setJornadasViajeInput] = useState(8);
@@ -1871,6 +1889,26 @@ export const ChatView: React.FC<{
               <FastForward className="w-3.5 h-3.5 shrink-0" />
               <span className="sm:hidden">Salto</span>
               <span className="hidden sm:inline">Salto de Tiempo / Escena</span>
+            </button>
+            <button
+              onClick={alternarCoNarrativa}
+              aria-pressed={coNarrativa}
+              className={`shrink-0 min-h-[32px] text-xs font-cinzel font-bold px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border ${
+                coNarrativa
+                  ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)]'
+              }`}
+              title={
+                coNarrativa
+                  ? 'Co-narrativa ACTIVADA: lo que narres de un PNJ es canon y el Narrador construye encima en vez de reescribirlo. Pulsa para devolverle el reparto entero.'
+                  : 'Co-narrativa: enciéndela para llevar tú también a los PNJs —ponerles una frase en la boca, describir cómo reaccionan— y que el Narrador lo respete como canon en vez de reescribirlo a su manera.'
+              }
+            >
+              <Drama className="w-3.5 h-3.5 shrink-0" />
+              <span className="sm:hidden">{coNarrativa ? 'Co-narr. · ON' : 'Co-narr.'}</span>
+              <span className="hidden sm:inline">
+                {coNarrativa ? 'Co-narrativa activada' : 'Co-narrativa'}
+              </span>
             </button>
             {!isLastMessageIncomplete && (
               <button

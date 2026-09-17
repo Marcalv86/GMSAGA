@@ -423,6 +423,35 @@ export function setStoredAutoVincular(enabled: boolean): void {
  * Si nadie nota la diferencia jugando, sobran; si el reparto se enfría de
  * golpe, ya sabemos qué estaban sujetando.
  */
+/**
+ * ¿La jugadora puede narrar TAMBÉN a los PNJs?
+ *
+ * Por defecto NO: el reparto lo lleva el Narrador, y esa frontera es lo que
+ * hace que un PNJ pueda sorprenderla. Pero hay ratos en que apetece lo
+ * contrario —describir cómo reacciona alguien, ponerle una frase en la boca,
+ * llevar tú un momento entre dos personajes— y con la frontera dura el
+ * Narrador lo trata como una sugerencia: reescribe la escena a su manera y lo
+ * que tú acababas de narrar no ha pasado.
+ *
+ * Con esto encendido, lo que la jugadora narre de un PNJ es CANON y el
+ * Narrador construye encima en vez de repetirlo o corregirlo.
+ */
+export function getStoredCoNarrativa(pid?: string): boolean {
+  try {
+    return localStorage.getItem(`gmstudio_conarrativa_${pid || 'global'}`) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+export function setStoredCoNarrativa(enabled: boolean, pid?: string): void {
+  try {
+    localStorage.setItem(`gmstudio_conarrativa_${pid || 'global'}`, enabled ? 'on' : 'off');
+  } catch {
+    /* Sin almacenamiento se queda en la sesión y ya. */
+  }
+}
+
 export function getStoredBarrasAfinidad(): boolean {
   return localStorage.getItem('gmstudio_barras_afinidad') !== 'off';
 }
@@ -2157,6 +2186,8 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
    * veces en este archivo. No cuesta nada leerlo otra vez.
    */
   const relojesDePersona = relojesEnMarcha(project.memory?.gm_relojes).filter(r => r.sobre);
+  // Se lee del almacén del propio proyecto: el modo es de esta campaña.
+  const coNarrativa = getStoredCoNarrativa(project.id);
   const dosierPnjs = dosierDePersonajes(project.memory?.npcs || [], marcaDeHoy, relojesDePersona);
   const dosierLugares = dosierDeLugares(project.memory?.locations || []);
 
@@ -2778,6 +2809,28 @@ ${
 `.trim();
   })();
 
+  /*
+   * CO-NARRATIVA: la jugadora también lleva a los PNJs este rato.
+   *
+   * Sin esto, el Narrador trata lo que ella narra de un PNJ como una
+   * sugerencia educada: reescribe la escena a su manera y lo que ella acababa
+   * de poner en boca de alguien no ha pasado. Es correcto por defecto —el
+   * reparto es suyo, y esa frontera es lo que permite que un PNJ sorprenda—
+   * pero cuando se enciende hay que decirlo con todas las letras, porque el
+   * silencio aquí se lee como «mando yo».
+   */
+  const bloqueCoNarrativa = coNarrativa
+    ? `
+### 🎭 CO-NARRATIVA ACTIVADA — ELLA TAMBIÉN LLEVA AL REPARTO ESTE RATO
+La jugadora ha encendido el modo de roles invertidos. **Cuando ella narre lo que hace, dice o siente un PNJ, eso ES CANON y ya ha ocurrido.**
+- ✅ **Constrúyele encima.** Lo que ella acaba de narrar pasó: sigue desde el segundo siguiente, con las consecuencias de eso. No lo repitas con tus palabras, no lo cuentes otra vez «bien».
+- ⛔ **No lo corrijas, no lo suavices y no lo deshagas.** Nada de «en realidad él no haría eso» ni de reescribir su reacción a tu gusto. Si te chirría con el personaje, la salida es **la consecuencia, no el veto**: que ese gesto le cueste algo, que alguien lo note, que él mismo se sorprenda de haberlo hecho.
+- ✅ **Regístralo como lo que es.** Si en lo que ella narra el PNJ revela algo, se acerca, se enfada o promete algo, emite sus etiquetas igual que si lo hubieras escrito tú: \`[VÍNCULO:]\`, \`[RELOJ:]\`, lo que toque. Lo narrado por ella cuenta para la memoria.
+- ✅ **Tú sigues llevando todo lo demás**: el mundo, el tiempo, quien ella no esté llevando en ese momento, las consecuencias y las tiradas. Esto no es que dirija la partida: es que este rato compartís el reparto.
+- ⚠️ Y si narra a un PNJ **contradiciendo algo que ya es canon** —alguien que está muerto, que no está en la escena o que sabe algo imposible— no lo ignores en silencio: sigúel hasta donde puedas y señala la pega en una línea de mesa al final, no dentro de la prosa.
+`.trim()
+    : '';
+
   const bloqueSecretos = secretos.length || plan
     ? `
 ### 🔒 LA HISTORIA, YA TRAZADA — SOLO TÚ
@@ -2839,7 +2892,7 @@ ${lista
     ? `
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
-${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMochila ? `${bloqueMochila}\n` : ''}${bloqueAprendido ? `${bloqueAprendido}\n` : ''}${bloqueCuaderno ? `${bloqueCuaderno}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMochila ? `${bloqueMochila}\n` : ''}${bloqueAprendido ? `${bloqueAprendido}\n` : ''}${bloqueCuaderno ? `${bloqueCuaderno}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueCoNarrativa ? `${bloqueCoNarrativa}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
 ${
   allPreviousHistory.length > 0
     ? `### 📖 EL PASADO DE ESTA AVENTURA (capítulos ya cerrados)
