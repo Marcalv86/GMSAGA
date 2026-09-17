@@ -790,6 +790,7 @@ const VIAJE_RE = /\[\s*VIAJE\s*:\s*([^\]]+)\]/gi;
 const ESTAMOS_RE = /\[\s*ESTAMOS\s*:\s*([^\]]+)\]/gi;
 const LUGAR_RE = /\[\s*LUGAR\s*:\s*([^\]]+)\]/gi;
 const MISION_RE = /\[\s*(?:MISI[OÓ]N|TRAMA|ENCARGO)\s*:\s*([^\]]+)\]/gi;
+const PLAN_RE = /\[\s*(?:PLAN|PLAN_DE_CAMPA[NÑ]A|RUMBO)\s*:\s*([^\]]+)\]/gi;
 
 /**
  * Lee `[TIEMPO: +2h]`, `[TIEMPO: +1d 6h]`, `[TIEMPO: +45m]` o `[TIEMPO: +3 días]`.
@@ -2078,6 +2079,40 @@ export function leerLugares(texto: string): LugarLeido[] {
   return out;
 }
 
+
+export interface PlanLeido {
+  premisa?: string;
+  destino?: string;
+}
+
+/**
+ * El rumbo de la historia, corregido sobre la marcha.
+ *
+ * El plan se trazaba UNA vez, al principio, y se fosilizaba: ni el Narrador ni
+ * el Director podían tocarlo. Pero una historia jugada no va donde se dijo el
+ * primer día —la protagonista tuerce el rumbo, ignora el gancho que se le
+ * puso, se encapricha de un hilo secundario— y el destino escrito deja de ser
+ * el destino. Un plan que no se puede corregir no es un plan: es una profecía,
+ * y obliga a elegir entre forzar a la jugadora hacia él o ignorarlo del todo.
+ */
+export function leerPlan(texto: string): PlanLeido | null {
+  if (!texto || !/PLAN|RUMBO/i.test(texto)) return null;
+  PLAN_RE.lastIndex = 0;
+  const out: PlanLeido = {};
+  let m: RegExpExecArray | null;
+  while ((m = PLAN_RE.exec(texto)) !== null) {
+    for (const parte of m[1].split('|')) {
+      const i = parte.indexOf(':');
+      if (i < 1) continue;
+      const campo = parte.slice(0, i).trim().toLowerCase();
+      const valor = parte.slice(i + 1).trim();
+      if (!valor) continue;
+      if (/premisa|de qu|va de/.test(campo)) out.premisa = valor.slice(0, 600);
+      else if (/destino|acaba|hacia|rumbo|final/.test(campo)) out.destino = valor.slice(0, 600);
+    }
+  }
+  return out.premisa || out.destino ? out : null;
+}
 
 export interface MisionLeida {
   titulo: string;

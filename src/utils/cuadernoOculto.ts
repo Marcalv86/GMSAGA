@@ -436,7 +436,9 @@ export function aplicarPreparado(
   for (const c of leidas) {
     const i = fuera.findIndex(x => x.id === c.id || mismoNombre(x.titulo, c.titulo));
     if (i < 0) {
-      fuera.push({ ...c, usadaDiaAbs: c.usada ? diaAbs : undefined });
+      // Se fecha al nacer: es lo que luego permite decir «esto lleva doce
+      // jornadas esperando, muévelo o tíralo».
+      fuera.push({ ...c, creadaDiaAbs: diaAbs, usadaDiaAbs: c.usada ? diaAbs : undefined });
       continue;
     }
     const a = fuera[i];
@@ -454,7 +456,17 @@ export function aplicarPreparado(
       // Que algo esté usado no se deshace releyendo un documento.
       usada: c.usada || a.usada,
       sugerida: c.sugerida && a.sugerida,
-      usadaDiaAbs: c.usada && !a.usada ? diaAbs : a.usadaDiaAbs
+      usadaDiaAbs: c.usada && !a.usada ? diaAbs : a.usadaDiaAbs,
+      /*
+       * Reubicar una carta la REJUVENECE.
+       *
+       * Si al moverla de sitio conservara su fecha original, seguiría saliendo
+       * marcada como rancia al turno siguiente y el Director volvería a
+       * moverla, y otra vez. Cambiarle el «cuándo» es atenderla: la cuenta
+       * vuelve a empezar desde hoy.
+       */
+      creadaDiaAbs:
+        c.cuando && c.cuando !== a.cuando && !c.sugerida ? diaAbs ?? a.creadaDiaAbs : a.creadaDiaAbs ?? diaAbs
     };
   }
   return fuera.slice(-40);

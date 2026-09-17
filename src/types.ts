@@ -531,6 +531,17 @@ export interface CartaPreparada {
   /** Ya se ha usado: se queda como registro, no se borra. */
   usada?: boolean;
   /**
+   * El día de campaña en que se guardó.
+   *
+   * Sin esto no había forma de saber que una carta lleva media campaña
+   * esperando. Una trampa preparada para el faro al que la protagonista no
+   * piensa ir se queda ahí para siempre, ocupando sitio en el prompt y sin
+   * pasar nunca: no es que esté pendiente, es que está muerta, y nadie se lo
+   * decía al Director. Con la fecha se le puede avisar de que lo mueva a
+   * donde ella SÍ va a estar.
+   */
+  creadaDiaAbs?: number;
+  /**
    * La propuso la aplicación al arrancar leyendo los documentos, no salió jugando.
    *
    * Se marca a propósito: en dos semanas hay que poder distinguir lo que el
@@ -759,6 +770,15 @@ export interface Memory {
     premisa: string;
     /** Dónde acaba esto si nadie lo tuerce. */
     destino?: string;
+    /**
+     * El día de campaña de la última corrección a mano.
+     *
+     * El plan se trazaba una vez y se quedaba fosilizado, pero una historia
+     * jugada no va donde se dijo el primer día: la protagonista tuerce el
+     * rumbo y el destino escrito deja de ser el destino. Poder corregirlo es
+     * la diferencia entre un plan y una profecía.
+     */
+    retocadoDiaAbs?: number;
     /** Cuándo se trazó, para saber si se ha quedado viejo. */
     trazadoEl?: string;
   };

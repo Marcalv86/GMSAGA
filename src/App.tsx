@@ -139,6 +139,7 @@ import {
   AvanceDeNivel,
   MisionLeida,
   LugarLeido,
+  PlanLeido,
   CALENDARIO_HARPTOS,
   aDiaAbsoluto,
   avanzar,
@@ -1032,6 +1033,7 @@ export default function App() {
       let mem = conVinculos(p, hoyAbs);
       mem = conAvanceDeNivel(mem, t.avanceDeNivel);
       mem = conMisiones(mem, t.misiones);
+      mem = conPlan(mem, t.plan, hoyAbs);
 
       return { currentDate: nuevaFecha, threads, timeline, memory: mem };
     });
@@ -1064,6 +1066,29 @@ export default function App() {
    * conserva, porque una etiqueta que solo mueve el progreso no puede borrar
    * el objetivo.
    */
+  /*
+   * El rumbo, que se trazaba una vez y se fosilizaba.
+   *
+   * Una historia jugada no va donde se dijo el primer día: la protagonista
+   * tuerce el rumbo, ignora el gancho que se le puso o se encapricha de un
+   * hilo secundario. Un plan que no se puede corregir no es un plan, es una
+   * profecía, y obliga a elegir entre empujarla hacia él o ignorarlo. Se
+   * fusiona campo a campo: retocar el destino no borra la premisa.
+   */
+  const conPlan = (mem: Project['memory'], plan?: PlanLeido | null, diaAbs?: number): Project['memory'] => {
+    if (!mem || !plan || (!plan.premisa && !plan.destino)) return mem;
+    const previo = mem.plan_de_campana;
+    return {
+      ...mem,
+      plan_de_campana: {
+        premisa: plan.premisa || previo?.premisa || '',
+        destino: plan.destino || previo?.destino,
+        trazadoEl: previo?.trazadoEl,
+        retocadoDiaAbs: diaAbs ?? previo?.retocadoDiaAbs
+      }
+    };
+  };
+
   const conMisiones = (mem: Project['memory'], misiones?: MisionLeida[]): Project['memory'] => {
     if (!mem || !misiones?.length) return mem;
     const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -1719,6 +1744,7 @@ export default function App() {
     nivel?: AvanceDeNivel | null;
     misiones?: MisionLeida[];
     lugares?: LugarLeido[];
+    plan?: PlanLeido | null;
     corregirCronica?: string | null;
     rehacerUltimoTurno?: string | null;
   }): Promise<string[]> => {
@@ -1797,6 +1823,15 @@ export default function App() {
      * no podía tocar. Le decía «esa misión ya está hecha, la cierro» y se
      * quedaba activa en su pantalla y en el prompt de cada turno.
      */
+    if (orden.plan) {
+      await handleUpdateProjectField(prev => {
+        const cal = calendarioValido(prev.calendar) ? prev.calendar! : CALENDARIO_HARPTOS;
+        const hoy = prev.currentDate ? aDiaAbsoluto(cal, prev.currentDate) : undefined;
+        return { memory: conPlan(prev.memory, orden.plan, hoy) };
+      });
+      aplicado.push('🧭 Rumbo de la campaña actualizado');
+    }
+
     if (orden.misiones?.length) {
       await handleUpdateProjectField(prev => ({ memory: conMisiones(prev.memory, orden.misiones) }));
       aplicado.push(`🗺️ ${orden.misiones.length} trama(s) actualizada(s)`);

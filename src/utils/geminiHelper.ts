@@ -51,6 +51,8 @@ import {
   AvanceDeNivel,
   leerMisiones,
   MisionLeida,
+  leerPlan,
+  PlanLeido,
   parsearFechaTexto,
   extraerMinutoDeTexto,
   deducirFechaInicialDeTextos,
@@ -2401,14 +2403,36 @@ ${(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro'] as const)
     : '';
 
   const preparadoVivo = preparadoEnPie(project.memory?.gm_preparado).slice(0, 8);
+  /*
+   * UNA CARTA PUEDE MORIRSE DE VIEJA EN UN FARO AL QUE NADIE VA.
+   *
+   * Lo preparado se guardaba con un «cuándo» —«cuando lleguen al faro»— y ahí
+   * se quedaba. Si la protagonista no va al faro, esa complicación no es que
+   * esté pendiente: está MUERTA, ocupando sitio en el prompt de cada turno y
+   * sin llegar a pasar nunca. Y nadie se lo decía al Director, porque la lista
+   * se enseñaba igual el primer día que tres semanas después.
+   *
+   * Ahora se le dice cuánto lleva esperando cada una, y qué hacer con las que
+   * llevan demasiado: reubicarlas donde ella SÍ va a estar. Reubicar es
+   * reemitirla con otro «cuándo», y eso le pone el contador a cero.
+   */
+  const JORNADAS_PARA_RANCIA = 7;
   const bloquePreparado = preparadoVivo.length
     ? `\n**Lo que tienes preparado y aún no has usado:**\n${preparadoVivo
-        .map(
-          c =>
-            `- **${c.titulo}**${c.tipo && c.tipo !== 'otro' ? ` [${c.tipo}]` : ''}${
-              c.cuando ? ` — encaja ${c.cuando}` : ''
-            }${c.detalle ? `\n  · ${String(c.detalle).slice(0, 300)}` : ''}${c.hilo ? ` [hilo: ${c.hilo}]` : ''}`
-        )
+        .map(c => {
+          const espera =
+            typeof c.creadaDiaAbs === 'number' && Number.isFinite(marcaDeHoy)
+              ? Math.max(0, marcaDeHoy - c.creadaDiaAbs)
+              : null;
+          const rancia = espera !== null && espera >= JORNADAS_PARA_RANCIA;
+          return `- **${c.titulo}**${c.tipo && c.tipo !== 'otro' ? ` [${c.tipo}]` : ''}${
+            c.cuando ? ` — encaja ${c.cuando}` : ''
+          }${espera !== null && espera > 0 ? ` · lleva ${espera} jornada(s) esperando` : ''}${
+            rancia
+              ? ` ⚠️ **SE ESTÁ PUDRIENDO AQUÍ.** Si su sitio es un lugar al que ella no va, el error es del sitio, no de la idea: MUÉVELA a donde sí va a estar reemitiéndola con otro «cuando», o ciérrala con \`usada: sí\` si ya no pega.`
+              : ''
+          }${c.detalle ? `\n  · ${String(c.detalle).slice(0, 300)}` : ''}${c.hilo ? ` [hilo: ${c.hilo}]` : ''}`;
+        })
         .join('\n')}\n⭐ Si una de estas encaja en la escena de hoy, **úsala**: está preparada justo para no tener que improvisar. Y al usarla, apúntalo con \`[PREPARADO: su título | usada: sí]\` para que no te vuelva cada turno.`
     : '';
 
@@ -3426,6 +3450,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
    - [BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama cuelga] — TU CUADERNO, que ella NO lee. Se emite cuando ha pasado tiempo (un descanso largo, un salto, un viaje) y alguien con algo entre manos se ha movido **aunque no aparezca en escena**. Uno por cada quien se mueva. Ejemplo: [BAMBALINAS: Braelin | hizo: pregunta por el violín en los muelles | donde: el puerto | con: un marinero que hace la ruta de las islas | resultado: sabe qué es el instrumento y de dónde viene | hilo: el origen del violín]. ⛔ Esto NO se narra ni se insinúa: es memoria del mundo, no información para la jugadora. ⭐ Y lo que se registra aquí es lo que luego permite que alguien vuelva con algo de verdad en vez de volver con las manos vacías.
    - [RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve] — la cuenta atrás de lo que corre por detrás. «van: 3/6» fija los dos números; sobre un reloj que ya existe basta «van: +1» para avanzarlo, o «van: 4» para fijarlo. Ejemplo: [RELOJ: Bregan D'aerthe ata cabos sobre ella | van: +1 | al llenarse: mandan a alguien a buscarla en persona | de: Bregan D'aerthe]. Úsalo para las amenazas, las búsquedas, las investigaciones ajenas y los plazos. ⛔ Tampoco se narra. ⭐ **Y TAMBIÉN PARA LAS PERSONAS, que es lo que casi nadie hace:** añade \`sobre: Nombre\` y el reloj pasa a ser de ese vínculo. Ejemplo: [RELOJ: Jarlaxle decide qué es ella para él | van: 1/4 | al llenarse: le pide algo que ella no puede dar sin elegir bando | de: Jarlaxle | sobre: Jarlaxle]. Una relación sin reloj es un registro: dice cómo están las cosas y no promete nada. Con reloj **va a pasar algo**, y pasa aunque ella no lo empuje, igual que una amenaza. ✅ Abre uno cuando un vínculo llegue al punto en que su dueño **ya tendría que hacer algo al respecto**: quien la desea acabará moviendo pieza, quien le debe algo acabará cobrándoselo o pagándolo, quien la está evaluando acabará decidiendo. Y que al llenarse **cueste algo**: una elección, una lealtad, una puerta que se cierra. Un reloj cuyo final es «se hacen más amigos» no es un reloj.
    - [FACCIÓN: Nombre | es: qué es | quiere: su objetivo ahora | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra facción (rival); Tercera (guerra) | oculto: lo que ella no sabe | conocida: no] — la ficha de un bando. Emítela la primera vez que un grupo con intereses propios aparece o se menciona, y cuando su objetivo o su postura CAMBIEN. Una facción no es la suma de su gente: su objetivo sigue vivo aunque muera quien lo llevaba. ⛔ No la uses para grupos de paso ni para una pareja de matones: solo para lo que va a estar ahí toda la campaña.
+   - [PLAN: premisa: ... | destino: ...] — **corrige el rumbo de la campaña** cuando lo jugado lo haya desviado de verdad: ella ha ignorado el gancho principal, ha cerrado por su cuenta la vía que llevaba al final previsto, o ha convertido un hilo secundario en el importante. ⛔ No lo toques por una escena suelta ni cada vez que algo se tuerza un poco: esto es el mapa, y reescribirlo cada turno es no tener mapa. Solo un campo si solo cambia uno.
    - [MISIÓN: Título | objetivo: ... | progreso: ... | origen: quién lo encargó | estado: activa/completada/fallada | tipo: principal/secundaria/personal] — **abre, mueve o cierra una trama.** Emítela cuando alguien le encargue algo de verdad, cuando la escena haga avanzar un encargo abierto, y **sobre todo cuando lo complete**: una misión cumplida que sigue marcada como activa te la vas a encontrar en el dosier de cada turno como si estuviera pendiente. Por el título exacto, y lo que no pongas se conserva. ⛔ No abras una trama por cada conversación: solo lo que de verdad es un encargo o un hilo que ella persigue.
    - [PREPARADO: Título | tipo: escena/encuentro/complicacion/revelacion/pnj | detalle: qué pasa | cuando: en qué momento encaja | hilo: de qué cuelga] — guarda algo listo para usar más adelante, que es lo que hace un director antes de sentarse. Emítelo cuando se te ocurra algo bueno que AHORA no toca: así no se pierde y no acabas improvisándolo en caliente. Y cuando lo uses, ciérralo con [PREPARADO: el mismo título | usada: sí]. ⛔ Nada de esto se narra: es tu material.
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
@@ -4469,6 +4494,8 @@ export interface TiempoReportado {
   avanceDeNivel?: AvanceDeNivel;
   /** Tramas abiertas, movidas o cerradas en este turno. */
   misiones?: MisionLeida[];
+  /** El rumbo de la campaña, si el Narrador lo ha corregido. */
+  plan?: PlanLeido | null;
   /** Conjuros, rasgos o competencias ganados en este turno. */
   aprendido?: Aprendizaje[];
   /** Lo que ha pasado fuera de cámara, para el cuaderno del Director. */
@@ -4520,6 +4547,7 @@ async function saveStreamedMessage(
   const viaje = leerViaje(cleanedText);
   const lugares = leerLugares(cleanedText);
   const misiones = leerMisiones(cleanedText);
+  const plan = leerPlan(cleanedText);
   const inventario = leerInventario(cleanedText);
   // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
   const hudDeEsteTurno = leerFechaDeHud(fullText);
@@ -4582,6 +4610,7 @@ async function saveStreamedMessage(
         viaje,
         lugares,
         misiones,
+        plan,
         fechaHud: hudDeEsteTurno?.fechaTexto,
         momentoHud: hudDeEsteTurno?.momento,
         lugarHud: hudDeEsteTurno?.lugar,
@@ -6641,6 +6670,7 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[OLVIDA: lo que hay que quitar]\` — tu goma, y ahora **también tacha frases de la memoria general**, que antes era lo único intocable. Si ahí dentro quedó escrito un suceso desmentido —«desembarcaron en los muelles de Luskan»— con olvidarlo no basta que lo quites del diario: quítalo también de ahí, o seguirá dirigiendo la campaña desde dentro. ⚠️ Nunca vacía el bloque entero: si al tachar no quedara nada, se deja como estaba.
 
 ⭐ **LAS CUATRO DE ARRIBA SON LA DIFERENCIA ENTRE CORREGIR Y DECIR QUE CORRIGES.** Si aceptas que algo está mal y NO emites la etiqueta, no has arreglado nada: esta conversación no la lee el Narrador, y al turno siguiente volverá a hacer exactamente lo mismo. Emítelas siempre que des la razón, y di en voz alta lo que has corregido.
+- \`[PLAN: premisa: de qué va la historia | destino: dónde acaba esto si nadie lo tuerce]\` — **CORRIGE EL RUMBO DE LA CAMPAÑA.** El plan se trazó una vez, al principio, y una historia jugada no va donde se dijo el primer día: ella tuerce el rumbo, ignora un gancho o se encapricha de un hilo secundario. Un plan que no se puede corregir no es un plan, es una profecía. Puedes tocar solo un campo: retocar el destino no borra la premisa.
 - \`[MISIÓN: Título | objetivo: qué hay que lograr | progreso: por dónde va | origen: quién lo encargó | estado: activa/completada/fallada | tipo: principal/secundaria/personal]\` — **ABRE, MUEVE O CIERRA UNA TRAMA.** Por el título: si ya existe se actualiza, y lo que no pongas se conserva. ⭐ Esto antes no lo podía hacer nadie: las tramas solo se rellenaban en la sincronización completa, así que una misión recién encargada no existía y una recién cumplida seguía saliendo como activa. Si la jugadora te dice que algo ya está hecho, ciérralo con \`estado: completada\`.
 - \`[LUGAR: Nombre | lo concreto que ya se ha establecido de ese sitio]\` — añade una nota a un lugar, o lo crea. Es para lo que tiene que seguir siendo verdad la próxima vez que se entre: cómo se cierran sus puertas, quién guarda la entrada, qué está prohibido allí. Se acumula sin repetir lo ya dicho. ⚠️ Para decir DÓNDE ESTÁ la escena ahora mismo NO uses esto: eso es \`[ESTAMOS: ...]\`.
 - \`[NIVEL: 5]\` — **FIJA EL NIVEL DEL PERSONAJE EN SU FICHA.** Si la jugadora te dice que su nivel está mal, o que sube de nivel, **tienes que emitir esta etiqueta**: apuntarlo en la memoria general NO cambia la ficha. La memoria general es prosa que lee el Narrador; el nivel es un número que vive en la ficha, y si solo lo cuentas ahí queda una directiva diciendo una cosa y una ficha diciendo otra. Con \`[Avance: 2/3 hacia Nivel 6]\` fijas la cuenta de hitos sin subir todavía; al subir, esa cuenta se pone a cero sola.
@@ -6764,6 +6794,8 @@ export interface RespuestaDeMesa {
   nivel?: AvanceDeNivel | null;
   /** Tramas abiertas, movidas o cerradas desde la mesa. */
   misiones: MisionLeida[];
+  /** El rumbo de la campaña, retocado desde la mesa. */
+  plan: PlanLeido | null;
   /** Notas de lugar corregidas desde la mesa. */
   lugares: LugarLeido[];
   /** Texto corregido para reemplazar la última respuesta del GM en la Crónica. */
@@ -6981,6 +7013,7 @@ export async function preguntarAlDirectorOOC(
   // El mismo lector que usa la narración: `[NIVEL: 5]` y `[Avance: 2/3]`.
   const nivelDeMesa = leerAvanceDeNivel(bruto);
   const misionesDeMesa = leerMisiones(bruto);
+  const planDeMesa = leerPlan(bruto);
   const lugaresDeMesa = leerLugares(bruto);
 
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
@@ -7000,6 +7033,7 @@ export async function preguntarAlDirectorOOC(
     .replace(/\[\s*ETIQUETA\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*NIVEL\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*(?:MISI[OÓ]N|TRAMA|ENCARGO)\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*(?:PLAN|PLAN_DE_CAMPA[NÑ]A|RUMBO)\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*LUGAR\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*AVANCE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*(?:CORREGIR|REESCRIBIR)_(?:CRONICA|TURNO|ULTIMO_TURNO)\s*:[^\]]*\]/gi, '')
@@ -7040,6 +7074,7 @@ export async function preguntarAlDirectorOOC(
     nivel: nivelDeMesa,
     misiones: misionesDeMesa,
     lugares: lugaresDeMesa,
+    plan: planDeMesa,
     corregirCronica,
     rehacerUltimoTurno,
     fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount
