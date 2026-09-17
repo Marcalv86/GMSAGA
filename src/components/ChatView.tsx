@@ -1550,7 +1550,9 @@ export const ChatView: React.FC<{
         )}
 
         {chat?.messages && chat.messages.length > 0 && !isGenerating && (
-          <div className="max-w-[900px] mx-auto mb-2 flex justify-between items-center gap-2">
+          // `flex-wrap`: en el móvil eran tres botones en una fila que no da de
+          // sí, y el tercero se salía de la pantalla sin forma de pulsarlo.
+          <div className="max-w-[900px] mx-auto mb-2 flex flex-wrap justify-between items-center gap-2">
             {/*
               Las jornadas del capítulo, donde se puede hacer algo al respecto.
 
@@ -1571,10 +1573,10 @@ export const ChatView: React.FC<{
               motivo de existir: mientras haya calendario, el botón está.
             */}
             {jornadas.dias > 0 || (calendarioValido(project?.calendar) && project?.currentDate) || marcoActual ? (
-              <div className="relative shrink-0">
+              <div className="relative min-w-0">
                 <button
                   onClick={() => setTiempoAbierto(v => !v)}
-                  className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 min-h-[32px] text-[11px] font-cinzel transition-colors cursor-pointer active:scale-95 ${
+                  className={`min-w-0 max-w-full inline-flex items-center gap-1.5 rounded-full border px-2.5 min-h-[32px] text-[11px] font-cinzel transition-colors cursor-pointer active:scale-95 ${
                     jornadas.dias >= 4
                       ? 'border-amber-700/50 bg-amber-500/10 text-amber-950 dark:text-amber-100 font-bold'
                       : 'border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] text-[var(--text-secondary)]'
@@ -1586,6 +1588,7 @@ export const ChatView: React.FC<{
                   ) : (
                     <CalendarDays className="w-3.5 h-3.5 shrink-0" />
                   )}
+                  <span className="truncate min-w-0">
                   {(() => {
                     const v = project?.memory?.viaje;
                     if (v?.destino && v.jornadas) {
@@ -1608,6 +1611,7 @@ export const ChatView: React.FC<{
                     }
                     return txtJornada;
                   })()}
+                  </span>
                   {tiempoAbierto ? (
                     <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
                   ) : (
@@ -1880,7 +1884,7 @@ export const ChatView: React.FC<{
             ) : (
               <span />
             )}
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
             <button
               onClick={handleOpenTransitionModal}
               className="shrink-0 min-h-[32px] text-xs font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
