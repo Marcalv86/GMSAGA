@@ -789,6 +789,7 @@ const VIAJE_RE = /\[\s*VIAJE\s*:\s*([^\]]+)\]/gi;
 /** `[ESTAMOS: la bodega del bergantín, en alta mar]` — dónde transcurre la escena AHORA. */
 const ESTAMOS_RE = /\[\s*ESTAMOS\s*:\s*([^\]]+)\]/gi;
 const LUGAR_RE = /\[\s*LUGAR\s*:\s*([^\]]+)\]/gi;
+const MISION_RE = /\[\s*(?:MISI[OÓ]N|TRAMA|ENCARGO)\s*:\s*([^\]]+)\]/gi;
 
 /**
  * Lee `[TIEMPO: +2h]`, `[TIEMPO: +1d 6h]`, `[TIEMPO: +45m]` o `[TIEMPO: +3 días]`.
@@ -2077,6 +2078,65 @@ export function leerLugares(texto: string): LugarLeido[] {
   return out;
 }
 
+
+export interface MisionLeida {
+  titulo: string;
+  objetivo?: string;
+  progreso?: string;
+  origen?: string;
+  estado?: string;
+  tipo?: string;
+}
+
+/**
+ * Las tramas, que no las podía tocar NADIE.
+ *
+ * `memory.quests` se rellenaba únicamente en la sincronización completa —una
+ * relectura de la crónica entera, cuatro llamadas— y no había ninguna
+ * etiqueta, ni del Narrador ni del Director, capaz de abrir una misión,
+ * moverla o cerrarla. Así que una misión encargada en escena no existía hasta
+ * la siguiente sincronización, y una que la jugadora acababa de completar
+ * seguía apareciendo como activa en su pantalla y en el prompt de cada turno.
+ */
+export function leerMisiones(texto: string): MisionLeida[] {
+  if (!texto || !/MISI|TRAMA|ENCARGO/i.test(texto)) return [];
+  MISION_RE.lastIndex = 0;
+  const out: MisionLeida[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = MISION_RE.exec(texto)) !== null) {
+    const partes = m[1].split('|').map(x => x.trim());
+    const titulo = (partes.shift() || '').slice(0, 120);
+    if (titulo.length < 2) continue;
+    const c: Record<string, string> = {};
+    for (const parte of partes) {
+      const i = parte.indexOf(':');
+      if (i < 1) continue;
+      c[parte.slice(0, i).trim().toLowerCase()] = parte.slice(i + 1).trim();
+    }
+    const estadoCrudo = (c['estado'] || '').toLowerCase();
+    out.push({
+      titulo,
+      objetivo: c['objetivo']?.slice(0, 300) || undefined,
+      progreso: (c['progreso'] || c['avance'])?.slice(0, 400) || undefined,
+      origen: (c['origen'] || c['de'] || c['quien'])?.slice(0, 120) || undefined,
+      estado: /complet|cerrad|hecha|termin|cumplid/.test(estadoCrudo)
+        ? 'Completada'
+        : /fallad|fracas|perdid/.test(estadoCrudo)
+        ? 'Fallada'
+        : /activ|abiert|en curso|pendiente/.test(estadoCrudo)
+        ? 'Activa'
+        : undefined,
+      tipo: /principal/.test((c['tipo'] || '').toLowerCase())
+        ? 'principal'
+        : /personal/.test((c['tipo'] || '').toLowerCase())
+        ? 'personal'
+        : /secundar/.test((c['tipo'] || '').toLowerCase())
+        ? 'secundaria'
+        : undefined
+    });
+  }
+  return out;
+}
 
 /**
  * Dónde transcurre la escena AHORA MISMO, corregido a mano desde la mesa.

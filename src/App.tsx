@@ -137,6 +137,8 @@ import { RollRequest, rollDie } from './utils/rollRequests';
 import { Probabilidad, formatoSignificado, nuevaConsulta } from './utils/oracle';
 import {
   AvanceDeNivel,
+  MisionLeida,
+  LugarLeido,
   CALENDARIO_HARPTOS,
   aDiaAbsoluto,
   avanzar,
@@ -1029,6 +1031,7 @@ export default function App() {
 
       let mem = conVinculos(p, hoyAbs);
       mem = conAvanceDeNivel(mem, t.avanceDeNivel);
+      mem = conMisiones(mem, t.misiones);
 
       return { currentDate: nuevaFecha, threads, timeline, memory: mem };
     });
@@ -1047,6 +1050,50 @@ export default function App() {
    * Narrador anuncia la subida con `[NIVEL: 4]`, se cambia el nivel y la cuenta
    * de hitos vuelve a cero, que es lo que significa haber subido.
    */
+  /*
+   * LAS TRAMAS, QUE NO LAS PODÍA TOCAR NADIE.
+   *
+   * `memory.quests` solo se rellenaba en la sincronización completa —una
+   * relectura de la crónica entera, cuatro llamadas— y no había etiqueta
+   * ninguna, ni del Narrador ni del Director, capaz de abrir una misión,
+   * moverla o cerrarla. Una misión encargada en escena no existía hasta la
+   * siguiente sincronización, y una recién completada seguía saliendo como
+   * activa en la pantalla de la jugadora y en el prompt de cada turno.
+   *
+   * Se busca por título y se fusiona: lo que no venga en la etiqueta se
+   * conserva, porque una etiqueta que solo mueve el progreso no puede borrar
+   * el objetivo.
+   */
+  const conMisiones = (mem: Project['memory'], misiones?: MisionLeida[]): Project['memory'] => {
+    if (!mem || !misiones?.length) return mem;
+    const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    let lista = [...(mem.quests || [])];
+    for (const m of misiones) {
+      const i = lista.findIndex(q => clave(q.title || '') === clave(m.titulo));
+      if (i >= 0) {
+        lista[i] = {
+          ...lista[i],
+          objective: m.objetivo || lista[i].objective,
+          progress: m.progreso || lista[i].progress,
+          origin: m.origen || lista[i].origin,
+          status: m.estado || lista[i].status,
+          type: m.tipo || lista[i].type
+        };
+      } else {
+        lista.push({
+          id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          title: m.titulo,
+          origin: m.origen || '',
+          objective: m.objetivo || '',
+          progress: m.progreso || '',
+          status: m.estado || 'Activa',
+          type: m.tipo || 'secundaria'
+        });
+      }
+    }
+    return { ...mem, quests: lista };
+  };
+
   const conAvanceDeNivel = (mem: Project['memory'], avance?: AvanceDeNivel): Project['memory'] => {
     if (!avance || !mem) return mem;
     const pc = mem.player_character;
@@ -1670,6 +1717,8 @@ export default function App() {
     facciones?: Faccion[];
     preparado?: CartaPreparada[];
     nivel?: AvanceDeNivel | null;
+    misiones?: MisionLeida[];
+    lugares?: LugarLeido[];
     corregirCronica?: string | null;
     rehacerUltimoTurno?: string | null;
   }): Promise<string[]> => {
@@ -1741,6 +1790,40 @@ export default function App() {
           ? `⬆️ Nivel ${orden.nivel.nivelAlcanzado} en la ficha`
           : `⬆️ Avance de nivel ${orden.nivel.hitos}/${orden.nivel.necesarios ?? '?'}`
       );
+    }
+
+    /*
+     * Tramas y notas de lugar: dos pestañas que la jugadora ve y el Director
+     * no podía tocar. Le decía «esa misión ya está hecha, la cierro» y se
+     * quedaba activa en su pantalla y en el prompt de cada turno.
+     */
+    if (orden.misiones?.length) {
+      await handleUpdateProjectField(prev => ({ memory: conMisiones(prev.memory, orden.misiones) }));
+      aplicado.push(`🗺️ ${orden.misiones.length} trama(s) actualizada(s)`);
+    }
+
+    if (orden.lugares?.length) {
+      await handleUpdateProjectField(prev => {
+        const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        let lista = [...(prev.memory?.locations || [])];
+        for (const nuevo of orden.lugares!) {
+          const i = lista.findIndex(l => clave(l.name || '') === clave(nuevo.nombre));
+          if (i >= 0) {
+            const notas = (lista[i].notes || '').trim();
+            if (clave(notas).includes(clave(nuevo.detalle))) continue;
+            lista[i] = { ...lista[i], notes: notas ? `${notas} · ${nuevo.detalle}` : nuevo.detalle };
+          } else {
+            lista.push({
+              id: `loc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              name: nuevo.nombre,
+              desc: '',
+              notes: nuevo.detalle
+            });
+          }
+        }
+        return { memory: { ...(prev.memory || {}), locations: lista } as any };
+      });
+      aplicado.push(`📍 ${orden.lugares.length} lugar(es) anotado(s)`);
     }
 
     if (orden.etiquetados?.length && currentPId) {
