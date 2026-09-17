@@ -180,7 +180,34 @@ function safeName(value: string): string {
  * no hay carpeta o el permiso no está concedido: es una copia de seguridad, no
  * debe interrumpir la partida.
  */
+/*
+ * UNA ESCRITURA CADA VEZ, EN FILA.
+ *
+ * Nada impedía que dos guardados corrieran a la vez sobre el mismo archivo, y
+ * en un móvil un doble toque en el botón es facilísimo. Dos `createWritable()`
+ * abiertos sobre el mismo fichero se pisan, y lo que queda en disco no es la
+ * copia de ninguno de los dos: es un archivo roto que solo se descubre el día
+ * que hace falta.
+ *
+ * Con esto el segundo guardado espera al primero en vez de competir con él.
+ */
+let escrituraEnCurso: Promise<unknown> = Promise.resolve();
+
 export async function writeCampaignToDisk(
+  project: Project,
+  chats: Chat[],
+  files: ProjectFile[],
+  targetFileName?: string
+): Promise<{ written: boolean; fileName?: string; reason?: 'no-folder' | 'no-permission' | 'error' | 'incompleta' }> {
+  const miTurno = escrituraEnCurso.then(
+    () => escribirCampanaAhora(project, chats, files, targetFileName),
+    () => escribirCampanaAhora(project, chats, files, targetFileName)
+  );
+  escrituraEnCurso = miTurno.catch(() => undefined);
+  return miTurno;
+}
+
+async function escribirCampanaAhora(
   project: Project,
   chats: Chat[],
   files: ProjectFile[],

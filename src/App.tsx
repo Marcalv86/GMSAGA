@@ -5006,15 +5006,37 @@ export default function App() {
          */
         let imported: any;
         try {
-          imported = JSON.parse(event.target?.result as string);
+          /*
+           * El BOM: un archivo perfectamente válido que no se puede parsear.
+           *
+           * Tres bytes invisibles al principio (\uFEFF) que ponen Windows, el
+           * Bloc de notas y unas cuantas herramientas de sincronización al
+           * tocar un fichero de texto. `JSON.parse` revienta con «Unexpected
+           * token» y el archivo se ve bien en cualquier editor, así que uno
+           * concluye que la copia está corrupta cuando lo único que sobra son
+           * tres bytes. Se quitan, y de paso los espacios de los bordes.
+           */
+          const crudo = String(event.target?.result ?? '').replace(/^\uFEFF/, '').trim();
+          imported = JSON.parse(crudo);
         } catch (err) {
           console.error('JSON inválido al importar:', err);
+          /*
+           * El tamaño, dicho. En un móvil un archivo con retratos e imágenes
+           * dentro se pone en decenas de megas, y ahí `JSON.parse` puede caerse
+           * por memoria y no porque el archivo esté mal. Sin el número no hay
+           * forma de distinguir «está roto» de «no cabe en este teléfono».
+           */
+          const megas = (file.size / 1048576).toFixed(1);
+          const grande = file.size > 25 * 1048576;
           setAlertConfig({
             isOpen: true,
-            title: 'Archivo ilegible',
+            title: grande ? 'No he podido abrirlo (y pesa mucho)' : 'Archivo ilegible',
             message:
-              'Este archivo no es un JSON válido, así que ni siquiera he podido abrirlo.\n\n' +
-              'Suele pasar si se editó a mano, si la descarga se cortó a medias o si no es un archivo de GM Studio.\n\n' +
+              `No he conseguido leer «${file.name}» (${megas} MB).\n\n` +
+              (grande
+                ? 'Pesa bastante, y en un móvil eso puede tumbar la lectura por falta de memoria aunque el archivo esté perfecto. ' +
+                  'Prueba a abrirlo en un ordenador: si allí entra, el archivo está bien y el problema es el teléfono.\n\n'
+                : 'Suele pasar si se editó a mano, si la descarga se cortó a medias o si no es un archivo de GM Studio.\n\n') +
               `Detalle: ${err instanceof Error ? err.message : String(err)}`
           });
           reject(err);
