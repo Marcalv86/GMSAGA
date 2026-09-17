@@ -33,7 +33,7 @@ import { Chat, Project, ProjectFile } from '../types';
 import { describeApiError, ImagenDeMesa, modelosParaElDirector, preguntarAlDirectorOOC, VideoDeMesa } from '../utils/geminiHelper';
 import { SecretoLeido, ViajeLeido, VinculoLeido } from '../utils/campaignCalendar';
 import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from '../types';
-import type { AvanceDeNivel, LugarLeido, MisionLeida, PlanLeido } from '../utils/campaignCalendar';
+import type { AvanceDeNivel, LugarLeido, MisionLeida, PlanLeido, RevelacionLeida } from '../utils/campaignCalendar';
 import {
   conMiles,
   estimarCosteDeVideo,
@@ -123,6 +123,7 @@ export const MesaView: React.FC<{
     preparado?: CartaPreparada[];
     nivel?: AvanceDeNivel | null;
     misiones?: MisionLeida[];
+    revelaciones?: RevelacionLeida[];
     lugares?: LugarLeido[];
     plan?: PlanLeido | null;
     corregirCronica?: string | null;
@@ -283,6 +284,7 @@ export const MesaView: React.FC<{
           preparado: respuesta.preparado,
           nivel: respuesta.nivel,
           misiones: respuesta.misiones,
+          revelaciones: respuesta.revelaciones,
           lugares: respuesta.lugares,
           plan: respuesta.plan,
           corregirCronica: respuesta.corregirCronica,

@@ -341,7 +341,17 @@ export function aplicarEtiquetados<T extends { name: string; etiquetasBusqueda?:
 
 
 /** `[ESTADO: dónde están y cómo están ahora mismo]`. */
-const ESTADO_RE = /\[\s*ESTADO\s*:\s*([^\]]+)\]/gi;
+/*
+ * «Estado» significaba DOS cosas distintas según quién escribiera.
+ *
+ * Para el Narrador, \`[ESTADO: PG 18/25 | CA 15 | condiciones: ...]\` son los
+ * puntos de golpe del personaje. Para el Director, la memoria general de la
+ * campaña. Cada tubería tenía su propio lector y por eso nunca ha estallado,
+ * pero es una mina con el pie encima: basta que uno escriba en el formato del
+ * otro. \`SITUACIÓN\` dice lo mismo sin ambigüedad, y \`ESTADO\` se sigue
+ * aceptando para no romper lo que ya está escrito.
+ */
+const ESTADO_RE = /\[\s*(?:SITUACI[OÓ]N|ESTADO)\s*:\s*([^\]]+)\]/gi;
 
 /** La marca del bloque que gestiona la aplicación dentro de la memoria general. */
 const MARCA_ESTADO = '— DÓNDE ESTAMOS AHORA (corregido en la mesa) —';

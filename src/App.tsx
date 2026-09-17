@@ -140,6 +140,7 @@ import {
   MisionLeida,
   LugarLeido,
   PlanLeido,
+  RevelacionLeida,
   CALENDARIO_HARPTOS,
   aDiaAbsoluto,
   avanzar,
@@ -1743,6 +1744,7 @@ export default function App() {
     preparado?: CartaPreparada[];
     nivel?: AvanceDeNivel | null;
     misiones?: MisionLeida[];
+    revelaciones?: RevelacionLeida[];
     lugares?: LugarLeido[];
     plan?: PlanLeido | null;
     corregirCronica?: string | null;
@@ -1823,6 +1825,34 @@ export default function App() {
      * no podía tocar. Le decía «esa misión ya está hecha, la cierro» y se
      * quedaba activa en su pantalla y en el prompt de cada turno.
      */
+    /*
+     * «Eso ya lo descubrí»: un giro que sigue en pie se sigue sembrando cada
+     * turno, así que no poder cerrarlo desde la mesa obligaba a fingir sorpresa
+     * o a aguantar las insinuaciones para siempre.
+     */
+    if (orden.revelaciones?.length) {
+      const cerrados: string[] = [];
+      await handleUpdateProjectField(prev => {
+        const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const cal = calendarioValido(prev.calendar) ? prev.calendar! : CALENDARIO_HARPTOS;
+        const secretos = (prev.memory?.gm_secrets || []).map(sec => {
+          const toca = orden.revelaciones!.find(r => clave(r.nombre) === clave(sec.titulo));
+          if (!toca || sec.revelado) return sec;
+          cerrados.push(sec.titulo);
+          return {
+            ...sec,
+            revelado: {
+              diaAbs: prev.currentDate ? aDiaAbsoluto(cal, prev.currentDate) : undefined,
+              fecha: prev.currentDate ? fechaLegible(cal, prev.currentDate) : undefined,
+              como: toca.como
+            }
+          };
+        });
+        return { memory: { ...(prev.memory || {}), gm_secrets: secretos } as any };
+      });
+      if (cerrados.length) aplicado.push(`🔓 ${cerrados.length} giro(s) marcado(s) como descubierto(s)`);
+    }
+
     if (orden.plan) {
       await handleUpdateProjectField(prev => {
         const cal = calendarioValido(prev.calendar) ? prev.calendar! : CALENDARIO_HARPTOS;

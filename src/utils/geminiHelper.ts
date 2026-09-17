@@ -6724,13 +6724,14 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama]\` — apunta en tu cuaderno algo que ha pasado fuera de cámara. Sirve para cuando ella te pregunta «¿qué ha estado haciendo X estos días?» y hay que dejarlo escrito, o para corregir un apunte que se quedó corto. Queda fechado en el día de campaña actual.
 - \`[ESTAMOS: dónde transcurre la escena ahora]\` — **DÓNDE ESTÁIS DE VERDAD.** Es la corrección más importante que puedes hacer y hasta ahora no la tenías: si ella te dice que el Narrador la ha plantado en un sitio en el que no está, esto lo arregla. ⭐ **Emítela SIEMPRE que aceptes que el sitio está mal**, no te limites a decir que lo corriges: sin la etiqueta no se corrige nada y el Narrador vuelve a llevarla al mismo sitio el turno siguiente, porque lo que él lee es el diario, no esta conversación. Ejemplo: \`[ESTAMOS: la bodega de proa del bergantín corsario, en alta mar en el Mar de las Espadas]\`.
 - \`[VIAJE: destino | jornadas: N]\` y \`[VIAJE: cancelar]\` — el trayecto largo en marcha. Ábrelo si resulta que están de camino y nadie lo estaba contando; **cancélalo** si el viaje ya no va a ocurrir o si de verdad han llegado y la cuenta se quedó descolgada. ⚠️ \`[VIAJE: fin]\` solo cierra si las jornadas están cumplidas; para abandonar un camino a medias, \`cancelar\`.
-- \`[ESTADO: dónde están y cómo están ahora mismo]\` — **la memoria general de la campaña, que es la que el Narrador lee ENTERA en cada turno.** Mantiene un bloque tuyo al final que se reemplaza completo cada vez, así que escríbelo como una foto del presente: dónde están, con quién, en qué situación y qué acaba de pasar. Ejemplo: \`[ESTADO: Aryendell sigue prisionera en la bodega de proa del bergantín de Bregan D'aerthe, en alta mar en el Mar de las Espadas, con grilletes antimagia. NO han llegado a Luskan ni han desembarcado.\]\`
+- \`[SITUACIÓN: dónde están y cómo están ahora mismo]\` (vale también \`[ESTADO: ...]\`) — **la memoria general de la campaña, que es la que el Narrador lee ENTERA en cada turno.** Mantiene un bloque tuyo al final que se reemplaza completo cada vez, así que escríbelo como una foto del presente: dónde están, con quién, en qué situación y qué acaba de pasar. Ejemplo: \`[ESTADO: Aryendell sigue prisionera en la bodega de proa del bergantín de Bregan D'aerthe, en alta mar en el Mar de las Espadas, con grilletes antimagia. NO han llegado a Luskan ni han desembarcado.\]\`
 - \`[PUENTE: término | lo que arrastra, y esto, y esto otro]\` — **un comodín para el buscador.** Cuando en una escena se diga el término de la izquierda, la aplicación buscará también lo de la derecha aunque nadie lo haya nombrado. Emítelo cuando notes que algo NO se está encontrando: ella pregunta por alguien y el documento que lo cuenta no aparece, o dos cosas que tú sabes conectadas no se llaman igual en ningún sitio. ⭐ Los que más valen son los que solo sabes tú, los que no se deducen leyendo: \`[PUENTE: Soluun | Eldreth Veluuthra, cazadores nocturnos, pistoleros]\`. Se suman a los que ya hubiera, nunca los reemplazan.
 - \`[CORREGIR_CRONICA: El texto completo y corregido de la última respuesta del Narrador en la Crónica]\` — **CORRIGE / REEMPLAZA DIRECTAMENTE LA ÚLTIMA RESPUESTA DE LA CRÓNICA**. Si la jugadora te señala en la mesa OOC un error de lore, dato o interpretación en el último turno de la partida (ej: "Jarlaxle no se rapa por estética sino por una bola de fuego"), **debes redactar de nuevo esa respuesta de la crónica correctamente y emitir esta etiqueta con el texto completo corregido**. La aplicación reemplazará automáticamente la última respuesta del Narrador en el chat de juego ("Crónica") por la versión impecable que tú escribas.
 - \`[REHACER_ULTIMO_TURNO: Nota o instrucción de corrección]\` — **REGENERA CON IA EL ÚLTIMO TURNO DE LA CRÓNICA**. Borra la última respuesta del Narrador en el chat de juego y vuelve a pedir a la IA que genere la narración basada en tu indicación de corrección.
 - \`[OLVIDA: lo que hay que quitar]\` — tu goma, y ahora **también tacha frases de la memoria general**, que antes era lo único intocable. Si ahí dentro quedó escrito un suceso desmentido —«desembarcaron en los muelles de Luskan»— con olvidarlo no basta que lo quites del diario: quítalo también de ahí, o seguirá dirigiendo la campaña desde dentro. ⚠️ Nunca vacía el bloque entero: si al tachar no quedara nada, se deja como estaba.
 
 ⭐ **LAS CUATRO DE ARRIBA SON LA DIFERENCIA ENTRE CORREGIR Y DECIR QUE CORRIGES.** Si aceptas que algo está mal y NO emites la etiqueta, no has arreglado nada: esta conversación no la lee el Narrador, y al turno siguiente volverá a hacer exactamente lo mismo. Emítelas siempre que des la razón, y di en voz alta lo que has corregido.
+- \`[REVELADO: Título exacto del giro | cómo se enteró]\` — **MARCA UN GIRO COMO YA DESCUBIERTO.** Si te dice «eso ya lo sé» o «ya lo descubrimos, no me lo vuelvas a insinuar», esto es lo que lo cierra. ⭐ Importa más de lo que parece: un giro que sigue marcado como en pie **se le sigue sembrando en cada turno**, así que sin esto la única salida era fingir sorpresa o aguantar las pistas para siempre. El título, exacto.
 - \`[PLAN: premisa: de qué va la historia | destino: dónde acaba esto si nadie lo tuerce]\` — **CORRIGE EL RUMBO DE LA CAMPAÑA.** El plan se trazó una vez, al principio, y una historia jugada no va donde se dijo el primer día: ella tuerce el rumbo, ignora un gancho o se encapricha de un hilo secundario. Un plan que no se puede corregir no es un plan, es una profecía. Puedes tocar solo un campo: retocar el destino no borra la premisa.
 - \`[MISIÓN: Título | objetivo: qué hay que lograr | progreso: por dónde va | origen: quién lo encargó | estado: activa/completada/fallada | tipo: principal/secundaria/personal]\` — **ABRE, MUEVE O CIERRA UNA TRAMA.** Por el título: si ya existe se actualiza, y lo que no pongas se conserva. ⭐ Esto antes no lo podía hacer nadie: las tramas solo se rellenaban en la sincronización completa, así que una misión recién encargada no existía y una recién cumplida seguía saliendo como activa. Si la jugadora te dice que algo ya está hecho, ciérralo con \`estado: completada\`.
 - \`[LUGAR: Nombre | lo concreto que ya se ha establecido de ese sitio]\` — añade una nota a un lugar, o lo crea. Es para lo que tiene que seguir siendo verdad la próxima vez que se entre: cómo se cierran sus puertas, quién guarda la entrada, qué está prohibido allí. Se acumula sin repetir lo ya dicho. ⚠️ Para decir DÓNDE ESTÁ la escena ahora mismo NO uses esto: eso es \`[ESTAMOS: ...]\`.
@@ -6855,6 +6856,8 @@ export interface RespuestaDeMesa {
   nivel?: AvanceDeNivel | null;
   /** Tramas abiertas, movidas o cerradas desde la mesa. */
   misiones: MisionLeida[];
+  /** Giros que la mesa da por descubiertos. */
+  revelaciones: RevelacionLeida[];
   /** El rumbo de la campaña, retocado desde la mesa. */
   plan: PlanLeido | null;
   /** Notas de lugar corregidas desde la mesa. */
@@ -7074,6 +7077,17 @@ export async function preguntarAlDirectorOOC(
   // El mismo lector que usa la narración: `[NIVEL: 5]` y `[Avance: 2/3]`.
   const nivelDeMesa = leerAvanceDeNivel(bruto);
   const misionesDeMesa = leerMisiones(bruto);
+  /*
+   * «Eso ya lo descubrí» no se podía anotar.
+   *
+   * El Narrador podía marcar un giro como destapado con [REVELADO:], pero el
+   * Director no: es decir que la única forma de corregir un secreto mal
+   * marcado era volver a jugarlo. Y es justo lo que se le pide a la mesa —«ya
+   * sabemos lo del violín, no me lo vuelvas a insinuar»—, que sin esto se
+   * quedaba en una promesa: el giro seguía en pie y el Narrador lo seguía
+   * sembrando cada turno.
+   */
+  const revelacionesDeMesa = leerRevelaciones(bruto);
   const planDeMesa = leerPlan(bruto);
   const lugaresDeMesa = leerLugares(bruto);
 
@@ -7085,7 +7099,7 @@ export async function preguntarAlDirectorOOC(
     .replace(/\[\s*APRENDE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*BAMBALINAS\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*ESTAMOS\s*:[^\]]*\]/gi, '')
-    .replace(/\[\s*ESTADO\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*(?:SITUACI[OÓ]N|ESTADO)\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*PUENTE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*VIAJE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*RELOJ\s*:[^\]]*\]/gi, '')
@@ -7095,6 +7109,7 @@ export async function preguntarAlDirectorOOC(
     .replace(/\[\s*NIVEL\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*(?:MISI[OÓ]N|TRAMA|ENCARGO)\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*(?:PLAN|PLAN_DE_CAMPA[NÑ]A|RUMBO)\s*:[^\]]*\]/gi, '')
+    .replace(/\[\s*REVELADO\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*LUGAR\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*AVANCE\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*(?:CORREGIR|REESCRIBIR)_(?:CRONICA|TURNO|ULTIMO_TURNO)\s*:[^\]]*\]/gi, '')
@@ -7134,6 +7149,7 @@ export async function preguntarAlDirectorOOC(
     preparado,
     nivel: nivelDeMesa,
     misiones: misionesDeMesa,
+    revelaciones: revelacionesDeMesa,
     lugares: lugaresDeMesa,
     plan: planDeMesa,
     corregirCronica,
