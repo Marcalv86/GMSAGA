@@ -2364,6 +2364,59 @@ export default function App() {
    * Se hace UNA vez, en el primer mensaje de la campaña, y nunca vuelve a
    * molestar.
    */
+  /*
+   * 🎬 LA SESIÓN 0, MONTADA AL SUBIR LOS DOCUMENTOS.
+   *
+   * Un director no llega a la primera escena con la libreta en blanco: viene
+   * con los bandos claros, un par de cosas listas en la manga y algún plan ya
+   * en marcha desde antes de que apareciera nadie.
+   *
+   * Y el momento de montarlo es cuando entran los documentos, no cuando se
+   * escribe el primer mensaje: para entonces la jugadora ya está jugando y el
+   * tablero llega tarde, a rebufo del primer turno. Igual que la red
+   * semántica, esto se teje en cuanto hay con qué tejerlo.
+   *
+   * Solo si el cuaderno está vacío: en una campaña en marcha, lo que hay se
+   * ganó jugando y no se pisa con una lectura de documentos.
+   */
+  const montarSesionCero = async (archivos: ProjectFile[], proyecto: Project | null) => {
+    if (!proyecto) return;
+    const yaHayTablero =
+      (proyecto.memory?.gm_facciones || []).length ||
+      (proyecto.memory?.gm_preparado || []).length ||
+      (proyecto.memory?.gm_relojes || []).length;
+    if (yaHayTablero) return;
+
+    const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
+    const documentos = (archivos || []).filter(f => esTexto(f) && (f.content || '').trim().length > 200);
+    if (!documentos.length) return;
+
+    try {
+      const tablero = await leerElTableroDeDocumentos({ project: proyecto, files: archivos || [] });
+      if (!tablero.facciones.length && !tablero.preparado.length && !tablero.relojes.length) return;
+      const marca =
+        calendarioValido(proyecto.calendar) && proyecto.currentDate
+          ? aDiaAbsoluto(proyecto.calendar!, proyecto.currentDate)
+          : undefined;
+      await handleUpdateProjectField(prev => ({
+        memory: {
+          ...(prev.memory || {}),
+          gm_facciones: aplicarFacciones(prev.memory?.gm_facciones, tablero.facciones),
+          gm_preparado: aplicarPreparado(prev.memory?.gm_preparado, tablero.preparado, marca),
+          gm_relojes: aplicarRelojes(prev.memory?.gm_relojes, tablero.relojes, marca)
+        } as any
+      }));
+      logInfo(
+        'memory_sync',
+        'Sesión 0 montada de los documentos',
+        `${tablero.facciones.length} facciones, ${tablero.preparado.length} cartas preparadas y ${tablero.relojes.length} relojes en marcha.`
+      );
+    } catch (err) {
+      // Que falle no puede impedir nada: el cuaderno se llenará jugando.
+      logWarn('memory_sync', 'No se pudo montar la sesión 0 de los documentos', describeApiError(err));
+    }
+  };
+
   const revisarBibliotecaAlEstrenar = async (): Promise<boolean> => {
     if (!esElPrimerMensajeDeLaCampana()) return true;
 
@@ -2393,59 +2446,12 @@ export default function App() {
     }
 
     /*
-     * 🎬 LA SESIÓN 0, QUE NADIE ESTABA PREPARANDO.
-     *
-     * Un director no llega a la primera escena con la libreta en blanco: viene
-     * con los bandos claros, un par de cosas listas en la manga y algún plan
-     * ya en marcha desde antes. La aplicación arrancaba con las tres listas
-     * vacías y esperaba a que se llenaran jugando, así que las primeras
-     * sesiones el mundo era exactamente lo que cupiera en la escena: nadie
-     * tenía intereses, nadie se movía por su cuenta y no había nada preparado
-     * que sacar cuando hiciera falta.
-     *
-     * Se lee de los documentos, que es de donde tiene que salir —no se
-     * inventa un mundo paralelo al que la jugadora escribió—, y va en segundo
-     * plano: el primer turno sale YA y el tablero está puesto para el segundo.
+     * Red de seguridad: si los documentos ya estaban ahí de antes de que esto
+     * existiera, nadie ha subido nada desde entonces y el cuaderno sigue en
+     * blanco. Se monta ahora, en segundo plano, y el primer turno sale igual.
      */
-    const cuadernoVacio =
-      !(currentProject?.memory?.gm_facciones || []).length &&
-      !(currentProject?.memory?.gm_preparado || []).length &&
-      !(currentProject?.memory?.gm_relojes || []).length;
+    void montarSesionCero(currentFiles || [], currentProject || null);
 
-    if (cuadernoVacio && documentos.length >= 1) {
-      void (async () => {
-        try {
-          const tablero = await leerElTableroDeDocumentos({
-            project: currentProject!,
-            files: currentFiles || []
-          });
-          if (!tablero.facciones.length && !tablero.preparado.length && !tablero.relojes.length) return;
-          const marca = calendarioValido(currentProject?.calendar) && currentProject?.currentDate
-            ? aDiaAbsoluto(currentProject.calendar!, currentProject.currentDate)
-            : undefined;
-          await handleUpdateProjectField(prev => ({
-            memory: {
-              ...(prev.memory || {}),
-              gm_facciones: aplicarFacciones(prev.memory?.gm_facciones, tablero.facciones),
-              gm_preparado: aplicarPreparado(prev.memory?.gm_preparado, tablero.preparado, marca),
-              gm_relojes: aplicarRelojes(prev.memory?.gm_relojes, tablero.relojes, marca)
-            } as any
-          }));
-          logInfo(
-            'memory_sync',
-            'Sesión 0 montada al estrenar campaña',
-            `${tablero.facciones.length} facciones, ${tablero.preparado.length} cartas preparadas y ${tablero.relojes.length} relojes, leídos de los documentos.`
-          );
-        } catch (err) {
-          // Que falle no puede impedir jugar: el cuaderno se llenará sobre la marcha.
-          logWarn(
-            'memory_sync',
-            'No se pudo montar la sesión 0 al estrenar campaña',
-            describeApiError(err)
-          );
-        }
-      })();
-    }
     return true;
   };
 
@@ -3380,6 +3386,18 @@ export default function App() {
       relacionarPendiente.current = setTimeout(() => {
         relacionarPendiente.current = null;
         if (getStoredAutoVincular()) void handleRelacionarBiblioteca({ silencioso: true });
+        /*
+         * Y de paso se monta la mesa: los bandos, lo preparado y los planes
+         * que ya corren. Va en el MISMO temporizador que la red semántica
+         * porque el motivo es el mismo —subir seis documentos de golpe tiene
+         * que costar una lectura, no seis— y porque así el tablero está
+         * puesto antes de que se escriba la primera línea, en vez de llegar a
+         * rebufo del primer turno.
+         */
+        void montarSesionCero(
+          currentFilesRef.current,
+          projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
+        );
       }, ESPERA_ANTES_DE_REVINCULAR);
     } catch (error) {
       console.error('Error handling files upload:', error);
