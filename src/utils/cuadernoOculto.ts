@@ -121,7 +121,8 @@ export function leerRelojes(texto: string): RelojLeido[] {
       ...(Number.isFinite(incremento) ? { incremento } : {}),
       alLlenarse: (c['al llenarse'] || c['cuando se llene'] || c['pasa'] || '').slice(0, 300),
       deQuien: (c['de'] || c['de quien'] || c['quien'])?.slice(0, 120),
-      loIntuye: /^(si|sí|true)$/i.test(c['lo intuye'] || c['intuye'] || '')
+      loIntuye: /^(si|sí|true)$/i.test(c['lo intuye'] || c['intuye'] || ''),
+      sobre: (c['sobre'] || c['con'] || c['pnj'])?.slice(0, 120)
     });
   }
   return out;
@@ -202,6 +203,7 @@ export function aplicarRelojes(
       alLlenarse: r.alLlenarse || anterior.alLlenarse,
       deQuien: r.deQuien || anterior.deQuien,
       loIntuye: r.loIntuye || anterior.loIntuye,
+      sobre: r.sobre || anterior.sobre,
       cumplidoDiaAbs:
         llenos >= segmentos ? anterior.cumplidoDiaAbs ?? diaAbs : anterior.cumplidoDiaAbs
     };

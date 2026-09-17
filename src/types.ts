@@ -457,6 +457,21 @@ export interface RelojOculto {
   deQuien?: string;
   /** Si ella puede intuir que algo se está cociendo. */
   loIntuye?: boolean;
+  /**
+   * El nombre del PNJ de quien va este reloj, si va de una persona.
+   *
+   * Una relación era un REGISTRO: dos barras y unas notas que decían cómo
+   * están las cosas. Nada decía que fueran a pasar. El mundo sí tenía cuenta
+   * atrás —los planes, las amenazas, las búsquedas ajenas— y la gente no, así
+   * que las amenazas avanzaban solas y los vínculos esperaban sentados a que
+   * la jugadora los empujara.
+   *
+   * Con esto un vínculo puede tener lo mismo que tiene un peligro: segmentos,
+   * algo que ocurre al llenarse y un dueño que lo mueve aunque ella no mire.
+   * Y al llevar nombre, el reloj se le enseña al Narrador DENTRO de la ficha
+   * de esa persona, que es donde está mirando cuando la escribe.
+   */
+  sobre?: string;
   /** Día absoluto en que se llenó, si ya se llenó. */
   cumplidoDiaAbs?: number;
 }

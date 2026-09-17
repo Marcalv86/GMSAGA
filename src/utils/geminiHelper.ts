@@ -1711,7 +1711,7 @@ export function puentesDeLaCampana(
   return escritos.length ? escritos : project.memory?.puentes_de_busqueda || [];
 }
 
-function dosierDePersonajes(npcs: NPC[], marcaActual = 0): string {
+function dosierDePersonajes(npcs: NPC[], marcaActual = 0, relojes: RelojOculto[] = []): string {
   // Apagable desde Motor. Los datos no se tocan: solo dejan de viajar en el
   // prompt, para poder comprobar jugando si sujetaban algo o no.
   const barrasVisibles = getStoredBarrasAfinidad();
@@ -1933,6 +1933,28 @@ ${bloqueElenco}
     if (n.orientacion) {
       lineas.push(`- Orientación / disponibilidad: ${corta(n.orientacion, 120)}. Mándalo por encima de cualquier química que pida la escena.`);
     }
+    /*
+     * EL RELOJ DE ESTA PERSONA, EN LA FICHA DE ESTA PERSONA.
+     *
+     * Los relojes ya se listan en el cuaderno, pero el cuaderno es un bloque
+     * aparte que habla del mundo: amenazas, búsquedas, planes de facciones. Un
+     * reloj sobre alguien puesto ahí se lee como política, no como la persona
+     * que el Narrador está escribiendo ahora mismo. Repetido aquí cuesta una
+     * línea y aparece en el único sitio donde se decide lo que ese personaje
+     * hace en la escena.
+     */
+    for (const r of relojes.filter(r => coincidenNombresNpc(r.sobre || '', n.name))) {
+      const barra = `${'●'.repeat(Math.min(r.llenos, r.segmentos))}${'○'.repeat(Math.max(0, r.segmentos - r.llenos))}`;
+      const queda = Math.max(0, r.segmentos - r.llenos);
+      lineas.push(
+        `- ⏳ RELOJ DE ESTA RELACIÓN — ${r.nombre}: ${barra} (${r.llenos}/${r.segmentos})` +
+          `${r.alLlenarse ? `. Al llenarse: ${corta(r.alLlenarse, 200)}` : ''}` +
+          (queda <= 1
+            ? ` ❗ **ESTÁ A PUNTO.** Esta escena es un sitio estupendo para que se llene, o para el último aviso antes.`
+            : ` · Avánzalo con \`[RELOJ: ${r.nombre} | van: +1]\` cuando en escena pase algo que de verdad lo empuje —y NO lo avances porque sí—.`) +
+          `${r.loIntuye ? ' · Ella intuye que algo se cuece con él, aunque no sepa qué.' : ' ⛔ Ella NO sabe que esto existe: no se narra, se nota.'}`
+      );
+    }
     if (n.notes) lineas.push(`- Notas: ${corta(n.notes, 400)}`);
 
     // Idiomas del personaje y nivel de dominio
@@ -2124,7 +2146,14 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
   const marcaDeHoy = calendarioValido(project.calendar) && project.currentDate
     ? aDiaAbsoluto(project.calendar!, project.currentDate)
     : (chats || []).reduce((a, c) => a + (c.messages || []).length, 0);
-  const dosierPnjs = dosierDePersonajes(project.memory?.npcs || [], marcaDeHoy);
+  /*
+   * Se calcula AQUÍ y no se reutiliza `relojesVivos`, que se declara noventa
+   * lineas más abajo: usarlo desde aquí es un «Cannot access before
+   * initialization» en cuanto se ejecuta, y `tsc` no lo ve. Ya ha pasado dos
+   * veces en este archivo. No cuesta nada leerlo otra vez.
+   */
+  const relojesDePersona = relojesEnMarcha(project.memory?.gm_relojes).filter(r => r.sobre);
+  const dosierPnjs = dosierDePersonajes(project.memory?.npcs || [], marcaDeHoy, relojesDePersona);
   const dosierLugares = dosierDeLugares(project.memory?.locations || []);
 
   /*
@@ -2401,7 +2430,7 @@ ${
     : ''
 }${
           relojesVivos.length
-            ? `\n\n**Relojes en marcha — esto avanza esté ella delante o no:**\n${relojesVivos
+            ? `\n\n**Relojes en marcha — esto avanza esté ella delante o no (los que van «sobre» alguien se te repiten en su ficha, que es donde hacen falta):**\n${relojesVivos
                 .map(
                   r =>
                     `- **${r.nombre}**: ${'●'.repeat(Math.min(r.llenos, r.segmentos))}${'○'.repeat(
@@ -3367,7 +3396,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
     - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, ~Z Nombre (en poder de: Quién | donde: Dónde), +Z PO, -W PO] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda, consuma o LE QUITEN objetos o dinero durante la escena. **«+» entra o RECUPERA · «-» se acabó (consumido, gastado, entregado para siempre) · «~» SE LO HAN QUITADO pero sigue siendo suyo.** ⛔ El signo «~» es obligatorio cuando la requisan, la detienen, la registran, la roban o deja algo en prenda: esas cosas NO se borran de su ficha, cambian de manos, y hay que apuntar quién las tiene. Ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)]; si come 3: [INVENTARIO: -3 Buenas Bayas]; si gasta 15 de oro: [INVENTARIO: +Disfraz noble, -15 PO]; **si le requisan el equipaje al capturarla: [INVENTARIO: ~1 Violín (en poder de: la tripulación | donde: la bodega), ~1 Diario ilustrado (en poder de: la tripulación | donde: la bodega)]**; ⭐ **Y CUANDO SE LO DEVUELVEN O LO RECUPERA**: es IMPRESCINDIBLE emitir [INVENTARIO: +1 Violín, +1 Diario ilustrado] (o con «(equipado)» si lo empuña/viste). Al registrar la entrada con «+», la aplicación ELIMINA automáticamente el objeto de la lista de requisados y lo devuelve a su inventario activo (en sus manos / portado / equipado). Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
    - [APRENDE: +Nombre (tipo, detalle opcional), +Otro (tipo)] — OBLIGATORIO en el turno en que el protagonista GANA una capacidad nueva: al subir de nivel, al aprender un conjuro, al recibir adiestramiento, al desbloquear un rasgo o al ganar una competencia o un idioma. **Este registro es el único sitio donde queda constancia**: su ficha se subió una vez y está congelada en el nivel que tuviera aquel día, así que lo que no se apunte aquí se pierde y dentro de tres niveles nadie sabrá que lo tiene. El tipo va dentro del paréntesis y es uno de: conjuro, rasgo, competencia, mejora. Ejemplos: [APRENDE: +Rayo de escarcha (conjuro, truco de evocación)]; [APRENDE: +Sentido salvaje (rasgo), +Competencia en Supervivencia (competencia)]; [APRENDE: +2 a Sabiduría (mejora, al subir a nivel 4)]; [APRENDE: +Infracomún (competencia, se lo enseña un compañero)]. ⛔ Y no lo uses para objetos —eso es [INVENTARIO:]— ni para apuntar lo que YA figura en su ficha: solo lo nuevo. Si en este turno no ha aprendido nada, OMITE la línea.
    - [BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama cuelga] — TU CUADERNO, que ella NO lee. Se emite cuando ha pasado tiempo (un descanso largo, un salto, un viaje) y alguien con algo entre manos se ha movido **aunque no aparezca en escena**. Uno por cada quien se mueva. Ejemplo: [BAMBALINAS: Braelin | hizo: pregunta por el violín en los muelles | donde: el puerto | con: un marinero que hace la ruta de las islas | resultado: sabe qué es el instrumento y de dónde viene | hilo: el origen del violín]. ⛔ Esto NO se narra ni se insinúa: es memoria del mundo, no información para la jugadora. ⭐ Y lo que se registra aquí es lo que luego permite que alguien vuelva con algo de verdad en vez de volver con las manos vacías.
-   - [RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve] — la cuenta atrás de lo que corre por detrás. «van: 3/6» fija los dos números; sobre un reloj que ya existe basta «van: +1» para avanzarlo, o «van: 4» para fijarlo. Ejemplo: [RELOJ: Bregan D'aerthe ata cabos sobre ella | van: +1 | al llenarse: mandan a alguien a buscarla en persona | de: Bregan D'aerthe]. Úsalo para las amenazas, las búsquedas, las investigaciones ajenas y los plazos. ⛔ Tampoco se narra.
+   - [RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve] — la cuenta atrás de lo que corre por detrás. «van: 3/6» fija los dos números; sobre un reloj que ya existe basta «van: +1» para avanzarlo, o «van: 4» para fijarlo. Ejemplo: [RELOJ: Bregan D'aerthe ata cabos sobre ella | van: +1 | al llenarse: mandan a alguien a buscarla en persona | de: Bregan D'aerthe]. Úsalo para las amenazas, las búsquedas, las investigaciones ajenas y los plazos. ⛔ Tampoco se narra. ⭐ **Y TAMBIÉN PARA LAS PERSONAS, que es lo que casi nadie hace:** añade \`sobre: Nombre\` y el reloj pasa a ser de ese vínculo. Ejemplo: [RELOJ: Jarlaxle decide qué es ella para él | van: 1/4 | al llenarse: le pide algo que ella no puede dar sin elegir bando | de: Jarlaxle | sobre: Jarlaxle]. Una relación sin reloj es un registro: dice cómo están las cosas y no promete nada. Con reloj **va a pasar algo**, y pasa aunque ella no lo empuje, igual que una amenaza. ✅ Abre uno cuando un vínculo llegue al punto en que su dueño **ya tendría que hacer algo al respecto**: quien la desea acabará moviendo pieza, quien le debe algo acabará cobrándoselo o pagándolo, quien la está evaluando acabará decidiendo. Y que al llenarse **cueste algo**: una elección, una lealtad, una puerta que se cierra. Un reloj cuyo final es «se hacen más amigos» no es un reloj.
    - [FACCIÓN: Nombre | es: qué es | quiere: su objetivo ahora | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra facción (rival); Tercera (guerra) | oculto: lo que ella no sabe | conocida: no] — la ficha de un bando. Emítela la primera vez que un grupo con intereses propios aparece o se menciona, y cuando su objetivo o su postura CAMBIEN. Una facción no es la suma de su gente: su objetivo sigue vivo aunque muera quien lo llevaba. ⛔ No la uses para grupos de paso ni para una pareja de matones: solo para lo que va a estar ahí toda la campaña.
    - [PREPARADO: Título | tipo: escena/encuentro/complicacion/revelacion/pnj | detalle: qué pasa | cuando: en qué momento encaja | hilo: de qué cuelga] — guarda algo listo para usar más adelante, que es lo que hace un director antes de sentarse. Emítelo cuando se te ocurra algo bueno que AHORA no toca: así no se pierde y no acabas improvisándolo en caliente. Y cuando lo uses, ciérralo con [PREPARADO: el mismo título | usada: sí]. ⛔ Nada de esto se narra: es tu material.
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
@@ -6579,7 +6608,7 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[OLVIDA: lo que hay que quitar]\` — tu goma, y ahora **también tacha frases de la memoria general**, que antes era lo único intocable. Si ahí dentro quedó escrito un suceso desmentido —«desembarcaron en los muelles de Luskan»— con olvidarlo no basta que lo quites del diario: quítalo también de ahí, o seguirá dirigiendo la campaña desde dentro. ⚠️ Nunca vacía el bloque entero: si al tachar no quedara nada, se deja como estaba.
 
 ⭐ **LAS CUATRO DE ARRIBA SON LA DIFERENCIA ENTRE CORREGIR Y DECIR QUE CORRIGES.** Si aceptas que algo está mal y NO emites la etiqueta, no has arreglado nada: esta conversación no la lee el Narrador, y al turno siguiente volverá a hacer exactamente lo mismo. Emítelas siempre que des la razón, y di en voz alta lo que has corregido.
-- \`[RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve]\` — crea o mueve un plan que corre por detrás. «van: +1» lo avanza, «van: 4» lo fija.
+- \`[RELOJ: Nombre del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve]\` — crea o mueve un plan que corre por detrás. «van: +1» lo avanza, «van: 4» lo fija. Añadiendo \`sobre: Nombre de un PNJ\` el reloj es de una RELACIÓN, y se le enseña al Narrador dentro de la ficha de esa persona: úsalo cuando la jugadora quiera que un vínculo deje de estar quieto y tenga cuenta atrás, como la tienen las amenazas.
 - \`[FACCIÓN: Nombre | es: qué es | quiere: su objetivo | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra (rival) | oculto: lo que ella no sabe]\` — la ficha de un bando. Sirve para apuntar uno nuevo cuando ella te lo cuenta y para corregir una postura que ha cambiado jugando.
 - \`[ETIQUETA: nombre del archivo | términos, separados, por, comas]\` — dile al buscador por qué términos debe encontrar un documento de la biblioteca. **Esto arregla el fallo más silencioso que hay**: el buscador casa palabras, no significados, así que no sabe que Jarlaxle es drow y en una conversación con él la cantera de Menzoberranzan no sube. Tú sí lo sabes.
   - El nombre del archivo vale con un trozo reconocible: «Bregan D'aerthe» encuentra «COMPENDIO Mundo Bregan Daerthe (Jax, PNJs, Jarlaxle, Luskan).md».
