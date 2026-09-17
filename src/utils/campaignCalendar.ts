@@ -1269,7 +1269,7 @@ export function iconoDeHito(hito?: string): string {
 
 export interface RelacionInfo {
   icono: string;
-  tipo: 'rivalidad' | 'amistad' | 'romance' | 'enemistad' | 'alianza' | 'mentor' | 'ruptura' | 'desconfianza' | 'neutral';
+  tipo: 'rivalidad' | 'amistad' | 'romance' | 'enemistad' | 'alianza' | 'mentor' | 'familia' | 'ruptura' | 'desconfianza' | 'neutral';
   label: string;
   badgeClass: string;
 }
@@ -1287,103 +1287,136 @@ export interface RelacionInfo {
  * ⚖️ = Neutral
  */
 export function obtenerInfoRelacion(texto?: string): RelacionInfo {
-  if (!texto) {
-    return {
-      icono: '⚖️',
-      tipo: 'neutral',
-      label: 'Conocido',
-      badgeClass: 'bg-stone-100 text-stone-700 border-stone-300 dark:bg-stone-900/60 dark:text-stone-300 dark:border-stone-700'
-    };
-  }
+  const NEUTRAL: RelacionInfo = {
+    icono: '⚖️',
+    tipo: 'neutral',
+    label: 'Conocido',
+    badgeClass: 'bg-stone-100 text-stone-700 border-stone-300 dark:bg-stone-900/60 dark:text-stone-300 dark:border-stone-700'
+  };
+  if (!texto) return NEUTRAL;
 
   const t = sinTildes(texto);
 
-  // Rivalidad
-  if (/rival|competidor|desafio|duelo|antagonis|enfrentad|rivalidad/i.test(t)) {
-    return {
-      icono: '⚔️',
-      tipo: 'rivalidad',
-      label: 'Rivalidad',
-      badgeClass: 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60'
-    };
+  /*
+   * ⚠️ POR QUÉ EL PADRE DE LA PROTAGONISTA SALÍA COMO ENEMIGO.
+   *
+   * Esto buscaba SUBCADENAS sueltas, sin límite de palabra. Y una de las
+   * palabras de la lista de odio era «odio», que vive dentro de otras:
+   *
+   *     «Mentor — figura paterna, cust·ODIO· de la Marca Lythari»  →  💀 Enemistad
+   *
+   * No era la única. «cl·AMOR·» y «com·PASION·» daban romance, «re·TRATO·»
+   * daba pacto, «des·LEAL·» daba amistad y «duelo» —el de llorar a alguien—
+   * daba rivalidad. Cinco categorías contaminadas por buscar trozos de palabra
+   * en vez de palabras.
+   *
+   * Y había un segundo fallo encima: «custodio» SÍ tenía su propia categoría
+   * —Mentor / Protector, con esa palabra escrita dentro— pero se comprobaba
+   * DESPUÉS de la de odio, así que no llegaba nunca. Lo específico tiene que
+   * ir antes que lo genérico, o lo genérico se lo come.
+   *
+   * Ahora cada término va con \b delante y detrás, y las categorías concretas
+   * —familia, mentor— se miran primero.
+   */
+  const CATEGORIAS: { re: RegExp; info: RelacionInfo }[] = [
+    // Lo más específico primero: un vínculo de sangre o de crianza manda
+    // sobre cualquier otra lectura del texto.
+    {
+      re: /\b(padre|madre|hij[oa]|herman[oa]|famili\w*|paterna?l?|materna?l?|filial|abuel[oa]|ti[oa]|prim[oa]|adoptiv[oa]|crio|criada)\b/i,
+      info: {
+        icono: '🏡',
+        tipo: 'familia',
+        label: 'Familia',
+        badgeClass:
+          'bg-teal-100 text-teal-900 border-teal-300 dark:bg-teal-950/60 dark:text-teal-300 dark:border-teal-700/60'
+      }
+    },
+    {
+      re: /\b(mentor\w*|maestr[oa]|tutor\w*|protector\w*|custodi[oa]\w*|guia|aprendiz\w*|disc[ií]pul[oa])\b/i,
+      info: {
+        icono: '🛡️',
+        tipo: 'mentor',
+        label: 'Mentor / Protector',
+        badgeClass:
+          'bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-700/60'
+      }
+    },
+    {
+      re: /\b(traici\w*|ruptura|desamor|desengan\w*|abandono|traidor\w*)\b/i,
+      info: {
+        icono: '💔',
+        tipo: 'ruptura',
+        label: 'Ruptura / Traición',
+        badgeClass:
+          'bg-fuchsia-100 text-fuchsia-900 border-fuchsia-300 dark:bg-fuchsia-950/60 dark:text-fuchsia-300 dark:border-fuchsia-700/60'
+      }
+    },
+    {
+      re: /\b(enemig\w*|enemistad|antagonista|rencor\w*|odio|odia|odiosa?|hostil\w*|venganza|amenaza\w*)\b/i,
+      info: {
+        icono: '💀',
+        tipo: 'enemistad',
+        label: 'Enemistad',
+        badgeClass: 'bg-red-100 text-red-900 border-red-300 dark:bg-red-950/60 dark:text-red-300 dark:border-red-700/60'
+      }
+    },
+    {
+      re: /\b(rival\w*|competidor\w*|desafio|antagonis\w*|enfrentad[oa])\b/i,
+      info: {
+        icono: '⚔️',
+        tipo: 'rivalidad',
+        label: 'Rivalidad',
+        badgeClass:
+          'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60'
+      }
+    },
+    {
+      re: /\b(romance|romantic[oa]|amor|enamorad[oa]|enamor\w*|cortej\w*|pasion|sexual|pareja|amante|atraccion|quimica|desea)\b/i,
+      info: {
+        icono: '💘',
+        tipo: 'romance',
+        label: 'Interés Romántico',
+        badgeClass:
+          'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-700/60'
+      }
+    },
+    {
+      re: /\b(amistad|amig[oa]s?|camarada\w*|confidente|afecto|leal\w*|lealtad|fraternal)\b/i,
+      info: {
+        icono: '❇️',
+        tipo: 'amistad',
+        label: 'Amistad',
+        badgeClass:
+          'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/60'
+      }
+    },
+    {
+      re: /\b(alian\w*|pacto|juramento|promesa|socio|negocio|contrato|mecenas)\b/i,
+      info: {
+        icono: '🤝',
+        tipo: 'alianza',
+        label: 'Alianza / Pacto',
+        badgeClass:
+          'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-700/60'
+      }
+    },
+    {
+      re: /\b(desconfian\w*|tension|suspicaz|recelo\w*|vigilancia|frialdad)\b/i,
+      info: {
+        icono: '👁️',
+        tipo: 'desconfianza',
+        label: 'Desconfianza',
+        badgeClass:
+          'bg-slate-100 text-slate-900 border-slate-300 dark:bg-slate-900/60 dark:text-slate-300 dark:border-slate-700'
+      }
+    }
+  ];
+
+  for (const { re, info } of CATEGORIAS) {
+    if (re.test(t)) return info;
   }
 
-  // Interés Romántico / Amor / Romance
-  if (/romance|amor|enamor|cortej|declaraci|insinuaci|pasion|sexual|emocional|pareja|beso|amante|interes romantico|atracci|quimica/i.test(t)) {
-    return {
-      icono: '💘',
-      tipo: 'romance',
-      label: 'Interés Romántico',
-      badgeClass: 'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-700/60'
-    };
-  }
-
-  // Amistad / Camarada
-  if (/amistad|amig|camarada|confidente|cercan|afecto|leal|fratern/i.test(t)) {
-    return {
-      icono: '❇️',
-      tipo: 'amistad',
-      label: 'Amistad',
-      badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/60'
-    };
-  }
-
-  // Enemistad / Odio
-  if (/enemig|antagonista|rencor|odio|hostil|venganza|enemistad|amenaza/i.test(t)) {
-    return {
-      icono: '💀',
-      tipo: 'enemistad',
-      label: 'Enemistad',
-      badgeClass: 'bg-red-100 text-red-900 border-red-300 dark:bg-red-950/60 dark:text-red-300 dark:border-red-700/60'
-    };
-  }
-
-  // Alianza / Pacto
-  if (/alian|pacto|juramento|promesa|trato|socio|negocio/i.test(t)) {
-    return {
-      icono: '🤝',
-      tipo: 'alianza',
-      label: 'Alianza / Pacto',
-      badgeClass: 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-700/60'
-    };
-  }
-
-  // Mentor / Protector
-  if (/mentor|maestro|tutor|protector|custodio|guia/i.test(t)) {
-    return {
-      icono: '🛡️',
-      tipo: 'mentor',
-      label: 'Mentor / Protector',
-      badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-700/60'
-    };
-  }
-
-  // Ruptura / Traición
-  if (/traici|ruptura|desamor|desengano|abandono/i.test(t)) {
-    return {
-      icono: '💔',
-      tipo: 'ruptura',
-      label: 'Ruptura / Traición',
-      badgeClass: 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-700/60'
-    };
-  }
-
-  // Desconfianza / Tensión
-  if (/desconfian|tension|suspicaz|recelo|vigilancia|frialdad/i.test(t)) {
-    return {
-      icono: '👁️',
-      tipo: 'desconfianza',
-      label: 'Desconfianza',
-      badgeClass: 'bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-950/60 dark:text-orange-300 dark:border-orange-700/60'
-    };
-  }
-
-  return {
-    icono: '⚖️',
-    tipo: 'neutral',
-    label: texto,
-    badgeClass: 'bg-stone-100 text-stone-700 border-stone-300 dark:bg-stone-900/60 dark:text-stone-300 dark:border-stone-700'
-  };
+  return { ...NEUTRAL, label: texto };
 }
 
 export function iconoDeRelacion(texto?: string): string {
