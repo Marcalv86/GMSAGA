@@ -1749,7 +1749,75 @@ export function puentesDeLaCampana(
   return escritos.length ? escritos : project.memory?.puentes_de_busqueda || [];
 }
 
-function dosierDePersonajes(npcs: NPC[], marcaActual = 0, relojes: RelojOculto[] = []): string {
+/**
+ * Qué lenguas tienen en común un PNJ y la protagonista.
+ *
+ * Las listas vienen escritas a mano y con el nivel pegado detrás («Drow
+ * (nativo), Señas drow (avanzado), Común (medio)»), así que hay que quitar el
+ * paréntesis y las tildes antes de comparar.
+ *
+ * ⚠️ Se compara por IGUALDAD, nunca por «contiene»: «Señas drow» contiene
+ * «drow» y no es el mismo idioma ni de lejos —saber drow no es saber el código
+ * de signos de las Casas, que es justo el matiz sobre el que gira media escena
+ * de abordaje—.
+ */
+function idiomasCompartidos(idiomasPnj: string, idiomasPj: string[]): string[] {
+  const limpiar = (v: string) =>
+    v
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\([^)]*\)/g, '')
+      .replace(/\b(nativo|nativa|fluido|fluida|avanzado|avanzada|medio|media|basico|basica|chapurreado|de la superficie|de superficie)\b/g, '')
+      .replace(/[^a-z0-9ñ ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const suyos = new Map<string, string>();
+  for (const bruto of idiomasPj || []) {
+    const k = limpiar(String(bruto || ''));
+    if (k) suyos.set(k, String(bruto).trim());
+  }
+  if (!suyos.size) return [];
+
+  const fuera: string[] = [];
+  for (const trozo of String(idiomasPnj || '').split(/[,;/]|\sy\s/)) {
+    const k = limpiar(trozo);
+    if (!k) continue;
+    const comun = suyos.get(k);
+    if (comun && !fuera.includes(comun)) fuera.push(comun);
+  }
+  /*
+   * El vehicular al final, porque manda el primero.
+   *
+   * Un drow y una drow comparten DOS idiomas: el drow y el común. Dárselos al
+   * Narrador en el orden en que venían escritos era dejar la decisión al azar
+   * del documento —y el común suele ir el primero, que es justo el que no
+   * queremos—. El propio de la especie va delante y el de todo el mundo detrás.
+   */
+  return fuera.sort((x, y) => Number(esVehicular(x)) - Number(esVehicular(y)));
+}
+
+/** ¿Es el idioma franco («común», «infracomún», «estándar») y no uno propio? */
+function esVehicular(v: string): boolean {
+  return /comun|common|estandar|basic/i.test(
+    v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  );
+}
+
+function dosierDePersonajes(
+  npcs: NPC[],
+  marcaActual = 0,
+  relojes: RelojOculto[] = [],
+  /**
+   * Los idiomas de ELLA, para cruzarlos con los de cada PNJ.
+   *
+   * Sin esto, el Narrador tenía las dos listas en sitios distintos del envío y
+   * le tocaba cruzarlas de cabeza en cada réplica. No lo hacía: tiraba del
+   * idioma vehicular porque es el que ve escrito delante.
+   */
+  idiomasDeElla: string[] = []
+): string {
   // Apagable desde Motor. Los datos no se tocan: solo dejan de viajar en el
   // prompt, para poder comprobar jugando si sujetaban algo o no.
   const barrasVisibles = getStoredBarrasAfinidad();
@@ -1996,10 +2064,39 @@ ${bloqueElenco}
     if (n.notes) lineas.push(`- Notas: ${corta(n.notes, 400)}`);
 
     // Idiomas del personaje y nivel de dominio
-    if (n.idiomas) {
-      lineas.push(`- 🗣️ Idiomas & dominio: ${corta(n.idiomas, 200)}`);
-    } else if (n.characterSheet?.languages?.length) {
-      lineas.push(`- 🗣️ Idiomas & dominio: ${corta(n.characterSheet.languages.join(', '), 200)}`);
+    const idiomasPnj = n.idiomas || (n.characterSheet?.languages || []).join(', ');
+    if (idiomasPnj) {
+      lineas.push(`- 🗣️ Idiomas & dominio: ${corta(idiomasPnj, 200)}`);
+      /*
+       * ⭐ EL IDIOMA QUE COMPARTEN, CALCULADO AQUÍ Y PUESTO AL LADO.
+       *
+       * Fallo visto en partida: un corsario drow aborda a una PJ drow y le
+       * grita «¡Al suelo!» en común chapurreado, con su acento y todo. El
+       * Narrador creía estar aplicando bien la regla de niveles de dominio —y
+       * la aplicaba— pero en la única escena donde no tocaba: entre dos drow
+       * se habla drow, y pasarse al común es la excepción que hay que
+       * justificar, no el punto de partida.
+       *
+       * La regla de barrera idiomática estaba escrita entera desde un solo
+       * lado: qué NO entiende ella. Del caso contrario —que el PNJ y ella
+       * compartan lengua materna— no decía nada, así que el modelo elegía por
+       * su cuenta y elegía el idioma en el que está escrito el texto.
+       *
+       * Cruzar las dos listas es trivial, pero hay que hacerlo en CADA réplica
+       * y con las listas en dos puntos distintos del envío. Se hace aquí, una
+       * vez, y el resultado viaja pegado al personaje que gobierna.
+       */
+      const compartidos = idiomasCompartidos(idiomasPnj, idiomasDeElla);
+      if (compartidos.length) {
+        lineas.push(
+          `  ⭐ COMPARTEN LENGUA: ${compartidos.join(', ')} — **manda la primera**. Es EN ESA LENGUA como se hablan por defecto, ` +
+            `y el diálogo se escribe en texto normal porque ella lo entiende —sin acotar «dijo en ${compartidos[0]}», que eso ya se sabe—. ` +
+            `⛔ Que se pase al idioma vehicular es la EXCEPCIÓN y necesita un motivo en escena ` +
+            `(que haya delante alguien a quien quiera que le entienda, o justo lo contrario; burla; cortesía; que no la tome por de los suyos). ` +
+            `Sin ese motivo, no se cambia. Y si es la lengua propia de la especie o cultura de ambos, con más razón todavía: ` +
+            `dirigirse a uno de los tuyos en la lengua de los forasteros es un desaire, o un aviso.`
+        );
+      }
     }
 
     // Mini-ficha D&D 5e / Bloque de estadísticas de monstruo o PNJ
@@ -2193,7 +2290,12 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
   const relojesDePersona = relojesEnMarcha(project.memory?.gm_relojes).filter(r => r.sobre);
   // Se lee del almacén del propio proyecto: el modo es de esta campaña.
   const coNarrativa = getStoredCoNarrativa(project.id);
-  const dosierPnjs = dosierDePersonajes(project.memory?.npcs || [], marcaDeHoy, relojesDePersona);
+  const dosierPnjs = dosierDePersonajes(
+    project.memory?.npcs || [],
+    marcaDeHoy,
+    relojesDePersona,
+    project.memory?.player_character?.languages || []
+  );
   const dosierLugares = dosierDeLugares(project.memory?.locations || []);
 
   /*
@@ -3479,6 +3581,8 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
 0.6. [BARRERA IDIOMÁTICA UNIVERSAL Y CERO TRADUCCIÓN GRATUITA (INVIOLABLE)]:
    - **El idioma del texto representa ÚNICAMENTE lo que el protagonista (${pc?.name || 'el PJ'}) entiende**: Todo idioma, lengua alienígena, dialecto exótico, lengua arcana o código (sea drow, mandaloriano, huttés, élfico, binario, jerga de un gremio, etc.) que NO figure explícitamente en la ficha del personaje es una barrera real, opaca e inquebrantable. El protagonista no capta palabras sueltas, ni la idea general, ni el sentido por arte de magia a través del tono o los ademanes.
    - **Los hablantes nativos usan su lengua natal entre sí**: Miembros de una misma cultura, tripulación, especie o sindicato hablan naturalmente en su lengua en lo cotidiano y operativo. Con un extraño que no domina su idioma, lo primero y natural es hablar en su lengua materna o evaluar si vale la pena comunicarse con él.
+   - **⭐ Y ELLA TAMBIÉN ES DE ALGÚN SITIO — la otra mitad de esta regla, la que se olvida**: todo lo de arriba habla de lo que ${pc?.name || 'la protagonista'} NO entiende. Pues bien: cuando el PNJ tiene entre sus idiomas uno que ELLA también tiene, **ese es el idioma en el que le habla**, sin pensarlo y sin anunciarlo. Y si además es la lengua propia de la especie o la cultura de ambos, no hay ni elección: uno de los tuyos te habla en la lengua de los tuyos. ⛔ Que se dirija a ella en el idioma vehicular **es la excepción y hay que justificarla en escena** (quiere que un tercero le entienda, o justo que no; se burla; la trata de forastera; no la reconoce como de los suyos). Sin motivo, no se cambia. Un miliciano drow que aborda un barco y le grita a una drow en común chapurreado está mal escrito: le gritaría en drow, y el común lo reservaría para la tripulación de la superficie.
+   - **Lo que comparten se escribe en texto normal, sin acotación**: si hablan una lengua que ella domina, la réplica va en prosa corriente —ella la entiende, así que el lector la entiende— y **no se etiqueta** («—dijo en drow»). Eso solo hace falta para marcar lo que ella NO comprende, y ahí la acotación está prohibida igualmente: para eso están la fonética y la cadencia de los dos puntos de arriba.
    - **⛔ PROHIBIDO TRADUCIR O ESCRIBIR EL DIÁLOGO CON ETIQUETAS**: Escribir una frase comprensible en el idioma vehicular y añadirle «—murmuró en mandaloriano», «—dijo en drow», «—soltó en huttés» o «[en lengua extranjera] ¿quién eres?» destruye por completo la barrera idiomática en la misma línea. Tampoco resumas lo que dijeron («le preguntó de dónde venía»).
    - **Cómo narrar idiomas ininteligibles de forma inmersiva**:
      * *Opción A (Fonética en la lengua original sin traducir jamás):* Escribe la réplica en la fonética o transliteración de esa lengua sin traducirla jamás ni en ese turno ni después (ejemplos: en drow *«—Xun'dro ssin'urn? —murmuró...»*, en mandaloriano *«—Kote darasuum kote —soltó el guerrero...»*, etc.). Que la jugadora no entienda qué dijeron es exactamente el objetivo inmersivo buscado.
