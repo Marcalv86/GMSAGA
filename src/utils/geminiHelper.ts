@@ -7437,10 +7437,46 @@ export async function extraerIdentidadDeDocumentos({
   }
 
   const pc = project.memory?.player_character;
+
+  /*
+   * ⛔ EL RECORTE FIJO DE 30.000 SE COMÍA MEDIA FICHA.
+   *
+   * Había un tope de 30.000 caracteres POR DOCUMENTO y otro de 120.000 para el
+   * conjunto. Con una sola ficha delante eso significa tirar 90.000 caracteres
+   * de presupuesto que nadie está usando: una ficha de 52.000 entraba cortada
+   * por la mitad teniendo sitio de sobra para entera.
+   *
+   * Y el corte cae SIEMPRE en el peor sitio. Una ficha de personaje se escribe
+   * igual en todas partes: mecánicas arriba, y equipo, apariencia y notas de
+   * dirección AL FINAL. Cortar por el final es cortar exactamente lo que se
+   * viene a buscar. Se vio con la ficha de la campaña: la capa de piel de foca
+   * estaba en el carácter 30.840, la armadura en el 31.053, el dinero de
+   * partida más allá — nada de eso llegó nunca al modelo, y la mochila quedó
+   * con cinco cosas de las quince que hay escritas.
+   *
+   * Ahora el presupuesto se REPARTE entre las fuentes que haya, y si aun así
+   * un documento no cabe, se queda con su principio Y SU FINAL, avisando del
+   * hueco. Un final vale más que un medio en un documento como este.
+   */
+  const PRESUPUESTO_TOTAL = 120000;
+  const porFuente = Math.max(20000, Math.floor(PRESUPUESTO_TOTAL / Math.max(1, fuentes.length)));
+
+  const recortar = (contenido: string) => {
+    const t = contenido || '';
+    if (t.length <= porFuente) return t;
+    const cabeza = Math.floor(porFuente * 0.62);
+    const cola = porFuente - cabeza;
+    return (
+      t.slice(0, cabeza) +
+      `\n\n[...se han omitido ${t.length - porFuente} caracteres de la parte central de este documento...]\n\n` +
+      t.slice(-cola)
+    );
+  };
+
   const texto = fuentes
-    .map(f => `=== ${f.name} ===\n${(f.content || '').slice(0, 30000)}`)
+    .map(f => `=== ${f.name} ===\n${recortar(f.content || '')}`)
     .join('\n\n')
-    .slice(0, 120000);
+    .slice(0, PRESUPUESTO_TOTAL + 4000);
 
   const prompt = `De los documentos de abajo, saca la identidad del PROTAGONISTA${pc?.name ? ` (se llama ${pc.name})` : ''} y devuélvela en JSON.
 
@@ -7454,7 +7490,10 @@ Estos cuatro datos viajan al Narrador en cada turno como hechos fijos, así que 
 
 - "rasgos": ARRAY CON SUS RASGOS ACTIVOS — los que cambian lo que PASA en una escena, no los que adornan la ficha. ⭐ Este es el campo que más se ignoraba, porque estos rasgos viven enterrados en mitad de un documento larguísimo y se leen como ambientación. Saca sobre todo:\n  - **Los que dicen cómo reacciona el mundo ante ella**: un aspecto que llama la atención, una reputación, una marca visible, una presencia que impone o incomoda, pertenecer a algo que da miedo o respeto. Con su efecto, y con su CARA MALA si el documento la menciona —lo que atrae la atención buena atrae también la que no se pide—.\n  - **Las complicaciones y los límites**: maldiciones, dependencias, algo que empeora con el tiempo, una rutina que tiene que cumplir para no perder algo, una desventaja cultural o social.\n  - **Los dones raros que no son un conjuro**: transformaciones, sentidos especiales, vínculos con criaturas o espíritus, suerte que interviene.\n  - Cada uno: \`{ "nombre": "...", "efecto": "qué produce EN ESCENA, en una o dos frases, incluida la parte incómoda si la hay" }\`.\n  - ⛔ Nada de rasgos de clase corrientes, competencias sueltas ni conjuros: eso ya está en la ficha y no decide escenas. Máximo ocho, y si hay que elegir, manda el que más cambia lo que la gente hace delante de ella.\n- "inventory": ARRAY CON LO QUE LLEVA ENCIMA. ⭐ Este es el campo que más cambia la partida, porque sus cosas no son decoración de ficha: son material de escena. Un cuaderno se lee, se compara, se enseña y se roba; una herramienta se usa; un instrumento se toca y alguien lo oye; una reliquia la reconoce quien sabe lo que es.
   - Saca **todo lo que el documento le atribuya**: armas, armadura, ropa señalada, instrumentos, herramientas de su oficio, libros, cuadernos, diarios, cartas, mapas, amuletos, objetos de culto, reliquias, componentes, provisiones con nombre propio y regalos.
+  - **⛔ MIRA LA SECCIÓN DE EQUIPO ENTERA, Y MIRA HASTA EL FINAL DEL DOCUMENTO.** En una ficha, el equipo va casi siempre en una sección propia hacia el final, y ahí es donde están las cosas que importan. Recórrela de arriba abajo y saca TODAS sus entradas, una por una, sin quedarte en las dos o tres primeras. Si además hay una línea suelta de «equipo de trasfondo» o «equipo inicial» en otra parte, esa es un resumen, no la lista buena: la lista buena es la sección.
+  - **⭐ QUE UN OBJETO ESTÉ EXPLICADO LARGO SIGNIFICA QUE IMPORTA MÁS, NO MENOS.** Este es EL fallo de esta lectura: los objetos que de verdad mueven la campaña vienen con tres párrafos de explicación —de dónde salió, quién se lo dio, qué pasa cuando lo usa, qué no puede saber nadie de él— y eso se lee como ambientación y se salta, mientras que los que se copian son los que vienen en una lista corta y sosa. Es exactamente al revés. Si el documento le dedica párrafos, una estrella, una advertencia o una regla propia a un objeto, ese objeto **ENTRA EL PRIMERO**.
   - **Prioriza lo distintivo sobre lo genérico.** Entre «mochila» y «el cuaderno donde copia inscripciones», el segundo importa diez veces más: es lo que solo tiene ella. Lo corriente —cuerda, yesca, raciones— ponlo al final o agrúpalo.
+  - **⛔ Un objeto, una entrada.** Si el mismo cacharro aparece nombrado de dos maneras —una genérica en la lista de trasfondo y otra con su nombre propio en la sección de equipo (un «bastón de viaje» suelto por un lado y su bastón con nombre por otro; una «bolsa» y la bolsa donde guarda el instrumento)—, es UNA sola cosa: quédate con el nombre propio y tira el genérico. Duplicarlo le pone en la mochila dos objetos donde solo lleva uno.
   - Cada objeto: \`{ "name": "...", "quantity": 1, "notas": "qué es y por qué importa, en una frase", "deMision": false, "origen": "de quién salió, si consta" }\`.
   - Marca \`"deMision": true\` y rellena \`"encargo"\` SOLO si es una tarea con forma de objeto: una carta que entregar, algo que traducir, algo que hay que devolver.
   - ⛔ No te inventes equipo estándar de aventurero que el documento no nombre. Si no está escrito, no existe.
