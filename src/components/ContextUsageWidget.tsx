@@ -396,42 +396,42 @@ export const ContextUsageWidget: React.FC<{
                 >
                   <div className="font-cinzel font-bold text-base mb-1">
                     {peticionesHoy >= cupoDiario
-                      ? '\u26d4 Se acabaron los turnos de hoy'
+                      ? '⛔ Se acabaron los turnos de hoy'
                       : pasadaDeCuota
-                      ? '\u26d4 Cada turno se pasa de cuota'
+                      ? '⛔ Cada turno se pasa de cuota'
                       : cercaDeCuota
-                      ? '\u26a0\ufe0f Vas justa'
+                      ? '⚠️ Vas justa'
                       : cupoApurado
-                      ? '\u26a0\ufe0f Te quedan pocos turnos hoy'
-                      : '\u2705 Vas holgada'}
+                      ? '⚠️ Te quedan pocos turnos hoy'
+                      : '✅ Vas holgada'}
                   </div>
                   <p className="text-[13px] m-0 leading-relaxed">
                     {peticionesHoy >= cupoDiario ? (
                       <>
                         Llevas <strong>{peticionesHoy} de {cupoDiario}</strong> peticiones con {modeloDeNarracion}.
-                        No es por el tama\u00f1o de lo que mandas: es que se agot\u00f3 el cupo del d\u00eda. Cambia de modelo
-                        o espera a ma\u00f1ana.
+                        No es por el tamaño de lo que mandas: es que se agotó el cupo del día. Cambia de modelo
+                        o espera a mañana.
                       </>
                     ) : pasadaDeCuota ? (
                       <>
-                        Cada turno manda <strong>{compact(tokensMostrados)} fichas</strong> y el l\u00edmite por minuto
-                        est\u00e1 en {compact(TOPE_TOKENS_POR_MINUTO)}. Va a dar error <strong>aunque la clave est\u00e9 sin
-                        estrenar</strong>: no es cuota gastada, es que no cabe. Lo que m\u00e1s ocupa de lo que puedes
+                        Cada turno manda <strong>{compact(tokensMostrados)} fichas</strong> y el límite por minuto
+                        está en {compact(TOPE_TOKENS_POR_MINUTO)}. Va a dar error <strong>aunque la clave esté sin
+                        estrenar</strong>: no es cuota gastada, es que no cabe. Lo que más ocupa de lo que puedes
                         tocar es <strong>{loQueSePuedeTocar.nombre}</strong> ({compact(loQueSePuedeTocar.chars)}).{' '}
                         {loQueSePuedeTocar.donde}
                       </>
                     ) : cercaDeCuota ? (
                       <>
                         Vas por <strong>{compact(tokensMostrados)}</strong> de {compact(TOPE_TOKENS_POR_MINUTO)} fichas
-                        por minuto. A\u00fan cabe, pero un turno largo puede pasarse. Si quieres margen, lo m\u00e1s gordo
+                        por minuto. Aún cabe, pero un turno largo puede pasarse. Si quieres margen, lo más gordo
                         que puedes tocar es <strong>{loQueSePuedeTocar.nombre}</strong> ({compact(loQueSePuedeTocar.chars)}).{' '}
                         {loQueSePuedeTocar.donde}
                       </>
                     ) : cupoApurado ? (
                       <>
-                        El tama\u00f1o de los turnos est\u00e1 bien, pero llevas{' '}
+                        El tamaño de los turnos está bien, pero llevas{' '}
                         <strong>{peticionesHoy} de {cupoDiario}</strong> peticiones de hoy con {modeloDeNarracion}.
-                        Cuando se acaben no podr\u00e1s seguir con este modelo hasta ma\u00f1ana.
+                        Cuando se acaben no podrás seguir con este modelo hasta mañana.
                       </>
                     ) : (
                       <>

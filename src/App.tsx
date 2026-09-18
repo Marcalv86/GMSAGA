@@ -111,6 +111,7 @@ import {
   repasarEntreSesiones,
   rescatarFichaDePnj,
   extraerIdentidadDeDocumentos,
+  murioPorSegundoPlano,
   extraerMecanicasDeDocumento,
   generarEtiquetasDeBusqueda,
   relacionarBibliotecaInteligente,
@@ -2590,6 +2591,57 @@ export default function App() {
    * molestar.
    */
   /*
+   * ⏸️ LO QUE SE MUERE AL MINIMIZAR NO SE PIERDE: SE REINTENTA AL VOLVER.
+   *
+   * Chrome en Android congela la página en cuanto te vas a otra app, y con
+   * ella la petición en vuelo. La tarea de fondo muere con un «Failed to
+   * fetch» que parece un problema de conexión y no lo es, y como la app no
+   * sabía distinguirlo, lo apuntaba en el registro y ahí se quedaba: el
+   * trabajo no se hacía y nadie volvía a intentarlo.
+   *
+   * Aquí se guarda la tarea por nombre —así no se apilan copias— y se vuelve
+   * a lanzar cuando la pestaña recupera el foco, con un respiro para que la
+   * red del teléfono termine de despertarse.
+   */
+  const tareasEnEspera = useRef(new Map<string, () => Promise<void>>());
+
+  const reintentarAlVolver = (nombre: string, tarea: () => Promise<void>) => {
+    tareasEnEspera.current.set(nombre, tarea);
+    logInfo(
+      'memory_sync',
+      'Tarea de fondo aplazada hasta volver a la app',
+      `«${nombre}» se cortó al minimizar. Se retomará sola al volver.`
+    );
+  };
+
+  useEffect(() => {
+    const alVolver = () => {
+      if (document.visibilityState !== 'visible') return;
+      const pendientes = [...tareasEnEspera.current.entries()];
+      if (!pendientes.length) return;
+      tareasEnEspera.current.clear();
+      void (async () => {
+        // Un respiro: al desbloquear, la red del móvil tarda un poco en estar.
+        await new Promise(r => setTimeout(r, 3000));
+        for (const [nombre, tarea] of pendientes) {
+          try {
+            await tarea();
+          } catch (err) {
+            logWarn('memory_sync', `No se pudo retomar «${nombre}» al volver a la app`, describeApiError(err));
+          }
+          await new Promise(r => setTimeout(r, 1500));
+        }
+      })();
+    };
+    document.addEventListener('visibilitychange', alVolver);
+    window.addEventListener('focus', alVolver);
+    return () => {
+      document.removeEventListener('visibilitychange', alVolver);
+      window.removeEventListener('focus', alVolver);
+    };
+  }, []);
+
+  /*
    * 🎬 LA SESIÓN 0, MONTADA AL SUBIR LOS DOCUMENTOS.
    *
    * Un director no llega a la primera escena con la libreta en blanco: viene
@@ -2612,18 +2664,18 @@ export default function App() {
     if (!documentos.length) return;
 
     /*
-     * QU\u00c9 HAY SIN MIRAR, QUE NO ES LO MISMO QUE \u00abEL CUADERNO EST\u00c1 VAC\u00cdO\u00bb.
+     * QUÉ HAY SIN MIRAR, QUE NO ES LO MISMO QUE «EL CUADERNO ESTÁ VACÍO».
      *
-     * La primera versi\u00f3n solo montaba la mesa con el cuaderno en blanco, y esa
+     * La primera versión solo montaba la mesa con el cuaderno en blanco, y esa
      * regla da por supuesto que la biblioteca se sube de una sentada. No se
-     * sube as\u00ed: el material est\u00e1 repartido en carpetas y entra en dos o tres
-     * tandas, y m\u00e1s tarde se corrige un compendio y se vuelve a subir. Con la
-     * regla vieja, la primera tanda montaba el tablero y **todo lo dem\u00e1s no se
-     * miraba jam\u00e1s**: el resto de la biblioteca exist\u00eda para el buscador pero
+     * sube así: el material está repartido en carpetas y entra en dos o tres
+     * tandas, y más tarde se corrige un compendio y se vuelve a subir. Con la
+     * regla vieja, la primera tanda montaba el tablero y **todo lo demás no se
+     * miraba jamás**: el resto de la biblioteca existía para el buscador pero
      * no para el Director.
      *
-     * Ahora se lleva la cuenta de qu\u00e9 se ha mirado y en qu\u00e9 estado estaba, as\u00ed
-     * que una tanda nueva \u2014o un documento corregido\u2014 vuelve a ser \u00abpor mirar\u00bb
+     * Ahora se lleva la cuenta de qué se ha mirado y en qué estado estaba, así
+     * que una tanda nueva —o un documento corregido— vuelve a ser «por mirar»
      * y se revisa buscando lo que traiga de nuevo.
      */
     const vistos = new Map(
@@ -2632,6 +2684,7 @@ export default function App() {
     const porMirar = documentos.filter(f => vistos.get(f.id) !== huellaDeDocumento(f));
     if (!porMirar.length) return;
 
+    const arranque = Date.now();
     try {
       const tablero = await leerElTableroDeDocumentos({
         project: proyecto,
@@ -2644,8 +2697,8 @@ export default function App() {
           : undefined;
       /*
        * La cuenta se guarda AUNQUE no haya salido nada: un documento que no da
-       * para facciones ni relojes tampoco va a darlo la pr\u00f3xima vez, y sin
-       * esto se releer\u00eda en cada subida gastando una petici\u00f3n para nada.
+       * para facciones ni relojes tampoco va a darlo la próxima vez, y sin
+       * esto se releería en cada subida gastando una petición para nada.
        */
       const huellas = documentos.map(f => ({ id: f.id, huella: huellaDeDocumento(f) }));
       await handleUpdateProjectField(prev => ({
@@ -2661,11 +2714,24 @@ export default function App() {
       logInfo(
         'memory_sync',
         total ? 'Mesa actualizada con los documentos nuevos' : 'Documentos nuevos revisados, sin novedad',
-        `${porMirar.length} documento(s) por mirar \u2192 ${tablero.facciones.length} facciones, ${tablero.preparado.length} cartas preparadas y ${tablero.relojes.length} relojes.`
+        `${porMirar.length} documento(s) por mirar → ${tablero.facciones.length} facciones, ${tablero.preparado.length} cartas preparadas y ${tablero.relojes.length} relojes.`
       );
     } catch (err) {
-      // Que falle no puede impedir nada, y NO se apunta la huella: as\u00ed se
+      // Que falle no puede impedir nada, y NO se apunta la huella: así se
       // reintenta en la siguiente subida en vez de darlo por mirado.
+      //
+      // Pero «en la siguiente subida» puede no llegar nunca: si acabas de
+      // subirlo todo, no hay siguiente. Cuando el corte fue por minimizar la
+      // app, se retoma al volver en vez de morir en una línea del registro.
+      if (murioPorSegundoPlano(err, arranque)) {
+        reintentarAlVolver('Revisar los documentos para la mesa', () =>
+          montarSesionCero(
+            currentFilesRef.current,
+            projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
+          )
+        );
+        return;
+      }
       logWarn('memory_sync', 'No se pudieron revisar los documentos para la mesa', describeApiError(err));
     }
   };
@@ -3924,6 +3990,7 @@ export default function App() {
       !pc?.inventory?.length;
     if (!faltaAlgo) return;
 
+    const arranqueFicha = Date.now();
     try {
       const id = await extraerIdentidadDeDocumentos({ project: proyecto, files: archivos });
       const puestos: string[] = [];
@@ -3997,6 +4064,13 @@ export default function App() {
         setTimeout(() => setTopProgress(p => (p.type === 'sync' ? { active: false } : p)), 6000);
       }
     } catch (err) {
+      // Si murió porque te fuiste a otra app, se retoma sola al volver.
+      if (murioPorSegundoPlano(err, arranqueFicha)) {
+        reintentarAlVolver('Leer la ficha del protagonista', () =>
+          completarFichaDesdeDocumento(currentFilesRef.current)
+        );
+        return;
+      }
       // Que no se pueda leer no puede romper el marcar un archivo.
       logWarn('memory_sync', 'No se pudo leer la ficha del protagonista del documento', String(err), {
         projectName: proyecto.name

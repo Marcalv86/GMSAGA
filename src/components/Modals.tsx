@@ -620,23 +620,23 @@ export const ApiKeyModal: React.FC<{
                     const hayPrecio = Number.isFinite(pe) && Number.isFinite(ps) && pe >= 0 && ps >= 0;
                     const dia = Number.isFinite(td) && td > 0 ? td : 0;
                     const eur = (n: number) =>
-                      n < 0.01 ? `${(n * 100).toFixed(2)} c\u00e9ntimos` : `${n.toFixed(2)} \u20ac`;
+                      n < 0.01 ? `${(n * 100).toFixed(2)} céntimos` : `${n.toFixed(2)} €`;
                     return (
                       <div className="mt-3 pt-3 border-t border-[var(--glass-border)] space-y-2">
                         <div className="font-cinzel font-bold text-[11px] text-[var(--text-primary)]">
-                          \u00bfCu\u00e1nto costar\u00eda esto pagando?
+                          ¿Cuánto costaría esto pagando?
                         </div>
                         <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                          Los tokens de arriba son reales. Pon el precio <strong>por mill\u00f3n de tokens</strong> de tu
-                          modelo \u2014est\u00e1 en la tarifa de Google, y cambia, por eso no viene escrito aqu\u00ed\u2014 y sale la
-                          cuenta. \u26a0\ufe0f La cach\u00e9 abarata la entrada y esto <strong>no la descuenta</strong>: lo que salga
+                          Los tokens de arriba son reales. Pon el precio <strong>por millón de tokens</strong> de tu
+                          modelo —está en la tarifa de Google, y cambia, por eso no viene escrito aquí— y sale la
+                          cuenta. ⚠️ La caché abarata la entrada y esto <strong>no la descuenta</strong>: lo que salga
                           es el techo, no la factura.
                         </p>
                         <div className="grid grid-cols-3 gap-2">
                           {[
                             { v: precioEntrada, set: setPrecioEntrada, l: 'Entrada / 1M', ph: '0.10' },
                             { v: precioSalida, set: setPrecioSalida, l: 'Salida / 1M', ph: '0.40' },
-                            { v: turnosAlDia, set: setTurnosAlDia, l: 'Turnos al d\u00eda', ph: '30' }
+                            { v: turnosAlDia, set: setTurnosAlDia, l: 'Turnos al día', ph: '30' }
                           ].map(c => (
                             <label key={c.l} className="flex flex-col gap-1">
                               <span className="text-[10px] text-[var(--text-secondary)] font-cinzel">{c.l}</span>
@@ -665,7 +665,7 @@ export const ApiKeyModal: React.FC<{
                                     <strong className="text-[var(--accent)]">{eur(porTurno)}</strong> por turno
                                     {dia > 0 ? (
                                       <>
-                                        {' '}\u00b7 {eur(porTurno * dia)}/d\u00eda \u00b7{' '}
+                                        {' '}· {eur(porTurno * dia)}/día ·{' '}
                                         <strong>{eur(porTurno * dia * 30)}/mes</strong>
                                       </>
                                     ) : null}

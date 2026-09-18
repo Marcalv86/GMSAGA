@@ -6789,7 +6789,7 @@ QUÉ SÍ PUEDES HACER AQUÍ:
 
 🔧 Y ARREGLAR LO QUE ESTÉ MAL, QUE ES LA RAZÓN DE SER DE ESTA PESTAÑA.
 La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: **te lo pide a ti y lo arreglas tú**, igual que en una mesa de verdad nadie le abre el cuaderno al Director. Así que cuando te digan que algo está mal, no contestes «entra en Memoria y bórralo»: **hazlo**, emite la etiqueta correspondiente y dilo en palabras.
-- \`[PNJ: Nombre | nuevoNombre: ... | relacion: ... | estado: ... | notas: ... | desc: ... | apariencia: ... | alias: ... | idiomas: ... | orientacion: ... | aparenta: ... | oculta: ... | atr: desea/inter\u00e9s/ninguna | previo: s\u00ed | vin: 0-20 | con: 0-20]\` o \`[VÍNCULO: Nombre | ...]\` — **EDITA / CORRIGE / REGISTRA UN PNJ EN LA MEMORIA**. Si la jugadora te dice que un PNJ está mal en la lista de memoria (su nombre, ocupación, notas, relación, descripción, estado, etc.), **DEBES EMITIR SIEMPRE esta etiqueta con los datos corregidos para que se aplique en la memoria**. ⚠️ **\`atr\` NO es un número.** Es \`desea\`, \`interés\` o \`ninguna\` —y \`ninguna\` es lo que APAGA a quien quedó marcado por error—. Si escribes una cifra ahí estás usando una escala que ya no existe.
+- \`[PNJ: Nombre | nuevoNombre: ... | relacion: ... | estado: ... | notas: ... | desc: ... | apariencia: ... | alias: ... | idiomas: ... | orientacion: ... | aparenta: ... | oculta: ... | atr: desea/interés/ninguna | previo: sí | vin: 0-20 | con: 0-20]\` o \`[VÍNCULO: Nombre | ...]\` — **EDITA / CORRIGE / REGISTRA UN PNJ EN LA MEMORIA**. Si la jugadora te dice que un PNJ está mal en la lista de memoria (su nombre, ocupación, notas, relación, descripción, estado, etc.), **DEBES EMITIR SIEMPRE esta etiqueta con los datos corregidos para que se aplique en la memoria**. ⚠️ **\`atr\` NO es un número.** Es \`desea\`, \`interés\` o \`ninguna\` —y \`ninguna\` es lo que APAGA a quien quedó marcado por error—. Si escribes una cifra ahí estás usando una escala que ya no existe.
   - ⚠️ **Si solo dices «Ok, lo hago» con texto pero no emites la etiqueta \`[PNJ: ...]\` o \`[VÍNCULO: ...]\`, la aplicación NO puede modificar la ficha y todo seguirá igual.**
   - Para renombrar: \`[PNJ: NombreViejo | nuevoNombre: NombreNuevo]\`
   - Para corregir notas, datos o descripción: \`[PNJ: Nombre | notas: texto corregido | relacion: Aliado/Enemigo/etc.]\`
@@ -8735,6 +8735,48 @@ Para continuar de inmediato y con máxima agilidad:
   }
 
   return fallo.detail || (err instanceof Error ? err.message : String(err ?? '')) || 'Error desconocido.';
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * «FAILED TO FETCH» NO SIEMPRE ES LA CONEXIÓN. EN EL MÓVIL CASI NUNCA LO ES.
+ * ---------------------------------------------------------------------------
+ *
+ * Chrome en Android congela la página en cuanto la app se minimiza o se apaga
+ * la pantalla, y al congelarla MATA la petición que hubiera en vuelo. Lo que
+ * llega al `catch` es un `TypeError: Failed to fetch` idéntico al de quedarse
+ * sin cobertura, así que la aplicación soltaba «Comprueba tu conexión a
+ * internet» y mandaba a mirar el wifi a alguien cuyo wifi estaba perfecto.
+ *
+ * Peor aún: los `setTimeout` de los reintentos también se congelan, así que la
+ * cadena de respaldo —tres modelos, seis claves— no llega a correr. El fallo
+ * se ve enorme y en realidad solo pasó una cosa: te fuiste a otra app.
+ *
+ * Aquí se apunta CUÁNDO se ocultó la pestaña por última vez. Con eso, una
+ * tarea que sepa a qué hora empezó puede distinguir las dos cosas.
+ */
+let ultimoOcultado = 0;
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') ultimoOcultado = Date.now();
+  });
+}
+
+/** ¿Se fue la app a segundo plano desde `inicio` (o sigue ahí ahora mismo)? */
+export function seOcultoLaApp(inicio: number): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.visibilityState === 'hidden' || ultimoOcultado >= inicio;
+}
+
+/**
+ * El fallo es «te minimizaste», no «no hay internet».
+ *
+ * Solo cuenta como tal si el error es de red Y la pestaña estuvo oculta en
+ * algún momento desde que arrancó la tarea: sin las dos cosas, es un fallo de
+ * red de verdad y hay que decirlo tal cual.
+ */
+export function murioPorSegundoPlano(err: unknown, inicio: number): boolean {
+  return classifyApiError(err).isNetwork && seOcultoLaApp(inicio);
 }
 
 export function parseStateTag(text: string): {
