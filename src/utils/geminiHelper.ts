@@ -7439,31 +7439,44 @@ export async function extraerIdentidadDeDocumentos({
   const pc = project.memory?.player_character;
 
   /*
-   * ⛔ EL RECORTE FIJO DE 30.000 SE COMÍA MEDIA FICHA.
+   * ⛔ SU FICHA VIAJA ENTERA. SIN RECORTES.
    *
-   * Había un tope de 30.000 caracteres POR DOCUMENTO y otro de 120.000 para el
-   * conjunto. Con una sola ficha delante eso significa tirar 90.000 caracteres
-   * de presupuesto que nadie está usando: una ficha de 52.000 entraba cortada
-   * por la mitad teniendo sitio de sobra para entera.
+   * Aquí hubo un tope de 30.000 caracteres por documento que se comía la
+   * segunda mitad de una ficha de 52.000 —y la segunda mitad de una ficha es
+   * donde vive el equipo, la apariencia y las notas de dirección, o sea justo
+   * lo que se viene a buscar—. Luego fue un reparto de presupuesto. Ahora no
+   * hay recorte: **si el documento está marcado como ficha del OC, va entero**.
    *
-   * Y el corte cae SIEMPRE en el peor sitio. Una ficha de personaje se escribe
-   * igual en todas partes: mecánicas arriba, y equipo, apariencia y notas de
-   * dirección AL FINAL. Cortar por el final es cortar exactamente lo que se
-   * viene a buscar. Se vio con la ficha de la campaña: la capa de piel de foca
-   * estaba en el carácter 30.840, la armadura en el 31.053, el dinero de
-   * partida más allá — nada de eso llegó nunca al modelo, y la mochila quedó
-   * con cinco cosas de las quince que hay escritas.
+   * Se puede, y el cálculo es sencillo: en castellano un token son unos cuatro
+   * caracteres, así que una ficha de 52.000 son unas 13.000 fichas de texto.
+   * El límite que aprieta de verdad es el de tokens por minuto —250.000 en
+   * Flash Lite—, y esto es un 5% de eso. Cabría ocho veces. Además es tarea de
+   * fondo: sale por las claves de atrás, no por la que narra.
    *
-   * Ahora el presupuesto se REPARTE entre las fuentes que haya, y si aun así
-   * un documento no cabe, se queda con su principio Y SU FINAL, avisando del
-   * hueco. Un final vale más que un medio en un documento como este.
+   * El techo que queda es una red de seguridad contra lo absurdo, no un
+   * recorte de trabajo: 400.000 caracteres (~100.000 fichas), que son ocho
+   * fichas como la de esta campaña. Ninguna ficha de personaje real lo toca.
+   *
+   * ⚠️ Y la red sigue haciendo falta por un motivo concreto: si NO hay ningún
+   * documento marcado como ficha, esto lee los seis primeros documentos de
+   * texto que encuentre, y ahí dentro puede haber compendios de medio millón
+   * de caracteres cada uno. Sin tope, esa llamada se pasaría del límite por
+   * minuto ella sola. Así que la ficha marcada va entera y el modo a ciegas
+   * sigue repartiendo presupuesto.
    */
-  const PRESUPUESTO_TOTAL = 120000;
-  const porFuente = Math.max(20000, Math.floor(PRESUPUESTO_TOTAL / Math.max(1, fuentes.length)));
+  const TECHO_DE_SEGURIDAD = 400000;
+  const hayFichaMarcada = fichas.length > 0;
+  const porFuente = hayFichaMarcada
+    ? TECHO_DE_SEGURIDAD
+    : Math.max(20000, Math.floor(120000 / Math.max(1, fuentes.length)));
 
   const recortar = (contenido: string) => {
     const t = contenido || '';
     if (t.length <= porFuente) return t;
+    /*
+     * Si algún día algo no cabe, se queda con su principio Y SU FINAL.
+     * En una ficha el final vale más que el medio: ahí está el equipo.
+     */
     const cabeza = Math.floor(porFuente * 0.62);
     const cola = porFuente - cabeza;
     return (
@@ -7476,7 +7489,7 @@ export async function extraerIdentidadDeDocumentos({
   const texto = fuentes
     .map(f => `=== ${f.name} ===\n${recortar(f.content || '')}`)
     .join('\n\n')
-    .slice(0, PRESUPUESTO_TOTAL + 4000);
+    .slice(0, TECHO_DE_SEGURIDAD + 8000);
 
   const prompt = `De los documentos de abajo, saca la identidad del PROTAGONISTA${pc?.name ? ` (se llama ${pc.name})` : ''} y devuélvela en JSON.
 
@@ -9013,7 +9026,22 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
    * El tamaño zanja la duda sin depender de ninguna palabra: nadie escribe una
    * ficha de sesenta mil caracteres, y ningún módulo baja de ahí.
    */
-  const DEMASIADO_LARGO_PARA_SER_FICHA = 60000;
+  /*
+   * ⚠️ Este número se quedó corto, y la prueba la dio la propia campaña.
+   *
+   * Decía el comentario de al lado que «nadie escribe una ficha de sesenta mil
+   * caracteres». Pues sí: la ficha de esta campaña tiene 52.166 y sigue
+   * creciendo, así que estaba a un par de secciones de dejar de reconocerse a
+   * sí misma como ficha —y una ficha que deja de serlo ya no viaja en cada
+   * turno, ni se lee para rellenar la identidad, que es bastante peor que el
+   * problema que este tope venía a resolver—.
+   *
+   * El tope sigue haciendo falta, porque un módulo clasificado como ficha del
+   * protagonista se envía entero en todos los turnos. Pero para separar una
+   * ficha de un módulo no hace falta afinar: un módulo de campaña anda por el
+   * medio millón de caracteres largo, no por los ciento cincuenta mil.
+   */
+  const DEMASIADO_LARGO_PARA_SER_FICHA = 150000;
   const esLibro = (file.content || '').length > DEMASIADO_LARGO_PARA_SER_FICHA;
 
   const palabraEnTexto = (claves: string[], texto: string) =>
