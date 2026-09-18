@@ -2792,6 +2792,12 @@ export default function App() {
       );
     };
 
+    /*
+     * Se declara aquí, fuera del `try`, porque quien la lee es el `finally`:
+     * dentro del bloque de la narración no la alcanza.
+     */
+    let seOcultoNarrando = false;
+
     try {
       const targetChat = currentChats.find(c => c.id === currentChatId);
       if (!targetChat) return;
@@ -2827,9 +2833,20 @@ export default function App() {
         }
       };
 
+      /*
+       * Si la pestaña se oculta MIENTRAS se narra, se apunta.
+       *
+       * En el móvil eso significa que el navegador va a congelar la página y
+       * matar la petición en curso. El turno quedará truncado, igual que si
+       * Google hubiera dado un 503 — y desde fuera se ven idénticos. Saber
+       * cuál de las dos cosas pasó es la diferencia entre «reintento» y
+       * «no vuelvas a irte a WhatsApp a mitad de escena».
+       */
       const onVolverVisible = () => {
         volcarPendiente();
-        if (document.visibilityState === 'visible') {
+        if (document.visibilityState === 'hidden') {
+          seOcultoNarrando = true;
+        } else {
           if (!wakeLockRef.current) pedirCandadoDePantalla();
         }
       };
@@ -3030,6 +3047,35 @@ export default function App() {
       }
     } finally {
       backgroundHeartbeat.stop(volcarPendiente);
+
+      /*
+       * Y si el turno se quedó a medias DESPUÉS de haberse ido a otra app, se
+       * marca. Así el aviso de «relato interrumpido» puede decir por qué en vez
+       * de dejar a la jugadora pensando que ha fallado el modelo.
+       */
+      if (seOcultoNarrando && currentPId && currentChatId) {
+        try {
+          const chsFin = getLocalChats(currentPId);
+          const chatFin = chsFin.find(c => c.id === currentChatId);
+          const ultimo = chatFin?.messages?.[chatFin.messages.length - 1];
+          if (ultimo?.role === 'model' && isNarrativeIncomplete(ultimo.content || '')) {
+            const marcados = chsFin.map(c =>
+              c.id !== currentChatId
+                ? c
+                : {
+                    ...c,
+                    messages: c.messages.map((m, i) =>
+                      i === c.messages.length - 1 ? { ...m, cortadoEnSegundoPlano: true } : m
+                    )
+                  }
+            );
+            setCurrentChats(marcados);
+            saveLocalChats(currentPId, marcados);
+          }
+        } catch {
+          // Marcar el motivo es un extra: que falle no puede tocar la partida.
+        }
+      }
 
       // La copia en disco es red de seguridad: si hay carpeta configurada en Copias, se sincroniza en segundo plano.
       if (currentProject) {

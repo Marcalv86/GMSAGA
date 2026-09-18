@@ -71,7 +71,7 @@ import {
   FileText
 } from 'lucide-react';
 interface ChatMessageItemProps {
-  m: { role: 'user' | 'model'; content: string };
+  m: { role: 'user' | 'model'; content: string; cortadoEnSegundoPlano?: boolean };
   idx: number;
   isEditing: boolean;
   editDraft: string;
@@ -434,11 +434,22 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                   <Sparkles className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
+                  {/*
+                    Decir POR QUÉ se cortó, cuando se sabe.
+                    Un relato truncado se ve igual lo haya cortado Google o
+                    haberse ido a otra aplicación a mitad de turno, y confundir
+                    las dos cosas lleva a reintentar contra un modelo que no
+                    tenía la culpa.
+                  */}
                   <span className="font-cinzel font-bold text-amber-700 dark:text-amber-300 block">
-                    Respuesta incompleta o interrumpida
+                    {m.cortadoEnSegundoPlano
+                      ? 'Se cortó al salir de la aplicación'
+                      : 'Respuesta incompleta o interrumpida'}
                   </span>
                   <span className="text-[11px] text-[var(--text-secondary)]">
-                    El relato se interrumpió antes de concluir la escena. Complétalo para cerrar la narración limpiamente en este mismo mensaje sin duplicar chats.
+                    {m.cortadoEnSegundoPlano
+                      ? 'Saliste a otra app mientras el Narrador escribía y el móvil congeló la página, así que la petición murió a medias. No ha fallado nada: lo escrito está guardado y se puede rematar aquí mismo.'
+                      : 'El relato se interrumpió antes de concluir la escena. Complétalo para cerrar la narración limpiamente en este mismo mensaje sin duplicar chats.'}
                   </span>
                 </div>
               </div>
@@ -568,7 +579,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
 }, areChatMessageItemPropsEqual);
 
 interface ChatMessagesListProps {
-  messages: { role: 'user' | 'model'; content: string }[];
+  messages: { role: 'user' | 'model'; content: string; cortadoEnSegundoPlano?: boolean }[];
   editingIndex: number | null;
   editDraft: string;
   setEditDraft: (v: string) => void;

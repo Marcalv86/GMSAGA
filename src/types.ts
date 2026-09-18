@@ -1086,6 +1086,16 @@ export interface Message {
   timestamp?: string;
   /** Versión novelada y literaria de la respuesta del jugador para lectura y maquetación de novela */
   novelContent?: string;
+  /**
+   * El turno se cortó porque la app pasó a segundo plano, no porque fallara.
+   *
+   * Un relato truncado se ve igual lo haya cortado un 503 de Google o haberse
+   * ido a otra aplicación a mitad de turno: en el móvil el navegador congela
+   * la pestaña oculta y mata la petición en curso, y eso no hay API web que lo
+   * evite. Pero saber CUÁL de las dos cosas pasó cambia qué hace uno después
+   * —y evita cabrearse con Gemini por algo que no ha hecho—.
+   */
+  cortadoEnSegundoPlano?: boolean;
 }
 
 export interface GlobalGrimorio {
