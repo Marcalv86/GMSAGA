@@ -3708,6 +3708,28 @@ export default function App() {
             await handleRelacionarBiblioteca({ silencioso: true });
             await new Promise(r => setTimeout(r, 2000));
           }
+          /*
+           * 🪪 Y SI ENTRE LO QUE HA LLEGADO VIENE SU FICHA, SE LEE SOLA.
+           *
+           * Clasificar un documento a mano como ficha del OC ya disparaba esta
+           * lectura (`handleUpdateFileCategory`), pero la subida clasifica sola
+           * —`classifyFileAuto` decide la etiqueta ahí mismo, en el bucle de
+           * arriba— y por ese camino no la llamaba nadie. Resultado: subes la
+           * ficha, la aplicación la marca correctamente como ficha del OC... y
+           * la memoria se queda con «Protagonista» hasta que a alguien se le
+           * ocurre reclasificar a mano o pulsar el botón de leer la ficha.
+           *
+           * La misma historia de siempre: la regla existe, es correcta, y no
+           * llega al sitio donde hace falta. Aquí llega.
+           *
+           * Va ANTES de montar la mesa a propósito: el borrador de campaña se
+           * escribe mucho mejor sabiendo cómo se llama ella y qué es.
+           */
+          if (newFilesList.some(f => f.category === 'sheet_pj')) {
+            await completarFichaDesdeDocumento(currentFilesRef.current);
+            await new Promise(r => setTimeout(r, 2000));
+          }
+
           await montarSesionCero(
             currentFilesRef.current,
             projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
@@ -3879,8 +3901,17 @@ export default function App() {
    * botón de leer la ficha, que sí avisa antes de sustituir.
    */
   const completarFichaDesdeDocumento = async (archivos: ProjectFile[]) => {
-    if (!currentProject) return;
-    const pc = currentProject.memory?.player_character;
+    /*
+     * El proyecto se lee de la referencia viva, no del cierre.
+     *
+     * Esto ya no lo llama solo el botón de clasificar a mano: lo llama también
+     * la cadena de la subida, que corre dentro de un `setTimeout` y vería el
+     * `currentProject` de hace unos segundos —el de ANTES de guardar los
+     * archivos nuevos—. Con la referencia lee el de ahora.
+     */
+    const proyecto = projectsRef.current.find(pr => pr.id === currentPIdRef.current) || currentProject;
+    if (!proyecto) return;
+    const pc = proyecto.memory?.player_character;
     const nombreDeReserva = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
     const faltaNombre = !(pc?.name || '').trim() || nombreDeReserva.test((pc?.name || '').trim());
     const faltaAlgo =
@@ -3894,7 +3925,7 @@ export default function App() {
     if (!faltaAlgo) return;
 
     try {
-      const id = await extraerIdentidadDeDocumentos({ project: currentProject, files: archivos });
+      const id = await extraerIdentidadDeDocumentos({ project: proyecto, files: archivos });
       const puestos: string[] = [];
       await handleUpdateMemory(mem => {
         const actual = mem.player_character;
@@ -3956,7 +3987,7 @@ export default function App() {
       });
       if (puestos.length) {
         logInfo('memory_sync', 'Ficha del protagonista completada desde su documento', puestos.join(' · '), {
-          projectName: currentProject.name
+          projectName: proyecto.name
         });
         setTopProgress({
           active: true,
@@ -3968,7 +3999,7 @@ export default function App() {
     } catch (err) {
       // Que no se pueda leer no puede romper el marcar un archivo.
       logWarn('memory_sync', 'No se pudo leer la ficha del protagonista del documento', String(err), {
-        projectName: currentProject.name
+        projectName: proyecto.name
       });
     }
   };
@@ -4430,11 +4461,14 @@ export default function App() {
     });
     try {
       let filesModified = false;
+      // Si al reclasificar alguno PASA A SER ficha del OC, hay que leerla.
+      let estrenaFichaDelOc = false;
       const refreshedFiles = await loadFilesFromDB(currentPId);
       const updatedFiles = refreshedFiles.map(file => {
         const autoCat = classifyFileAuto(file, currentProject.memory);
         if (autoCat !== file.category) {
           filesModified = true;
+          if (autoCat === 'sheet_pj') estrenaFichaDelOc = true;
           return { ...file, category: autoCat };
         }
         return file;
@@ -4444,6 +4478,10 @@ export default function App() {
         setCurrentFiles(updatedFiles);
         await saveFilesToDB(currentPId, updatedFiles);
       }
+
+      // Reclasificar y descubrir que un documento era su ficha es decir quién
+      // es: se lee sin pedirlo, igual que al etiquetarla a mano.
+      if (estrenaFichaDelOc) void completarFichaDesdeDocumento(updatedFiles);
 
       // Also auto-assign portraits to PC, NPCs and Locations if names match and portrait is missing
       let memoryModified = false;
