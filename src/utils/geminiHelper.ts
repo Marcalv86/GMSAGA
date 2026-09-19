@@ -3236,6 +3236,42 @@ ${rescatados.map(r => `--- [Fragmento de: ${r.fragmento.fileName}${r.fragmento.t
    * compite con un compendio de doscientos mil. Ahora tiene sitio propio,
    * pegado al bloque del protagonista, que es donde se atiende.
    */
+  /*
+   * 🗡️ QUIÉN VIAJA CON ELLA AHORA — y con qué rango.
+   *
+   * La sección de abajo («compañeros, familiares y monturas») está escrita para
+   * bichos: dice «el bicho» y dice que lo que hace en una escena tensa lo
+   * declara ella. Aplicarle eso a un mercenario con galones es justo al revés
+   * de cómo funciona esta mesa, donde quien manda una banda decide por la
+   * cuadrilla y la protagonista no lidera una organización ajena.
+   *
+   * Por eso la gente que va con ella NO se duplica en otra lista: se marca
+   * sobre su PNJ, que ya tiene su vínculo, su confianza y su reloj de relación.
+   * Duplicarlo partiría su ficha en dos y una de las mitades se quedaría vieja
+   * — el mismo fallo que un objeto apuntado con dos nombres distintos.
+   */
+  const enGrupo = (project.memory?.npcs || []).filter(n => n.enElGrupo && (n.name || '').trim());
+  const grupoSection = enGrupo.length
+    ? `
+### 🗡️ LA CUADRILLA — QUIÉNES VAN CON ELLA AHORA MISMO
+**Están EN LA ESCENA salvo que la propia escena diga lo contrario** (se quedaron fuera, los han separado, están heridos). Si llevan tres escenas sin abrir la boca y nada lo explica, se te han olvidado — y eso se nota antes que ninguna otra cosa.
+- No son escolta de adorno: tienen oficio, opinión y cosas que perder. Hablan cuando les afecta, discrepan cuando algo les parece mal y resuelven lo suyo sin que nadie se lo mande.
+- ⛔ Y NO SON EL CORO DE NADIE: no existen para darle la razón a la protagonista ni para explicarle lo que tiene que hacer.
+${enGrupo
+  .map(n => {
+    const rango =
+      n.rangoEnElGrupo === 'manda'
+        ? ' — **MANDA**: las decisiones de la cuadrilla las toma esta persona, rápido y sin someterlas a votación. Ella propone, ejecuta su parte y carga con las consecuencias, pero NO lidera esto. ⛔ Nunca le traslades a ella un «¿y qué hacemos?» que le toca decidir a quien manda.'
+        : n.rangoEnElGrupo === 'acompana'
+          ? ' — la acompaña y le sigue el paso: apoya, cubre y opina, pero no decide por ella ni le da lecciones de su oficio.'
+          : ' — de igual a igual: ni le manda ni le obedece; discute, negocia y a veces se sale con la suya.';
+    return `- **${n.name}**${n.relation ? ` (${n.relation})` : ''}${rango}`;
+  })
+  .join('\n')}
+⛔ Ir en el mismo grupo no le da a nadie el oficio de los demás: cada uno sigue sabiendo lo suyo y solo lo suyo.
+`.trim()
+    : '';
+
   const acompanantes = (project.memory?.companions || []).filter(c => (c?.name || '').trim());
   const companionSection =
     companionFiles.length || acompanantes.length
@@ -3705,6 +3741,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
     - [COMENTARIO_DM: comentario breve, simpático, sincero o ingenioso del DM fuera de personaje] — OPCIONAL (1-2 frases). Emítelo solo cuando ocurra algo genuinamente divertido, una pifia o éxito crítico épico, una jugarreta memorable del PJ a un PNJ (o viceversa), o un momento de rol memorable. Este comentario se envía automáticamente al chat OOC de la Mesa como un mensaje del DM, con tu personalidad entusiasta, cómica, sincera y rolera de colega de mesa. Si el turno es rutinario, formal o solemne, OMITE totalmente esta etiqueta.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | agotamiento: 0-10 | condiciones: lista separada por comas, o "ninguna"]
+   - [GRUPO: Nombre | entra | manda] cuando alguien se suma a la cuadrilla y viaja con ella, y [GRUPO: Nombre | sale] cuando se separa. El rango es «manda», «iguales» o «acompaña», y hay que ponerlo: de ello depende quién toma las decisiones del grupo. Mientras no lo marques, para la aplicación esa persona NO va con ella y tú te olvidarás de meterla en escena dentro de dos turnos.
    - [DOLENCIA: nombre | cd: 12 | exitos: 0-2] para abrir o llevar una enfermedad, y [DOLENCIA: nombre | curada] para cerrarla. Dos éxitos SEGUIDOS la curan; un fallo la agrava o suma un nivel de agotamiento. Si la enfermedad no se anota aquí, no existe pasado este turno.
    - [FICHA: sab 18 | comp 3 | pasiva 16 | +Sigilo 5] — SOLO cuando suba de nivel o la jugadora te corrija sus números. Su ficha se subió congelada en el nivel de aquel día: una puntuación que sube, un bonificador que cambia o una competencia nueva no existen hasta que los apuntes aquí, y hasta entonces sigues calibrando sus tiradas con los datos de entonces. Las competencias se añaden con «+Nombre bono» y SUMAN a las que ya tiene.
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
@@ -3744,7 +3781,7 @@ ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | agotamiento: 0
 
   const bloqueVivo = `
 ${fragmentosConsultaText ? `${fragmentosConsultaText}\n\n` : ''}${pjSection}
-${companionSection ? `\n${companionSection}\n` : ''}
+${grupoSection ? `\n${grupoSection}\n` : ''}${companionSection ? `\n${companionSection}\n` : ''}
 
 ### CONOCIMIENTO DE LA CAMPAÑA (MEMORIA VIVA)
 ${memoryContext}
@@ -4166,6 +4203,7 @@ export async function generateStoryTurnStream({
     agotamiento?: number;
     ficha?: FichaCorregida;
     dolencias?: CambioDeDolencia[];
+    grupo?: CambioDeGrupo[];
   }) => void;
   /** El Narrador informa de cuánto tiempo ha pasado y de qué queda en marcha. */
   onTimeReported?: (t: TiempoReportado) => void;
@@ -4856,6 +4894,7 @@ async function saveStreamedMessage(
     agotamiento?: number;
     ficha?: FichaCorregida;
     dolencias?: CambioDeDolencia[];
+    grupo?: CambioDeGrupo[];
   }) => void,
   onTimeReported?: (t: TiempoReportado) => void,
   /**
@@ -4987,12 +5026,18 @@ async function saveStreamedMessage(
   cleanedText = deLaFicha.cleaned;
   const deDolencias = parseDolenciaTags(cleanedText);
   cleanedText = deDolencias.cleaned;
+  const deGrupo = parseGrupoTags(cleanedText);
+  cleanedText = deGrupo.cleaned;
 
-  if (onStateReported && (state || deLaFicha.ficha || deDolencias.cambios.length)) {
+  if (
+    onStateReported &&
+    (state || deLaFicha.ficha || deDolencias.cambios.length || deGrupo.cambios.length)
+  ) {
     onStateReported({
       ...(state || {}),
       ...(deLaFicha.ficha ? { ficha: deLaFicha.ficha } : {}),
-      ...(deDolencias.cambios.length ? { dolencias: deDolencias.cambios } : {})
+      ...(deDolencias.cambios.length ? { dolencias: deDolencias.cambios } : {}),
+      ...(deGrupo.cambios.length ? { grupo: deGrupo.cambios } : {})
     });
   }
 
@@ -7062,7 +7107,7 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 
 QUÉ NO HACES AQUÍ:
 - ⛔ NO narras, NO haces avanzar la historia y NO decides acciones del personaje. Si te piden jugar algo, recuérdales que eso va en la pestaña de Jugar.
-- ⛔ NO haces avanzar el reloj de la partida: aquí no pasa el tiempo ni se escribe crónica, así que nada de \`[TIEMPO:]\`, \`[AGENDA:]\` ni \`[PRESENTES:]\`. ✅ **Todas las demás etiquetas del apartado de arriba SÍ son tuyas y se aplican de verdad**, incluidas \`[NIVEL:]\`, \`[BAMBALINAS:]\`, \`[RELOJ:]\`, \`[FACCIÓN:]\`, \`[PREPARADO:]\`, \`[LUGAR:]\`, \`[ESTADO:]\`, \`[ESTAMOS:]\`, \`[VIAJE:]\`, \`[PUENTE:]\`, \`[APRENDE:]\`, \`[DOLENCIA:]\` y \`[FICHA:]\`. No te cortes con ellas: corregir la memoria es tu trabajo, y una corrección que solo cuentas en prosa **no cambia nada de la aplicación**.
+- ⛔ NO haces avanzar el reloj de la partida: aquí no pasa el tiempo ni se escribe crónica, así que nada de \`[TIEMPO:]\`, \`[AGENDA:]\` ni \`[PRESENTES:]\`. ✅ **Todas las demás etiquetas del apartado de arriba SÍ son tuyas y se aplican de verdad**, incluidas \`[NIVEL:]\`, \`[BAMBALINAS:]\`, \`[RELOJ:]\`, \`[FACCIÓN:]\`, \`[PREPARADO:]\`, \`[LUGAR:]\`, \`[ESTADO:]\`, \`[ESTAMOS:]\`, \`[VIAJE:]\`, \`[PUENTE:]\`, \`[APRENDE:]\`, \`[DOLENCIA:]\`, \`[GRUPO:]\` y \`[FICHA:]\`. No te cortes con ellas: corregir la memoria es tu trabajo, y una corrección que solo cuentas en prosa **no cambia nada de la aplicación**.
 - ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
 - Si no sabes algo porque no consta en los documentos ni en lo que tienes delante, dilo. No lo inventes.
 ${buscarEnLaWeb ? `
@@ -9152,6 +9197,48 @@ export interface CambioDeDolencia {
   exitos?: number;
   notas?: string;
   curada?: boolean;
+}
+
+/**
+ * `[GRUPO: Nombre | entra | manda]` · `[GRUPO: Nombre | sale]`
+ *
+ * Marca quién viaja con ella AHORA. Es una bandera sobre un PNJ que ya existe,
+ * no una ficha nueva: quien va con ella tiene su vínculo, su confianza y su
+ * reloj de relación en la lista de PNJs, y duplicarlo en una lista aparte
+ * dejaría dos versiones de la misma persona con una de ellas envejeciendo.
+ *
+ * El rango no es adorno: un escolta que la acompaña y un superior que la lleva
+ * a sueldo no se juegan igual. Sin decirlo, el Narrador trata como acompañante
+ * dócil a cualquiera que viaje con ella —incluido quien manda una banda—.
+ */
+export interface CambioDeGrupo {
+  nombre: string;
+  entra: boolean;
+  rango?: 'manda' | 'iguales' | 'acompana';
+}
+
+export function parseGrupoTags(text: string): { cleaned: string; cambios: CambioDeGrupo[] } {
+  const cambios: CambioDeGrupo[] = [];
+  let cleaned = text;
+  for (const m of text.matchAll(/\[GRUPO:([^\]]*)\]/gi)) {
+    cleaned = cleaned.replace(m[0], '');
+    const partes = m[1].split('|').map(x => x.trim()).filter(Boolean);
+    const nombre = (partes.shift() || '').trim();
+    if (!nombre) continue;
+    const resto = partes.join(' ').toLowerCase();
+    // Por defecto entra: se nombra a alguien en el grupo para meterlo, y sacarlo
+    // hay que decirlo. Al revés, un «[GRUPO: Braelin]» suelto lo echaría.
+    const sale = /\b(sale|fuera|se queda|se separa|se va|baja|deja el grupo)\b/.test(resto);
+    const rango: CambioDeGrupo['rango'] = /\b(manda|lidera|jefe|jefa|al mando|superior)\b/.test(resto)
+      ? 'manda'
+      : /\b(acompa\w*|escolta|a su lado|sigue)\b/.test(resto)
+        ? 'acompana'
+        : /\b(iguales?|par|de t[uú] a t[uú])\b/.test(resto)
+          ? 'iguales'
+          : undefined;
+    cambios.push({ nombre, entra: !sale, rango });
+  }
+  return { cleaned: cleaned.trim(), cambios };
 }
 
 export function parseFichaTag(text: string): { cleaned: string; ficha: FichaCorregida | null } {

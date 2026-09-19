@@ -2998,8 +2998,29 @@ export default function App() {
               else males.push(fundida);
             }
 
+            /*
+             * 🗡️ QUIÉN VA CON ELLA — sobre el PNJ que ya existe.
+             *
+             * Se busca por nombre con el mismo emparejador que usa todo lo
+             * demás (tolera «Braelin» / «Braelin Janquay» / un acento suelto),
+             * porque si no, marcar el grupo crearía un PNJ nuevo con el mismo
+             * nombre y tendríamos dos Braelin: uno con vínculo y otro con la
+             * bandera. Si no existe todavía, no se inventa: cuando lo fiche el
+             * extractor de PNJs, se vuelve a marcar.
+             */
+            const npcsActualizados = state.grupo?.length
+              ? (mem.npcs || []).map(n => {
+                  const cambio = state.grupo!.find(g => coincidenNombresNpc(g.nombre, n.name));
+                  if (!cambio) return n;
+                  return cambio.entra
+                    ? { ...n, enElGrupo: true, ...(cambio.rango ? { rangoEnElGrupo: cambio.rango } : {}) }
+                    : { ...n, enElGrupo: false };
+                })
+              : mem.npcs;
+
             return {
               ...mem,
+              ...(state.grupo?.length ? { npcs: npcsActualizados } : {}),
               player_character: {
                 ...pcPrev,
                 ...(state.hp !== undefined ? { hp: state.hp } : {}),

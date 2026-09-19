@@ -2446,6 +2446,40 @@ export const MemoryManager: React.FC<{
                                 </span>
                               );
                             })()}
+                            {/*
+                              🗡️ ¿VIAJA CON ELLA? Un interruptor, no una pestaña.
+
+                              Quien va en la cuadrilla ya está aquí, con su
+                              vínculo y su reloj: duplicarlo en una lista de
+                              «compañeros» dejaría dos versiones de la misma
+                              persona y una envejecería. Así que es una marca
+                              sobre el PNJ. Solo icono, que en el móvil el
+                              texto no cabe.
+                            */}
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                void onUpdateMemory(mem => ({
+                                  ...mem,
+                                  npcs: (mem.npcs || []).map(x =>
+                                    x.id === n.id ? { ...x, enElGrupo: !x.enElGrupo } : x
+                                  )
+                                }));
+                              }}
+                              className={`text-[10px] px-1.5 py-0.5 rounded-full border font-cinzel font-bold shrink-0 transition-all cursor-pointer ${
+                                n.enElGrupo
+                                  ? 'bg-[var(--accent)]/15 border-[var(--accent)]/40 text-[var(--accent)]'
+                                  : 'bg-transparent border-[var(--glass-border)] text-[var(--text-secondary)] opacity-50 hover:opacity-100'
+                              }`}
+                              title={
+                                n.enElGrupo
+                                  ? `${n.name} viaja con ella: el Narrador lo mete en escena salvo que algo lo impida. Pulsa para sacarlo del grupo.`
+                                  : `${n.name} no va con ella. Pulsa para meterlo en la cuadrilla.`
+                              }
+                              aria-label={n.enElGrupo ? 'Sacar del grupo' : 'Meter en el grupo'}
+                            >
+                              🗡️
+                            </button>
                             {n.status && (
                               <span className="text-[9px] bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.2 rounded font-cinzel font-semibold shrink-0">
                                 {n.status}

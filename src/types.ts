@@ -919,6 +919,29 @@ export interface NPC {
   diasVistos?: number[];
   /** Deja de ser figurante y se le abre ficha de vínculo. */
   recurrente?: boolean;
+  /**
+   * Va CON ella ahora mismo: viaja, entra en las escenas y actúa.
+   *
+   * Es una marca sobre el PNJ, no una ficha aparte, y eso es deliberado. Quien
+   * viaja con ella ya existe en PNJs con su atracción, su vínculo, su confianza
+   * y su reloj de relación; duplicarlo en una lista de «compañeros» partiría su
+   * ficha en dos y una de las dos mitades se quedaría desactualizada — que es
+   * el mismo fallo que un objeto apuntado con dos nombres distintos.
+   *
+   * Lo que «va conmigo» cambia de verdad es CONDUCTA: está presente salvo que
+   * la escena diga lo contrario, opina de las decisiones, actúa en combate y no
+   * se le puede narrar como ausente. Eso es una bandera, no una entidad.
+   */
+  enElGrupo?: boolean;
+  /**
+   * Quién manda, que en este grupo no es un detalle.
+   *
+   * Un escolta que la acompaña y un superior que la lleva a sueldo no se juegan
+   * igual: al primero no le toca decidir por ella, y al segundo sí le toca
+   * decidir por la cuadrilla. Sin esto, el Narrador trata a todo el que viaje
+   * con ella como acompañante dócil —incluido alguien que manda una banda—.
+   */
+  rangoEnElGrupo?: 'manda' | 'iguales' | 'acompana';
   /** Lo que deja ver: cómo trata al protagonista. Se muestra siempre. */
   aparenta?: string;
   /** Lo que calla. Va tapado: leerlo es destriparse la traición. */
