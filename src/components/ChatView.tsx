@@ -326,7 +326,15 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                 <div className="text-[10px] font-cinzel font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300 mb-0.5">
                   El Director te pregunta
                 </div>
-                <div className="text-sm text-[var(--text-primary)] break-words">{q}</div>
+                {/*
+                  La pregunta va por el mismo renderizador que la prosa: el
+                  Narrador escribe con negritas y enumera opciones, y pintarla
+                  como texto plano dejaba los asteriscos a la vista y las
+                  opciones apelmazadas en un ladrillo.
+                */}
+                <div className="text-sm text-[var(--text-primary)] break-words markdown-body">
+                  <ReactMarkdown>{q}</ReactMarkdown>
+                </div>
               </div>
             </div>
           ))}
