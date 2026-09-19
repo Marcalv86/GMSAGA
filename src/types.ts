@@ -949,6 +949,19 @@ export interface NPC {
    * partida.
    */
   rangoEnElGrupo?: 'manda' | 'supervisa' | 'iguales' | 'acompana';
+  /*
+   * ⚠️ Y UNA COSA QUE EL RANGO NO DICE: ninguno de estos obedece a nadie.
+   *
+   * Ir en grupo significa que cada PNJ es OTRO JUGADOR llevado por la IA, con
+   * su criterio, su turno y su derecho a negarse. El rango dice quién decide la
+   * operación, no quién manda sobre quién: ni siquiera `acompana` —que solo
+   * significa que ella tiene más antigüedad— convierte a nadie en su secuaz.
+   *
+   * Los secuaces, aprendices y gente a sueldo son otra cosa y llegan mucho más
+   * adelante, con rango y plaza propia donde tenerlos. Confundir las dos cosas
+   * es exactamente la deriva que hace que el modelo trate a una cuadrilla de
+   * veteranos como el séquito de una novata.
+   */
   /** Lo que deja ver: cómo trata al protagonista. Se muestra siempre. */
   aparenta?: string;
   /** Lo que calla. Va tapado: leerlo es destriparse la traición. */
