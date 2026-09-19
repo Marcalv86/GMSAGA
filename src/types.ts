@@ -256,6 +256,22 @@ export interface PlayerAttributes {
   cha: number;
 }
 
+/**
+ * Una dolencia con su reloj, no una palabra suelta en «condiciones».
+ *
+ * Una enfermedad en esta mesa no es una etiqueta: es una salvación de CON cada
+ * 24 h, y dos éxitos seguidos la curan. Eso es una cuenta, y una cuenta no cabe
+ * en una lista de texto libre — se pierde en cuanto pasa un día.
+ */
+export interface Dolencia {
+  nombre: string;
+  /** CD de la salvación (de Constitución, salvo que las notas digan otra cosa). */
+  cd?: number;
+  /** Éxitos SEGUIDOS acumulados. Al llegar a 2 se cura y desaparece. */
+  exitos?: number;
+  notas?: string;
+}
+
 export interface PlayerCurrencies {
   cp: number; // Cobre
   sp: number; // Plata
@@ -354,6 +370,28 @@ export interface PlayerCharacter {
   savingThrowProficiencies?: string[];
   skillProficiencies?: string[];
   conditions?: string[];
+  /**
+   * Agotamiento como NÚMERO, del 0 al 10.
+   *
+   * Vivía —cuando vivía— como texto dentro de `conditions`, y el agotamiento de
+   * esta mesa es aritmética: −1 acumulativo a TODAS las tiradas de d20 por
+   * nivel, −5 pies de velocidad, muerte al 10, y un nivel menos por descanso
+   * largo con comida y agua. Con texto libre no se suma nada y no se descuenta
+   * nada: el nivel se escribía una vez y no volvía a tocarse.
+   */
+  agotamiento?: number;
+  /** Enfermedades activas, cada una con su salvación y sus éxitos seguidos. */
+  dolencias?: Dolencia[];
+  /**
+   * Competencias entrenadas con su bonificador, tal como las nombra su ficha.
+   *
+   * ⚠️ Son las INICIALES: la ficha se sube congelada en el nivel que tuviera
+   * ese día. Lo que gane subiendo de nivel se añade con `[FICHA: ...]` desde la
+   * Mesa, igual que el inventario y lo aprendido.
+   */
+  skillProficienciesDetalle?: { nombre: string; bono?: number }[];
+  /** Percepción pasiva, para las tiradas ocultas del Narrador contra ella. */
+  passivePerception?: number;
   inventory?: InventoryItem[];
   currencies?: PlayerCurrencies;
   maxCarryWeight?: number;

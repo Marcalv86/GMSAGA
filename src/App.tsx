@@ -2948,16 +2948,87 @@ export default function App() {
         targetMessageIndex: options?.appendToMessageIndex,
         // El estado del protagonista lo lleva el Narrador, no el jugador.
         onStateReported: state => {
-          void handleUpdateMemory(mem => ({
-            ...mem,
-            player_character: {
-              ...(mem.player_character || { name: 'Protagonista' }),
-              ...(state.hp !== undefined ? { hp: state.hp } : {}),
-              ...(state.maxHp !== undefined ? { maxHp: state.maxHp } : {}),
-              ...(state.ac !== undefined ? { ac: state.ac } : {}),
-              ...(state.conditions !== undefined ? { conditions: state.conditions } : {})
+          void handleUpdateMemory(mem => {
+            const pcPrev = mem.player_character || { name: 'Protagonista' };
+
+            /*
+             * Las competencias SE SUMAN, no se sustituyen.
+             *
+             * Lo que trae su ficha son sus competencias de partida; lo que gana
+             * subiendo de nivel se añade encima. Si esto reemplazara la lista,
+             * anotar una pericia nueva le borraría las ocho que ya tenía — y
+             * nadie se daría cuenta hasta que el Narrador dejara de nombrarlas.
+             */
+            const clave = (v: string) =>
+              v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+            const compsNuevas = state.ficha?.skillProficiencies || [];
+            const compsPrev = pcPrev.skillProficienciesDetalle || [];
+            const compsFusionadas = compsNuevas.length
+              ? [
+                  ...compsPrev.filter(c => !compsNuevas.some(n => clave(n.nombre) === clave(c.nombre))),
+                  ...compsNuevas
+                ]
+              : compsPrev;
+
+            /*
+             * Las dolencias: dos éxitos SEGUIDOS y fuera.
+             *
+             * La regla de curación se aplica aquí, no en el prompt, porque es
+             * una cuenta y las cuentas no se le piden a un modelo pequeño en
+             * mitad de una escena.
+             */
+            let males = [...(pcPrev.dolencias || [])];
+            for (const cambio of state.dolencias || []) {
+              const i = males.findIndex(d => clave(d.nombre) === clave(cambio.nombre));
+              if (cambio.curada) {
+                if (i >= 0) males.splice(i, 1);
+                continue;
+              }
+              const fundida = {
+                nombre: cambio.nombre,
+                cd: cambio.cd ?? (i >= 0 ? males[i].cd : undefined),
+                exitos: cambio.exitos ?? (i >= 0 ? males[i].exitos : 0),
+                notas: cambio.notas ?? (i >= 0 ? males[i].notas : undefined)
+              };
+              if ((fundida.exitos || 0) >= 2) {
+                if (i >= 0) males.splice(i, 1);
+                continue;
+              }
+              if (i >= 0) males[i] = fundida;
+              else males.push(fundida);
             }
-          }));
+
+            return {
+              ...mem,
+              player_character: {
+                ...pcPrev,
+                ...(state.hp !== undefined ? { hp: state.hp } : {}),
+                ...(state.maxHp !== undefined ? { maxHp: state.maxHp } : {}),
+                ...(state.ac !== undefined ? { ac: state.ac } : {}),
+                ...(state.conditions !== undefined ? { conditions: state.conditions } : {}),
+                ...(state.agotamiento !== undefined ? { agotamiento: state.agotamiento } : {}),
+                ...(state.dolencias?.length ? { dolencias: males } : {}),
+                ...(state.ficha?.attributes
+                  ? {
+                      attributes: {
+                        ...(pcPrev.attributes || { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }),
+                        ...state.ficha.attributes
+                      }
+                    }
+                  : {}),
+                ...(state.ficha?.proficiencyBonus !== undefined
+                  ? { proficiencyBonus: state.ficha.proficiencyBonus }
+                  : {}),
+                ...(state.ficha?.passivePerception !== undefined
+                  ? { passivePerception: state.ficha.passivePerception }
+                  : {}),
+                ...(state.ficha?.savingThrowProficiencies?.length
+                  ? { savingThrowProficiencies: state.ficha.savingThrowProficiencies }
+                  : {}),
+                ...(compsNuevas.length ? { skillProficienciesDetalle: compsFusionadas } : {})
+              }
+            };
+          });
         },
         onTimeReported: t => {
           const modelMsgIdx =
@@ -3996,7 +4067,10 @@ export default function App() {
       !pc?.languages?.length ||
       !pc?.appearance ||
       // La mochila vacía también es «falta algo»: es lo que el Narrador lee cada turno.
-      !pc?.inventory?.length;
+      !pc?.inventory?.length ||
+      // Y sus atributos: sin ellos no se puede pedir una sola tirada bien.
+      !pc?.attributes ||
+      !pc?.skillProficienciesDetalle?.length;
     if (!faltaAlgo) return;
 
     const arranqueFicha = Date.now();
@@ -4058,6 +4132,28 @@ export default function App() {
         if (id.currencies && !Object.values(actual?.currencies || {}).some(v => v)) {
           nuevo.currencies = id.currencies;
           puestos.push('el dinero de partida');
+        }
+        /*
+         * ⭐ LOS NÚMEROS CON LOS QUE SE TIRA.
+         *
+         * Los campos llevaban en el tipo desde el principio y se rellenaban
+         * solo para los PNJs. Para ella no los leía nadie, así que el Narrador
+         * pedía tiradas contra atributos que no conocía y tenía prohibido
+         * nombrar competencias de una lista que estaba vacía.
+         */
+        if (id.attributes && !actual?.attributes) {
+          nuevo.attributes = id.attributes;
+          const a = id.attributes;
+          puestos.push(`atributos (FUE ${a.str} DES ${a.dex} CON ${a.con} INT ${a.int} SAB ${a.wis} CAR ${a.cha})`);
+        }
+        if (id.proficiencyBonus && !actual?.proficiencyBonus) nuevo.proficiencyBonus = id.proficiencyBonus;
+        if (id.passivePerception && !actual?.passivePerception) nuevo.passivePerception = id.passivePerception;
+        if (id.savingThrowProficiencies?.length && !actual?.savingThrowProficiencies?.length) {
+          nuevo.savingThrowProficiencies = id.savingThrowProficiencies;
+        }
+        if (id.skillProficiencies?.length && !actual?.skillProficienciesDetalle?.length) {
+          nuevo.skillProficienciesDetalle = id.skillProficiencies;
+          puestos.push(`${id.skillProficiencies.length} competencias entrenadas`);
         }
         return { ...mem, player_character: nuevo };
       });

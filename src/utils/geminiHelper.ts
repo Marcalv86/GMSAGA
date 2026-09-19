@@ -17,7 +17,7 @@ import {
   viajaSiemprePorCategoria,
   interesPorLaProtagonista
 } from '../types';
-import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, InventoryItem, MovimientoOculto, PlayerCurrencies, RelojOculto } from '../types';
+import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, InventoryItem, MovimientoOculto, PlayerAttributes, PlayerCurrencies, RelojOculto } from '../types';
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { quitarEtiquetasInternas } from './etiquetasInternas';
 import { ampliarConPuentes, buscar, construirIndice } from './localSearch';
@@ -3270,6 +3270,56 @@ ${pc.race
   ? `- RAZA / ESPECIE: ${pc.race} ← DATO FIJO. Es lo que ES, por encima de lo que sugiera cualquier documento, nombre o descripción. No la cambies, no la "corrijas" y no describas al protagonista como de otra especie ni de pasada.`
   : `- RAZA / ESPECIE: ⚠️ NO CONSTA EN LA FICHA. NO te la inventes ni la deduzcas del nombre, del tatuaje o del lugar de origen: describe al protagonista sin nombrar su especie y, si hace falta para la escena, pregúntaselo a la jugadora con [Pregunta de Mesa: ...].`}
 ${pc.class ? `- CLASE Y NIVEL: ${pc.class} ${pc.level || ''}` : ''}
+${(() => {
+  /*
+   * ⭐ CONTRA QUÉ SE TIRA. Lo que hacía falta para que dos reglas funcionen.
+   *
+   * En esta mesa toda tirada se pide contra uno de los seis atributos, y está
+   * PROHIBIDO nombrar una competencia que no conste en su ficha. Las dos reglas
+   * estaban escritas y ninguna podía cumplirse, porque aquí no llegaba ni un
+   * atributo ni una competencia: los campos existían en el código y se
+   * rellenaban solo para los PNJs.
+   *
+   * Y no es que no estuvieran en la petición —su ficha entera viaja cada turno—
+   * es que estaban dentro de una tabla de markdown en mitad de cincuenta mil
+   * caracteres. Estar en el envío no es llegar. Aquí suben a cuatro líneas que
+   * no se pueden pasar por alto, al lado de las reglas que las gobiernan.
+   */
+  const a = pc.attributes;
+  const comps = pc.skillProficienciesDetalle;
+  const salv = pc.savingThrowProficiencies;
+  if (!a && !comps?.length && !salv?.length && !pc.passivePerception) {
+    return `- ⚠️ SUS ATRIBUTOS NO CONSTAN. Pide las tiradas contra el atributo a secas (\`[Petición de Tirada: SAB | CD 14]\`) y NO nombres ninguna competencia: no tienes su lista, así que cualquiera que escribas te la estarías inventando.`;
+  }
+  const mod = (v: number) => {
+    const m = Math.floor((v - 10) / 2);
+    return m >= 0 ? `+${m}` : `${m}`;
+  };
+  const lineas: string[] = [];
+  if (a) {
+    lineas.push(
+      `- 🎲 SUS ATRIBUTOS — FUE ${a.str} (${mod(a.str)}) · DES ${a.dex} (${mod(a.dex)}) · CON ${a.con} (${mod(a.con)}) · INT ${a.int} (${mod(a.int)}) · SAB ${a.wis} (${mod(a.wis)}) · CAR ${a.cha} (${mod(a.cha)})` +
+        `${pc.proficiencyBonus ? ` · competencia +${pc.proficiencyBonus}` : ''}. Calibra las CD con esto: lo que para ella es fácil y lo que es cuesta arriba sale de aquí, no de lo que te parezca.`
+    );
+  }
+  if (salv?.length) lineas.push(`- 🛡️ Salvaciones con competencia: ${salv.join(', ')}.`);
+  if (comps?.length) {
+    lineas.push(
+      `- 📚 SUS COMPETENCIAS ENTRENADAS, Y NO HAY MÁS: ${comps
+        .map(c => `${c.nombre}${typeof c.bono === 'number' ? ` ${c.bono >= 0 ? '+' : ''}${c.bono}` : ''}`)
+        .join(' · ')}. ⛔ Estas son las ÚNICAS que puedes nombrar, y siempre SUMADAS a un atributo, nunca solas: \`[Petición de Tirada: SAB + Supervivencia | CD 15]\`, jamás \`[Petición de Tirada: Supervivencia]\`. Cualquier otra cosa que se te ocurra —Sigilo, Engaño, Persuasión, Acrobacias— NO la tiene: eso se pide con el atributo a secas.`
+    );
+  }
+  if (pc.passivePerception) {
+    lineas.push(
+      `- 👁️ Percepción pasiva ${pc.passivePerception}. Es contra este número contra el que tiras en secreto lo que se le acerca sin que lo vea.`
+    );
+  }
+  lineas.push(
+    `- ⚠️ Esto es su ficha de PARTIDA, congelada en el nivel que tuviera el día que se subió. Lo que gane subiendo de nivel no está aquí hasta que se anote: si te dice que ha subido y qué ha cogido, apúntalo con \`[FICHA: ...]\` y a partir de ahí cuenta.`
+  );
+  return lineas.join('\n');
+})()}
 ${pc.languages?.length
   ? `- IDIOMAS QUE HABLA Y ENTIENDE: ${pc.languages.join(', ')} ← SOLO ESTOS. Cualquier otro idioma le resulta ruido o fonética incomprensible: no capta palabras sueltas, ni el sentido general por el tono, ni los gestos de un código manual o alienígena que no conozca.`
   : `- IDIOMAS: no constan en la ficha. Da por supuesto ÚNICAMENTE el idioma estándar/común de su entorno. Cualquier lengua foránea, dialecto alienígena, código de facción o jerga desconocida NO la entiende.`}
@@ -3654,7 +3704,9 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
    - [PREPARADO: Título | tipo: escena/encuentro/complicacion/revelacion/pnj | detalle: qué pasa | cuando: en qué momento encaja | hilo: de qué cuelga | si nadie va: qué pasa en el mundo si esto no se usa nunca] — guarda algo listo para usar más adelante, que es lo que hace un director antes de sentarse. Emítelo cuando se te ocurra algo bueno que AHORA no toca: así no se pierde y no acabas improvisándolo en caliente. Y cuando lo uses, ciérralo con [PREPARADO: el mismo título | usada: sí]. ⛔ Nada de esto se narra: es tu material. ⭐ **Rellena siempre «si nadie va»**, que es lo que separa una trampa de una promesa: si preparas una emboscada en el faro y ella no va al faro, el farero sigue muerto, la señal sigue apagada y algún barco encalla. No ir también es una decisión, y una decisión sin consecuencia es que daba igual.
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
     - [COMENTARIO_DM: comentario breve, simpático, sincero o ingenioso del DM fuera de personaje] — OPCIONAL (1-2 frases). Emítelo solo cuando ocurra algo genuinamente divertido, una pifia o éxito crítico épico, una jugarreta memorable del PJ a un PNJ (o viceversa), o un momento de rol memorable. Este comentario se envía automáticamente al chat OOC de la Mesa como un mensaje del DM, con tu personalidad entusiasta, cómica, sincera y rolera de colega de mesa. Si el turno es rutinario, formal o solemne, OMITE totalmente esta etiqueta.
-${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | condiciones: lista separada por comas, o "ninguna"]
+${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | agotamiento: 0-10 | condiciones: lista separada por comas, o "ninguna"]
+   - [DOLENCIA: nombre | cd: 12 | exitos: 0-2] para abrir o llevar una enfermedad, y [DOLENCIA: nombre | curada] para cerrarla. Dos éxitos SEGUIDOS la curan; un fallo la agrava o suma un nivel de agotamiento. Si la enfermedad no se anota aquí, no existe pasado este turno.
+   - [FICHA: sab 18 | comp 3 | pasiva 16 | +Sigilo 5] — SOLO cuando suba de nivel o la jugadora te corrija sus números. Su ficha se subió congelada en el nivel de aquel día: una puntuación que sube, un bonificador que cambia o una competencia nueva no existen hasta que los apuntes aquí, y hasta entonces sigues calibrando sus tiradas con los datos de entonces. Las competencias se añaden con «+Nombre bono» y SUMAN a las que ya tiene.
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
 
   // Todo lo que cambia de un turno a otro. Va detrás para no romper el prefijo
@@ -3701,6 +3753,44 @@ ${calendarioSection}
 
 ### ESTADO ACTUAL DEL PROTAGONISTA (AHORA MISMO)
 Estado actual conocido: PG ${pc?.hp ?? '?'}/${pc?.maxHp ?? '?'}, CA ${pc?.ac ?? '?'}${pc?.conditions?.length ? `, condiciones: ${pc.conditions.join(', ')}` : ''}.
+${(() => {
+  /*
+   * 😮‍💨 EL AGOTAMIENTO, COMO NÚMERO Y CON SU CUENTA HECHA.
+   *
+   * El agotamiento de esta mesa es aritmética: −1 a TODAS las tiradas de d20
+   * por nivel. Vivía como palabra suelta dentro de «condiciones», y con texto
+   * libre no se suma nada: se escribía una vez y no volvía a descontarse ni a
+   * subir. Aquí va el número, y va con el −X ya calculado, porque pedirle a un
+   * modelo pequeño que reste en mitad de una escena es pedirle que se olvide.
+   */
+  const n = pc?.agotamiento;
+  const partes: string[] = [];
+  if (typeof n === 'number' && n > 0) {
+    partes.push(
+      `😮‍💨 AGOTAMIENTO NIVEL ${n} DE 10 → **−${n} a TODAS sus tiradas de d20** (ataques, salvaciones y pruebas de atributo) y −${n * 5} pies de velocidad. ` +
+        `Aplícalo a cada CD y a cada resultado, y que se le NOTE en la prosa: le pesan los brazos, tarda en enfocar, se apoya donde antes no se apoyaba. ` +
+        (n >= 8
+          ? `⚠️ A este nivel está al borde: al 10 muere o se desploma. `
+          : '') +
+        `Un descanso largo con comida y agua le quita uno; súbelo o bájalo con \`[ESTADO: agotamiento: N]\` cuando la escena lo justifique.`
+    );
+  }
+  const males = pc?.dolencias?.filter(d => d?.nombre) || [];
+  if (males.length) {
+    partes.push(
+      `🤒 ENFERMA: ${males
+        .map(
+          d =>
+            `**${d.nombre}**${d.cd ? ` (salvación de CON, CD ${d.cd})` : ''} — lleva ${d.exitos || 0}/2 éxitos seguidos` +
+            `${d.notas ? `. ${d.notas}` : ''}`
+        )
+        .join(' · ')}. ` +
+        `Cada 24 h de mundo o cada descanso largo le toca una salvación: dos éxitos SEGUIDOS la curan, y un fallo agrava los síntomas o le añade un nivel de agotamiento. ` +
+        `Lleva la cuenta con \`[DOLENCIA: nombre | exitos: N]\` y quítala con \`[DOLENCIA: nombre | curada]\`. ⛔ Y que se note en cada escena: la enfermedad no es una etiqueta, es sudor, temblor y decisiones peores.`
+    );
+  }
+  return partes.join('\n');
+})()}
 ${
   pc?.name || pc?.race || pc?.languages?.length
     ? `
@@ -4068,7 +4158,15 @@ export async function generateStoryTurnStream({
   /** Permite cortar la generación desde la interfaz sin perder lo ya escrito. */
   signal?: AbortSignal;
   /** El Narrador informa del estado del protagonista al cerrar su turno. */
-  onStateReported?: (state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] }) => void;
+  onStateReported?: (state: {
+    hp?: number;
+    maxHp?: number;
+    ac?: number;
+    conditions?: string[];
+    agotamiento?: number;
+    ficha?: FichaCorregida;
+    dolencias?: CambioDeDolencia[];
+  }) => void;
   /** El Narrador informa de cuánto tiempo ha pasado y de qué queda en marcha. */
   onTimeReported?: (t: TiempoReportado) => void;
   /** Informa de los tokens consumidos en el turno (entrada, salida, total). */
@@ -4750,7 +4848,15 @@ async function saveStreamedMessage(
   chat: Chat,
   fullText: string,
   onSaveMessage?: (updatedChat: Chat) => Promise<void> | void,
-  onStateReported?: (state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] }) => void,
+  onStateReported?: (state: {
+    hp?: number;
+    maxHp?: number;
+    ac?: number;
+    conditions?: string[];
+    agotamiento?: number;
+    ficha?: FichaCorregida;
+    dolencias?: CambioDeDolencia[];
+  }) => void,
   onTimeReported?: (t: TiempoReportado) => void,
   /**
    * Los guardados intermedios del flujo van con `false`. El estado es idempotente
@@ -4868,9 +4974,27 @@ async function saveStreamedMessage(
   }
 
 
+  /*
+   * Estado, ficha y dolencias salen por el MISMO canal.
+   *
+   * Las tres cosas acaban en `player_character`, y abrir tres caminos paralelos
+   * hasta la memoria era repetir el error de siempre: tres sitios donde
+   * enterarse, y uno de ellos sin conectar. Se parsean aquí y viajan juntas.
+   */
   const { cleaned, state } = parseStateTag(cleanedText);
   cleanedText = cleaned;
-  if (state && onStateReported) onStateReported(state);
+  const deLaFicha = parseFichaTag(cleanedText);
+  cleanedText = deLaFicha.cleaned;
+  const deDolencias = parseDolenciaTags(cleanedText);
+  cleanedText = deDolencias.cleaned;
+
+  if (onStateReported && (state || deLaFicha.ficha || deDolencias.cambios.length)) {
+    onStateReported({
+      ...(state || {}),
+      ...(deLaFicha.ficha ? { ficha: deLaFicha.ficha } : {}),
+      ...(deDolencias.cambios.length ? { dolencias: deDolencias.cambios } : {})
+    });
+  }
 
   const newMessages = [...chat.messages];
   if (targetMessageIndex !== undefined && newMessages[targetMessageIndex]) {
@@ -6902,6 +7026,8 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 - \`[INVENTARIO: +1 Objeto, -2 Otro, ~1 Objeto (en poder de: Quién | donde: Dónde), -15 PO]\` — corrige la mochila y el dinero. Sirve para meter lo que el personaje ya traía de casa y nunca se apuntó («mi violín no está en la lista»), y para quitar lo que sobra.
   - **\`~\` es «se lo han quitado»**, y es distinto de \`-\`. Si la requisaron, la detuvieron, la registraron o la robaron, sus cosas siguen siendo suyas y las tiene otro: van con \`~\` y con quién las tiene. Borrarlas con \`-\` hace desaparecer al personaje de la partida —sus documentos, sus herramientas y sus reliquias son lo que la define—. Cuando las recupere, \`+\` se las devuelve a las manos.
 - \`[APRENDE: +Nombre (tipo)]\` — apunta un conjuro, un rasgo, una competencia, un idioma o una mejora de característica que ella tenga y no conste. Tipos: conjuro, rasgo, competencia, mejora. Es LA vía para arreglar el hueco más silencioso que hay: su ficha se subió congelada en un nivel y todo lo que ha ganado subiendo desde entonces no está escrito en ninguna parte. Si te dice «al subir a nivel 4 cogí Bola de fuego y +2 a Sabiduría», lo apuntas y ya cuenta: \`[APRENDE: +Bola de fuego (conjuro), +2 a Sabiduría (mejora, nivel 4)]\`.
+- \`[FICHA: sab 18 | comp 3 | pasiva 16 | +Sigilo 5]\` — el HERMANO MECÁNICO del anterior, y hace falta aparte. \`[APRENDE:]\` deja escrito QUÉ ha ganado, en palabras; \`[FICHA:]\` cambia los NÚMEROS con los que tú calibras cada tirada suya. Si sube a nivel 4 y se pone la Sabiduría a 18, \`[APRENDE:]\` lo cuenta y \`[FICHA: sab 18]\` hace que de verdad tires contra 18. Úsalas juntas cuando suba de nivel. Las competencias se añaden con «+Nombre bono» y SUMAN a las suyas de partida, no las reemplazan.
+- \`[DOLENCIA: nombre | cd: 12 | exitos: 1]\` — abrir o llevar la cuenta de una enfermedad; \`[DOLENCIA: nombre | curada]\` la cierra. Dos éxitos seguidos curan, un fallo agrava. Si no se anota aquí, la enfermedad se olvida en cuanto acabe el turno.
 - \`[BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama]\` — apunta en tu cuaderno algo que ha pasado fuera de cámara. Sirve para cuando ella te pregunta «¿qué ha estado haciendo X estos días?» y hay que dejarlo escrito, o para corregir un apunte que se quedó corto. Queda fechado en el día de campaña actual.
 - \`[ESTAMOS: dónde transcurre la escena ahora]\` — **DÓNDE ESTÁIS DE VERDAD.** Es la corrección más importante que puedes hacer y hasta ahora no la tenías: si ella te dice que el Narrador la ha plantado en un sitio en el que no está, esto lo arregla. ⭐ **Emítela SIEMPRE que aceptes que el sitio está mal**, no te limites a decir que lo corriges: sin la etiqueta no se corrige nada y el Narrador vuelve a llevarla al mismo sitio el turno siguiente, porque lo que él lee es el diario, no esta conversación. Ejemplo: \`[ESTAMOS: la bodega de proa del bergantín corsario, en alta mar en el Mar de las Espadas]\`.
 - \`[VIAJE: destino | jornadas: N]\` y \`[VIAJE: cancelar]\` — el trayecto largo en marcha. Ábrelo si resulta que están de camino y nadie lo estaba contando; **cancélalo** si el viaje ya no va a ocurrir o si de verdad han llegado y la cuenta se quedó descolgada. ⚠️ \`[VIAJE: fin]\` solo cierra si las jornadas están cumplidas; para abandonar un camino a medias, \`cancelar\`.
@@ -6936,7 +7062,7 @@ La jugadora NO entra a tocar la memoria, las fichas ni el diario con las manos: 
 
 QUÉ NO HACES AQUÍ:
 - ⛔ NO narras, NO haces avanzar la historia y NO decides acciones del personaje. Si te piden jugar algo, recuérdales que eso va en la pestaña de Jugar.
-- ⛔ NO haces avanzar el reloj de la partida: aquí no pasa el tiempo ni se escribe crónica, así que nada de \`[TIEMPO:]\`, \`[AGENDA:]\` ni \`[PRESENTES:]\`. ✅ **Todas las demás etiquetas del apartado de arriba SÍ son tuyas y se aplican de verdad**, incluidas \`[NIVEL:]\`, \`[BAMBALINAS:]\`, \`[RELOJ:]\`, \`[FACCIÓN:]\`, \`[PREPARADO:]\`, \`[LUGAR:]\`, \`[ESTADO:]\`, \`[ESTAMOS:]\`, \`[VIAJE:]\`, \`[PUENTE:]\` y \`[APRENDE:]\`. No te cortes con ellas: corregir la memoria es tu trabajo, y una corrección que solo cuentas en prosa **no cambia nada de la aplicación**.
+- ⛔ NO haces avanzar el reloj de la partida: aquí no pasa el tiempo ni se escribe crónica, así que nada de \`[TIEMPO:]\`, \`[AGENDA:]\` ni \`[PRESENTES:]\`. ✅ **Todas las demás etiquetas del apartado de arriba SÍ son tuyas y se aplican de verdad**, incluidas \`[NIVEL:]\`, \`[BAMBALINAS:]\`, \`[RELOJ:]\`, \`[FACCIÓN:]\`, \`[PREPARADO:]\`, \`[LUGAR:]\`, \`[ESTADO:]\`, \`[ESTAMOS:]\`, \`[VIAJE:]\`, \`[PUENTE:]\`, \`[APRENDE:]\`, \`[DOLENCIA:]\` y \`[FICHA:]\`. No te cortes con ellas: corregir la memoria es tu trabajo, y una corrección que solo cuentas en prosa **no cambia nada de la aplicación**.
 - ⛔ NO reveles secretos que el personaje no sepa a menos que te lo pregunten explícitamente como jugadora («dime la verdad como Director»). Si dudas, pregunta si quiere saberlo antes de soltarlo.
 - Si no sabes algo porque no consta en los documentos ni en lo que tienes delante, dilo. No lo inventes.
 ${buscarEnLaWeb ? `
@@ -7375,6 +7501,13 @@ export interface IdentidadLeida {
   class?: string;
   languages?: string[];
   appearance?: string;
+  /** Los seis, con su puntuación (no el modificador). Contra esto se tira todo. */
+  attributes?: PlayerAttributes;
+  proficiencyBonus?: number;
+  /** Sus competencias INICIALES, las de la ficha subida, con su bonificador. */
+  skillProficiencies?: { nombre: string; bono?: number }[];
+  savingThrowProficiencies?: string[];
+  passivePerception?: number;
   /**
    * Sus rasgos ACTIVOS, ya en una línea por rasgo.
    *
@@ -7511,6 +7644,11 @@ Estos cuatro datos viajan al Narrador en cada turno como hechos fijos, así que 
   - Marca \`"deMision": true\` y rellena \`"encargo"\` SOLO si es una tarea con forma de objeto: una carta que entregar, algo que traducir, algo que hay que devolver.
   - ⛔ No te inventes equipo estándar de aventurero que el documento no nombre. Si no está escrito, no existe.
 - "currencies": el dinero con el que empieza, si la ficha lo dice, como \`{ "gp": 0, "sp": 0, "cp": 0, "ep": 0, "pp": 0 }\`. Si no consta, omite el campo entero.
+- "attributes": ⭐ SUS SEIS ATRIBUTOS, como \`{ "str": 8, "dex": 12, "con": 12, "int": 15, "wis": 16, "cha": 14 }\`. **La PUNTUACIÓN, no el modificador**: si la ficha pone «16 (+3)», el número que va aquí es el 16. Suelen venir en una tabla de seis columnas cerca del principio, con los nombres en el idioma del documento (FUE/DES/CON/INT/SAB/CAR = str/dex/con/int/wis/cha). Si no las encuentras, omite el campo: inventarlas es peor que no tenerlas, porque contra ellas se piden todas las tiradas.
+- "proficiencyBonus": su bonificador de competencia, solo el número (de «Comp. +2» sale \`2\`).
+- "skillProficiencies": ARRAY con sus competencias o pericias ENTRENADAS y el bonificador de cada una: \`[{ "nombre": "Naturaleza", "bono": 7 }, { "nombre": "Percepción", "bono": 5 }]\`. ⭐ Este campo importa más de lo que parece: el Narrador tiene PROHIBIDO nombrar una competencia que no conste, así que si esto viene vacío no puede usar ninguna —ni las que ella tiene de verdad—. Saca las que la ficha le atribuya explícitamente, con su nombre tal cual y su número. Si la ficha distingue niveles (expertas / competentes), da igual: van todas en la misma lista, cada una con su bono.
+- "savingThrowProficiencies": ARRAY con los nombres de los atributos en los que tiene competencia en salvaciones: \`["SAB", "INT"]\`.
+- "passivePerception": su percepción pasiva, solo el número. Es contra lo que el Narrador tira en secreto para que no la pille una emboscada, así que si consta, ponla.
 
 ⛔ Si un dato NO consta en los documentos, omite el campo. No lo deduzcas del nombre, del lugar de origen ni de lo que te parezca probable: un dato inventado aquí se convierte en canon y contradice lo que la jugadora tenga escrito.
 
@@ -7579,6 +7717,52 @@ Responde ÚNICAMENTE con el JSON, sin nada más:
     .filter(Boolean)
     .slice(0, 60) as InventoryItem[];
 
+  /*
+   * ⭐ ATRIBUTOS Y COMPETENCIAS, QUE ESTABAN EN EL ENVÍO Y NO LLEGABAN.
+   *
+   * Los campos existían en el tipo desde siempre y se rellenaban... para los
+   * PNJs. Para ella, no: ni se leían ni se mandaban. Y su ficha entera SÍ viaja
+   * cada turno como documento permanente, así que los atributos estaban en la
+   * petición —dentro de una tabla de markdown, en el carácter mil y pico de un
+   * documento de cincuenta mil—. Estar en el envío no es llegar: mismo fallo
+   * que con sus rasgos activos y con su equipo.
+   *
+   * Sin esto, dos reglas escritas de la mesa no pueden cumplirse: «toda tirada
+   * se pide contra uno de los seis atributos» y «nunca inventes una
+   * competencia, solo las que consten en su ficha» — con la lista vacía, o se
+   * las inventa o no usa ninguna.
+   */
+  const num = (v: any, min: number, max: number) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) && n >= min && n <= max ? n : undefined;
+  };
+
+  const atr = p?.attributes && typeof p.attributes === 'object' ? p.attributes : null;
+  const atributos: PlayerAttributes | undefined = atr
+    ? (() => {
+        const seis = (['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(k => num(atr[k], 1, 30));
+        // O están los seis o no está ninguno: media tabla de atributos es peor
+        // que ninguna, porque los que falten se rellenarían a ojo.
+        return seis.every(v => v !== undefined)
+          ? ({ str: seis[0], dex: seis[1], con: seis[2], int: seis[3], wis: seis[4], cha: seis[5] } as PlayerAttributes)
+          : undefined;
+      })()
+    : undefined;
+
+  const competencias = (Array.isArray(p?.skillProficiencies) ? p.skillProficiencies : [])
+    .map((x: any) => {
+      const nombreComp = txt(typeof x === 'string' ? x : x?.nombre, 60);
+      if (!nombreComp) return null;
+      return { nombre: nombreComp, bono: typeof x === 'string' ? undefined : num(x?.bono, -5, 30) };
+    })
+    .filter(Boolean)
+    .slice(0, 30) as { nombre: string; bono?: number }[];
+
+  const salvaciones = (Array.isArray(p?.savingThrowProficiencies) ? p.savingThrowProficiencies : [])
+    .map((x: any) => txt(String(x), 20))
+    .filter(Boolean)
+    .slice(0, 6) as string[];
+
   const bolsa = p?.currencies && typeof p.currencies === 'object' ? p.currencies : null;
   const monedas: PlayerCurrencies | undefined = bolsa
     ? (['cp', 'sp', 'ep', 'gp', 'pp'] as const).reduce((acc, k) => {
@@ -7592,6 +7776,11 @@ Responde ÚNICAMENTE con el JSON, sin nada más:
     name: nombre && !generico.test(nombre) ? nombre : undefined,
     race: txt(p?.race, 80),
     class: txt(p?.class, 80),
+    attributes: atributos,
+    proficiencyBonus: num(p?.proficiencyBonus, 1, 12),
+    skillProficiencies: competencias.length ? competencias : undefined,
+    savingThrowProficiencies: salvaciones.length ? salvaciones : undefined,
+    passivePerception: num(p?.passivePerception, 1, 40),
     languages: idiomas?.length ? idiomas : undefined,
     appearance: txt(p?.appearance, 1200),
     /*
@@ -8935,15 +9124,132 @@ export function murioPorSegundoPlano(err: unknown, inicio: number): boolean {
   return classifyApiError(err).isNetwork && seOcultoLaApp(inicio);
 }
 
+/**
+ * `[FICHA: ...]` — corregir atributos y competencias desde la Mesa.
+ *
+ * Su ficha se sube UNA VEZ y se queda congelada en el nivel que tuviera aquel
+ * día. Todo lo que gane subiendo —una puntuación que sube, una competencia
+ * nueva, el bonificador que cambia— no está escrito en ninguna parte, y sin una
+ * vía para anotarlo el Narrador sigue calibrando las tiradas con los números de
+ * nivel 1 tres niveles después, sin que nadie entienda por qué salen raras.
+ *
+ * Formatos que entiende, todos opcionales y combinables:
+ *   [FICHA: fue 10 | des 14 | sab 18]
+ *   [FICHA: competencia +Sigilo 5, +Engaño 4]
+ *   [FICHA: comp 3 | pasiva 16 | salvaciones SAB, INT]
+ */
+export interface FichaCorregida {
+  attributes?: Partial<PlayerAttributes>;
+  proficiencyBonus?: number;
+  passivePerception?: number;
+  savingThrowProficiencies?: string[];
+  skillProficiencies?: { nombre: string; bono?: number }[];
+}
+
+export interface CambioDeDolencia {
+  nombre: string;
+  cd?: number;
+  exitos?: number;
+  notas?: string;
+  curada?: boolean;
+}
+
+export function parseFichaTag(text: string): { cleaned: string; ficha: FichaCorregida | null } {
+  const match = text.match(/\[FICHA:([^\]]*)\]/i);
+  if (!match) return { cleaned: text, ficha: null };
+  const body = match[1];
+  const cleaned = text.replace(match[0], '').trim();
+  const ficha: any = {};
+
+  const ATRIBUTOS: [RegExp, keyof PlayerAttributes][] = [
+    [/\b(?:fue|fuerza|str|strength)\s*:?\s*(\d{1,2})\b/i, 'str'],
+    [/\b(?:des|destreza|dex|dexterity)\s*:?\s*(\d{1,2})\b/i, 'dex'],
+    [/\b(?:con|constituci[oó]n|constitution)\s*:?\s*(\d{1,2})\b/i, 'con'],
+    [/\b(?:int|inteligencia|intelligence)\s*:?\s*(\d{1,2})\b/i, 'int'],
+    [/\b(?:sab|sabidur[ií]a|wis|wisdom)\s*:?\s*(\d{1,2})\b/i, 'wis'],
+    [/\b(?:car|carisma|cha|charisma)\s*:?\s*(\d{1,2})\b/i, 'cha']
+  ];
+  const attrs: Partial<PlayerAttributes> = {};
+  for (const [re, clave] of ATRIBUTOS) {
+    const m = body.match(re);
+    if (m) {
+      const v = parseInt(m[1], 10);
+      if (v >= 1 && v <= 30) attrs[clave] = v;
+    }
+  }
+  if (Object.keys(attrs).length) ficha.attributes = attrs;
+
+  // «comp 3» es el bonificador; ojo con no confundirlo con «competencia +X».
+  const bono = body.match(/\b(?:comp|bonificador\s+de\s+competencia|prof)\s*:?\s*\+?(\d{1,2})\b/i);
+  if (bono) ficha.proficiencyBonus = Math.max(1, Math.min(12, parseInt(bono[1], 10)));
+
+  const pasiva = body.match(/\b(?:pasiva|percepci[oó]n\s+pasiva|passive)\s*:?\s*(\d{1,2})\b/i);
+  if (pasiva) ficha.passivePerception = Math.max(1, Math.min(40, parseInt(pasiva[1], 10)));
+
+  const salv = body.match(/\bsalvaciones?\s*:?\s*([^|\]]+)/i);
+  if (salv) {
+    const lista = salv[1]
+      .split(/[,;]/)
+      .map(x => x.trim().toUpperCase())
+      .filter(x => /^(FUE|DES|CON|INT|SAB|CAR)$/.test(x));
+    if (lista.length) ficha.savingThrowProficiencies = lista;
+  }
+
+  /*
+   * Las competencias se anotan con «+Nombre bono», y el «+» es a propósito:
+   * esto SUMA a lo que ya tiene, no lo reemplaza. Lo que trae su ficha son sus
+   * competencias de partida; lo que gane jugando se añade encima.
+   */
+  const comps: { nombre: string; bono?: number }[] = [];
+  for (const m of body.matchAll(/\+\s*([\p{L}][\p{L} '-]{1,40}?)\s*(?:\+?(\d{1,2}))?(?=\s*[,;|\]]|$)/gu)) {
+    const nombre = m[1].trim();
+    if (!nombre || /^(competencias?|pericias?|salvaciones?)$/i.test(nombre)) continue;
+    comps.push({ nombre, bono: m[2] ? parseInt(m[2], 10) : undefined });
+  }
+  if (comps.length) ficha.skillProficiencies = comps.slice(0, 20);
+
+  return { cleaned, ficha: Object.keys(ficha).length ? ficha : null };
+}
+
+/**
+ * `[DOLENCIA: nombre | cd: 12 | exitos: 1]` o `[DOLENCIA: nombre | curada]`.
+ *
+ * Una enfermedad es una cuenta que avanza cada 24 h, no una palabra en la lista
+ * de condiciones: dos éxitos SEGUIDOS la curan y un fallo la agrava. Sin sitio
+ * donde llevar esa cuenta, la dolencia se escribía una vez y se quedaba ahí
+ * para siempre o desaparecía sin que nadie la curara.
+ */
+export function parseDolenciaTags(text: string): { cleaned: string; cambios: CambioDeDolencia[] } {
+  const cambios: CambioDeDolencia[] = [];
+  let cleaned = text;
+  for (const m of text.matchAll(/\[DOLENCIA:([^\]]*)\]/gi)) {
+    cleaned = cleaned.replace(m[0], '');
+    const partes = m[1].split('|').map(x => x.trim()).filter(Boolean);
+    const nombre = (partes.shift() || '').trim();
+    if (!nombre) continue;
+    const entrada: CambioDeDolencia = { nombre };
+    for (const campo of partes) {
+      if (/^(curada|curado|sana|resuelta|fuera)$/i.test(campo)) { entrada.curada = true; continue; }
+      const cd = campo.match(/^cd\s*:?\s*(\d{1,2})$/i);
+      if (cd) { entrada.cd = parseInt(cd[1], 10); continue; }
+      const ex = campo.match(/^[eé]xitos?\s*:?\s*(\d)$/i);
+      if (ex) { entrada.exitos = Math.max(0, Math.min(2, parseInt(ex[1], 10))); continue; }
+      entrada.notas = campo.slice(0, 200);
+    }
+    cambios.push(entrada);
+  }
+  return { cleaned: cleaned.trim(), cambios };
+}
+
 export function parseStateTag(text: string): {
   cleaned: string;
-  state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] } | null;
+  state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[]; agotamiento?: number } | null;
 } {
   const match = text.match(/\[ESTADO:([^\]]*)\]/i);
   if (!match) return { cleaned: text, state: null };
 
   const body = match[1];
-  const state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[] } = {};
+  const state: { hp?: number; maxHp?: number; ac?: number; conditions?: string[]; agotamiento?: number } = {};
 
   const hp = body.match(/(?:PG|HP|vida)\s*:?\s*(\d+)\s*\/\s*(\d+)/i);
   if (hp) {
@@ -8956,6 +9262,9 @@ export function parseStateTag(text: string): {
 
   const ac = body.match(/(?:CA|AC|defensa)\s*:?\s*(\d+)/i);
   if (ac) state.ac = parseInt(ac[1], 10);
+
+  const ago = body.match(/(?:agotamiento|fatiga|exhaustion)\s*:?\s*(\d+)/i);
+  if (ago) state.agotamiento = Math.max(0, Math.min(10, parseInt(ago[1], 10)));
 
   const cond = body.match(/condiciones?\s*:?\s*([^|\]]*)/i);
   if (cond) {

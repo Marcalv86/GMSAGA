@@ -354,7 +354,7 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud, project }) => {
         {/* Cabecera / Barra principal del Cintillo */}
         <div
           onClick={() => setCollapsed(!collapsed)}
-          className={`px-3.5 py-2 flex items-center justify-between gap-2 bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] cursor-pointer hover:bg-[color-mix(in_srgb,var(--surface)_75%,transparent)] transition-colors ${
+          className={`px-3.5 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] cursor-pointer hover:bg-[color-mix(in_srgb,var(--surface)_75%,transparent)] transition-colors ${
             collapsed ? '' : 'border-b border-[var(--glass-border)]/50'
           }`}
           title={collapsed ? 'Pulsa para expandir detalles de la escena' : 'Pulsa para contraer'}
@@ -381,11 +381,29 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud, project }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0 shrink">
+            {/*
+              LA PASTILLA DE FECHA, QUE EN EL MÓVIL SE MONTABA SOBRE SÍ MISMA.
+
+              Era `shrink-0` con una cadena de cincuenta y cinco caracteres
+              dentro —«1 de Altosolar (Alturiak) de 1492 CV · Mediodía
+              (12:35)»—, así que en una pantalla de 360 px se negaba a
+              encogerse, desbordaba la tarjeta y el texto acababa pisando el
+              icono de la izquierda.
+
+              Ahora: en el móvil va SOLO la hora, que es el dato que se mira de
+              un vistazo; la fecha completa vuelve a partir de `sm`. Y por si
+              acaso, la pastilla se encoge y corta en vez de desbordar. La
+              cadena entera sigue estando en el `title` para quien la quiera.
+            */}
             {fullTime && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-cinzel font-medium bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)] border border-[var(--accent)]/20">
-                <Clock className="w-3 h-3 opacity-70" />
-                <span>{fullTime}</span>
+              <span
+                className="inline-flex items-center gap-1 min-w-0 max-w-full px-2 py-0.5 rounded-full text-[11px] font-cinzel font-medium bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)] border border-[var(--accent)]/20"
+                title={fullTime}
+              >
+                <Clock className="w-3 h-3 opacity-70 shrink-0" />
+                <span className="truncate hidden sm:inline">{fullTime}</span>
+                <span className="truncate sm:hidden">{hud.timeOfDay || hud.date}</span>
               </span>
             )}
             
