@@ -3973,12 +3973,47 @@ ${bloqueVivo}`;
     ? `\n\n[⛔ CÓMO SE LEE LO QUE ACABA DE ESCRIBIR LA JUGADORA (aplícalo, no lo narres): eso NO es prosa tuya que continuar, es lo que ella DECLARA, esté en primera o en tercera persona y lleve corchetes o no. 1) No se lo devuelvas ampliado: ni gestos, ni posturas, ni miradas, ni MOTIVOS que ella no haya escrito. Arranca por el mundo. 2) De todo lo que haya ahí, para el mundo solo EXISTE lo que un testigo con ojos y oídos habría captado desde donde está. Los juicios, opiniones, comparaciones, recuerdos y motivos NO han salido de su boca: ningún PNJ los responde, los alude ni los adivina. Callar sí se ve, y un PNJ puede interpretarlo mal —eso es bueno—; acertar con el porqué porque tú lo has leído, no.]`
     : '';
 
+  /*
+   * ✂️ EL PRESUPUESTO DE PALABRAS, CALCULADO Y DICHO EN NÚMEROS.
+   *
+   * La regla de «ajusta el largo a lo que te han dado» está escrita arriba y no
+   * basta, porque Gemini está entrenado para ser exhaustivo y llena el espacio
+   * que le dejes: le digas lo que le digas, devuelve su párrafo y medio. Un
+   * «uno o dos párrafos» es elástico y él lo estira; un número no.
+   *
+   * Así que el largo no se le pide, se le CALCULA: la aplicación sabe cuánto ha
+   * escrito la jugadora y le pone el techo aquí, al final del todo, que es lo
+   * último que lee antes de ponerse a escribir.
+   *
+   * ⚠️ Y va dicho como TECHO, nunca como objetivo, porque un modelo que recibe
+   * un número lo trata como una cuota que hay que llenar — que es exactamente
+   * el problema que se quiere resolver, solo que con más pasos.
+   */
+  const palabrasDeElla = userText.trim().split(/\s+/).filter(Boolean).length;
+  const esTurnoInicial = (currentChat.messages || []).length <= 1;
+  const techoDePalabras = !palabrasDeElla
+    ? 0
+    : palabrasDeElla <= 12
+      ? 90
+      : palabrasDeElla <= 40
+        ? 170
+        : palabrasDeElla <= 120
+          ? 280
+          : 420;
+  const presupuestoDeTurno =
+    techoDePalabras && !esTurnoInicial
+      ? `\n\n[✂️ LARGO DE ESTE TURNO — la jugadora ha escrito ${palabrasDeElla} ${palabrasDeElla === 1 ? 'palabra' : 'palabras'}, así que este turno va de unas **${techoDePalabras} palabras como TECHO**.` +
+        ` ⚠️ Es un límite, NO un objetivo: si lo que hay que contar cabe en dos frases, se cuenta en dos frases y se acaba el turno. ⛔ No rellenes con ambiente, ni recapitules lo que ya pasó, ni cierres con una reflexión bonita para ocupar el hueco — el relleno no entra por no tener qué decir, entra por pudor a que el turno se vea corto.` +
+        ` ✅ La excepción, y solo esta: si en este turno se llega a un lugar nuevo o cae una revelación grande de verdad, puedes pasarte — y entonces se nota que era necesario.]`
+      : '';
+
   const esTurnoUno = (currentChat.messages || []).length <= 1;
   const turnOneScanPrompt = esTurnoUno 
     ? `\n\n[⛔ TURNO 1 DE CAMPAÑA - ESCANEO INICIAL OBLIGATORIO DE DOCUMENTOS DE ARRANQUE]: Este es el primer turno de la campaña. Has recibido documentos adjuntos de arranque y premisa. Analízalos a fondo. Si la premisa o el documento de arranque sitúa al grupo en alta mar, en un barco, o en trayecto hacia un destino, ES OBLIGATORIO que declares en este primer turno las etiquetas [ESTAMOS: ...], [LUGAR: ...] y [VIAJE: Destino | jornadas: N] (ej. [VIAJE: Luskan | jornadas: 10]) para que la aplicación configure la travesía y el HUD correctamente. No dejes estos campos vacíos ni omitas el viaje si la premisa es marítima.`
     : '';
 
-  const finalUserPayload = userText + diceContext + recordatorioDeTurno + turnOneScanPrompt;
+  const finalUserPayload =
+    userText + diceContext + recordatorioDeTurno + turnOneScanPrompt + presupuestoDeTurno;
 
   if (lastRole === 'user') {
     contents[contents.length - 1].parts.push({ text: '\n\n' + finalUserPayload });
