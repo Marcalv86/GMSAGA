@@ -111,9 +111,11 @@ import {
   repasarEntreSesiones,
   rescatarFichaDePnj,
   extraerIdentidadDeDocumentos,
+  esFichaDelPj,
   murioPorSegundoPlano,
   extraerMecanicasDeDocumento,
   generarEtiquetasDeBusqueda,
+  generarEtiquetasDeBusquedaLote,
   relacionarBibliotecaInteligente,
   getStoredAutoVincular,
   elencoDeLaCampana,
@@ -761,6 +763,44 @@ export default function App() {
       );
     }
   }, [currentProject?.id, currentProject?.memory?.npcs]);
+
+  // 🪪 Auto-lectura de la ficha del protagonista (OC) en segundo plano
+  // En cuanto se detecta la ficha en los archivos o hay documentos candidatos,
+  // y la ficha del protagonista en memoria está vacía o sin nombre, se lee de inmediato.
+  const autoLecturaFichaRef = useRef<string>('');
+  useEffect(() => {
+    if (!currentPId || !currentFiles.length || isGenerating) return;
+    const proyecto = projectsRef.current.find(pr => pr.id === currentPId) || currentProject;
+    if (!proyecto) return;
+
+    const pc = proyecto.memory?.player_character;
+    const nombreDeReserva = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
+    const nombreActual = (pc?.name || '').trim();
+    const faltaNombre = !nombreActual || nombreDeReserva.test(nombreActual);
+    const faltaAlgo =
+      faltaNombre ||
+      !pc?.race ||
+      !pc?.class ||
+      !pc?.appearance ||
+      !pc?.languages?.length ||
+      !pc?.attributes;
+
+    if (!faltaAlgo) return;
+
+    const hayDocumentos = currentFiles.some(
+      f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 50
+    );
+    if (!hayDocumentos) return;
+
+    const huella = currentFiles
+      .map(f => `${f.id}:${f.category || ''}:${(f.content || '').length}`)
+      .join('|');
+    if (autoLecturaFichaRef.current === huella) return;
+
+    autoLecturaFichaRef.current = huella;
+    console.log('[AutoLectura Ficha OC] Ficha incompleta y documentos detectados. Lanzando lectura en segundo plano...');
+    void completarFichaDesdeDocumento(currentFiles);
+  }, [currentPId, currentFiles, currentProject?.memory?.player_character?.name]);
 
   // Project Management
   const handleCreateProject = () => {
@@ -3838,6 +3878,23 @@ export default function App() {
       setCurrentFiles(updated);
       await saveFilesToDB(currentPId, updated);
 
+      // 🪪 LECTURA INMEDIATA EN SEGUNDO PLANO DE LA FICHA DEL PROTAGONISTA (OC)
+      // En cuanto se detecta la ficha en los archivos recién subidos, se lee y procesa de inmediato
+      // en segundo plano sin obligar al usuario a pulsar ningún botón ni esperar otros lotes.
+      const hayFichaOTexto = newFilesList.some(
+        f => f.category === 'sheet_pj' || esFichaDelPj(f) || (!f.isImage && !f.isAudio && (f.content || '').trim().length > 50)
+      );
+      const proyectoRef = projectsRef.current.find(pr => pr.id === currentPIdRef.current) || currentProject;
+      const pcRef = proyectoRef?.memory?.player_character;
+      const nombreRes = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
+      const faltaNombreOc = !(pcRef?.name || '').trim() || nombreRes.test((pcRef?.name || '').trim());
+      const faltaDatosOc = faltaNombreOc || !pcRef?.race || !pcRef?.class || !pcRef?.appearance;
+
+      if (hayFichaOTexto && faltaDatosOc) {
+        console.log('[Upload] Ficha del OC detectada en la subida. Leyendo en segundo plano de inmediato...');
+        void completarFichaDesdeDocumento(updated);
+      }
+
       setAlertConfig({
         isOpen: true,
         title: 'Archivos Guardados',
@@ -3901,7 +3958,13 @@ export default function App() {
            * Va ANTES de montar la mesa a propósito: el borrador de campaña se
            * escribe mucho mejor sabiendo cómo se llama ella y qué es.
            */
-          if (newFilesList.some(f => f.category === 'sheet_pj')) {
+          const yaCompletoOc = (() => {
+            const curP = projectsRef.current.find(pr => pr.id === currentPIdRef.current);
+            const curPc = curP?.memory?.player_character;
+            const nRes = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
+            return Boolean(curPc?.name && !nRes.test(curPc.name) && curPc.race && curPc.class);
+          })();
+          if (newFilesList.some(f => f.category === 'sheet_pj') && !yaCompletoOc) {
             await completarFichaDesdeDocumento(currentFilesRef.current);
             await new Promise(r => setTimeout(r, 2000));
           }
@@ -4076,7 +4139,7 @@ export default function App() {
    * no se toca nunca, ni aunque el documento diga otra cosa: para eso está el
    * botón de leer la ficha, que sí avisa antes de sustituir.
    */
-  const completarFichaDesdeDocumento = async (archivos: ProjectFile[]) => {
+  const completarFichaDesdeDocumento = async (archivos?: ProjectFile[]) => {
     /*
      * El proyecto se lee de la referencia viva, no del cierre.
      *
@@ -4087,9 +4150,13 @@ export default function App() {
      */
     const proyecto = projectsRef.current.find(pr => pr.id === currentPIdRef.current) || currentProject;
     if (!proyecto) return;
+    const listaArchivos = archivos && archivos.length ? archivos : currentFilesRef.current;
+    if (!listaArchivos.length) return;
+
     const pc = proyecto.memory?.player_character;
     const nombreDeReserva = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
-    const faltaNombre = !(pc?.name || '').trim() || nombreDeReserva.test((pc?.name || '').trim());
+    const nombreActual = (pc?.name || '').trim();
+    const faltaNombre = !nombreActual || nombreDeReserva.test(nombreActual);
     const faltaAlgo =
       faltaNombre ||
       !pc?.race ||
@@ -4104,8 +4171,13 @@ export default function App() {
     if (!faltaAlgo) return;
 
     const arranqueFicha = Date.now();
+    setTopProgress({
+      active: true,
+      label: 'Leyendo ficha del protagonista en segundo plano...',
+      type: 'sync'
+    });
     try {
-      const id = await extraerIdentidadDeDocumentos({ project: proyecto, files: archivos });
+      const id = await extraerIdentidadDeDocumentos({ project: proyecto, files: listaArchivos });
       const puestos: string[] = [];
       await handleUpdateMemory(mem => {
         const actual = mem.player_character;
@@ -4197,8 +4269,11 @@ export default function App() {
           type: 'sync'
         });
         setTimeout(() => setTopProgress(p => (p.type === 'sync' ? { active: false } : p)), 6000);
+      } else {
+        setTopProgress(p => (p.type === 'sync' ? { active: false } : p));
       }
     } catch (err) {
+      setTopProgress(p => (p.type === 'sync' ? { active: false } : p));
       // Si murió porque te fuiste a otra app, se retoma sola al volver.
       if (murioPorSegundoPlano(err, arranqueFicha)) {
         reintentarAlVolver('Leer la ficha del protagonista', () =>
@@ -4233,9 +4308,9 @@ export default function App() {
   /*
    * Etiqueta los documentos de texto que aún no tengan etiquetas de búsqueda.
    *
-   * De uno en uno y con pausa: el cupo diario da de sobra con el modelo de
-   * fondo, pero quince peticiones por minuto se agotan rápido si se lanzan
-   * diez de golpe —y el turno de partida tiene preferencia sobre esto—.
+   * Se ejecuta en UNA SOLA LLAMADA por lote mediante generarEtiquetasDeBusquedaLote,
+   * indexando todos los archivos pendientes de una vez sin consumir múltiples peticiones
+   * por minuto ni requerir bucles secuenciales con pausas artificiales.
    */
   const etiquetarLosQueLleguenSinEtiquetas = async () => {
     const pid = currentPIdRef.current;
@@ -4253,19 +4328,19 @@ export default function App() {
     );
     if (!pendientes.length) return;
 
-    for (const doc of pendientes.slice(0, 8)) {
-      try {
-        const etiquetas = await generarEtiquetasDeBusqueda(doc, elencoDeLaCampana(proyecto));
-        if (!etiquetas) continue;
+    try {
+      const lote = pendientes.slice(0, 15);
+      const mapaEtiquetas = await generarEtiquetasDeBusquedaLote(lote, elencoDeLaCampana(proyecto));
+      if (Object.keys(mapaEtiquetas).length > 0) {
         const frescos = await loadFilesFromDB(pid);
-        const conEtiquetas = frescos.map(f => (f.id === doc.id ? { ...f, etiquetasBusqueda: etiquetas } : f));
+        const conEtiquetas = frescos.map(f =>
+          mapaEtiquetas[f.id] ? { ...f, etiquetasBusqueda: mapaEtiquetas[f.id] } : f
+        );
         setCurrentFiles(conEtiquetas);
         await saveFilesToDB(pid, conEtiquetas);
-      } catch (err) {
-        // Uno que falle no puede parar a los demás, y siempre queda el botón.
-        logWarn('storage', `No se pudo etiquetar "${doc.name}" al subirlo`, describeApiError(err));
       }
-      await new Promise(r => setTimeout(r, 2500));
+    } catch (err) {
+      logWarn('storage', 'No se pudieron etiquetar los documentos al subirlos', describeApiError(err));
     }
   };
 
@@ -6371,6 +6446,7 @@ export default function App() {
               onUpdateMemory={handleUpdateMemory}
               onUpdateProject={handleUpdateProjectField}
               onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
+              onCompletarFichaDesdeDocumento={() => completarFichaDesdeDocumento(currentFiles)}
               isGenerating={isSyncingMemory}
             />
           )}

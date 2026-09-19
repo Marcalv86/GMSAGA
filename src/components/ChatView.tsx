@@ -160,7 +160,6 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   }
 
   const invitaciones = isModel && hasOracle ? leerInvitaciones(m.content) : [];
-  const isIncomplete = isModel && isNarrativeIncomplete(m.content);
   const contentSinPeticiones = rollRequests.length ? stripRollRequests(m.content) : m.content;
   const contentSinInvitaciones = isModel ? limpiarInvitaciones(contentSinPeticiones) : contentSinPeticiones;
 
@@ -178,6 +177,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
    * comía la pregunta, y la escena se paraba sin que nadie supiera por qué.
    */
   const preguntasDeMesa = isModel ? parsePreguntasDeMesa(textWithoutHUD) : [];
+  const isIncomplete = isModel && isNarrativeIncomplete(m.content) && rollRequests.length === 0 && preguntasDeMesa.length === 0;
 
   // Limpiar etiquetas de sincronización interna que hayan quedado
   const cleanContent = isModel ? stripStateTag(textWithoutHUD) : textWithoutHUD;
@@ -420,24 +420,24 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                 return (
                   <div
                     key={`${idx}-roll-${rIdx}`}
-                    className="relative overflow-hidden rounded-xl border border-[var(--accent)]/40 bg-gradient-to-r from-[color-mix(in_srgb,var(--accent)_14%,var(--surface))] via-[var(--surface)] to-[color-mix(in_srgb,var(--accent)_8%,var(--surface))] p-3.5 sm:p-4 shadow-md shadow-amber-950/5 flex flex-wrap items-center justify-between gap-3 font-lora"
+                    className="relative overflow-hidden rounded-lg border border-[var(--accent)]/35 bg-gradient-to-r from-[color-mix(in_srgb,var(--accent)_10%,var(--surface))] via-[var(--surface)] to-[color-mix(in_srgb,var(--accent)_5%,var(--surface))] p-2.5 sm:p-3 shadow-xs flex flex-wrap items-center justify-between gap-2.5 font-lora"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] text-[var(--on-accent)] flex items-center justify-center shrink-0 shadow-sm shadow-amber-900/30 border border-amber-300/40">
-                        <Dices className="w-5 h-5" />
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] text-[var(--on-accent)] flex items-center justify-center shrink-0 shadow-xs border border-amber-300/30">
+                        <Dices className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[10px] font-cinzel font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1">
+                        <div className="text-[9px] font-cinzel font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1">
                           <span>Desafío de Acción</span>
                         </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-cinzel text-sm sm:text-base font-bold text-[var(--text-primary)]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-cinzel text-xs sm:text-sm font-bold text-[var(--text-primary)]">
                             Tirada de {req.skill}
                           </span>
                           {req.dc && (
-                            <span className={`text-[11px] font-cinzel font-bold px-2 py-0.5 rounded-full border shadow-2xs flex items-center gap-1 ${dcBadgeClass}`}>
+                            <span className={`text-[10px] font-cinzel font-bold px-1.5 py-0.5 rounded-full border ${dcBadgeClass}`}>
                               <span>CD {req.dc}</span>
-                              <span className="opacity-70 text-[9px] font-normal">({dcDifficulty})</span>
+                              <span className="opacity-70 text-[8px] font-normal">({dcDifficulty})</span>
                             </span>
                           )}
                         </div>
@@ -447,10 +447,10 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                     {isLastMessage && !isGenerating && (
                       <button
                         onClick={() => handleRollRequestClick(req)}
-                        className="ml-auto px-4 py-2 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] hover:brightness-110 active:scale-95 text-[var(--on-accent)] rounded-lg font-cinzel text-xs font-bold shadow-md shadow-[var(--accent)]/20 border border-amber-200/40 flex items-center gap-2 transition-all cursor-pointer"
+                        className="ml-auto px-3 py-1.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] hover:brightness-110 active:scale-95 text-[var(--on-accent)] rounded-lg font-cinzel text-xs font-bold shadow-xs border border-amber-200/30 flex items-center gap-1.5 transition-all cursor-pointer"
                         title="Tira un d20 con azar real y añade el resultado a tu mensaje."
                       >
-                        <Dices className="w-4 h-4" />
+                        <Dices className="w-3.5 h-3.5" />
                         <span>Tirar d20</span>
                       </button>
                     )}
@@ -924,7 +924,11 @@ export const ChatView: React.FC<{
 
   const lastMessage = chat?.messages && chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null;
   const isLastMessageIncomplete = Boolean(
-    lastMessage && lastMessage.role === 'model' && isNarrativeIncomplete(lastMessage.content)
+    lastMessage &&
+      lastMessage.role === 'model' &&
+      isNarrativeIncomplete(lastMessage.content) &&
+      parseRollRequests(lastMessage.content).length === 0 &&
+      parsePreguntasDeMesa(lastMessage.content).length === 0
   );
 
   // Ventana rápida de emojis temáticos

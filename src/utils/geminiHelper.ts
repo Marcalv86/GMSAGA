@@ -75,7 +75,7 @@ import {
 } from './campaignCalendar';
 import { cambioVacio, leerInventario } from './inventoryTag';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
-import { aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa } from './cuadernoOculto';
+import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa } from './cuadernoOculto';
 import { leerEstado, leerEtiquetados, leerOlvidos, OrdenDeEtiquetado } from './ordenesDeMesa';
 import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
@@ -1168,7 +1168,10 @@ let globalRoundRobinIndex = (() => {
  *   colocando primero las claves sanas y dejando al final las que están en enfriamiento por 429.
  * - En 'failover_only': devuelve las claves en su orden fijo original.
  */
-export function getRotatedApiKeys(): {
+export function getRotatedApiKeys(opciones?: {
+  modelo?: string;
+  esTareaDeFondo?: boolean;
+}): {
   keys: string[];
   activeOriginalIndex: number;
   totalKeys: number;
@@ -1213,7 +1216,7 @@ export function getRotatedApiKeys(): {
    * petición, así que esto no cuesta ni una llamada de más.
    */
   if (mode === 'inteligente') {
-    const modelo = getStoredModel();
+    const modelo = opciones?.modelo || getStoredModel();
     const { limite } = techoDeEnvio(modelo);
     const presion = presionDelMinuto(modelo, allKeys.length);
     const gastado = (i: number) => presion.porClave[i] || 0;
@@ -1227,8 +1230,16 @@ export function getRotatedApiKeys(): {
     const pegajosa = allKeys[globalRoundRobinIndex % allKeys.length];
     const iPegajosa = allKeys.indexOf(pegajosa);
 
-    let elegida = iPegajosa;
-    if (iPegajosa < 0 || limite - gastado(iPegajosa) < margenMinimo) {
+    let elegida = iPegajosa >= 0 ? iPegajosa : 0;
+    if (opciones?.esTareaDeFondo && allKeys.length > 1) {
+      // Para tareas de fondo en modo inteligente: seleccionar la clave con menor carga acumulada
+      // para no consumir la cuota por minuto ni competir con la clave activa del narrador.
+      let mejor = 0;
+      for (let i = 1; i < allKeys.length; i++) {
+        if (gastado(i) < gastado(mejor)) mejor = i;
+      }
+      elegida = mejor;
+    } else if (iPegajosa < 0 || limite - gastado(iPegajosa) < margenMinimo) {
       // A la que viene usándose ya no le cabe: se salta a la más libre.
       let mejor = 0;
       for (let i = 1; i < allKeys.length; i++) {
@@ -2019,12 +2030,12 @@ ${bloqueElenco}
       const dado = dadoDeAtraccion(n.id || n.name);
       const salida = dado >= 19 ? '\`atr: desea\`' : dado >= 15 ? '\`atr: interés\`' : 'nada —y entonces emite \`atr: ninguna\` para dejarlo cerrado—';
       lineas.push(
-        `- ❓ ATRACCIÓN SIN DECIDIR: nadie ha establecido todavía qué siente por la protagonista, y eso NO significa que no sienta nada. ` +
-          `Decídelo ESTE TURNO y dilo con \`atr:\` dentro de su \`[VÍNCULO:]\`. ` +
+        `- ❓ ATRACCIÓN SIN DECIDIR: decide ESTE TURNO qué siente por la protagonista y dilo con \`atr:\` dentro de su \`[VÍNCULO:]\`. ` +
           `**(1)** ¿La crió, es familia o la tuvo de aprendiza? → la atracción queda descartada, y lo que toca es \`previo: sí\` con \`vin\` y \`con\` ALTOS. ` +
-          `**(2)** ¿Lo describe algún documento? → **manda su personalidad, y el dado de abajo NO SE USA.** ⛔ Y aquí el fallo de siempre: **nadie es demisexual por defecto.** A quien los documentos pintan como conquistador, mundano, hedonista o simplemente al que le gusta mirar, el deseo se le enciende EN EL ACTO y no necesita conocerla de nada. Convertirlo en alguien que «primero necesita confianza» no es prudencia, es reescribirle el personaje —y «curiosidad profesional» es la forma educada de castrarlo—. Eso sí vale para quien el documento describa como reservado o de vínculo lento. ` +
-          `**(3)** ¿No hay documento y te lo acabas de inventar? → **ya está tirado: el d20 de esta persona ha salido ${dado}** → ${salida}. Es un dado de verdad, tirado por la aplicación y atado a este personaje; no lo tires tú ni lo cambies porque te apetezca otra cosa. ` +
-          `⭐ Y mira TAMBIÉN los rasgos de la ficha de ella que dicen cómo reacciona el mundo ante ella: son mecánica activa y entran en esta decisión.`
+          `**(2)** ¿Perfil de seductor, corsario, bribón, hedonista o conquistador (ej. Jarlaxle)? → **NO HAY TIRADA DE DADOS.** Si la protagonista es visualmente atractiva o tiene belleza/carisma, entra **AUTOMÁTICAMENTE** en \`atr: desea\` y modo cortejo directo (si se la lleva esa noche a la cama, premio que se lleva; nada de timidez, dudas o necesitar semanas de confianza). ` +
+          `**(3)** ¿Lo describe algún documento como reservado o de vínculo lento? → entonces manda su ficha y requiere trato previo. ` +
+          `**(4)** ¿PNJ secundario ordinario sin perfil claro? → el dado de fondo para esta persona es ${dado} → ${salida}. ` +
+          `⭐ Y los rasgos de belleza peligrosa o magnetismo de la ficha de ella activan el deseo carnal inmediato en cualquier PNJ afín sin requerir tiradas.`
       );
     }
     /*
@@ -2114,9 +2125,22 @@ ${bloqueElenco}
             `⛔ Que se pase al idioma vehicular es la EXCEPCIÓN y necesita un motivo en escena ` +
             `(que haya delante alguien a quien quiera que le entienda, o justo lo contrario; burla; cortesía; que no la tome por de los suyos). ` +
             `Sin ese motivo, no se cambia. Y si es la lengua propia de la especie o cultura de ambos, con más razón todavía: ` +
-            `dirigirse a uno de los tuyos en la lengua de los forasteros es un desaire, o un aviso.`
+            `dirigirse a uno de los tuyos en la lengua de los forasteros es un desaire, o un aviso. ` +
+            `⛔ Prohibido que este PNJ conozca otras lenguas raras que ella hable si no constan en la ficha de este PNJ.`
+        );
+      } else {
+        lineas.push(
+          `  ⛔ BARRERA IDIOMÁTICA TOTAL (NO COMPARTEN IDIOMA):\n` +
+            `    - La protagonista habla [${idiomasDeElla.join(', ') || 'sus lenguas de ficha'}] y este PNJ SOLO conoce [${idiomasPnj}].\n` +
+            `    - ❌ **CERO POLÍGLOTAS POR CASUALIDAD**: Queda TERMINANTEMENTE PROHIBIDO inventar que este PNJ «casualmente aprendió la lengua de ella en el pasado», «la chapurrea por un viejo viaje» o «entiende palabras sueltas». Si no consta en su ficha, NO LA ENTIENDE EN ABSOLUTO.\n` +
+            `    - ❌ **CERO IDENTIFICACIÓN MÁGICA DE LENGUAS (ANTI-LINGÜISTA)**: Si ella habla en una lengua o dialecto que el PNJ no domina, el PNJ NO PUEDE adivinar ni decir qué idioma es (prohibido decir «hablas druídico / lengua de las Moonshae / silvano»). Para el PNJ son únicamente sonidos extraños, murmullos o jerigonza incomprensible de forastera.\n` +
+            `    - ❌ **CERO COMÚN FLUIDO**: Si este PNJ no tiene Común registrado, no habla común. Todo lo que diga sonará ininteligible para ella (describe fonética, aspereza, tono y lenguaje corporal). La interacción debe resolverse con mímica, señas toscas, intimidación visual o magia.`
         );
       }
+    } else {
+      lineas.push(
+        `- 🗣️ Idiomas: no fijados en ficha (asume los lógicos estrictos de su raza/origen; si es un marinero drow raso de la Infraoscuridad, NO domina el común de la superficie). ⛔ Prohibido inventar que casualmente conoce la lengua de ella o identificar su dialecto. Fíjalos con \`[VÍNCULO: ${n.name} | idiomas: ...]\`.`
+      );
     }
 
     // Mini-ficha D&D 5e / Bloque de estadísticas de monstruo o PNJ
@@ -2320,11 +2344,34 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
   const hilosDeAlguien = (project.memory?.gm_secrets || []).filter(
     sec => !sec.revelado && (sec.deQuien || '').trim()
   );
+  const idiomasDeElla = (() => {
+    const list: string[] = [];
+    if (project.memory?.player_character?.languages?.length) {
+      list.push(...project.memory.player_character.languages);
+    }
+    for (const a of project.memory?.player_character?.aprendido || []) {
+      if (a.tipo === 'competencia' && a.name) {
+        list.push(a.name);
+      }
+    }
+    if (list.length === 0) {
+      const sheetFile = files.find(
+        f => !f.isImage && !f.isAudio && (f.category === 'sheet_pj' || looksLikeProtagonistSheet(f, project.memory))
+      );
+      const text = (sheetFile?.content || '') + ' ' + (project.memory?.player_character?.sheetText || '');
+      const match = text.match(/Idiomas?[:\s]+([^\n\r]+)/i);
+      if (match && match[1]) {
+        const parts = match[1].split(/[,;/]|\sy\s/).map(s => s.trim()).filter(Boolean);
+        list.push(...parts);
+      }
+    }
+    return Array.from(new Set(list));
+  })();
   const dosierPnjs = dosierDePersonajes(
     project.memory?.npcs || [],
     marcaDeHoy,
     relojesDePersona,
-    project.memory?.player_character?.languages || [],
+    idiomasDeElla,
     hilosDeAlguien
   );
   const dosierLugares = dosierDeLugares(project.memory?.locations || []);
@@ -3763,6 +3810,11 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
      ⭐ Y de aquí sale el largo solo, sin contar palabras: **un turno que resuelve un latido de conversación es corto por naturaleza.** Si te está saliendo largo, casi siempre es que has metido dos.
    - Cada intervención de diálogo o cambio de interlocutor DEBE ir en su propio párrafo independiente con sangría o guion de diálogo (— Diálogo...).
    - Deja que la prosa respire con cadencia novelesca. Queda TERMINANTEMENTE PROHIBIDO volcar parrafadas kilométricas continuas sin espacios.
+   - **AUTOLIMITACIÓN DE TOKENS, ECONOMÍA DE METADATOS Y PREVENCIÓN INTELIGENTE DE TRUNCAMIENTOS (OBLIGATORIO)**:
+     * **Longitud Anticipada y Cierre Limpio**: Estructura la respuesta para una extensión moderada y ágil de 2 a 4 párrafos cinematográficos (200 a 400 palabras), garantizando que la narración concluya siempre con oraciones completas y un desenlace cerrado mucho antes de agotar los límites de tokens de salida del modelo.
+     * **Prohibido el Truncamiento a Mitad de Frase**: Toda intervención debe cerrar sus oraciones completas y terminar en un punto y aparte, una línea de diálogo cerrada o una petición formal de tirada, sin palabras a medio escribir ni ideas colgadas.
+     * **Detención Inmediata ante Peligro o Tirada**: Si una acción entraña riesgo o incertidumbre, narra el detonante sensorial en 1 o 2 párrafos y detén el turno en seco con la petición de tirada antes de describir desenlaces hipotéticos.
+     * **Economía de Etiquetas y Tarjetas de Cierre**: Emite ÚNICAMENTE las etiquetas entre corchetes de datos (\`[VÍNCULO: ...]\`, \`[ESTADO: ...]\`, \`[INVENTARIO: ...]\`, etc.) que hayan sufrido una modificación **real y tangible** durante este turno. Queda prohibido escupir bloques repetitivos de 6 a 8 tarjetas al final si el estado sigue igual.
 3. Consulta la MEMORIA VIVA y la BASE DE CONOCIMIENTO antes de escribir para no contradecir hechos pasados ni inventar datos si ya existen.
    [QUÉ HACER CUANDO NO SABES ALGO]: sabes mucho de ambientaciones publicadas, pero ESTA campaña no es ninguna de ellas: es la que está en estos documentos y en esta memoria. Ante un dato que no tengas, distingue tres casos.
    - Si lo que ibas a decir podría contradecir el material de la jugadora, no lo digas. Rodéalo: describe lo que el protagonista percibe sin afirmar el dato, o deja que el personaje que lo sabría no lo suelte todavía.
@@ -4056,44 +4108,37 @@ export function isNarrativeIncomplete(text: string): boolean {
   if (raw.length < 15) return false;
   if (raw === 'Tirando dados...' || raw === 'Pensando...') return false;
 
-  // Quitar etiquetas informativas de capítulos
-  const clean = raw.replace(/\[CHAPTER:[^\]]*\]/gi, '').trim();
-  if (clean.length < 15) return false;
-
-  // Si termina con etiquetas de cierre, estado o tirada formales, ha concluido formalmente
-  const tailText = clean.slice(-250);
-  if (/\[(?:ESTADO|TIEMPO|AGENDA|HILO|PRESENTES|VINCULO|AFINIDAD|AVANCE|NIVEL|Petición de Tirada|Petición de Salvación|Tirada DM|Tirada)[^\]]*\]\s*$/i.test(tailText)) {
+  // Si contiene peticiones formales al jugador (dados, salvaciones o preguntas de mesa), la escena pausó deliberadamente
+  if (/\[\s*(?:Petición|Pregunta\s+de\s+Mesa|Oráculo)\b[^\]]*\]/i.test(raw)) {
     return false;
   }
 
-  // Si termina con cierre formal de turno o estímulo cinematográfico
-  if (/< ?¿?Qué haces\?? ?>/i.test(clean) || /———◆———/i.test(clean)) return false;
+  // Quitar etiquetas informativas de capítulos
+  let clean = raw.replace(/\[CHAPTER:[^\]]*\]/gi, '').trim();
+  if (clean.length < 15) return false;
 
-  const lastChar = clean[clean.length - 1];
-  const validPunctuation = ['.', '!', '?', '…', '»', '"', '”', '’', '`', '>'];
-  
+  // Si termina con cierre formal de turno o estímulo cinematográfico
+  if (/< ?¿?Qué haces\?? ?>/i.test(clean) || /———◆———\s*$/i.test(clean)) return false;
+
+  // Quitar progresivamente todas las etiquetas de corchetes del final (ej: [ESTADO:...], [VÍNCULO:...], [Tirada DM...], etc.)
+  while (/\[[^\]]+\]\s*$/.test(clean)) {
+    clean = clean.replace(/\[[^\]]+\]\s*$/, '').trim();
+  }
+
+  if (!clean || clean.length < 10) return false;
+
+  // Limpiar formato de cierre como asteriscos, guiones bajos o comillas tipográficas
+  const cleanTail = clean.replace(/[*_~`"”'’»)]+$/g, '').trim();
+  if (!cleanTail) return false;
+
+  const lastChar = cleanTail[cleanTail.length - 1];
+  const validPunctuation = ['.', '!', '?', '…', ':', ';', '—', '-', '>'];
+
   if (validPunctuation.includes(lastChar)) {
     return false;
   }
 
-  if (lastChar === '*') {
-    const asterisks = (clean.match(/\*/g) || []).length;
-    if (asterisks % 2 === 0) {
-      const beforeAsterisk = clean.replace(/\*+$/, '').trim();
-      const lastCharBefore = beforeAsterisk[beforeAsterisk.length - 1];
-      if (lastCharBefore && validPunctuation.includes(lastCharBefore)) {
-        return false;
-      }
-    }
-  }
-
-  if (lastChar === ']') {
-    if (/\[[a-zA-Z0-9_\s:|áéíóúÁÉÍÓÚñÑ—–\-.,+/?#]+\]$/.test(clean)) {
-      return false;
-    }
-  }
-
-  // Si termina en letra, número, coma, guion, dos puntos o punto y coma, está cortada
+  // Si termina en letra, número, coma o sin signo de cierre, está cortada
   return true;
 }
 
@@ -5246,19 +5291,13 @@ export async function generateContentWithFailover({
    */
   proposito?: string;
 }): Promise<any> {
-  const { keys: rotadas } = getRotatedApiKeys();
-  // Para tareas secundarias o de fondo (memoria, trazado, novelización, lectura de fichas),
-  // si el usuario dispone de varias claves en su bolsillo, invertimos el orden de las claves
-  // para que utilicen las claves secundarias (ej. clave 6, 5, 4...). De este modo NUNCA consumen
-  // la cuota de fichas por minuto (TPM) ni interfieren con la clave principal del narrador.
-  const esTareaDeFondo = Boolean(proposito && proposito !== 'Turno narrado');
-  const todasLasClaves =
-    rotadas.length > 1 && esTareaDeFondo
-      ? [...rotadas].reverse()
-      : rotadas.length > 0
-        ? rotadas
-        : [''];
   const base = sanitizeModelId(primaryModel || getBackgroundTaskModel(), DEFAULT_BACKGROUND_MODEL_ID);
+  const esTareaDeFondo = Boolean(proposito && proposito !== 'Turno narrado');
+  const { keys: rotadas } = getRotatedApiKeys({
+    modelo: base,
+    esTareaDeFondo
+  });
+  const todasLasClaves = rotadas.length > 0 ? rotadas : [''];
   const rawChain = preferredChain || getModelFailoverChain(base);
   const chainLimpia = rawChain
     .map(m => sanitizeModelId(m, DEFAULT_MODEL_ID))
@@ -5350,13 +5389,18 @@ export async function generateContentWithFailover({
         const cancelarPorFuera = () => relojDeGuardia.abort();
         signal?.addEventListener('abort', cancelarPorFuera, { once: true });
 
+        const storedKeys = getStoredApiKeys();
+        const idxOriginal = storedKeys.indexOf(currentKey);
+        const claveN = idxOriginal >= 0 ? idxOriginal + 1 : (k + 1);
+        const totalClaves = storedKeys.length > 0 ? storedKeys.length : undefined;
+
         const idLlamada = abrirLlamada({
           proposito,
           modelo: model,
-          claveN: todasLasClaves.indexOf(currentKey) + 1 || undefined,
-          totalClaves: todasLasClaves.length > 1 ? todasLasClaves.length : undefined,
+          claveN,
+          totalClaves,
           intento,
-          esRespaldo: i > 0,
+          esRespaldo: i > 0 || k > 0,
           caracteresEnviados: (() => {
             try {
               return typeof contents === 'string' ? contents.length : JSON.stringify(contents ?? '').length;
@@ -7701,6 +7745,57 @@ export interface IdentidadLeida {
  * Narrador en cada turno como hechos fijos eran precisamente los únicos que
  * nadie leía de ningún sitio.
  */
+export function esFichaDelPj(f: ProjectFile): boolean {
+  if (f.category === 'sheet_pj') return true;
+  const n = (f.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const sheetWords = [
+    'ficha',
+    'personaje',
+    'character',
+    'sheet',
+    'protagonista',
+    'pj',
+    'oc',
+    'hoja',
+    'stats',
+    'estadisticas',
+    'perfil',
+    'aryendell',
+    'aurindell',
+    'auron'
+  ];
+  if (sheetWords.some(k => n.includes(k))) {
+    if (['pnj', 'npc', 'boss', 'bestiario', 'villano'].some(k => n.includes(k))) return false;
+    return true;
+  }
+
+  const c = (f.content || '').slice(0, 4000).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const tieneAtributos =
+    (c.includes('fuerza') && c.includes('destreza')) ||
+    (c.includes('str') && c.includes('dex')) ||
+    (c.includes('fue') && c.includes('des') && c.includes('con'));
+  const tieneRasgosDnd =
+    c.includes('puntos de golpe') ||
+    c.includes('hit points') ||
+    c.includes('clase de armadura') ||
+    c.includes('armor class') ||
+    c.includes('ca:') ||
+    c.includes('clase y nivel') ||
+    c.includes('alineamiento') ||
+    c.includes('trasfondo') ||
+    c.includes('competencias') ||
+    c.includes('salvaciones');
+
+  const esExcluido =
+    f.category === 'sheet_npc' ||
+    f.category === 'sheet_companion' ||
+    n.includes('bestiario') ||
+    n.includes('pnj') ||
+    n.includes('npc');
+
+  return tieneAtributos && tieneRasgosDnd && !esExcluido;
+}
+
 export async function extraerIdentidadDeDocumentos({
   project,
   files
@@ -7708,19 +7803,16 @@ export async function extraerIdentidadDeDocumentos({
   project: Project;
   files: ProjectFile[];
 }): Promise<IdentidadLeida> {
-  const esFichaDelPj = (f: ProjectFile) => {
-    const n = f.name.toLowerCase();
-    return (
-      f.category === 'sheet_pj' ||
-      ['ficha', 'personaje', 'character', 'sheet', 'protagonista', 'pj', 'oc'].some(k => n.includes(k))
-    );
-  };
-
   // Primero sus fichas; si no hay ninguna marcada, el resto de documentos de
   // texto, que a veces el trasfondo vive en un archivo con otro nombre.
   const candidatos = files.filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 50);
   const fichas = candidatos.filter(esFichaDelPj);
-  const fuentes = (fichas.length ? fichas : candidatos).slice(0, 6);
+  const candidatosOrdenados = [...candidatos].sort((a, b) => {
+    const aEsFicha = esFichaDelPj(a) ? 1 : 0;
+    const bEsFicha = esFichaDelPj(b) ? 1 : 0;
+    return bEsFicha - aEsFicha;
+  });
+  const fuentes = (fichas.length ? fichas : candidatosOrdenados).slice(0, 6);
   if (fuentes.length === 0) {
     throw new Error('No hay documentos de texto de los que leer la ficha. Sube la ficha del personaje en Archivos.');
   }
@@ -8259,53 +8351,22 @@ export async function leerElTableroDeDocumentos({
   if (!todas.length) return { facciones: [], preparado: [], relojes: [] };
 
   /*
-   * NINGUN DOCUMENTO SE CAE EN SILENCIO.
+   * UNIFICACIÓN DE LECTURA EN UNA SOLA LLAMADA.
    *
-   * Aquí había un `.slice(0, 8)`: con nueve documentos, el noveno no se
-   * miraba, y sin decirlo. Eso tenía sentido cuando una petición costaba un
-   * veinteavo del día; con el modelo de fondo en Flash Lite —quinientas por
-   * clave— ya no: leer en dos tandas cuesta dos peticiones de tres mil.
+   * Antes se partía en tandas de 6 archivos (`POR_TANDA = 6`), disparando
+   * hasta 4 peticiones consecutivas al modelo de fondo en menos de 20 segundos.
+   * Con Flash Lite (ventana de 1.000.000 de tokens), todos los documentos caben
+   * con holgura en un solo prompt (hasta 250.000 caracteres de texto).
    *
-   * Se leen de seis en seis y se funde el resultado. Las tandas van una tras
-   * otra, no a la vez, porque el límite que sigue apretando no es el del día
-   * sino el del MINUTO, y quince peticiones por minuto se agotan rápido si se
-   * lanzan todas de golpe.
+   * Hacerlo en una sola llamada ahorra peticiones del límite RPM, evita duplicar
+   * facciones entre tandas y permite al modelo correlacionar todo el material.
    */
-  const POR_TANDA = 6;
-  const MAX_TANDAS = 4;
-  if (todas.length > POR_TANDA) {
-    const tandas: ProjectFile[][] = [];
-    for (let i = 0; i < todas.length && tandas.length < MAX_TANDAS; i += POR_TANDA) {
-      tandas.push(todas.slice(i, i + POR_TANDA));
-    }
-    const juntas = { facciones: [] as Faccion[], preparado: [] as CartaPreparada[], relojes: [] as RelojOculto[] };
-    let proyectoQueCrece = project;
-    for (const tanda of tandas) {
-      // Cada tanda ve lo que sacaron las anteriores, para no repetirlo.
-      const parcial = await leerElTableroDeDocumentos({ project: proyectoQueCrece, files, soloEstos: tanda });
-      juntas.facciones = aplicarFacciones(juntas.facciones, parcial.facciones);
-      juntas.preparado = aplicarPreparado(juntas.preparado, parcial.preparado);
-      juntas.relojes = aplicarRelojes(juntas.relojes, parcial.relojes);
-      proyectoQueCrece = {
-        ...proyectoQueCrece,
-        memory: {
-          ...(proyectoQueCrece.memory || ({} as Memory)),
-          gm_facciones: aplicarFacciones(proyectoQueCrece.memory?.gm_facciones, parcial.facciones),
-          gm_relojes: aplicarRelojes(proyectoQueCrece.memory?.gm_relojes, parcial.relojes),
-          gm_preparado: aplicarPreparado(proyectoQueCrece.memory?.gm_preparado, parcial.preparado)
-        }
-      } as Project;
-      await new Promise(r => setTimeout(r, 1500));
-    }
-    return juntas;
-  }
-
   const fuentes = todas;
 
   const texto = fuentes
     .map(f => `=== ${f.name} ===\n${(f.content || '').slice(0, 24000)}`)
     .join('\n\n')
-    .slice(0, 120000);
+    .slice(0, 250000);
 
   const pc = project.memory?.player_character;
   /*
@@ -9647,7 +9708,20 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
     'player',
     'jugador',
     'personaje jugador',
-    'hoja_personaje'
+    'hoja_personaje',
+    'ficha',
+    'sheet',
+    'character',
+    'personaje',
+    'hoja personaje',
+    'ficha personaje',
+    'hoja de personaje',
+    'ficha de personaje',
+    'hoja_de_personaje',
+    'ficha_de_personaje',
+    'aryendell',
+    'aurindell',
+    'auron'
   ];
 
   // Comprobar coincidencia con personajes existentes en memoria
@@ -9681,6 +9755,71 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
 
     if (isCompanionDoc) return 'sheet_companion';
 
+    // Normalizar texto del documento para detección robusta sin tildes
+    const normDoc = lowerDocContent.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const normName = lowerName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Ficha de personaje / OC:
+    // Si el nombre del archivo contiene palabras de ficha o si el contenido tiene estructura de D&D 5e
+    const sheetFileWords = [
+      'ficha',
+      'personaje',
+      'character',
+      'sheet',
+      'pj',
+      'oc',
+      'protagonista',
+      'hoja',
+      'stats',
+      'estadisticas',
+      'perfil',
+      'hoja_personaje',
+      'hoja de personaje',
+      'ficha de personaje',
+      'aryendell',
+      'aurindell',
+      'auron'
+    ];
+    const tieneNombreDeFicha = palabraEnNombre(sheetFileWords) || sheetFileWords.some(w => normName.includes(w));
+
+    const tieneAtributosDnd =
+      (normDoc.includes('fuerza') && normDoc.includes('destreza')) ||
+      (normDoc.includes('str') && normDoc.includes('dex')) ||
+      (normDoc.includes('fue') && normDoc.includes('des') && normDoc.includes('con'));
+
+    const tieneRasgosDnd =
+      normDoc.includes('clase y nivel') ||
+      normDoc.includes('class & level') ||
+      normDoc.includes('puntos de golpe') ||
+      normDoc.includes('hit points') ||
+      normDoc.includes('clase de armadura') ||
+      normDoc.includes('armor class') ||
+      normDoc.includes('ca:') ||
+      normDoc.includes('alineamiento') ||
+      normDoc.includes('alignment') ||
+      normDoc.includes('trasfondo') ||
+      normDoc.includes('salvaciones') ||
+      normDoc.includes('saving throws') ||
+      normDoc.includes('competencias') ||
+      normDoc.includes('proficiencies');
+
+    const esEstructuraFicha = (tieneAtributosDnd && tieneRasgosDnd) || (tieneNombreDeFicha && (tieneAtributosDnd || tieneRasgosDnd));
+
+    // Si es claramente un PNJ o monstruo específico (por nombre de archivo o statblock explícito de monstruo)
+    const esExplicitamenteNpc =
+      matchesNpcMemory ||
+      palabraEnNombre(['pnj', 'npc', 'boss', 'villano', 'bestiario', 'monstruo', 'enemigo']) ||
+      normName.includes('bestiario') ||
+      (normDoc.includes('statblock') && (normDoc.includes('desafio') || normDoc.includes('challenge rating') || normDoc.includes('vd')));
+
+    if (esEstructuraFicha && !esExplicitamenteNpc && !esLibro) {
+      return 'sheet_pj';
+    }
+
+    if (tieneNombreDeFicha && !esExplicitamenteNpc && !esLibro) {
+      return 'sheet_pj';
+    }
+
     // Pertenencias personales, diario íntimo, runas de adivinación o trasfondo del protagonista
     const personalPcKeywords = [
       'diario',
@@ -9708,48 +9847,33 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
       palabraEnNombre(pjKeywords) ||
       palabraEnNombre(personalPcKeywords) ||
       (palabraEnTexto(personalPcKeywords, lowerDocContent) &&
-        (lowerDocContent.includes('diario') ||
-          lowerDocContent.includes('runas') ||
-          lowerDocContent.includes('adivinación') ||
-          lowerDocContent.includes('adivinacion') ||
-          lowerDocContent.includes('posesiones') ||
-          lowerDocContent.includes('pertenencias') ||
+        (normDoc.includes('diario') ||
+          normDoc.includes('runas') ||
+          normDoc.includes('adivinacion') ||
+          normDoc.includes('posesiones') ||
+          normDoc.includes('pertenencias') ||
           matchesPcName));
 
-    if (isPcPersonalDoc) return 'sheet_pj';
+    if (isPcPersonalDoc && !esExplicitamenteNpc) return 'sheet_pj';
 
     const isNpcDoc =
       matchesNpcMemory ||
       palabraEnNombre(npcKeywords) ||
       (palabraEnTexto(npcKeywords, lowerDocContent) &&
-        (lowerDocContent.includes('puntos de golpe') ||
-          lowerDocContent.includes('statblock') ||
-          lowerDocContent.includes('desafío') ||
-          lowerDocContent.includes('vd')));
+        (normDoc.includes('statblock') ||
+          normDoc.includes('desafio') ||
+          normDoc.includes('challenge rating') ||
+          normDoc.includes('vd')));
 
     if (isNpcDoc && !esLibro) return 'sheet_npc';
 
     const isGenericSheet =
-      palabraEnNombre([
-        'ficha',
-        'personaje',
-        'character',
-        'sheet',
-        'pj',
-        'oc',
-        'protagonista',
-        'trasfondo',
-        'stats',
-        'estadisticas',
-        'hoja_personaje'
-      ]) ||
-      lowerDocContent.includes('clase y nivel') ||
-      lowerDocContent.includes('puntos de golpe') ||
-      lowerDocContent.includes('alineamiento') ||
-      lowerDocContent.includes('trasfondo:') ||
-      (lowerDocContent.includes('fuerza') &&
-        lowerDocContent.includes('destreza') &&
-        lowerDocContent.includes('constitución'));
+      tieneNombreDeFicha ||
+      normDoc.includes('clase y nivel') ||
+      normDoc.includes('puntos de golpe') ||
+      normDoc.includes('alineamiento') ||
+      normDoc.includes('trasfondo') ||
+      (normDoc.includes('fuerza') && normDoc.includes('destreza') && normDoc.includes('constitucion'));
 
     if (isGenericSheet && !esLibro) {
       if (matchesPcName || palabraEnNombre(pjKeywords)) return 'sheet_pj';
@@ -11468,6 +11592,114 @@ ${muestra}`,
   const salida = terminosUnicos.join(', ');
   if (!salida) throw new Error('El modelo no ha devuelto ninguna etiqueta válida tras limpiar.');
   return salida;
+}
+
+/**
+ * Genera etiquetas de búsqueda para múltiples documentos de la biblioteca en UNA SOLA LLAMADA.
+ * Evita disparar 6-10 llamadas consecutivas que saturan la tasa de peticiones por minuto.
+ */
+export async function generarEtiquetasDeBusquedaLote(
+  files: ProjectFile[],
+  elenco: string[] = []
+): Promise<Record<string, string>> {
+  const validos = files.filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 100);
+  if (!validos.length) return {};
+
+  if (validos.length === 1) {
+    try {
+      const etiq = await generarEtiquetasDeBusqueda(validos[0], elenco);
+      return { [validos[0].id]: etiq };
+    } catch {
+      return {};
+    }
+  }
+
+  const modelo = getBackgroundTaskModel();
+  const config = {
+    temperature: 0,
+    ...(esModeloAbierto(modelo) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+  } as any;
+
+  const MUESTRA = 25000;
+  const documentosPrompt = validos.map(f => {
+    const texto = (f.content || '').trim();
+    const muestra = texto.length <= MUESTRA * 2 ? texto : `${texto.slice(0, MUESTRA)}\n\n[...]\n\n${texto.slice(-MUESTRA)}`;
+    return `--- DOCUMENTO ID: "${f.id}" | TÍTULO: "${f.name}" ---
+${muestra}`;
+  }).join('\n\n');
+
+  const bloqueElenco = elenco.length
+    ? `\nQUIÉN Y QUÉ HABITA ESTA CAMPAÑA:
+${elenco.slice(0, 60).join(', ')}
+De esa lista, incluye como etiqueta a TODO EL QUE CADA DOCUMENTO AYUDE A INTERPRETAR.\n`
+    : '';
+
+  const prompt = `Eres el documentalista de una mesa de rol. Te doy ${validos.length} documentos de la biblioteca de una campaña.
+Para CADA documento, genera los términos clave por los que habría que encontrarlo cuando una escena de rol lo necesite.
+
+QUÉ ESCRIBIR PARA CADA DOCUMENTO:
+- Nombres propios que contiene: lugares, facciones, dioses, personajes, objetos.
+- Conceptos y biomas: temas clave específicos del texto.
+- Disparadores de escena: acciones, peligros o situaciones (naufragio, abordaje, sigilo, juicio...).
+- Sinónimos y términos relacionados.
+${bloqueElenco}
+QUÉ NO ESCRIBIR:
+- Palabras genéricas de rol (aventura, campaña, personaje, jugador, dados, reglas).
+- Frases o explicaciones.
+
+Devuelve EXCLUSIVAMENTE un objeto JSON válido con este formato exacto:
+{
+  "etiquetas": {
+    "ID_DEL_DOCUMENTO": "término 1, término 2, término 3, ...",
+    ...
+  }
+}
+Genera entre 25 y 45 términos por documento en una sola línea separada por comas.
+
+DOCUMENTOS A ETIQUETAR:
+${documentosPrompt}`;
+
+  try {
+    const response = await generateContentWithFailover({
+      proposito: 'Etiquetar documentos de la biblioteca en lote',
+      primaryModel: modelo,
+      contents: prompt,
+      config
+    });
+
+    const textoCrudo = (response.text || '').trim();
+    const resultado: Record<string, string> = {};
+
+    const jsonLimpio = textoCrudo.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const parsed = JSON.parse(jsonLimpio);
+    const mapa = parsed.etiquetas || parsed;
+    if (typeof mapa === 'object' && mapa !== null) {
+      for (const f of validos) {
+        const crudo = mapa[f.id] || mapa[f.name];
+        if (typeof crudo === 'string' && crudo.trim()) {
+          const terminosUnicos: string[] = [];
+          const vistos = new Set<string>();
+          for (const t of crudo.split(',')) {
+            const limpio = t.replace(/^[\s\d\-•*`'"]+|[\s.`'"]+$/g, '').replace(/\s+/g, ' ').trim();
+            if (limpio.length >= 2 && limpio.length <= 60) {
+              const norma = limpio.toLowerCase();
+              if (!vistos.has(norma)) {
+                vistos.add(norma);
+                terminosUnicos.push(limpio);
+              }
+            }
+          }
+          if (terminosUnicos.length > 0) {
+            resultado[f.id] = terminosUnicos.join(', ');
+          }
+        }
+      }
+    }
+    return resultado;
+  } catch (e) {
+    console.warn('[Etiquetado Lote] Error generando etiquetas en lote:', e);
+    return {};
+  }
 }
 
 /**

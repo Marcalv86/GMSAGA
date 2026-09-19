@@ -318,14 +318,14 @@ export const RollBadgeCard: React.FC<{ roll: RollInfo }> = ({ roll }) => {
   if (roll.type === 'dm') {
     const isSuccess = roll.dc !== undefined && roll.total !== undefined ? roll.total >= roll.dc : true;
     return (
-      <div className="my-2 p-3 rounded-xl border border-[var(--glass-border)] bg-[var(--surface-soft)] shadow-sm flex flex-wrap items-center justify-between gap-3 font-lora">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400">
-            <Dices className="w-4 h-4" />
+      <div className="my-1.5 p-2 sm:p-2.5 rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)] shadow-xs flex flex-wrap items-center justify-between gap-2 font-lora">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 border bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400">
+            <Dices className="w-3.5 h-3.5" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--accent)]">
+              <span className="font-cinzel font-bold text-xs text-[var(--accent)]">
                 Tirada de DM / PNJ
               </span>
               {roll.dc !== undefined ? (
@@ -344,16 +344,16 @@ export const RollBadgeCard: React.FC<{ roll: RollInfo }> = ({ roll }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 bg-[var(--bg-color)]/80 px-3.5 py-1.5 rounded-lg border border-[var(--user-border)] shadow-inner">
-          <span className="text-[10px] font-cinzel text-[var(--text-secondary)] uppercase">Total</span>
-          <span className="text-base sm:text-lg font-cinzel font-bold text-[var(--accent)]">
+        <div className="flex items-center gap-1.5 shrink-0 bg-[var(--bg-color)]/80 px-2.5 py-1 rounded-md border border-[var(--user-border)] shadow-inner">
+          <span className="text-[9px] font-cinzel text-[var(--text-secondary)] uppercase">Total</span>
+          <span className="text-sm sm:text-base font-cinzel font-bold text-[var(--accent)]">
             {roll.total ?? roll.natural}
           </span>
-          <span className="text-[11px] text-[var(--text-secondary)]">
+          <span className="text-[10px] text-[var(--text-secondary)]">
             (d{roll.sides || 20}: {roll.natural}{roll.modifier ? ` + ${roll.modifier}` : ''})
           </span>
           {roll.dc !== undefined && (
-            <span className={`text-[11px] font-cinzel font-bold px-1.5 py-0.5 rounded ${isSuccess ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : 'text-rose-600 dark:text-rose-400 bg-rose-500/10'}`}>
+            <span className={`text-[10px] font-cinzel font-bold px-1.5 py-0.5 rounded ${isSuccess ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : 'text-rose-600 dark:text-rose-400 bg-rose-500/10'}`}>
               {isSuccess ? 'Éxito' : 'Fallo'}
             </span>
           )}

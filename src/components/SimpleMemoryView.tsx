@@ -30,6 +30,7 @@ interface SimpleMemoryViewProps {
   onUpdateMemory: (updater: (prev: Memory) => Memory) => Promise<void>;
   onUpdateProject?: (fields: Partial<Project> | ((prev: Project) => Partial<Project>)) => Promise<void>;
   onTriggerAIUpdate?: () => void;
+  onCompletarFichaDesdeDocumento?: () => Promise<void>;
   isGenerating?: boolean;
 }
 
@@ -40,6 +41,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   onUpdateMemory,
   onUpdateProject,
   onTriggerAIUpdate,
+  onCompletarFichaDesdeDocumento,
   isGenerating = false
 }) => {
   const memory: Memory = project.memory || {
@@ -382,6 +384,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             onUpdateMemory={onUpdateMemory}
             onUpdateProject={onUpdateProject}
             onTriggerAIUpdate={onTriggerAIUpdate ? async () => { onTriggerAIUpdate(); } : undefined}
+            onCompletarFichaDesdeDocumento={onCompletarFichaDesdeDocumento}
             isGenerating={isGenerating}
             hasChats={chats.length > 0}
             secciones={['giros', 'bambalinas', 'relojes', 'facciones', 'preparado']}
@@ -418,6 +421,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             onUpdateMemory={onUpdateMemory}
             onUpdateProject={onUpdateProject}
             onTriggerAIUpdate={onTriggerAIUpdate ? async () => { onTriggerAIUpdate(); } : undefined}
+            onCompletarFichaDesdeDocumento={onCompletarFichaDesdeDocumento}
             isGenerating={isGenerating}
             hasChats={chats.length > 0}
             topBanner={

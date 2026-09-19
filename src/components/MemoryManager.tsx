@@ -57,6 +57,7 @@ import {
 import { esNombreDeProtagonista } from '../utils/sanitizers';
 import { obtenerOGenerarFichaNpc, asegurarFichaCompletaNpc } from '../utils/canonicalNpcStats';
 import { deduplicarInventario, sonElMismoObjeto } from '../utils/inventoryTag';
+import { extraerIdentidadDeDocumentos, esFichaDelPj } from '../utils/geminiHelper';
 
 // `getAtrInfo` se retiró con la escala 0-20: el deseo ya no tiene tramos —
 // ni los seis de esta función eran seis conductas, sino tres.
@@ -154,6 +155,7 @@ export const MemoryManager: React.FC<{
   onTriggerAIUpdate?: () => Promise<void>;
   onAutoClassifyAll?: () => Promise<void>;
   onUploadEntityImage?: (file: File, category?: any) => Promise<string>;
+  onCompletarFichaDesdeDocumento?: () => Promise<void>;
   isGenerating?: boolean;
   hasChats?: boolean;
   /** Qué secciones mostrar. Sin esto, se muestran todas. */
@@ -168,6 +170,7 @@ export const MemoryManager: React.FC<{
   onTriggerAIUpdate,
   onAutoClassifyAll,
   onUploadEntityImage,
+  onCompletarFichaDesdeDocumento,
   isGenerating = false,
   hasChats = false,
   secciones,
@@ -239,6 +242,66 @@ export const MemoryManager: React.FC<{
 
   // Dossier modals
   const [selectedNpcForDossier, setSelectedNpcForDossier] = useState<NPC | null>(null);
+
+  // Lectura automática de la ficha del protagonista (OC) desde los documentos subidos
+  const [leyendoFicha, setLeyendoFicha] = useState(false);
+  const autoLecturaFichaIntentada = useRef(false);
+
+  const handleEjecutarLecturaFicha = async () => {
+    if (leyendoFicha || isGenerating) return;
+    setLeyendoFicha(true);
+    try {
+      if (onCompletarFichaDesdeDocumento) {
+        await onCompletarFichaDesdeDocumento();
+      } else {
+        const id = await extraerIdentidadDeDocumentos({ project, files });
+        await onUpdateMemory(mem => {
+          const actual = mem?.player_character;
+          const nuevo = { ...(actual || { name: 'Protagonista' }) };
+          if (id.name) nuevo.name = id.name;
+          if (id.race) nuevo.race = id.race;
+          if (id.class) nuevo.class = id.class;
+          if (id.languages?.length) nuevo.languages = id.languages;
+          if (id.appearance) nuevo.appearance = id.appearance;
+          if (id.featuresAndTraits) nuevo.featuresAndTraits = id.featuresAndTraits;
+          if (id.inventory?.length) {
+            const yaEstaba = actual?.inventory || [];
+            const clave = (n: string) =>
+              n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+            const conocidos = new Set(yaEstaba.map(i => clave(i.name || '')));
+            const entran = id.inventory.filter(i => !conocidos.has(clave(i.name || '')));
+            nuevo.inventory = [...yaEstaba, ...entran];
+          }
+          if (id.currencies) nuevo.currencies = id.currencies;
+          if (id.attributes) nuevo.attributes = id.attributes;
+          if (id.proficiencyBonus) nuevo.proficiencyBonus = id.proficiencyBonus;
+          if (id.passivePerception) nuevo.passivePerception = id.passivePerception;
+          if (id.savingThrowProficiencies?.length) nuevo.savingThrowProficiencies = id.savingThrowProficiencies;
+          if (id.skillProficiencies?.length) nuevo.skillProficienciesDetalle = id.skillProficiencies;
+          return { ...(mem || {}), player_character: nuevo };
+        });
+      }
+    } catch (err) {
+      console.error('Error al leer la ficha del OC:', err);
+    } finally {
+      setLeyendoFicha(false);
+    }
+  };
+
+  // Disparo automático en segundo plano en cuanto se detecta que la ficha del protagonista está vacía
+  // y hay documentos candidatos subidos en el proyecto
+  useEffect(() => {
+    const pcActual = project.memory?.player_character;
+    const nombre = (pcActual?.name || '').trim();
+    const esDefecto = !nombre || /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i.test(nombre);
+    const faltaDatos = esDefecto || !pcActual?.race || !pcActual?.class || !pcActual?.appearance;
+    const hayArchivos = files.some(f => esFichaDelPj(f) || (!f.isImage && !f.isAudio && (f.content || '').trim().length > 50));
+
+    if (faltaDatos && hayArchivos && !autoLecturaFichaIntentada.current && !leyendoFicha && !isGenerating) {
+      autoLecturaFichaIntentada.current = true;
+      void handleEjecutarLecturaFicha();
+    }
+  }, [files.length, project.memory?.player_character?.name]);
 
   // Auto-migración segura: consolidar acontecimientos del protagonista al Diario y Cronica de Campaña
   useEffect(() => {
@@ -991,13 +1054,37 @@ export const MemoryManager: React.FC<{
                     /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i.test(
                       (memory.player_character?.name || '').trim()
                     ) ? (
-                      <p className="mt-1 text-[11px] leading-snug text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/40 rounded-lg px-2 py-1.5 m-0">
-                        ⚠️ <strong>Tu personaje no tiene nombre en la ficha.</strong> El Narrador lo llama
-                        «Protagonista» en cada turno, y sin nombre la aplicación no puede reconocerlo, así que acaba
-                        creándole tarjeta de PNJ. Dale a <strong>«Sincronizar Memoria Completa con IA»</strong>, que lee tu ficha
-                        subida y lo rellena, o escríbelo a mano aquí.
-                      </p>
-                    ) : null}
+                      <div className="mt-2 p-2.5 bg-amber-500/10 border border-amber-500/40 rounded-lg flex flex-col gap-2">
+                        <p className="text-[11px] leading-snug text-amber-800 dark:text-amber-300 m-0">
+                          ⚠️ <strong>Tu personaje no tiene nombre en la ficha.</strong> El Narrador lo llama
+                          «Protagonista» en cada turno, y sin nombre la aplicación no puede reconocerlo.
+                        </p>
+                        <div className="flex items-center gap-2 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={handleEjecutarLecturaFicha}
+                            disabled={leyendoFicha || isGenerating}
+                            className="px-2.5 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-cinzel font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-xs"
+                          >
+                            <Sparkles className={`w-3.5 h-3.5 ${leyendoFicha ? 'animate-spin' : ''}`} />
+                            {leyendoFicha ? 'Leyendo ficha en 2º plano...' : '⚡ Leer y rellenar desde mi ficha subida'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 mt-1">
+                        <button
+                          type="button"
+                          onClick={handleEjecutarLecturaFicha}
+                          disabled={leyendoFicha || isGenerating}
+                          className="text-[11px] text-[var(--accent)] hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          title="Vuelve a leer el documento de la ficha subida para sincronizar nombre, raza, clase, rasgos, mochila y estadísticas."
+                        >
+                          <Sparkles className={`w-3 h-3 ${leyendoFicha ? 'animate-spin' : ''}`} />
+                          {leyendoFicha ? 'Leyendo ficha en 2º plano...' : 'Sincronizar con ficha subida'}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/*
