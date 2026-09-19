@@ -3711,7 +3711,14 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
      · **Combate, tensión o decisión táctica → 1 o 2 párrafos** secos y cinéticos, y se corta en el impacto o en la petición de tirada.
      · **Llegada a un sitio nuevo o exploración → 2 a 4 párrafos** con atmósfera de verdad: olores, luz, sonido, peligro.
      · **Un hito grande o una revelación → lo que haga falta**, sin relleno.
-     El turno de ella marca el compás: si escribe tres palabras, no le devuelvas una página.
+     ⚠️ **Y esto NO significa medir contra lo que ella haya escrito de largo.** Hay quien juega escribiendo tres palabras y quiere una escena entera, y está en su derecho. Lo que marca el compás es **cuánto pasa en el turno**, no cuánto se teclea.
+   - **⛔⛔ NI UNA PREGUNTA SIN CONTESTAR, NI UN CAMBIO DE TEMA EN EL MISMO TURNO. Esto es lo que de verdad hincha los turnos.**
+     Tu vicio no es escribir largo: es **apilar temas**. El PNJ dice lo suyo, y además saca un asunto nuevo, y además propone moverse a otro sitio — y la pregunta que le habían hecho hace dos líneas se queda en el aire para siempre. Así la conversación se deshilacha: cada turno abre algo y deja lo anterior sin cerrar.
+     · **Si ella le ha preguntado algo a un PNJ, ese PNJ CONTESTA en este turno.** Puede negarse, evadirse, mentir o mandarla a paseo —todo eso son respuestas y se notan— pero la pregunta NO se queda colgando mientras la escena sigue a otra cosa.
+     · **Si un PNJ le ha preguntado algo a ella, el turno TERMINA ahí.** No contestes por ella y no muevas la escena: se espera.
+     · **UN SOLO TEMA POR TURNO en conversación.** Un PNJ no suelta su respuesta Y abre un tema nuevo Y empuja la escena. Eso es encadenar latidos dentro de un diálogo, y está prohibido igual que fuera de él.
+     ✅ **La comprobación, antes de cerrar el turno:** repasa qué quedó abierto en el turno anterior —una pregunta suya, una pregunta de un PNJ, un ofrecimiento sin respuesta— y mira si ESTE turno lo atiende. Si no lo atiende, no has continuado la conversación: **has empezado otra**.
+     ⭐ Y de aquí sale el largo solo, sin contar palabras: **un turno que resuelve un latido de conversación es corto por naturaleza.** Si te está saliendo largo, casi siempre es que has metido dos.
    - Cada intervención de diálogo o cambio de interlocutor DEBE ir en su propio párrafo independiente con sangría o guion de diálogo (— Diálogo...).
    - Deja que la prosa respire con cadencia novelesca. Queda TERMINANTEMENTE PROHIBIDO volcar parrafadas kilométricas continuas sin espacios.
 3. Consulta la MEMORIA VIVA y la BASE DE CONOCIMIENTO antes de escribir para no contradecir hechos pasados ni inventar datos si ya existen.
@@ -3973,47 +3980,12 @@ ${bloqueVivo}`;
     ? `\n\n[⛔ CÓMO SE LEE LO QUE ACABA DE ESCRIBIR LA JUGADORA (aplícalo, no lo narres): eso NO es prosa tuya que continuar, es lo que ella DECLARA, esté en primera o en tercera persona y lleve corchetes o no. 1) No se lo devuelvas ampliado: ni gestos, ni posturas, ni miradas, ni MOTIVOS que ella no haya escrito. Arranca por el mundo. 2) De todo lo que haya ahí, para el mundo solo EXISTE lo que un testigo con ojos y oídos habría captado desde donde está. Los juicios, opiniones, comparaciones, recuerdos y motivos NO han salido de su boca: ningún PNJ los responde, los alude ni los adivina. Callar sí se ve, y un PNJ puede interpretarlo mal —eso es bueno—; acertar con el porqué porque tú lo has leído, no.]`
     : '';
 
-  /*
-   * ✂️ EL PRESUPUESTO DE PALABRAS, CALCULADO Y DICHO EN NÚMEROS.
-   *
-   * La regla de «ajusta el largo a lo que te han dado» está escrita arriba y no
-   * basta, porque Gemini está entrenado para ser exhaustivo y llena el espacio
-   * que le dejes: le digas lo que le digas, devuelve su párrafo y medio. Un
-   * «uno o dos párrafos» es elástico y él lo estira; un número no.
-   *
-   * Así que el largo no se le pide, se le CALCULA: la aplicación sabe cuánto ha
-   * escrito la jugadora y le pone el techo aquí, al final del todo, que es lo
-   * último que lee antes de ponerse a escribir.
-   *
-   * ⚠️ Y va dicho como TECHO, nunca como objetivo, porque un modelo que recibe
-   * un número lo trata como una cuota que hay que llenar — que es exactamente
-   * el problema que se quiere resolver, solo que con más pasos.
-   */
-  const palabrasDeElla = userText.trim().split(/\s+/).filter(Boolean).length;
-  const esTurnoInicial = (currentChat.messages || []).length <= 1;
-  const techoDePalabras = !palabrasDeElla
-    ? 0
-    : palabrasDeElla <= 12
-      ? 90
-      : palabrasDeElla <= 40
-        ? 170
-        : palabrasDeElla <= 120
-          ? 280
-          : 420;
-  const presupuestoDeTurno =
-    techoDePalabras && !esTurnoInicial
-      ? `\n\n[✂️ LARGO DE ESTE TURNO — la jugadora ha escrito ${palabrasDeElla} ${palabrasDeElla === 1 ? 'palabra' : 'palabras'}, así que este turno va de unas **${techoDePalabras} palabras como TECHO**.` +
-        ` ⚠️ Es un límite, NO un objetivo: si lo que hay que contar cabe en dos frases, se cuenta en dos frases y se acaba el turno. ⛔ No rellenes con ambiente, ni recapitules lo que ya pasó, ni cierres con una reflexión bonita para ocupar el hueco — el relleno no entra por no tener qué decir, entra por pudor a que el turno se vea corto.` +
-        ` ✅ La excepción, y solo esta: si en este turno se llega a un lugar nuevo o cae una revelación grande de verdad, puedes pasarte — y entonces se nota que era necesario.]`
-      : '';
-
   const esTurnoUno = (currentChat.messages || []).length <= 1;
   const turnOneScanPrompt = esTurnoUno 
     ? `\n\n[⛔ TURNO 1 DE CAMPAÑA - ESCANEO INICIAL OBLIGATORIO DE DOCUMENTOS DE ARRANQUE]: Este es el primer turno de la campaña. Has recibido documentos adjuntos de arranque y premisa. Analízalos a fondo. Si la premisa o el documento de arranque sitúa al grupo en alta mar, en un barco, o en trayecto hacia un destino, ES OBLIGATORIO que declares en este primer turno las etiquetas [ESTAMOS: ...], [LUGAR: ...] y [VIAJE: Destino | jornadas: N] (ej. [VIAJE: Luskan | jornadas: 10]) para que la aplicación configure la travesía y el HUD correctamente. No dejes estos campos vacíos ni omitas el viaje si la premisa es marítima.`
     : '';
 
-  const finalUserPayload =
-    userText + diceContext + recordatorioDeTurno + turnOneScanPrompt + presupuestoDeTurno;
+  const finalUserPayload = userText + diceContext + recordatorioDeTurno + turnOneScanPrompt;
 
   if (lastRole === 'user') {
     contents[contents.length - 1].parts.push({ text: '\n\n' + finalUserPayload });
