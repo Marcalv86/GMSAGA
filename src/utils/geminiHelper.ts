@@ -3255,16 +3255,25 @@ ${rescatados.map(r => `--- [Fragmento de: ${r.fragmento.fileName}${r.fragmento.t
     ? `
 ### 🗡️ LA CUADRILLA — QUIÉNES VAN CON ELLA AHORA MISMO
 **Están EN LA ESCENA salvo que la propia escena diga lo contrario** (se quedaron fuera, los han separado, están heridos). Si llevan tres escenas sin abrir la boca y nada lo explica, se te han olvidado — y eso se nota antes que ninguna otra cosa.
-- No son escolta de adorno: tienen oficio, opinión y cosas que perder. Hablan cuando les afecta, discrepan cuando algo les parece mal y resuelven lo suyo sin que nadie se lo mande.
-- ⛔ Y NO SON EL CORO DE NADIE: no existen para darle la razón a la protagonista ni para explicarle lo que tiene que hacer.
+
+⛔⛔ **LO PRIMERO, Y ES LO QUE MÁS SE INCUMPLE: ELLA NO MANDA AQUÍ.**
+Tu inclinación por defecto es poner a la protagonista al frente porque es la protagonista: que los demás esperen su plan, le pidan permiso, le pregunten «¿qué hacemos?» y ejecuten lo que decida. **Eso está prohibido en esta mesa.** Quien entra en una organización entra por abajo, y una novata entra más abajo todavía.
+- A alguien recién llegado **no le asignan escolta: le asignan supervisión.** La gente que la acompaña está ahí para **vigilarla, enseñarla y ponerla a prueba** — y rinde cuentas ante sus superiores, no ante ella. Que se note: la corrigen, le dan la faena rutinaria, la observan cuando cree que no la miran, y lo que opinen de ella viaja hacia arriba.
+- Su rango en la cuadrilla es el que se haya GANADO jugando, no el que convenga a la escena. Acompañar a quien manda es el peldaño alto y se gana; al principio es trabajo de abajo y bajo el criterio de otro.
+- ⛔ Nunca le traslades a ella una decisión que le corresponde a quien está por encima. Si hay que decidir algo de la cuadrilla, lo decide quien manda; ella propone, ejecuta su parte y carga con las consecuencias.
+
+Y con todo eso, **no son el coro de nadie**: tienen oficio, opinión y cosas que perder. Hablan cuando les afecta, discrepan cuando algo les parece mal y resuelven lo suyo sin que se lo manden. Tampoco existen para explicarle a nadie lo que tiene que hacer.
+
 ${enGrupo
   .map(n => {
     const rango =
       n.rangoEnElGrupo === 'manda'
-        ? ' — **MANDA**: las decisiones de la cuadrilla las toma esta persona, rápido y sin someterlas a votación. Ella propone, ejecuta su parte y carga con las consecuencias, pero NO lidera esto. ⛔ Nunca le traslades a ella un «¿y qué hacemos?» que le toca decidir a quien manda.'
+        ? ' — **MANDA**: las decisiones de la cuadrilla las toma esta persona, rápido y sin someterlas a votación ni a la aprobación de ella.'
         : n.rangoEnElGrupo === 'acompana'
-          ? ' — la acompaña y le sigue el paso: apoya, cubre y opina, pero no decide por ella ni le da lecciones de su oficio.'
-          : ' — de igual a igual: ni le manda ni le obedece; discute, negocia y a veces se sale con la suya.';
+          ? ' — **la sigue a ELLA**, y esto es un peldaño ganado, no el punto de partida: en algún momento de la partida se decidió que aquí ella lleva la voz. Aun así no es su criado: opina, discute y tiene lo suyo.'
+          : n.rangoEnElGrupo === 'iguales'
+            ? ' — **de igual a igual**: ni le manda ni le obedece; discute, negocia y a veces se sale con la suya.'
+            : ' — **ESTÁ POR ENCIMA DE ELLA**: la vigila, la instruye y la evalúa, y lo que vea lo cuenta arriba. No le pide permiso, le dice lo que toca; y cuando ella se equivoca, se lo hace saber. ⚠️ Este es el trato por defecto mientras no conste otra cosa: entre suponer que ella manda y suponer que no, la respuesta es que no.';
     return `- **${n.name}**${n.relation ? ` (${n.relation})` : ''}${rango}`;
   })
   .join('\n')}
@@ -3676,6 +3685,10 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
    - **⛔ Prohibido devolverlo por la puerta de atrás:** Nada de que el interlocutor repita de inmediato en el idioma común lo que acaba de decir, ni de que un tercero se lo traduzca gratis, ni de que el narrador lo aclare después. Si la información ha de llegarle, debe ser por una vía de juego (contratar un droide/intérprete, usar tecnología o magia, negociar o forzar al PNJ a cambiar de idioma).
    - **El cambio a una lengua común/estándar es una CONCESIÓN deliberada:** Si un PNJ decide hablar en el idioma del protagonista, es un gesto deliberado con coste o intención (por diversión, cálculo, conveniencia, burla o respeto táctico), nunca la opción automática.
 1. [PROTAGONISMO DEL JUGADOR]: La aventura gira estrictamente en torno a este protagonista (${pc?.name || 'el personaje del jugador'}). Al iniciar la escena, sitúa directamente al protagonista en primer plano, describiendo su presencia física, entorno inmediato, sensaciones sensoriales y el contexto según su trasfondo y ficha. Nunca comiences de forma genérica o neutral ignorando su identidad y habilidades.
+   ⛔ **PERO PROTAGONISTA NO ES LO MISMO QUE JEFA, Y ESTA MISMA REGLA ES LA QUE TE HACE CONFUNDIRLO.** «La aventura gira en torno a ella» significa que la CÁMARA está en ella, no que el mundo le obedezca. Tu inclinación es hacer que mande: que los demás esperen su plan, le pidan permiso, le pregunten «¿y ahora qué hacemos?», le cedan la decisión de una operación ajena o la metan en una jugada que le corresponde a un profesional. Nada de eso.
+   - **Su rango es el que se haya ganado jugando**, y al entrar en una organización se entra por abajo: faena rutinaria, a las órdenes de otro, y con gente por encima que la vigila, la instruye y la pone a prueba. Estar presente en algo grande es un peldaño que se sube, no el punto de partida.
+   - **Una facción resuelve sus problemas con su propia gente.** Antes de meterla en una operación, pregúntate qué recursos tiene esa organización para eso y por qué no los está usando. Si la única respuesta es «porque quiero a la protagonista dentro», la escena está mal montada: rehazla. Ella puede estar ahí por otras vías —se cuela, insiste, tiene algo que nadie más tiene, la usan de cebo o de tapadera, o le toca esperar fuera y tragarse el quedarse fuera—.
+   - **Que no lleve la voz cantante NO es quitarle protagonismo.** Su escena está en lo que ve, en lo que decide después, en lo que le cuesta obedecer y en cómo se gana el sitio. Eso es mejor material que una novata dando órdenes a veteranos.
 2. [FORMATO EDITORIAL, SALTOS DE PÁRRAFO Y RESPIRACIÓN DE LA PROSA - OBLIGATORIO]:
    Escribe con una maquetación limpia y agradable de leer:
    - Prosa Narrativa 100% Inmersiva: Queda TERMINANTEMENTE PROHIBIDO imprimir cabeceras o bloques de estadísticas en texto plano dentro del relato (como 📅 Fecha, 👤 Nivel, 🌟 Hito, ⚜️ Renombre o 🖤 PNJ ATR). Todos los datos del personaje y del mundo se consultan en el HUD y se actualizan silenciosamente mediante las etiquetas entre corchetes al final del mensaje.
@@ -3741,7 +3754,7 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
      ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano a Beniago, sin abrirla | de: Jarlaxle)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
     - [COMENTARIO_DM: comentario breve, simpático, sincero o ingenioso del DM fuera de personaje] — OPCIONAL (1-2 frases). Emítelo solo cuando ocurra algo genuinamente divertido, una pifia o éxito crítico épico, una jugarreta memorable del PJ a un PNJ (o viceversa), o un momento de rol memorable. Este comentario se envía automáticamente al chat OOC de la Mesa como un mensaje del DM, con tu personalidad entusiasta, cómica, sincera y rolera de colega de mesa. Si el turno es rutinario, formal o solemne, OMITE totalmente esta etiqueta.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | agotamiento: 0-10 | condiciones: lista separada por comas, o "ninguna"]
-   - [GRUPO: Nombre | entra | manda] cuando alguien se suma a la cuadrilla y viaja con ella, y [GRUPO: Nombre | sale] cuando se separa. El rango es «manda», «iguales» o «acompaña», y hay que ponerlo: de ello depende quién toma las decisiones del grupo. Mientras no lo marques, para la aplicación esa persona NO va con ella y tú te olvidarás de meterla en escena dentro de dos turnos.
+   - [GRUPO: Nombre | entra | supervisa] cuando alguien se suma a la cuadrilla y viaja con ella, y [GRUPO: Nombre | sale] cuando se separa. Mientras no lo marques, para la aplicación esa persona NO va con ella y tú te olvidarás de meterla en escena dentro de dos turnos. El rango dice quién está por encima de quién, y no es cosmético: «manda» (decide por la cuadrilla), «supervisa» (está por encima de ella: la vigila, la instruye y la evalúa), «iguales», o «acompaña» (la sigue a ella — esto SE GANA jugando, no es el punto de partida de nadie). ⚠️ Si no lo pones, se da por supuesto «supervisa»: quien entra en una organización entra por abajo.
    - [DOLENCIA: nombre | cd: 12 | exitos: 0-2] para abrir o llevar una enfermedad, y [DOLENCIA: nombre | curada] para cerrarla. Dos éxitos SEGUIDOS la curan; un fallo la agrava o suma un nivel de agotamiento. Si la enfermedad no se anota aquí, no existe pasado este turno.
    - [FICHA: sab 18 | comp 3 | pasiva 16 | +Sigilo 5] — SOLO cuando suba de nivel o la jugadora te corrija sus números. Su ficha se subió congelada en el nivel de aquel día: una puntuación que sube, un bonificador que cambia o una competencia nueva no existen hasta que los apuntes aquí, y hasta entonces sigues calibrando sus tiradas con los datos de entonces. Las competencias se añaden con «+Nombre bono» y SUMAN a las que ya tiene.
      Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
@@ -9214,7 +9227,7 @@ export interface CambioDeDolencia {
 export interface CambioDeGrupo {
   nombre: string;
   entra: boolean;
-  rango?: 'manda' | 'iguales' | 'acompana';
+  rango?: 'manda' | 'supervisa' | 'iguales' | 'acompana';
 }
 
 export function parseGrupoTags(text: string): { cleaned: string; cambios: CambioDeGrupo[] } {
@@ -9229,13 +9242,24 @@ export function parseGrupoTags(text: string): { cleaned: string; cambios: Cambio
     // Por defecto entra: se nombra a alguien en el grupo para meterlo, y sacarlo
     // hay que decirlo. Al revés, un «[GRUPO: Braelin]» suelto lo echaría.
     const sale = /\b(sale|fuera|se queda|se separa|se va|baja|deja el grupo)\b/.test(resto);
-    const rango: CambioDeGrupo['rango'] = /\b(manda|lidera|jefe|jefa|al mando|superior)\b/.test(resto)
+    /*
+     * ⚠️ El orden importa y el hueco por defecto también.
+     *
+     * Antes, no decir nada significaba «iguales», y eso es el error que se
+     * quería evitar: una novata en una organización no va con iguales, va con
+     * quien la supervisa. Ahora el hueco se deja VACÍO a propósito, y el prompt
+     * trata lo vacío como «está por encima de ella» — entre suponer que manda
+     * la protagonista y suponer que no, la respuesta es que no.
+     */
+    const rango: CambioDeGrupo['rango'] = /\b(manda|lidera|jefe|jefa|al mando|superior|capit\w*)\b/.test(resto)
       ? 'manda'
-      : /\b(acompa\w*|escolta|a su lado|sigue)\b/.test(resto)
-        ? 'acompana'
+      : /\b(supervis\w*|vigila\w*|instruye|ense\w*|tutela\w*|mentor\w*|eval[uú]a\w*|a prueba|por encima|veterano|veterana)\b/.test(resto)
+        ? 'supervisa'
         : /\b(iguales?|par|de t[uú] a t[uú])\b/.test(resto)
           ? 'iguales'
-          : undefined;
+          : /\b(acompa\w*|escolta|a su lado|la sigue|a sus [oó]rdenes)\b/.test(resto)
+            ? 'acompana'
+            : undefined;
     cambios.push({ nombre, entra: !sale, rango });
   }
   return { cleaned: cleaned.trim(), cambios };

@@ -934,14 +934,21 @@ export interface NPC {
    */
   enElGrupo?: boolean;
   /**
-   * Quién manda, que en este grupo no es un detalle.
+   * Quién está por encima de quién, que aquí no es un detalle.
    *
-   * Un escolta que la acompaña y un superior que la lleva a sueldo no se juegan
-   * igual: al primero no le toca decidir por ella, y al segundo sí le toca
-   * decidir por la cuadrilla. Sin esto, el Narrador trata a todo el que viaje
-   * con ella como acompañante dócil —incluido alguien que manda una banda—.
+   * ⛔ Y OJO CON EL PUNTO MEDIO, que es donde se cuela el fallo. La primera
+   * versión de esto tenía tres rangos —manda / iguales / acompaña— y eso deja
+   * fuera el caso NORMAL: una novata que entra en una organización no va con
+   * iguales ni con escoltas a su servicio. Va con agentes que la vigilan, la
+   * enseñan y la ponen a prueba, y que responden ante otro, no ante ella.
+   *
+   * Sin ese rango, el modelo cae en lo de siempre: hacer que la protagonista
+   * mande porque es la protagonista. De ahí `supervisa`, que es el que más se
+   * va a usar al principio de una campaña — y `acompana` pasa a ser lo que
+   * debió ser desde el principio: un peldaño que se GANA, no el punto de
+   * partida.
    */
-  rangoEnElGrupo?: 'manda' | 'iguales' | 'acompana';
+  rangoEnElGrupo?: 'manda' | 'supervisa' | 'iguales' | 'acompana';
   /** Lo que deja ver: cómo trata al protagonista. Se muestra siempre. */
   aparenta?: string;
   /** Lo que calla. Va tapado: leerlo es destriparse la traición. */
