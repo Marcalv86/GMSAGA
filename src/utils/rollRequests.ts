@@ -68,6 +68,32 @@ export function stripRollRequests(text: string): string {
  * pero un mensaje editado a mano o venido de una importación puede traerlo. Limpiar también
  * al pintar sale gratis y evita que se cuele cualquier etiqueta en mitad del relato.
  */
+/**
+ * ⛔ LAS PREGUNTAS DEL NARRADOR SE BORRABAN ANTES DE ENSEÑARLAS.
+ *
+ * `[Pregunta de Mesa: ...]` es la vía por la que el Director pregunta en vez de
+ * inventarse un dato: qué arranque se juega, qué encuentra un PNJ en el diario,
+ * cómo ayuda exactamente la protagonista. Está documentada por todo el envío y
+ * el Narrador la usa.
+ *
+ * Y `stripStateTag` la BORRABA del texto antes de pintarlo. Así que el Narrador
+ * preguntaba, la aplicación se tragaba la pregunta, y a la jugadora le llegaba
+ * una escena que se paraba sin decir por qué. La aplicación callándose justo
+ * donde tenía que gritar, otra vez.
+ *
+ * Se siguen quitando de la prosa —para que no salgan como un corchete suelto en
+ * mitad del párrafo— pero ahora se recogen antes y se pintan aparte.
+ */
+export function parsePreguntasDeMesa(text: string): string[] {
+  if (!text) return [];
+  const fuera: string[] = [];
+  for (const m of text.matchAll(/\[\s*Pregunta\s+de\s+Mesa\s*:([^\]]*)\]/gi)) {
+    const cuerpo = (m[1] || '').trim();
+    if (cuerpo) fuera.push(cuerpo);
+  }
+  return fuera;
+}
+
 export function stripStateTag(text: string): string {
   if (!text) return '';
   return quitarEtiquetasInternas(text)

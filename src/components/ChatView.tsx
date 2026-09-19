@@ -6,7 +6,7 @@ import { SpotifyPreview } from './SpotifyPreview';
 import { CreativeStudioModal } from './CreativeStudioModal';
 import { OpcionesDeTransicion, SceneTransitionModal } from './SceneTransitionModal';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
-import { parseRollRequests, stripRollRequests, stripStateTag, RollRequest } from '../utils/rollRequests';
+import { parseRollRequests, stripRollRequests, stripStateTag, parsePreguntasDeMesa, RollRequest } from '../utils/rollRequests';
 import { formatNarrativeText } from '../utils/textFormatter';
 import { parseMessageSegments, RollBadgeCard } from './RollBadge';
 import { parseSceneHUD, SceneHUDCard } from './SceneHUDCard';
@@ -169,6 +169,16 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
     ? parseSceneHUD(contentSinInvitaciones)
     : { narrativeText: contentSinInvitaciones, sceneHUD: null };
 
+  /*
+   * Las preguntas del Director, RESCATADAS antes de que las borre la limpieza.
+   *
+   * `stripStateTag` quita `[Pregunta de Mesa: ...]` del texto —bien, porque un
+   * corchete suelto en mitad del párrafo es ruido— pero eso significaba que la
+   * pregunta no llegaba a ninguna parte: el Narrador preguntaba, la app se
+   * comía la pregunta, y la escena se paraba sin que nadie supiera por qué.
+   */
+  const preguntasDeMesa = isModel ? parsePreguntasDeMesa(textWithoutHUD) : [];
+
   // Limpiar etiquetas de sincronización interna que hayan quedado
   const cleanContent = isModel ? stripStateTag(textWithoutHUD) : textWithoutHUD;
 
@@ -302,6 +312,24 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
           {isModel && sceneHUD && (
             <SceneHUDCard hud={sceneHUD} messageIndex={idx} project={project} />
           )}
+
+          {/* ❓ LO QUE EL DIRECTOR TE ESTÁ PREGUNTANDO. Antes se borraba. */}
+          {preguntasDeMesa.map((q, qIdx) => (
+            <div
+              key={`${idx}-preg-${qIdx}`}
+              className="my-2 rounded-xl border border-sky-500/40 bg-[color-mix(in_srgb,#0ea5e9_10%,var(--surface))] p-3 sm:p-3.5 flex items-start gap-3 font-lora shadow-xs"
+            >
+              <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-700 dark:text-sky-300 flex items-center justify-center shrink-0 text-lg">
+                ❓
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-cinzel font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300 mb-0.5">
+                  El Director te pregunta
+                </div>
+                <div className="text-sm text-[var(--text-primary)] break-words">{q}</div>
+              </div>
+            </div>
+          ))}
 
           {segments.map((seg, sIdx) => {
             if (seg.type === 'roll') {
