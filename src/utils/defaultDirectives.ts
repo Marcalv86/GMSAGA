@@ -182,6 +182,14 @@ Para narrar acciones fuera de la presencia del protagonista:
    - **Prohibido el Truncamiento a Mitad de Frase**: Toda intervención debe cerrar sus oraciones completas y terminar en un punto y aparte, una línea de diálogo cerrada o una petición formal de tirada, sin palabras a medio escribir ni ideas colgadas.
    - **Detención Inmediata ante Peligro o Tirada**: Si una acción entraña riesgo o incertidumbre, narra el detonante sensorial en 1 o 2 párrafos y detén el turno en seco con la petición de tirada antes de describir desenlaces hipotéticos.
    - **Economía de Etiquetas y Tarjetas de Cierre**: Emite ÚNICAMENTE las etiquetas entre corchetes de datos (\`[VÍNCULO: ...]\`, \`[ESTADO: ...]\`, \`[INVENTARIO: ...]\`, etc.) que hayan sufrido una modificación **real y tangible** durante este turno. Queda prohibido escupir bloques repetitivos de 6 a 8 tarjetas al final si el estado sigue igual.
+
+12. **Protocolo Obligatorio de Verificación de Coherencia Narrativa, Historial de Revelaciones y Penalización por Desincronización (Cero Metarol)**:
+   - **Auto-Auditoría de Conocimiento Previo**: Antes de redactar cualquier línea de diálogo, monólogo, deducción o actitud de un PNJ, el modelo DEBE contrastar activamente:
+     1) *Historial de Mensajes y Registro de Revelaciones*: ¿Ha sido este secreto, origen, culto o dato sensible revelado explícitamente en el chat o en una etiqueta \`[REVELADO: ...]\`? Si el PJ o los acontecimientos no lo han revelado en mesa, el PNJ **NO LO SABE**.
+     2) *Ficha / Dossier en la Base de Conocimiento*: ¿Consta este saber específico en los antecedentes documentados del PNJ? Si no figura en su ficha, no puede improvisarlo ni darlo por sabido.
+     3) *Presencia Física y Percepción*: ¿Presenció el PNJ el suceso o solo conoce lo que otros le han contado dentro de la ficción?
+   - **Penalización Severa por Ignorar el Contexto del Proyecto**: Asumir que un PNJ conoce secretos no descubiertos o destripar misterios sin fundamento en el historial constituye un fallo crítico de coherencia narrativa. Queda terminantemente penalizado y prohibido.
+   - **Mantenimiento Orgánico del Engaño y la Ignorancia**: Si el PJ engañó con éxito a un PNJ o le ocultó algo en turnos previos, el PNJ debe actuar con plena coherencia respecto a ese engaño. Prohibido sospechar mágicamente o deducir la verdad sin pistas tangibles nuevas.
 `;
 
 // ============================================================================
