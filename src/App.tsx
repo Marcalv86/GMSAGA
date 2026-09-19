@@ -2656,12 +2656,15 @@ export default function App() {
    * Solo si el cuaderno está vacío: en una campaña en marcha, lo que hay se
    * ganó jugando y no se pisa con una lectura de documentos.
    */
-  const montarSesionCero = async (archivos: ProjectFile[], proyecto: Project | null) => {
-    if (!proyecto) return;
+  const montarSesionCero = async (
+    archivos: ProjectFile[],
+    proyecto: Project | null
+  ): Promise<{ facciones: number; preparado: number; relojes: number } | null> => {
+    if (!proyecto) return null;
 
     const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
     const documentos = (archivos || []).filter(f => esTexto(f) && (f.content || '').trim().length > 200);
-    if (!documentos.length) return;
+    if (!documentos.length) return null;
 
     /*
      * QUÉ HAY SIN MIRAR, QUE NO ES LO MISMO QUE «EL CUADERNO ESTÁ VACÍO».
@@ -2682,7 +2685,7 @@ export default function App() {
       (proyecto.memory?.documentos_del_tablero || []).map(d => [d.id, d.huella])
     );
     const porMirar = documentos.filter(f => vistos.get(f.id) !== huellaDeDocumento(f));
-    if (!porMirar.length) return;
+    if (!porMirar.length) return null;
 
     const arranque = Date.now();
     try {
@@ -2716,6 +2719,11 @@ export default function App() {
         total ? 'Mesa actualizada con los documentos nuevos' : 'Documentos nuevos revisados, sin novedad',
         `${porMirar.length} documento(s) por mirar → ${tablero.facciones.length} facciones, ${tablero.preparado.length} cartas preparadas y ${tablero.relojes.length} relojes.`
       );
+      return {
+        facciones: tablero.facciones.length,
+        preparado: tablero.preparado.length,
+        relojes: tablero.relojes.length
+      };
     } catch (err) {
       // Que falle no puede impedir nada, y NO se apunta la huella: así se
       // reintenta en la siguiente subida en vez de darlo por mirado.
@@ -2724,16 +2732,17 @@ export default function App() {
       // subirlo todo, no hay siguiente. Cuando el corte fue por minimizar la
       // app, se retoma al volver en vez de morir en una línea del registro.
       if (murioPorSegundoPlano(err, arranque)) {
-        reintentarAlVolver('Revisar los documentos para la mesa', () =>
-          montarSesionCero(
+        reintentarAlVolver('Revisar los documentos para la mesa', async () => {
+          await montarSesionCero(
             currentFilesRef.current,
             projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
-          )
-        );
-        return;
+          );
+        });
+        return null;
       }
       logWarn('memory_sync', 'No se pudieron revisar los documentos para la mesa', describeApiError(err));
     }
+    return null;
   };
 
   const revisarBibliotecaAlEstrenar = async (): Promise<boolean> => {
@@ -4681,7 +4690,7 @@ export default function App() {
        */
       setTopProgress({
         active: true,
-        label: 'Sincronizando entidades, crónica y cronología (paso 1/4)...',
+        label: 'Sincronizando entidades, crónica y cronología (paso 1/5)...',
         type: 'sync'
       });
       const syncResult = await syncFullCampaignFromChats(currentProject, currentChats, currentFiles);
@@ -4691,7 +4700,7 @@ export default function App() {
 
       setTopProgress({
         active: true,
-        label: 'Sintetizando memoria general del proyecto (paso 2/4)...',
+        label: 'Sintetizando memoria general del proyecto (paso 2/5)...',
         type: 'sync'
       });
       const claudeProjectMem = await generateClaudeProjectMemory({
@@ -4708,7 +4717,7 @@ export default function App() {
 
       setTopProgress({
         active: true,
-        label: 'Verificando ficha e identidad en documentos (paso 3/4)...',
+        label: 'Verificando ficha e identidad en documentos (paso 3/5)...',
         type: 'sync'
       });
       const fichaLeida = await extraerIdentidadDeDocumentos({ project: currentProject, files: currentFiles }).catch(err => {
@@ -4924,7 +4933,7 @@ export default function App() {
       try {
         setTopProgress({
           active: true,
-          label: 'Tramando historia y giros de la campaña (paso 4/4)...',
+          label: 'Tramando historia y giros de la campaña (paso 4/5)...',
           type: 'sync'
         });
         await new Promise(r => setTimeout(r, 1200));
@@ -4956,6 +4965,41 @@ export default function App() {
         });
       }
 
+      /*
+       * ⭐ Y EL TABLERO, QUE SE RECONSTRUÍA DESDE EL CHAT Y DE NINGÚN OTRO SITIO.
+       *
+       * Facciones, cartas preparadas y relojes se rehacían con `reconstruirMesa`
+       * y `reconstruirCuaderno`, que releen las ETIQUETAS que el Narrador haya
+       * emitido jugando. En una campaña de dos turnos no hay ninguna, así que
+       * salía vacío — y quedaba vacío para siempre.
+       *
+       * Leer eso de los DOCUMENTOS sí existía (`montarSesionCero`), pero colgaba
+       * de dos sitios a los que no se vuelve: la subida de archivos y el primer
+       * mensaje de la campaña. Así que el camino que uno hace de verdad —vaciar
+       * la memoria y pulsar «Sincronizar»— no lo llamaba nadie, y el botón que
+       * promete poner al día TODA la campaña dejaba tres pestañas del cuaderno
+       * exactamente igual de vacías que estaban.
+       *
+       * Vaciar la memoria borra también la cuenta de documentos ya mirados, así
+       * que desde aquí se vuelven a mirar todos. Y si no hay nada nuevo que
+       * mirar, esto se sale solo y no gasta ni una petición.
+       */
+      let tableroMontado: { facciones: number; preparado: number; relojes: number } | null = null;
+      try {
+        setTopProgress({
+          active: true,
+          label: 'Montando el tablero con los documentos (paso 5/5)...',
+          type: 'sync'
+        });
+        await new Promise(r => setTimeout(r, 1200));
+        tableroMontado = await montarSesionCero(
+          currentFilesRef.current,
+          projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
+        );
+      } catch (err) {
+        logWarn('memory_sync', 'No se pudo montar el tablero durante la sincronización', describeApiError(err));
+      }
+
       setAlertConfig({
         isOpen: true,
         title: '¡Sincronización Total con IA Completada!',
@@ -4983,8 +5027,20 @@ export default function App() {
                 .join(', ')}, y te lo digo solo para que lo sepas: la bolsa no se rehace desde aquí, porque la etiqueta anota lo que entra y sale, no el saldo, y con lo que empezaste está en tu ficha. De ahora en adelante sube y baja sola con lo que ganes y gastes en escena.\n`
             : '') +
           (girosTrazados > 0
-            ? `• ${girosTrazados} ${girosTrazados === 1 ? 'giro' : 'giros'} en la estructura de la historia (pestaña Giros).\n\n`
-            : `• La estructura de la historia no se ha podido trazar esta vez; mira el registro de errores.\n\n`) +
+            ? `• ${girosTrazados} ${girosTrazados === 1 ? 'giro' : 'giros'} en la estructura de la historia (pestaña Giros).\n`
+            : `• La estructura de la historia no se ha podido trazar esta vez; mira el registro de errores.\n`) +
+          (() => {
+            if (!tableroMontado) return `• El tablero no traía nada nuevo de los documentos.\n\n`;
+            const t = tableroMontado;
+            const partes = [
+              t.facciones ? `${t.facciones} ${t.facciones === 1 ? 'facción' : 'facciones'}` : '',
+              t.preparado ? `${t.preparado} ${t.preparado === 1 ? 'carta preparada' : 'cartas preparadas'}` : '',
+              t.relojes ? `${t.relojes} ${t.relojes === 1 ? 'reloj' : 'relojes'}` : ''
+            ].filter(Boolean);
+            return partes.length
+              ? `• ${partes.join(', ')} sacadas de tus documentos (pestañas Facciones, Preparado y Relojes).\n\n`
+              : `• Los documentos se han revisado y no daban para facciones, cartas ni relojes.\n\n`;
+          })() +
           `Lo que ya estaba escrito no se ha tocado` +
           (notasConservadas > 0
             ? `, incluidas tus ${notasConservadas} ${notasConservadas === 1 ? 'nota' : 'notas'}.`
