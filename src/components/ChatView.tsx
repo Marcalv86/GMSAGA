@@ -317,7 +317,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
           {preguntasDeMesa.map((q, qIdx) => (
             <div
               key={`${idx}-preg-${qIdx}`}
-              className="my-2 rounded-xl border border-sky-500/40 bg-[color-mix(in_srgb,#0ea5e9_10%,var(--surface))] p-3 sm:p-3.5 flex items-start gap-3 font-lora shadow-xs"
+              className="my-2 rounded-xl border border-sky-500/40 bg-[color-mix(in_srgb,var(--gem)_10%,var(--surface))] p-3 sm:p-3.5 flex items-start gap-3 font-lora shadow-xs"
             >
               <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-700 dark:text-sky-300 flex items-center justify-center shrink-0 text-lg">
                 ❓

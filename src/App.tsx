@@ -5768,12 +5768,12 @@ export default function App() {
           <div className="w-full h-[3px] bg-[var(--surface)]/40 relative overflow-hidden shadow-xs">
             {topProgress.percent !== undefined ? (
               <div
-                className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-emerald-400 dark:from-amber-400 dark:via-amber-300 dark:to-emerald-400 transition-all duration-300 ease-out shadow-[0_0_10px_rgba(245,158,11,0.8)]"
+                className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-emerald-400 dark:from-amber-400 dark:via-amber-300 dark:to-emerald-400 transition-all duration-300 ease-out shadow-[0_0_10px_color-mix(in_srgb,var(--bronze)_80%,transparent)]"
                 style={{ width: `${Math.max(5, Math.min(100, topProgress.percent))}%` }}
               />
             ) : (
               <div className="h-full w-full bg-[var(--glass-border)] relative overflow-hidden">
-                <div className="absolute inset-y-0 w-2/5 bg-gradient-to-r from-transparent via-amber-400 to-transparent animate-top-progress shadow-[0_0_10px_rgba(245,158,11,0.8)]" />
+                <div className="absolute inset-y-0 w-2/5 bg-gradient-to-r from-transparent via-amber-400 to-transparent animate-top-progress shadow-[0_0_10px_color-mix(in_srgb,var(--bronze)_80%,transparent)]" />
               </div>
             )}
           </div>

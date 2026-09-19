@@ -3,6 +3,100 @@
 @theme {
   --font-cinzel: 'Cinzel', serif;
   --font-lora: 'Lora', serif;
+
+  /*
+   * ───────────────────────────────────────────────────────────────────────
+   * LA PALETA SALE DEL ICONO, NO DE TAILWIND.
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * El icono de la aplicación es un d20 granate sobre cuero, con anillo de
+   * bronce y TRES GEMAS DE TURQUESA. La interfaz ya era cálida —pergamino,
+   * granate y oro— pero por dentro seguía usando los azules de fábrica de
+   * Tailwind (`sky`, `indigo`, `blue`, `cyan`) en doscientos sitios: las
+   * pastillas de clima, los avisos, los botones de fusionar, la tarjeta de
+   * preguntas. Y esos azules son FRÍOS: al lado del pergamino cantan como una
+   * nota desafinada, porque no comparten temperatura con nada de alrededor.
+   *
+   * Tocar doscientas clases a mano sería un destrozo con riesgo de romper algo
+   * por el camino. Así que se redefine la ESCALA: en Tailwind v4 los colores
+   * son variables, y reapuntarlas aquí arrastra todos los usos de golpe.
+   *
+   * Las cuatro familias frías pasan a la turquesa de las gemas del icono,
+   * templada hacia el verde azulado para que conviva con el oro. Quien escriba
+   * `text-sky-700` mañana sin saber nada de esto, seguirá saliendo en la gama.
+   */
+
+  /* 💎 La turquesa de las gemas — el frío de la casa, el único que hay. */
+  --color-sky-50: #eef8f8;
+  --color-sky-100: #d5eeef;
+  --color-sky-200: #aadcdf;
+  --color-sky-300: #7cc6cb;
+  --color-sky-400: #55acb4;
+  --color-sky-500: #3b8f98;
+  --color-sky-600: #2f747d;
+  --color-sky-700: #285e66;
+  --color-sky-800: #234c53;
+  --color-sky-900: #1f3f45;
+  --color-sky-950: #12272b;
+
+  /* `cyan` es la misma gema: que no haya dos turquesas distintas compitiendo. */
+  --color-cyan-50: #eef8f8;
+  --color-cyan-100: #d5eeef;
+  --color-cyan-200: #aadcdf;
+  --color-cyan-300: #7cc6cb;
+  --color-cyan-400: #55acb4;
+  --color-cyan-500: #3b8f98;
+  --color-cyan-600: #2f747d;
+  --color-cyan-700: #285e66;
+  --color-cyan-800: #234c53;
+  --color-cyan-900: #1f3f45;
+  --color-cyan-950: #12272b;
+
+  /*
+   * `blue` e `indigo` se usan para «esto es de la IA» y para acciones de
+   * mantenimiento. Van a la misma gema pero un punto más profunda y algo más
+   * azulada, para que sigan distinguiéndose de `sky` sin salirse de la gama.
+   */
+  --color-blue-50: #edf6f8;
+  --color-blue-100: #d3e9ee;
+  --color-blue-200: #a6d2dc;
+  --color-blue-300: #73b6c4;
+  --color-blue-400: #4a99aa;
+  --color-blue-500: #357e8f;
+  --color-blue-600: #2b6675;
+  --color-blue-700: #265460;
+  --color-blue-800: #22454f;
+  --color-blue-900: #1e3a42;
+  --color-blue-950: #112329;
+
+  --color-indigo-50: #f0f4f6;
+  --color-indigo-100: #dae6ea;
+  --color-indigo-200: #b4ccd4;
+  --color-indigo-300: #86adba;
+  --color-indigo-400: #5c8e9e;
+  --color-indigo-500: #447384;
+  --color-indigo-600: #385e6c;
+  --color-indigo-700: #314e5a;
+  --color-indigo-800: #2b424c;
+  --color-indigo-900: #263841;
+  --color-indigo-950: #15222a;
+
+  /*
+   * Y el ámbar de fábrica tira a amarillo limón en los tonos claros, que al
+   * lado del bronce del anillo se ve verdoso. Se calienta hacia el oro viejo
+   * del icono.
+   */
+  --color-amber-50: #fbf4e4;
+  --color-amber-100: #f6e7c6;
+  --color-amber-200: #ecd09a;
+  --color-amber-300: #e0b673;
+  --color-amber-400: #d09c4f;
+  --color-amber-500: #bd8339;
+  --color-amber-600: #9d682c;
+  --color-amber-700: #7c5026;
+  --color-amber-800: #634024;
+  --color-amber-900: #523620;
+  --color-amber-950: #2f1d11;
 }
 
 /*
@@ -43,6 +137,16 @@
   /* Color del texto que va ENCIMA del acento. Sobre el granate del tema claro es
      blanco; sobre el dorado del tema noche tiene que ser tinta oscura. */
   --on-accent: #ffffff;
+  /*
+   * 🎲 LOS COLORES DEL ICONO, con nombre, para no volver a tirar de Tailwind.
+   * `--gem` es la turquesa de las tres gemas; `--ember` el naranja del fuego
+   * que corre por las caras del dado; `--leather` el cuero del fondo.
+   */
+  --gem: #3b8f98;
+  --gem-soft: #7cc6cb;
+  --ember: #c2532a;
+  --leather: #4a3527;
+  --bronze: #a9813f;
   color-scheme: light;
 }
 
@@ -66,6 +170,13 @@ html[data-theme='dark'] {
   --surface: #241c18;
   --surface-soft: #1d1613;
   --on-accent: #1a1310;
+  /* De noche las gemas suben de brillo: a la luz de vela una turquesa apagada
+     se confunde con el gris, y el fuego del dado es lo que más se ve. */
+  --gem: #6fc2c9;
+  --gem-soft: #a4dde1;
+  --ember: #e0703f;
+  --leather: #2a1e17;
+  --bronze: #c9a05a;
   color-scheme: dark;
 }
 
