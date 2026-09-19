@@ -1639,6 +1639,8 @@ export interface SecretoLeido {
   titulo: string;
   secreto: string;
   comoSeDescubre?: string;
+  /** De quién es el hilo, si pertenece a un PNJ concreto. */
+  deQuien?: string;
 }
 
 /**
@@ -1660,11 +1662,28 @@ export function leerSecretos(texto: string): SecretoLeido[] {
     if (titulo.length < 3) continue;
     let secreto = '';
     let comoSeDescubre: string | undefined;
+    /*
+     * ⭐ DE QUIÉN ES ESTE HILO, que no se podía decir.
+     *
+     * Un secreto no siempre es de la trama grande: muchas veces es de UN PNJ
+     * —a Azleah le están desapareciendo las chicas de su banda y no sabe qué ha
+     * sido de ellas—. Eso es historia personal suya, y no vale menos que la de
+     * la protagonista: es lo que hace que el mundo tenga gente dentro en vez de
+     * figurantes esperando turno.
+     *
+     * Pero sin dueño, el hilo se quedaba en el cuaderno del Director y no
+     * llegaba nunca a la persona a la que pertenece: Azleah salía en escena sin
+     * que nada recordara que lleva eso encima. Con el dueño apuntado, el hilo
+     * viaja pegado a su ficha y sale con ella.
+     */
+    let deQuien: string | undefined;
     for (const parte of partes) {
       const corte = parte.indexOf(':');
       const campo = corte > 0 ? sinTildes(parte.slice(0, corte)).trim().toLowerCase() : '';
       if (campo === 'se descubre' || campo === 'descubre' || campo === 'como' || campo === 'pista') {
         comoSeDescubre = parte.slice(corte + 1).trim() || undefined;
+      } else if (campo === 'de' || campo === 'quien' || campo === 'es de' || campo === 'dueno') {
+        deQuien = parte.slice(corte + 1).trim() || undefined;
       } else if (!secreto) {
         // El primer trozo sin nombre de campo es el secreto en sí.
         secreto = parte;
@@ -1672,7 +1691,7 @@ export function leerSecretos(texto: string): SecretoLeido[] {
     }
     if (!secreto) continue;
     if (!out.some(x => x.titulo.toLowerCase() === titulo.toLowerCase())) {
-      out.push({ titulo, secreto, comoSeDescubre });
+      out.push({ titulo, secreto, comoSeDescubre, deQuien });
     }
   }
   return out;

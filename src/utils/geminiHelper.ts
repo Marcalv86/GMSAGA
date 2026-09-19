@@ -1816,7 +1816,9 @@ function dosierDePersonajes(
    * le tocaba cruzarlas de cabeza en cada réplica. No lo hacía: tiraba del
    * idioma vehicular porque es el que ve escrito delante.
    */
-  idiomasDeElla: string[] = []
+  idiomasDeElla: string[] = [],
+  /** Hilos personales con dueño, para sacarlos junto a la persona de la que son. */
+  hilosDeAlguien: SecretoDeCampana[] = []
 ): string {
   // Apagable desde Motor. Los datos no se tocan: solo dejan de viajar en el
   // prompt, para poder comprobar jugando si sujetaban algo o no.
@@ -2063,6 +2065,24 @@ ${bloqueElenco}
     }
     if (n.notes) lineas.push(`- Notas: ${corta(n.notes, 400)}`);
 
+    /*
+     * ⚡ LO SUYO — el hilo que ESTE personaje arrastra.
+     *
+     * Aquí se deshace el fallo de considerar que la única historia que cuenta
+     * es la de la protagonista. Que a Azleah le estén desapareciendo las chicas
+     * de su banda es asunto suyo, no de la protagonista, y no vale menos: es lo
+     * que hace que el mundo tenga gente dentro en vez de figurantes esperando
+     * turno. Pero un hilo que vive en el cuaderno del Director no sale nunca;
+     * puesto aquí, entra en escena con su dueño.
+     */
+    for (const h of hilosDeAlguien.filter(x => coincidenNombresNpc(x.deQuien || '', n.name))) {
+      lineas.push(
+        `- ⚡ LO QUE ARRASTRA ${(n.name || '').toUpperCase()} (asunto SUYO, no de la protagonista): ${corta(h.titulo, 120)} — ${corta(h.secreto, 300)}` +
+          `${h.comoSeDescubre ? ` · Puede salir por: ${corta(h.comoSeDescubre, 160)}` : ''}` +
+          `. Esto le pesa aunque nadie se lo pregunte: le cambia el humor, le hace desaparecer un rato, le pone de mal café cuando alguien toca el tema de refilón. ⛔ Y NO se lo sueltes a la protagonista porque sí: sale cuando se gana, o cuando a él/ella le conviene contarlo.`
+      );
+    }
+
     // Idiomas del personaje y nivel de dominio
     const idiomasPnj = n.idiomas || (n.characterSheet?.languages || []).join(', ');
     if (idiomasPnj) {
@@ -2290,11 +2310,22 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
   const relojesDePersona = relojesEnMarcha(project.memory?.gm_relojes).filter(r => r.sobre);
   // Se lee del almacén del propio proyecto: el modo es de esta campaña.
   const coNarrativa = getStoredCoNarrativa(project.id);
+  /*
+   * Los hilos que son de ALGUIEN, para que salgan con esa persona.
+   *
+   * Un secreto con dueño no es trama de fondo: es lo que ese PNJ lleva encima
+   * cuando entra por la puerta. Viajando solo en el cuaderno del Director no se
+   * acordaba nadie de él; pegado a su ficha, sale con él.
+   */
+  const hilosDeAlguien = (project.memory?.gm_secrets || []).filter(
+    sec => !sec.revelado && (sec.deQuien || '').trim()
+  );
   const dosierPnjs = dosierDePersonajes(
     project.memory?.npcs || [],
     marcaDeHoy,
     relojesDePersona,
-    project.memory?.player_character?.languages || []
+    project.memory?.player_character?.languages || [],
+    hilosDeAlguien
   );
   const dosierLugares = dosierDeLugares(project.memory?.locations || []);
 
@@ -7127,7 +7158,8 @@ QUÉ SÍ PUEDES HACER AQUÍ:
   Y dices en palabras qué has apuntado, para que se vea. Esas notas viajan contigo en todos los turnos de partida, así que escríbelas cortas, concretas y en un lenguaje que un Narrador pueda cumplir.
 - ⛔ No apuntes nada que no te hayan pedido. No es tu cuaderno: es el suyo. Ante la duda, pregunta antes de apuntar.
 - PLANTAR UN GIRO PARA MÁS ADELANTE. Si lo que te cuenta es una idea de trama que todavía NO ha pasado —«quiero que los dueños del barco resulten ser agentes Zhentarim», «el mercader es quien la vendió», «ese PNJ en realidad trabaja para la otra facción»—, guárdala como secreto de campaña con una línea:
-  \`[SECRETO: título corto | la verdad | se descubre: por dónde puede salir]\`
+  \`[SECRETO: título corto | la verdad | se descubre: por dónde puede salir | de: Nombre del PNJ si el hilo es SUYO]\`
+  ⭐ Usa \`de:\` siempre que el hilo pertenezca a un personaje y no a la trama grande —*«a Azleah le están desapareciendo las chicas de su banda y no sabe qué ha sido de ellas»*—. Con el dueño apuntado, ese hilo aparece en la ficha de esa persona y entra en escena con ella; sin él, se queda en tu cuaderno y no te acuerdas nunca. **La historia de un PNJ no vale menos que la de la protagonista**: es lo que hace que el mundo tenga gente dentro.
   Le vuelve al Narrador en cada turno con candado, para que ponga pistas y coherencia sin contarlo, y solo se abre cuando salga en escena. Dile en palabras qué has guardado.
 
 ⚖️ DÓNDE VA CADA COSA (las dos son buenas, no te cortes de usarlas):

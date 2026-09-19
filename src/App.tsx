@@ -1383,7 +1383,12 @@ export default function App() {
         // giro original ni resucitar uno que ya se destapó.
         secretosDeCampana = secretosDeCampana.map(x =>
           x === ya
-            ? { ...x, comoSeDescubre: x.comoSeDescubre || nuevo.comoSeDescubre, secreto: x.secreto || nuevo.secreto }
+            ? {
+                ...x,
+                comoSeDescubre: x.comoSeDescubre || nuevo.comoSeDescubre,
+                secreto: x.secreto || nuevo.secreto,
+                deQuien: x.deQuien || nuevo.deQuien
+              }
             : x
         );
         return;
@@ -1393,6 +1398,7 @@ export default function App() {
         titulo: nuevo.titulo,
         secreto: nuevo.secreto,
         comoSeDescubre: nuevo.comoSeDescubre,
+        deQuien: nuevo.deQuien,
         origen: 'narrador'
       });
     });
@@ -1777,7 +1783,9 @@ export default function App() {
    * pantalla: un giro ahí es un giro destripado. Los secretos van con candado,
    * solo al Narrador, y se abren cuando salgan jugando.
    */
-  const plantarSecretosDesdeLaMesa = (nuevos: { titulo: string; secreto: string; comoSeDescubre?: string }[]) => {
+  const plantarSecretosDesdeLaMesa = (
+    nuevos: { titulo: string; secreto: string; comoSeDescubre?: string; deQuien?: string }[]
+  ) => {
     if (!nuevos.length) return;
     handleUpdateMemory(mem => {
       const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -1789,6 +1797,7 @@ export default function App() {
           titulo: n.titulo,
           secreto: n.secreto,
           comoSeDescubre: n.comoSeDescubre,
+          deQuien: n.deQuien,
           origen: 'jugadora' as const
         }));
       return añadir.length ? { ...mem, gm_secrets: [...previos, ...añadir] } : mem;

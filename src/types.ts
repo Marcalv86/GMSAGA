@@ -634,6 +634,15 @@ export interface SecretoDeCampana {
   /** Por dónde puede salir: registrar el camarote, emborrachar al contramaestre… */
   comoSeDescubre?: string;
   /**
+   * De quién es este hilo, si es de alguien en concreto.
+   *
+   * No todo secreto es de la trama grande: muchos son de UN PNJ, y esos son los
+   * que hacen que el mundo tenga gente dentro. Sin este campo el hilo vivía en
+   * el cuaderno y no llegaba a la ficha de su dueño, así que el PNJ entraba en
+   * escena sin que nada recordara que lleva eso encima.
+   */
+  deQuien?: string;
+  /**
    * A qué capa de la cebolla pertenece.
    *
    * 1 = lo que PARECE que pasa · 2 = lo que pasa de verdad · 3 = quién está
