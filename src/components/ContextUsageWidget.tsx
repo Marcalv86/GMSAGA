@@ -21,6 +21,7 @@ import { peticionesDeHoy } from '../utils/usageStats';
 import { presionDelMinuto, ultimoCacheMedido, getLlamadas, suscribirseALlamadas } from '../utils/callLog';
 import {
   formatearCosteUSD,
+  formatearSaldoUSD,
   getEstadisticasDeGasto,
   setStoredInitialBalance
 } from '../utils/pricing';
@@ -454,7 +455,7 @@ export const ContextUsageWidget: React.FC<{
                   <>
                     Saldo:{' '}
                     <strong className="font-mono text-emerald-800 dark:text-emerald-300 font-bold">
-                      {formatearCosteUSD(statsCoste.saldoRestante)}
+                      {formatearSaldoUSD(statsCoste.saldoRestante)}
                     </strong>
                   </>
                 ) : (
@@ -581,7 +582,7 @@ export const ContextUsageWidget: React.FC<{
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                       <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-2.5 py-2">
                         <div className="font-mono text-base font-bold text-amber-700 dark:text-amber-300">
-                          {statsCoste.saldoRestante !== null ? formatearCosteUSD(statsCoste.saldoRestante) : 'No fijado'}
+                          {formatearSaldoUSD(statsCoste.saldoRestante)}
                         </div>
                         <div className="text-[10px] font-cinzel text-[var(--text-secondary)]">
                           Saldo Restante

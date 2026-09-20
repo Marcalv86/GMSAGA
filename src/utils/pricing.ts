@@ -119,7 +119,14 @@ export function formatearCosteUSD(coste: number, precisionAlta = false): string 
   if (precisionAlta || coste < 0.01) {
     return `$${coste.toFixed(4)}`;
   }
-  return `$${coste.toFixed(3)}`;
+  return `$${coste.toFixed(2)}`;
+}
+
+export function formatearSaldoUSD(saldo: number | null): string {
+  if (saldo === null) return 'No fijado';
+  if (saldo === 0) return '$0.00';
+  if (saldo < 0.01) return `$${saldo.toFixed(4)}`;
+  return `$${saldo.toFixed(2)}`;
 }
 
 const CLAVE_SALDO_INICIAL = 'gmstudio_user_balance_initial';

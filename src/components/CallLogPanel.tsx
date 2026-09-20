@@ -17,6 +17,7 @@ import {
 import {
   calcularCosteLlamada,
   formatearCosteUSD,
+  formatearSaldoUSD,
   getEstadisticasDeGasto,
   setStoredInitialBalance
 } from '../utils/pricing';
@@ -185,7 +186,7 @@ export const CallLogPanel: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center">
               <div className="rounded-md border border-[var(--glass-border)] bg-[var(--surface)] px-2 py-1.5">
                 <div className="font-mono text-sm font-bold text-amber-700 dark:text-amber-300">
-                  {statsCoste.saldoRestante !== null ? formatearCosteUSD(statsCoste.saldoRestante) : 'No fijado'}
+                  {formatearSaldoUSD(statsCoste.saldoRestante)}
                 </div>
                 <div className="text-[10px] font-cinzel text-[var(--text-secondary)] leading-tight">
                   Saldo Estimado
