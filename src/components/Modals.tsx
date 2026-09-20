@@ -19,6 +19,8 @@ import {
   getStoredAutoVincular,
   setStoredAutoNovelize,
   setStoredAutoVincular,
+  getStoredAutoBackgroundTasks,
+  setStoredAutoBackgroundTasks,
   getStoredBarrasAfinidad,
   setStoredBarrasAfinidad,
   getStoredBackgroundModel,
@@ -170,6 +172,7 @@ export const ApiKeyModal: React.FC<{
   const [autoFailover, setAutoFailover] = useState<boolean>(getStoredAutoFailover());
   const [autoNovelize, setAutoNovelize] = useState<boolean>(getStoredAutoNovelize());
   const [autoVincular, setAutoVincular] = useState<boolean>(getStoredAutoVincular());
+  const [autoBackgroundTasks, setAutoBackgroundTasks] = useState<boolean>(getStoredAutoBackgroundTasks());
   const [barrasAfinidad, setBarrasAfinidad] = useState<boolean>(getStoredBarrasAfinidad());
   const [historyWindow, setHistoryWindow] = useState<HistoryWindowSetting>(getStoredHistoryWindow());
   const [keyRotationMode, setKeyRotationMode] = useState<KeyRotationMode>(getStoredKeyRotationMode());
@@ -394,6 +397,8 @@ export const ApiKeyModal: React.FC<{
       setTopP(getStoredTopP());
       setAutoFailover(getStoredAutoFailover());
       setAutoNovelize(getStoredAutoNovelize());
+      setAutoVincular(getStoredAutoVincular());
+      setAutoBackgroundTasks(getStoredAutoBackgroundTasks());
       setHistoryWindow(getStoredHistoryWindow());
       setUso(resumirUso());
     }
@@ -422,6 +427,7 @@ export const ApiKeyModal: React.FC<{
     setStoredAutoFailover(autoFailover);
     setStoredAutoNovelize(autoNovelize);
     setStoredAutoVincular(autoVincular);
+    setStoredAutoBackgroundTasks(autoBackgroundTasks);
     setStoredBarrasAfinidad(barrasAfinidad);
     localStorage.setItem('gmstudio_precio_entrada', precioEntrada);
     localStorage.setItem('gmstudio_precio_salida', precioSalida);
@@ -818,6 +824,42 @@ export const ApiKeyModal: React.FC<{
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Tareas de IA en segundo plano / Modo Ahorro Estricto */}
+              <div className="pt-3 border-t border-[var(--glass-border)]">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--glass-border)] p-3 rounded-lg flex items-start justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <label
+                        onClick={() => setAutoBackgroundTasks(!autoBackgroundTasks)}
+                        className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+                        Tareas Automáticas de IA en Segundo Plano
+                      </label>
+                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
+                        autoBackgroundTasks
+                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 font-semibold'
+                      }`}>
+                        {autoBackgroundTasks ? 'Activas' : 'Desactivadas (Modo Ahorro Máximo)'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
+                      Controla si la aplicación ejecuta análisis automáticos en segundo plano (síntesis periódica de memoria del proyecto, trazado inicial de historia y lectura automática del tablero de facciones). Si lo <strong>desactivas</strong>, la IA <strong>NUNCA</strong> consumirá saldo ni tokens por su cuenta: solo se llamará cuando envíes un turno o cuando pulses manualmente un botón en el cuaderno.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={autoBackgroundTasks}
+                      onChange={e => setAutoBackgroundTasks(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
                   </label>
                 </div>
               </div>
@@ -1237,7 +1279,14 @@ export const ApiKeyModal: React.FC<{
                     <input
                       type="checkbox"
                       checked={usePaidTierOnly}
-                      onChange={e => setUsePaidTierOnly(e.target.checked)}
+                      onChange={e => {
+                        const isChecked = e.target.checked;
+                        setUsePaidTierOnly(isChecked);
+                        if (isChecked) {
+                          setAutoBackgroundTasks(false);
+                          setAutoNovelize(false);
+                        }
+                      }}
                       className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
                     />
                     <span className="text-xs font-semibold font-cinzel text-[var(--text-primary)]">
@@ -1251,15 +1300,15 @@ export const ApiKeyModal: React.FC<{
                   <div className="mb-3 p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-800 dark:text-emerald-200 flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                     <div className="space-y-0.5">
-                      <strong className="block font-semibold">Uso 100% Exclusivo Activado:</strong>
+                      <strong className="block font-semibold">Modo Saldo Activo + Turno Único (Ahorro Total de Tokens):</strong>
                       <span>
-                        El sistema dirigirá todas las peticiones única y exclusivamente a esta clave para consumir tu saldo de Google Cloud. Tus otras claves se mantendrán guardadas en reserva y no se usarán.
+                        Todas las peticiones van a tu clave de saldo y se resuelven <strong>en un único turno principal</strong> con tu modelo activo (narración, inventario, vínculos y bitácora). Las tareas secundarias que re-leían los compendios en segundo plano quedan desactivadas automáticamente.
                       </span>
                     </div>
                   </div>
                 ) : (
                   <p className="text-[11px] text-[var(--text-secondary)] mb-2.5 leading-relaxed">
-                    Si activas la casilla, la app se bloqueará para usar <strong>únicamente</strong> esta clave con saldo, ignorando el resto sin borrarlas.
+                    Si activas la casilla, la app se bloqueará para usar <strong>únicamente</strong> esta clave con saldo y activará automáticamente el <strong>Modo Turno Único</strong> para no gastar tokens en segundo plano.
                   </p>
                 )}
 

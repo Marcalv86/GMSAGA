@@ -127,6 +127,7 @@ import {
   isNarrativeIncomplete,
   novelizeUserMessage,
   getStoredAutoNovelize,
+  getStoredAutoBackgroundTasks,
   generarNoticiasSaltoTemporal,
   anclarHistorialPorHud,
   consolidarCronicaAlCerrarCapitulo
@@ -2822,7 +2823,7 @@ export default function App() {
      * segundos a que se teja algo antes de escribir la primera línea.
      */
     const hayMapa = (currentFiles || []).some(f => f.name?.includes('Red Semántica'));
-    if (!hayMapa && documentos.length >= 2 && getStoredAutoVincular()) {
+    if (getStoredAutoBackgroundTasks() && !hayMapa && documentos.length >= 2 && getStoredAutoVincular()) {
       void handleRelacionarBiblioteca({ silencioso: true });
     }
 
@@ -2832,7 +2833,9 @@ export default function App() {
      * no llega a dispararlo nunca. Aquí dentro ya se comprueba qué falta por
      * mirar, así que si está todo visto no gasta nada.
      */
-    void montarSesionCero(currentFiles || [], currentProject || null);
+    if (getStoredAutoBackgroundTasks()) {
+      void montarSesionCero(currentFiles || [], currentProject || null);
+    }
 
     return true;
   };
@@ -3166,6 +3169,7 @@ export default function App() {
       // Solo se ejecuta si está activada en Configuración (por defecto OFF para no consumir TPM/RPM en capa gratuita).
       // Siempre se puede novelizar bajo demanda desde el Lector de Novela.
       if (
+        getStoredAutoBackgroundTasks() &&
         getStoredAutoNovelize() &&
         currentProject &&
         currentChatId &&
@@ -3331,7 +3335,7 @@ export default function App() {
           currentFiles.some(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200) ||
           effectiveChats.some(c => (c.messages || []).length >= 1);
 
-        if (needsInitialSync || needsDailySync) {
+        if (getStoredAutoBackgroundTasks() && (needsInitialSync || needsDailySync)) {
           setTimeout(async () => {
             try {
               // 1. Estudio ágil de documentos, contexto y arranque de campaña:
@@ -3402,7 +3406,12 @@ export default function App() {
         const desdeElUltimoIntento = Date.now() - (intentoDeTrazadoRef.current[currentProject.id] || 0);
         const puedeReintentar = desdeElUltimoIntento > 20 * 60 * 1000;
 
-        if (hayConQueTramar && (sinTrazarTodavia || needsDailySync) && puedeReintentar) {
+        if (
+          getStoredAutoBackgroundTasks() &&
+          hayConQueTramar &&
+          (sinTrazarTodavia || needsDailySync) &&
+          puedeReintentar
+        ) {
           intentoDeTrazadoRef.current[currentProject.id] = Date.now();
           setTimeout(async () => {
             try {
@@ -3940,10 +3949,12 @@ export default function App() {
          * teje mejor con los documentos ya etiquetados.
          */
         void (async () => {
-          await etiquetarLosQueLleguenSinEtiquetas();
-          if (getStoredAutoVincular()) {
-            await handleRelacionarBiblioteca({ silencioso: true });
-            await new Promise(r => setTimeout(r, 2000));
+          if (getStoredAutoBackgroundTasks()) {
+            await etiquetarLosQueLleguenSinEtiquetas();
+            if (getStoredAutoVincular()) {
+              await handleRelacionarBiblioteca({ silencioso: true });
+              await new Promise(r => setTimeout(r, 2000));
+            }
           }
           /*
            * 🪪 Y SI ENTRE LO QUE HA LLEGADO VIENE SU FICHA, SE LEE SOLA.
@@ -3968,15 +3979,17 @@ export default function App() {
             const nRes = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
             return Boolean(curPc?.name && !nRes.test(curPc.name) && curPc.race && curPc.class);
           })();
-          if (newFilesList.some(f => f.category === 'sheet_pj') && !yaCompletoOc) {
+          if (getStoredAutoBackgroundTasks() && newFilesList.some(f => f.category === 'sheet_pj') && !yaCompletoOc) {
             await completarFichaDesdeDocumento(currentFilesRef.current);
             await new Promise(r => setTimeout(r, 2000));
           }
 
-          await montarSesionCero(
-            currentFilesRef.current,
-            projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
-          );
+          if (getStoredAutoBackgroundTasks()) {
+            await montarSesionCero(
+              currentFilesRef.current,
+              projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
+            );
+          }
         })();
       }, ESPERA_ANTES_DE_REVINCULAR);
     } catch (error) {

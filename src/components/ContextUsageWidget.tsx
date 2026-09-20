@@ -13,6 +13,8 @@ import {
   setStoredBusquedaLocal,
   PRESUPUESTO_FRAGMENTOS_CONSULTA,
   setStoredUsePaidTierOnly,
+  getStoredAutoBackgroundTasks,
+  setStoredAutoBackgroundTasks,
   techoDeEnvio
 } from '../utils/geminiHelper';
 import { peticionesDeHoy } from '../utils/usageStats';
@@ -469,6 +471,54 @@ export const ContextUsageWidget: React.FC<{
                     </span>
                   </label>
                 </div>
+
+                {/* Selector de Tareas en Segundo Plano / Modo Ahorro */}
+                {(() => {
+                  const autoBg = getStoredAutoBackgroundTasks();
+                  return (
+                    <div
+                      className={`p-3 rounded-lg border transition-all flex items-center justify-between gap-3 ${
+                        autoBg
+                          ? 'border-[var(--glass-border)] bg-[var(--surface-soft)]'
+                          : 'border-amber-500/50 bg-amber-500/10'
+                      }`}
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-cinzel font-bold text-xs text-[var(--text-primary)]">
+                            Tareas de IA en Segundo Plano
+                          </span>
+                          <span className={`text-[10px] font-sans px-1.5 py-0.2 rounded font-semibold border ${
+                            autoBg
+                              ? 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border-emerald-500/30'
+                              : 'bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/30 font-bold'
+                          }`}>
+                            {autoBg ? 'Activas' : 'Modo Ahorro Máximo (Desactivadas)'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[var(--text-secondary)] m-0">
+                          {autoBg
+                            ? 'La IA ejecuta análisis de memoria y campaña en segundo plano. Si quieres proteger al 100% tu saldo, apágalo: la IA solo correrá al enviar un turno.'
+                            : 'Modo ahorro activo: la IA NUNCA consume saldo en segundo plano. Solo procesa cuando tú envías un mensaje o pulsas un botón manual.'}
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer shrink-0 select-none bg-[var(--surface)] px-2.5 py-1.5 rounded-md border border-[var(--glass-border)] hover:border-amber-500/50 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={autoBg}
+                          onChange={e => {
+                            setStoredAutoBackgroundTasks(e.target.checked);
+                            setLatido(v => v + 1);
+                          }}
+                          className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                        />
+                        <span className="text-xs font-semibold font-cinzel text-[var(--text-primary)]">
+                          {autoBg ? '🟢 Activas' : '🟠 Modo Ahorro'}
+                        </span>
+                      </label>
+                    </div>
+                  );
+                })()}
 
                 {/*
                   LA RESPUESTA PRIMERO. Debajo están los datos para quien los
