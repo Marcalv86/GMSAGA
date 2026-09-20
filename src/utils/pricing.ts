@@ -143,10 +143,15 @@ export function setStoredInitialBalance(balance: number | null): void {
   if (balance === null || !Number.isFinite(balance) || balance < 0) {
     localStorage.removeItem(CLAVE_SALDO_INICIAL);
     localStorage.removeItem(CLAVE_SALDO_TIMESTAMP);
-    return;
+  } else {
+    localStorage.setItem(CLAVE_SALDO_INICIAL, balance.toString());
+    localStorage.setItem(CLAVE_SALDO_TIMESTAMP, Date.now().toString());
   }
-  localStorage.setItem(CLAVE_SALDO_INICIAL, balance.toString());
-  localStorage.setItem(CLAVE_SALDO_TIMESTAMP, Date.now().toString());
+  try {
+    window.dispatchEvent(new Event('gm_balance_changed'));
+  } catch {
+    // Fallback safe
+  }
 }
 
 export interface BalanceStats {
@@ -171,20 +176,18 @@ export function getEstadisticasDeGasto(llamadas: LlamadaRegistrada[]): BalanceSt
   let ultimoTurnoFichasCache = 0;
   let ultimoTurnoPctCache = 0;
 
-  // Las llamadas vienen ordenadas o sin ordenar; filtramos por timestamp si hay saldo inicial fijado
   const llamadasValidas = llamadas.filter(l => l.estado === 'ok' || l.estado === 'cortada');
 
-  // Encontrar el último turno narrado
-  for (let i = 0; i < llamadas.length; i++) {
-    const l = llamadas[i];
-    if (/^Turno narrado/i.test(l.proposito || '')) {
-      const des = calcularCosteLlamada(l);
-      ultimoTurnoCoste = des.costeTotal;
-      ultimoTurnoAhorro = des.ahorroPorCache;
-      ultimoTurnoFichasCache = des.fichasEnCache;
-      ultimoTurnoPctCache = des.fichasEntrada > 0 ? Math.round((des.fichasEnCache / des.fichasEntrada) * 100) : 0;
-      break;
-    }
+  // Encontrar el último turno narrado (el más reciente por fecha de inicio)
+  const turnos = llamadasValidas.filter(l => /^Turno narrado/i.test(l.proposito || ''));
+  if (turnos.length > 0) {
+    const ordenados = [...turnos].sort((a, b) => (Date.parse(b.inicio) || 0) - (Date.parse(a.inicio) || 0));
+    const l = ordenados[0];
+    const des = calcularCosteLlamada(l);
+    ultimoTurnoCoste = des.costeTotal;
+    ultimoTurnoAhorro = des.ahorroPorCache;
+    ultimoTurnoFichasCache = des.fichasEnCache;
+    ultimoTurnoPctCache = des.fichasEntrada > 0 ? Math.round((des.fichasEnCache / des.fichasEntrada) * 100) : 0;
   }
 
   for (const l of llamadasValidas) {

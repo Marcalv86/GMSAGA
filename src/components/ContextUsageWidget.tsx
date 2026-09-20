@@ -68,6 +68,8 @@ export const ContextUsageWidget: React.FC<{
   const [editandoSaldoModal, setEditandoSaldoModal] = useState(false);
   const [inputSaldoModal, setInputSaldoModal] = useState('');
 
+  const [balanceVersion, setBalanceVersion] = useState(0);
+
   /*
    * La ventana del minuto se vacía sola, y la pantalla tiene que enterarse.
    *
@@ -78,32 +80,40 @@ export const ContextUsageWidget: React.FC<{
   const [, setLatido] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setLatido(v => v + 1), 5000);
-    const onSettingsChange = () => setLatido(v => v + 1);
+    const onSettingsChange = () => {
+      setLatido(v => v + 1);
+      setBalanceVersion(v => v + 1);
+    };
     const unsubLlamadas = suscribirseALlamadas(l => setLlamadas([...l]));
     window.addEventListener('storage', onSettingsChange);
     window.addEventListener('gemini_paid_tier_changed', onSettingsChange);
     window.addEventListener('gemini_settings_changed', onSettingsChange);
+    window.addEventListener('gm_balance_changed', onSettingsChange);
     return () => {
       clearInterval(id);
       unsubLlamadas();
       window.removeEventListener('storage', onSettingsChange);
       window.removeEventListener('gemini_paid_tier_changed', onSettingsChange);
       window.removeEventListener('gemini_settings_changed', onSettingsChange);
+      window.removeEventListener('gm_balance_changed', onSettingsChange);
     };
   }, []);
 
-  const statsCoste = useMemo(() => getEstadisticasDeGasto(llamadas), [llamadas]);
+  const statsCoste = useMemo(() => getEstadisticasDeGasto(llamadas), [llamadas, balanceVersion]);
 
   const guardarSaldoModal = () => {
-    const num = parseFloat(inputSaldoModal.replace(',', '.'));
-    if (Number.isFinite(num) && num >= 0) {
-      setStoredInitialBalance(num);
-    } else if (inputSaldoModal.trim() === '') {
+    const limpio = inputSaldoModal.trim().replace(',', '.');
+    if (limpio === '') {
       setStoredInitialBalance(null);
+    } else {
+      const num = parseFloat(limpio);
+      if (Number.isFinite(num) && num >= 0) {
+        setStoredInitialBalance(num);
+      }
     }
     setEditandoSaldoModal(false);
     setInputSaldoModal('');
-    setLatido(v => v + 1);
+    setBalanceVersion(v => v + 1);
   };
 
   const medirDeVerdad = async () => {
@@ -542,9 +552,8 @@ export const ContextUsageWidget: React.FC<{
                     <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-[var(--surface)] border border-[var(--glass-border)]">
                       <span className="text-xs text-[var(--text-secondary)]">Saldo disponible en Google Cloud ($ USD):</span>
                       <input
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Ej. 4.18"
                         value={inputSaldoModal}
                         onChange={e => setInputSaldoModal(e.target.value)}

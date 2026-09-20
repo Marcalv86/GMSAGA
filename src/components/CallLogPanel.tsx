@@ -65,8 +65,19 @@ export const CallLogPanel: React.FC = () => {
   const [copiado, setCopiado] = useState(false);
   const [editandoSaldo, setEditandoSaldo] = useState(false);
   const [nuevoSaldoInput, setNuevoSaldoInput] = useState('');
+  const [balanceVersion, setBalanceVersion] = useState(0);
 
-  useEffect(() => suscribirseALlamadas(l => setLlamadas([...l].reverse())), []);
+  useEffect(() => {
+    const unsub = suscribirseALlamadas(l => setLlamadas([...l].reverse()));
+    const onBalChange = () => setBalanceVersion(v => v + 1);
+    window.addEventListener('storage', onBalChange);
+    window.addEventListener('gm_balance_changed', onBalChange);
+    return () => {
+      unsub();
+      window.removeEventListener('storage', onBalChange);
+      window.removeEventListener('gm_balance_changed', onBalChange);
+    };
+  }, []);
 
   const visibles = useMemo(() => {
     const esTurno = (l: LlamadaRegistrada) => l.proposito.startsWith('Turno narrado');
@@ -77,19 +88,23 @@ export const CallLogPanel: React.FC = () => {
   }, [llamadas, filtro]);
 
   const r = useMemo(() => resumenDeLlamadas(llamadas), [llamadas]);
-  const statsCoste = useMemo(() => getEstadisticasDeGasto(llamadas), [llamadas]);
+  const statsCoste = useMemo(() => getEstadisticasDeGasto(llamadas), [llamadas, balanceVersion]);
   const uso = useMemo(() => usoDeDocumentos(llamadas), [llamadas]);
   const [bibliotecaAbierta, setBibliotecaAbierta] = useState(false);
 
   const guardarSaldo = () => {
-    const num = parseFloat(nuevoSaldoInput.replace(',', '.'));
-    if (Number.isFinite(num) && num >= 0) {
-      setStoredInitialBalance(num);
-    } else if (nuevoSaldoInput.trim() === '') {
+    const limpio = nuevoSaldoInput.trim().replace(',', '.');
+    if (limpio === '') {
       setStoredInitialBalance(null);
+    } else {
+      const num = parseFloat(limpio);
+      if (Number.isFinite(num) && num >= 0) {
+        setStoredInitialBalance(num);
+      }
     }
     setEditandoSaldo(false);
     setNuevoSaldoInput('');
+    setBalanceVersion(v => v + 1);
   };
 
   const copiar = async () => {
@@ -141,9 +156,8 @@ export const CallLogPanel: React.FC = () => {
             <div className="flex items-center gap-2 pt-1">
               <span className="text-xs text-[var(--text-secondary)]">Saldo disponible ($ USD):</span>
               <input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 placeholder="Ej. 4.18"
                 value={nuevoSaldoInput}
                 onChange={e => setNuevoSaldoInput(e.target.value)}
