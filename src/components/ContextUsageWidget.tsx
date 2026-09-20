@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, ProjectFile, Chat } from '../types';
 import {
@@ -18,12 +18,20 @@ import {
   techoDeEnvio
 } from '../utils/geminiHelper';
 import { peticionesDeHoy } from '../utils/usageStats';
-import { presionDelMinuto, ultimoCacheMedido } from '../utils/callLog';
+import { presionDelMinuto, ultimoCacheMedido, getLlamadas, suscribirseALlamadas } from '../utils/callLog';
+import {
+  formatearCosteUSD,
+  getEstadisticasDeGasto,
+  setStoredInitialBalance
+} from '../utils/pricing';
 
 import {
   BookOpen,
   Brain,
   ChartColumn,
+  CreditCard,
+  DollarSign,
+  Edit3,
   Gauge,
   Image,
   Info,
@@ -34,7 +42,9 @@ import {
   Paperclip,
   Search,
   Scroll,
-  X
+  Sparkles,
+  X,
+  Zap
 } from 'lucide-react';
 export const ContextUsageWidget: React.FC<{
   project: Project | null;
@@ -54,6 +64,9 @@ export const ContextUsageWidget: React.FC<{
   const [midiendo, setMidiendo] = useState(false);
   const [errorMedida, setErrorMedida] = useState('');
   const [busqueda, setBusqueda] = useState(() => getStoredBusquedaLocal());
+  const [llamadas, setLlamadas] = useState(() => getLlamadas());
+  const [editandoSaldoModal, setEditandoSaldoModal] = useState(false);
+  const [inputSaldoModal, setInputSaldoModal] = useState('');
 
   /*
    * La ventana del minuto se vacía sola, y la pantalla tiene que enterarse.
@@ -66,16 +79,32 @@ export const ContextUsageWidget: React.FC<{
   useEffect(() => {
     const id = setInterval(() => setLatido(v => v + 1), 5000);
     const onSettingsChange = () => setLatido(v => v + 1);
+    const unsubLlamadas = suscribirseALlamadas(l => setLlamadas([...l]));
     window.addEventListener('storage', onSettingsChange);
     window.addEventListener('gemini_paid_tier_changed', onSettingsChange);
     window.addEventListener('gemini_settings_changed', onSettingsChange);
     return () => {
       clearInterval(id);
+      unsubLlamadas();
       window.removeEventListener('storage', onSettingsChange);
       window.removeEventListener('gemini_paid_tier_changed', onSettingsChange);
       window.removeEventListener('gemini_settings_changed', onSettingsChange);
     };
   }, []);
+
+  const statsCoste = useMemo(() => getEstadisticasDeGasto(llamadas), [llamadas]);
+
+  const guardarSaldoModal = () => {
+    const num = parseFloat(inputSaldoModal.replace(',', '.'));
+    if (Number.isFinite(num) && num >= 0) {
+      setStoredInitialBalance(num);
+    } else if (inputSaldoModal.trim() === '') {
+      setStoredInitialBalance(null);
+    }
+    setEditandoSaldoModal(false);
+    setInputSaldoModal('');
+    setLatido(v => v + 1);
+  };
 
   const medirDeVerdad = async () => {
     if (!project || !currentChatId) return;
@@ -401,6 +430,61 @@ export const ContextUsageWidget: React.FC<{
             )}
           </div>
         )}
+        {/* Widget de Saldo & Coste de API en la barra lateral */}
+        <div
+          onClick={() => setIsGuideOpen(true)}
+          className="mt-2.5 p-2 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15 transition-all cursor-pointer group flex flex-col gap-1.5"
+          title="Haz clic para abrir la contabilidad de saldo, costes por turno y ahorro por Context Caching"
+        >
+          <div className="flex items-center justify-between gap-1 text-[11px]">
+            <div className="flex items-center gap-1.5 font-cinzel font-bold text-amber-900 dark:text-amber-200">
+              <CreditCard className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>
+                {statsCoste.saldoRestante !== null ? (
+                  <>
+                    Saldo:{' '}
+                    <strong className="font-mono text-emerald-800 dark:text-emerald-300 font-bold">
+                      {formatearCosteUSD(statsCoste.saldoRestante)}
+                    </strong>
+                  </>
+                ) : (
+                  <span className="text-[10px] text-amber-800 dark:text-amber-300 underline underline-offset-2">
+                    Configurar Saldo
+                  </span>
+                )}
+              </span>
+            </div>
+            {statsCoste.ultimoTurnoCoste !== null && (
+              <span className="font-mono text-[10px] text-amber-800 dark:text-amber-300 font-semibold">
+                Último: {formatearCosteUSD(statsCoste.ultimoTurnoCoste, true)}
+              </span>
+            )}
+          </div>
+
+          {/* Estado de Context Caching */}
+          <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-secondary)] font-sans">
+            <div className="flex items-center gap-1">
+              {statsCoste.ultimoTurnoPctCache > 0 ? (
+                <span className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400 font-bold">
+                  <Zap className="w-3 h-3 text-emerald-500" />
+                  <span>Caché activo ({statsCoste.ultimoTurnoPctCache}% descuento)</span>
+                </span>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-0.5 text-sky-700 dark:text-sky-300 font-semibold"
+                  title="El primer turno o tras cambios de archivos es un arranque frío que crea el caché. Los siguientes turnos tendrán hasta un 75% de descuento."
+                >
+                  <span>❄️ Caché frío (1er turno)</span>
+                </span>
+              )}
+            </div>
+            {statsCoste.ahorroTotalCache > 0 && (
+              <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-[9px]">
+                +{formatearCosteUSD(statsCoste.ahorroTotalCache)} ahorrados
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Guide & Breakdown Modal */}
@@ -414,10 +498,10 @@ export const ContextUsageWidget: React.FC<{
                   <Brain className="w-4 h-4" />
                   <div>
                     <h3 className="font-cinzel text-lg md:text-xl text-[var(--accent)] font-bold m-0">
-                      Memoria y Capacidad del Tomo
+                      Memoria, Saldo y Capacidad del Tomo
                     </h3>
                     <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
-                      Gestión de contexto, consumo de tokens y optimización de archivos
+                      Contabilidad de crédito API, context caching y consumo de tokens
                     </p>
                   </div>
                 </div>
@@ -430,7 +514,112 @@ export const ContextUsageWidget: React.FC<{
               </div>
 
               {/* Modal Body */}
-              <div className="p-5 overflow-y-auto space-y-6 text-sm leading-relaxed">
+              <div className="p-5 overflow-y-auto space-y-5 text-sm leading-relaxed">
+                {/* Módulo de Contabilidad de Saldo & Costes de API */}
+                <div className="rounded-xl border-2 border-amber-500/40 bg-amber-500/10 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 font-cinzel font-bold text-sm text-amber-900 dark:text-amber-200">
+                      <DollarSign className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <span>Contabilidad de Saldo y Costes de API</span>
+                    </div>
+                    {!editandoSaldoModal && (
+                      <button
+                        onClick={() => {
+                          setInputSaldoModal(
+                            statsCoste.saldoInicial !== null ? statsCoste.saldoInicial.toString() : ''
+                          );
+                          setEditandoSaldoModal(true);
+                        }}
+                        className="flex items-center gap-1 text-xs text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-100 font-cinzel px-2.5 py-1 rounded border border-amber-500/40 bg-[var(--surface)] hover:bg-amber-500/20 cursor-pointer transition-colors"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>{statsCoste.saldoInicial !== null ? 'Ajustar Saldo' : 'Fijar Saldo Inicial'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {editandoSaldoModal ? (
+                    <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-[var(--surface)] border border-[var(--glass-border)]">
+                      <span className="text-xs text-[var(--text-secondary)]">Saldo disponible en Google Cloud ($ USD):</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Ej. 4.18"
+                        value={inputSaldoModal}
+                        onChange={e => setInputSaldoModal(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') guardarSaldoModal();
+                          if (e.key === 'Escape') setEditandoSaldoModal(false);
+                        }}
+                        className="w-28 px-2.5 py-1 text-xs font-mono rounded border border-[var(--user-border)] bg-[var(--bg-color)] text-[var(--text-primary)] focus:border-amber-500 focus:outline-hidden"
+                        autoFocus
+                      />
+                      <button
+                        onClick={guardarSaldoModal}
+                        className="px-3 py-1 text-xs font-cinzel font-bold bg-amber-600 text-white rounded hover:bg-amber-700 cursor-pointer"
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        onClick={() => setEditandoSaldoModal(false)}
+                        className="px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                      <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-2.5 py-2">
+                        <div className="font-mono text-base font-bold text-amber-700 dark:text-amber-300">
+                          {statsCoste.saldoRestante !== null ? formatearCosteUSD(statsCoste.saldoRestante) : 'No fijado'}
+                        </div>
+                        <div className="text-[10px] font-cinzel text-[var(--text-secondary)]">
+                          Saldo Restante
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-2.5 py-2">
+                        <div className="font-mono text-base font-bold text-rose-700 dark:text-rose-400">
+                          {formatearCosteUSD(statsCoste.gastoTotal)}
+                        </div>
+                        <div className="text-[10px] font-cinzel text-[var(--text-secondary)]">
+                          Gasto Acumulado
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-2.5 py-2">
+                        <div className="font-mono text-base font-bold text-[var(--accent)]">
+                          {statsCoste.ultimoTurnoCoste !== null ? formatearCosteUSD(statsCoste.ultimoTurnoCoste, true) : '—'}
+                        </div>
+                        <div className="text-[10px] font-cinzel text-[var(--text-secondary)]">
+                          Último Turno
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-2.5 py-2">
+                        <div className="font-mono text-base font-bold text-emerald-700 dark:text-emerald-400">
+                          +{formatearCosteUSD(statsCoste.ahorroTotalCache)}
+                        </div>
+                        <div className="text-[10px] font-cinzel text-[var(--text-secondary)] flex items-center justify-center gap-0.5">
+                          <span>Ahorro Caché</span>
+                          <Zap className="w-2.5 h-2.5 text-emerald-500" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg bg-[var(--surface)] p-2.5 text-xs text-[var(--text-secondary)] space-y-1.5 border border-[var(--glass-border)]">
+                    <div className="flex items-center gap-1.5 font-cinzel font-bold text-[var(--text-primary)]">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>¿Por qué el 1er turno cuesta más que los siguientes? (Context Caching)</span>
+                    </div>
+                    <p className="m-0 text-[11px] leading-relaxed">
+                      • <strong>Primer turno (Caché frío):</strong> Al iniciar la sesión o añadir documentos nuevos, Google procesa los textos completos para crear su caché interno. Con un tomo grande (~250k fichas) esto cuesta aproximadamente <strong>~$0.018</strong>.
+                      <br />
+                      • <strong>Siguientes turnos (Caché caliente):</strong> Google reutiliza el caché y <strong>aplica un 75% de descuento</strong> directo en todos los tokens cacheados. Cada turno posterior cuesta solo unos <strong>~$0.002 a $0.005</strong>.
+                      <br />
+                      • <strong>Tareas de fondo protegidas:</strong> Todas las tareas redundantes automáticas están deshabilitadas para que ninguna llamada invisible consuma tu saldo.
+                    </p>
+                  </div>
+                </div>
                 {/* Selector / Switch de Modo: Gratuito vs Pay-as-you-go (Google Cloud) */}
                 <div
                   className={`p-3 rounded-lg border transition-all flex items-center justify-between gap-3 ${

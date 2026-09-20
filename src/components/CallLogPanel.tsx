@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BookMarked, Check, ChevronDown, ChevronRight, Copy, Loader, Radio, Trash2, TriangleAlert, XCircle } from 'lucide-react';
+import { BookMarked, Check, ChevronDown, ChevronRight, Copy, DollarSign, Edit3, Loader, Radio, Trash2, TriangleAlert, XCircle, Zap } from 'lucide-react';
 import { versionEnUso } from '../utils/versionCheck';
 import {
   LlamadaRegistrada,
@@ -14,6 +14,12 @@ import {
   suscribirseALlamadas,
   usoDeDocumentos
 } from '../utils/callLog';
+import {
+  calcularCosteLlamada,
+  formatearCosteUSD,
+  getEstadisticasDeGasto,
+  setStoredInitialBalance
+} from '../utils/pricing';
 
 const n = (v?: number) => (v === undefined ? '—' : v.toLocaleString('es-ES'));
 
@@ -57,6 +63,8 @@ export const CallLogPanel: React.FC = () => {
   const [llamadas, setLlamadas] = useState<LlamadaRegistrada[]>(() => getLlamadas());
   const [filtro, setFiltro] = useState<'todas' | 'turnos' | 'fondo' | 'problemas'>('todas');
   const [copiado, setCopiado] = useState(false);
+  const [editandoSaldo, setEditandoSaldo] = useState(false);
+  const [nuevoSaldoInput, setNuevoSaldoInput] = useState('');
 
   useEffect(() => suscribirseALlamadas(l => setLlamadas([...l].reverse())), []);
 
@@ -69,8 +77,20 @@ export const CallLogPanel: React.FC = () => {
   }, [llamadas, filtro]);
 
   const r = useMemo(() => resumenDeLlamadas(llamadas), [llamadas]);
+  const statsCoste = useMemo(() => getEstadisticasDeGasto(llamadas), [llamadas]);
   const uso = useMemo(() => usoDeDocumentos(llamadas), [llamadas]);
   const [bibliotecaAbierta, setBibliotecaAbierta] = useState(false);
+
+  const guardarSaldo = () => {
+    const num = parseFloat(nuevoSaldoInput.replace(',', '.'));
+    if (Number.isFinite(num) && num >= 0) {
+      setStoredInitialBalance(num);
+    } else if (nuevoSaldoInput.trim() === '') {
+      setStoredInitialBalance(null);
+    }
+    setEditandoSaldo(false);
+    setNuevoSaldoInput('');
+  };
 
   const copiar = async () => {
     try {
@@ -94,6 +114,98 @@ export const CallLogPanel: React.FC = () => {
         <div className="font-mono text-[10px] text-[var(--text-secondary)] text-center">
           versión {versionEnUso()}
         </div>
+
+        {/* Módulo de Contabilidad de Saldo & Costes */}
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 font-cinzel font-bold text-xs text-amber-900 dark:text-amber-200">
+              <DollarSign className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>Contabilidad de Saldo & Costes de API</span>
+            </div>
+            {!editandoSaldo && (
+              <button
+                onClick={() => {
+                  setNuevoSaldoInput(statsCoste.saldoInicial !== null ? statsCoste.saldoInicial.toString() : '');
+                  setEditandoSaldo(true);
+                }}
+                className="flex items-center gap-1 text-[10px] text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-100 font-cinzel px-2 py-0.5 rounded border border-amber-500/40 hover:bg-amber-500/20 cursor-pointer transition-colors"
+                title="Ajustar el saldo inicial de tu cuenta de Google Cloud para llevar la cuenta"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>{statsCoste.saldoInicial !== null ? 'Ajustar Saldo' : 'Fijar Saldo Inicial'}</span>
+              </button>
+            )}
+          </div>
+
+          {editandoSaldo ? (
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs text-[var(--text-secondary)]">Saldo disponible ($ USD):</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Ej. 4.18"
+                value={nuevoSaldoInput}
+                onChange={e => setNuevoSaldoInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') guardarSaldo();
+                  if (e.key === 'Escape') setEditandoSaldo(false);
+                }}
+                className="w-24 px-2 py-1 text-xs font-mono rounded border border-[var(--user-border)] bg-[var(--surface)] text-[var(--text-primary)] focus:border-amber-500 focus:outline-hidden"
+                autoFocus
+              />
+              <button
+                onClick={guardarSaldo}
+                className="px-2.5 py-1 text-xs font-cinzel font-bold bg-amber-600 text-white rounded hover:bg-amber-700 cursor-pointer"
+              >
+                Guardar
+              </button>
+              <button
+                onClick={() => setEditandoSaldo(false)}
+                className="px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center">
+              <div className="rounded-md border border-[var(--glass-border)] bg-[var(--surface)] px-2 py-1.5">
+                <div className="font-mono text-sm font-bold text-amber-700 dark:text-amber-300">
+                  {statsCoste.saldoRestante !== null ? formatearCosteUSD(statsCoste.saldoRestante) : 'No fijado'}
+                </div>
+                <div className="text-[10px] font-cinzel text-[var(--text-secondary)] leading-tight">
+                  Saldo Estimado
+                </div>
+              </div>
+              <div className="rounded-md border border-[var(--glass-border)] bg-[var(--surface)] px-2 py-1.5">
+                <div className="font-mono text-sm font-bold text-rose-700 dark:text-rose-400">
+                  {formatearCosteUSD(statsCoste.gastoTotal)}
+                </div>
+                <div className="text-[10px] font-cinzel text-[var(--text-secondary)] leading-tight">
+                  Gasto Acumulado
+                </div>
+              </div>
+              <div className="rounded-md border border-[var(--glass-border)] bg-[var(--surface)] px-2 py-1.5">
+                <div className="font-mono text-sm font-bold text-[var(--accent)]">
+                  {statsCoste.ultimoTurnoCoste !== null ? formatearCosteUSD(statsCoste.ultimoTurnoCoste) : '—'}
+                </div>
+                <div className="text-[10px] font-cinzel text-[var(--text-secondary)] leading-tight">
+                  Último Turno
+                </div>
+              </div>
+              <div className="rounded-md border border-[var(--glass-border)] bg-[var(--surface)] px-2 py-1.5">
+                <div className="font-mono text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                  +{formatearCosteUSD(statsCoste.ahorroTotalCache)}
+                </div>
+                <div className="text-[10px] font-cinzel text-[var(--text-secondary)] leading-tight flex items-center justify-center gap-0.5" title="Ahorro del 75% aplicado por Google gracias a Context Caching">
+                  <span>Ahorro Caché</span>
+                  <Zap className="w-2.5 h-2.5 text-emerald-500" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center">
           {[
             { r: 'Llamadas', v: n(r.total) },
@@ -316,6 +428,28 @@ export const CallLogPanel: React.FC = () => {
                       caché {(() => { const c = porcentajeEnCache(l); return c !== undefined ? `${c}%` : n(l.fichasEnCache); })()}
                     </span>
                   ) : null}
+                  {/*
+                    Coste estimado de la llamada y ahorro obtenido por caché
+                  */}
+                  {(() => {
+                    const des = calcularCosteLlamada(l);
+                    if (des.fichasEntrada === 0 && des.fichasSalida === 0) return null;
+                    return (
+                      <span
+                        className="inline-flex items-center gap-1 font-mono text-amber-700 dark:text-amber-300 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20"
+                        title={`Coste estimado: ${formatearCosteUSD(des.costeTotal, true)}\n• Entrada: ${formatearCosteUSD(des.costeEntrada, true)} (${n(des.fichasNuevas)} nuevas + ${n(des.fichasEnCache)} cacheadas)\n• Salida/pensamiento: ${formatearCosteUSD(des.costeSalida, true)} (${n(des.fichasSalida)} fichas)${des.ahorroPorCache > 0 ? `\n• ¡Ahorro por caché!: +${formatearCosteUSD(des.ahorroPorCache, true)} (-75%)` : ''}`}
+                      >
+                        <DollarSign className="w-2.5 h-2.5" />
+                        <span>{formatearCosteUSD(des.costeTotal, true)}</span>
+                        {des.ahorroPorCache > 0 && (
+                          <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-[9px] ml-0.5">
+                            (-75% caché)
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })()}
+
                   {l.motivoDeCierre && l.motivoDeCierre !== 'STOP' && (
                     <span
                       className="text-amber-800 dark:text-amber-300 font-bold"
