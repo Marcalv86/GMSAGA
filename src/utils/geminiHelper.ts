@@ -869,15 +869,34 @@ export function setStoredPaidTierKey(key: string): void {
 }
 
 export function getStoredUsePaidTierOnly(): boolean {
-  return localStorage.getItem('gemini_use_paid_tier_only') === 'on';
+  return localStorage.getItem('gemini_use_paid_tier_only') === 'on' || localStorage.getItem('gemini_paid_tier_mode') === 'on';
 }
 
 export function setStoredUsePaidTierOnly(enabled: boolean): void {
   localStorage.setItem('gemini_use_paid_tier_only', enabled ? 'on' : 'off');
+  localStorage.setItem('gemini_paid_tier_mode', enabled ? 'on' : 'off');
+  try {
+    window.dispatchEvent(new Event('gemini_paid_tier_changed'));
+    window.dispatchEvent(new Event('storage'));
+  } catch {
+    // Ignorar en entornos sin window
+  }
 }
 
 export function isPaidTierActive(): boolean {
-  return getStoredUsePaidTierOnly() && Boolean(getStoredPaidTierKey());
+  const modoPagoActivado = getStoredUsePaidTierOnly();
+  const tieneClaveSaldo = Boolean(getStoredPaidTierKey());
+  const tieneClaveGeneral = getStoredApiKeys().length > 0;
+
+  // 1. Si el interruptor de modo saldo está encendido y hay cualquier clave configurada:
+  if (modoPagoActivado && (tieneClaveSaldo || tieneClaveGeneral)) {
+    return true;
+  }
+  // 2. Si hay una clave específica guardada en el campo de saldo de Google Cloud:
+  if (tieneClaveSaldo && localStorage.getItem('gemini_use_paid_tier_only') !== 'off') {
+    return true;
+  }
+  return false;
 }
 
 // Mapa en memoria para enfriamiento temporal de claves cuando devuelven 429 (Resource Exhausted)
@@ -930,8 +949,7 @@ export function segundosDeEnfriamiento(model: string): number {
 export function markKeyCooldown(key: string, durationMs: number = 60000) {
   const clean = cleanApiKey(key);
   if (clean) {
-    const paidKey = cleanApiKey(getStoredPaidTierKey());
-    const efectiva = clean === paidKey && isPaidTierActive()
+    const efectiva = isPaidTierActive()
       ? Math.min(durationMs, 5000)
       : durationMs;
     keyCooldownMap.set(clean, Date.now() + efectiva);
@@ -941,8 +959,7 @@ export function markKeyCooldown(key: string, durationMs: number = 60000) {
 export function isKeyInCooldown(key: string): boolean {
   const clean = cleanApiKey(key);
   if (!clean) return false;
-  const paidKey = cleanApiKey(getStoredPaidTierKey());
-  if (clean === paidKey && isPaidTierActive()) {
+  if (isPaidTierActive()) {
     const expiry = keyCooldownMap.get(clean);
     if (!expiry || Date.now() > expiry) {
       keyCooldownMap.delete(clean);
@@ -1242,7 +1259,7 @@ export function getRotatedApiKeys(opciones?: {
   // Si el usuario ha activado el Modo Saldo Exclusivo (Google Cloud / Pay-as-you-go),
   // se utiliza única y exclusivamente dicha clave, aislando por completo el resto del pool.
   if (isPaidTierActive()) {
-    const paidKey = getStoredPaidTierKey();
+    const paidKey = getStoredPaidTierKey() || getStoredApiKey();
     if (paidKey) {
       return {
         keys: [paidKey],
@@ -1382,7 +1399,7 @@ export function getRotatedApiKeys(opciones?: {
  */
 export function peekApiKeys(): string[] {
   if (isPaidTierActive()) {
-    const paidKey = getStoredPaidTierKey();
+    const paidKey = getStoredPaidTierKey() || getStoredApiKey();
     if (paidKey) return [paidKey];
   }
   const todas = getStoredApiKeys();
@@ -1411,7 +1428,7 @@ export function setStoredApiKey(key: string): void {
 
 export function hasConfiguredApiKey(): boolean {
   if (isPaidTierActive()) {
-    return Boolean(getStoredPaidTierKey());
+    return Boolean(getStoredPaidTierKey() || getStoredApiKeys().length > 0);
   }
   return getStoredApiKeys().length > 0;
 }
