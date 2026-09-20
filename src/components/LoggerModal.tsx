@@ -123,11 +123,11 @@ export const LoggerModal: React.FC<LoggerModalProps> = ({ isOpen, onClose }) => 
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[160] p-3 sm:p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[160] p-2 sm:p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden text-[var(--text-primary)]"
+        className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-xl shadow-2xl max-w-4xl w-full max-h-[88dvh] sm:max-h-[90vh] flex flex-col overflow-hidden min-h-0 text-[var(--text-primary)]"
         onClick={e => e.stopPropagation()}
       >
         {/* Cabecera */}

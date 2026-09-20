@@ -273,20 +273,12 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   return (
     <div id="simple-memory-container" className="flex-1 flex flex-col h-full bg-[var(--bg-color)] overflow-hidden">
       {/* Top memory mode toggle bar con botón único de sincronización unificada */}
-      <div id="memory-mode-toggle-bar" className="px-3 sm:px-6 py-2.5 bg-[var(--surface)] border-b border-[var(--glass-border)] flex flex-wrap items-center justify-between gap-3 shrink-0">
-        {/*
-          Tres iconos, no tres frases.
-
-          «Memoria del Personaje & Entidades» partido en tres líneas dentro de
-          un botón se come media pantalla en un móvil y encima queda feo. El
-          nombre completo sigue estando en el title y en el aria-label, y
-          debajo de cada pantalla hay una línea que explica qué es.
-        */}
-        <div className="flex items-center gap-1 p-1 bg-[color-mix(in_srgb,var(--surface-soft)_80%,transparent)] rounded-lg border border-[var(--glass-border)]">
+      <div id="memory-mode-toggle-bar" className="px-2 sm:px-6 py-2 bg-[var(--surface)] border-b border-[var(--glass-border)] flex items-center justify-between gap-2 shrink-0 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-[color-mix(in_srgb,var(--surface-soft)_80%,transparent)] rounded-lg border border-[var(--glass-border)] shrink-0">
           <button
             id="tab-btn-character-memory"
             onClick={() => handleSwitchMode('character')}
-            className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-md flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
               memoryMode === 'character'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
@@ -294,14 +286,14 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             title="Diario y Ficha del PJ: la crónica día a día, mochila, ficha de personaje, PNJs conocidos, lugares y misiones."
             aria-label="Diario y Ficha del PJ"
           >
-            <User className="w-4 h-4 shrink-0" />
-            <span className="font-cinzel text-xs font-bold whitespace-nowrap">Diario & PJ</span>
+            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="font-cinzel text-[11px] sm:text-xs font-bold whitespace-nowrap">Diario & PJ</span>
           </button>
 
           <button
             id="tab-btn-gm-memory"
             onClick={() => handleSwitchMode('gm')}
-            className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-md flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
               memoryMode === 'gm'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
@@ -309,14 +301,14 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             title="Cuaderno del GM: los giros que aún no han salido, lo que pasa fuera de cámara y los relojes que corren por detrás."
             aria-label="Cuaderno del GM"
           >
-            <VenetianMask className="w-4 h-4 shrink-0" />
-            <span className="font-cinzel text-xs font-bold whitespace-nowrap">Cuaderno GM</span>
+            <VenetianMask className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="font-cinzel text-[11px] sm:text-xs font-bold whitespace-nowrap">Cuaderno GM</span>
           </button>
 
           <button
             id="tab-btn-project-memory"
             onClick={() => handleSwitchMode('project')}
-            className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-md flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
               memoryMode === 'project'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
@@ -324,8 +316,11 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             title="Memoria Persistente: el documento maestro en Markdown de directivas aprendidas y estado global de la campaña."
             aria-label="Memoria Persistente"
           >
-            <ScrollText className="w-4 h-4 shrink-0" />
-            <span className="font-cinzel text-xs font-bold whitespace-nowrap">Memoria Persistente</span>
+            <ScrollText className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="font-cinzel text-[11px] sm:text-xs font-bold whitespace-nowrap">
+              <span className="sm:hidden">Memoria</span>
+              <span className="hidden sm:inline">Memoria Persistente</span>
+            </span>
           </button>
         </div>
 
@@ -335,11 +330,19 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             id="btn-unified-sync-memory"
             onClick={onTriggerAIUpdate}
             disabled={isCurrentlyWorking}
-            className="px-3.5 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold hover:opacity-90 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+            className="px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] sm:text-xs font-cinzel font-bold hover:opacity-90 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
             title="Sincroniza simultáneamente la memoria persistente del proyecto y la de personajes/entidades leyendo todos los chats y documentos."
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isCurrentlyWorking ? 'animate-spin' : ''}`} />
-            <span>{isCurrentlyWorking ? 'Sincronizando…' : 'Sincronizar Memoria Completa con IA'}</span>
+            <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isCurrentlyWorking ? 'animate-spin' : ''}`} />
+            <span>
+              {isCurrentlyWorking ? (
+                'Sincronizando…'
+              ) : (
+                <>
+                  <span className="hidden md:inline">Sincronizar </span>Memoria con IA
+                </>
+              )}
+            </span>
           </button>
         )}
       </div>

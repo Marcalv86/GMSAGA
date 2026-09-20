@@ -500,31 +500,31 @@ export const ContextUsageWidget: React.FC<{
       {/* Guide & Breakdown Modal */}
       {isGuideOpen &&
         createPortal(
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[150] p-4 font-lora animate-[fadeIn_0.2s_ease]">
-            <div className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden text-[var(--text-primary)]">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[150] p-2 sm:p-4 font-lora animate-[fadeIn_0.2s_ease]">
+            <div className="bg-[var(--bg-color)] border-2 border-[var(--accent)] rounded-xl shadow-2xl max-w-2xl w-full max-h-[88dvh] sm:max-h-[90vh] flex flex-col overflow-hidden min-h-0 text-[var(--text-primary)]">
               {/* Header */}
-              <div className="p-4 md:p-5 border-b border-[var(--glass-border)] flex justify-between items-center bg-[var(--sidebar-bg)]">
-                <div className="flex items-center gap-2.5">
-                  <Brain className="w-4 h-4" />
+              <div className="p-3.5 sm:p-5 border-b border-[var(--glass-border)] flex justify-between items-center bg-[var(--sidebar-bg)] shrink-0">
+                <div className="flex items-center gap-2 sm:gap-2.5">
+                  <Brain className="w-4 h-4 shrink-0 text-[var(--accent)]" />
                   <div>
-                    <h3 className="font-cinzel text-lg md:text-xl text-[var(--accent)] font-bold m-0">
+                    <h3 className="font-cinzel text-base sm:text-xl text-[var(--accent)] font-bold m-0">
                       Memoria, Saldo y Capacidad del Tomo
                     </h3>
-                    <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
+                    <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 mt-0.5">
                       Contabilidad de crédito API, context caching y consumo de tokens
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsGuideOpen(false)}
-                  className="text-[var(--text-secondary)] hover:text-[var(--accent)] text-xl font-bold p-1 cursor-pointer"
+                  className="text-[var(--text-secondary)] hover:text-[var(--accent)] text-xl font-bold p-1 cursor-pointer shrink-0"
                 >
-                  <X className="w-3.5 h-3.5" />{' '}
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Modal Body */}
-              <div className="p-5 overflow-y-auto space-y-5 text-sm leading-relaxed">
+              <div className="p-3.5 sm:p-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-4 sm:space-y-5 text-sm leading-relaxed touch-pan-y">
                 {/* Módulo de Contabilidad de Saldo & Costes de API */}
                 <div className="rounded-xl border-2 border-amber-500/40 bg-amber-500/10 p-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
