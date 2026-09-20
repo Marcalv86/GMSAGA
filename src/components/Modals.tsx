@@ -1279,14 +1279,7 @@ export const ApiKeyModal: React.FC<{
                     <input
                       type="checkbox"
                       checked={usePaidTierOnly}
-                      onChange={e => {
-                        const isChecked = e.target.checked;
-                        setUsePaidTierOnly(isChecked);
-                        if (isChecked) {
-                          setAutoBackgroundTasks(false);
-                          setAutoNovelize(false);
-                        }
-                      }}
+                      onChange={e => setUsePaidTierOnly(e.target.checked)}
                       className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
                     />
                     <span className="text-xs font-semibold font-cinzel text-[var(--text-primary)]">
@@ -1300,15 +1293,15 @@ export const ApiKeyModal: React.FC<{
                   <div className="mb-3 p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-800 dark:text-emerald-200 flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                     <div className="space-y-0.5">
-                      <strong className="block font-semibold">Modo Saldo Activo + Turno Único (Ahorro Total de Tokens):</strong>
+                      <strong className="block font-semibold">Uso 100% Exclusivo Activado:</strong>
                       <span>
-                        Todas las peticiones van a tu clave de saldo y se resuelven <strong>en un único turno principal</strong> con tu modelo activo (narración, inventario, vínculos y bitácora). Las tareas secundarias que re-leían los compendios en segundo plano quedan desactivadas automáticamente.
+                        El sistema dirigirá todas las peticiones única y exclusivamente a esta clave para consumir tu saldo de Google Cloud. Tus otras claves se mantendrán guardadas en reserva y no se usarán.
                       </span>
                     </div>
                   </div>
                 ) : (
                   <p className="text-[11px] text-[var(--text-secondary)] mb-2.5 leading-relaxed">
-                    Si activas la casilla, la app se bloqueará para usar <strong>únicamente</strong> esta clave con saldo y activará automáticamente el <strong>Modo Turno Único</strong> para no gastar tokens en segundo plano.
+                    Si activas la casilla, la app se bloqueará para usar <strong>únicamente</strong> esta clave con saldo, ignorando el resto sin borrarlas.
                   </p>
                 )}
 

@@ -504,14 +504,7 @@ export function setStoredAutoNovelize(enabled: boolean): void {
  * o botones manuales de sincronizar/trazar en el cuaderno).
  */
 export function getStoredAutoBackgroundTasks(): boolean {
-  const stored = localStorage.getItem('gmstudio_auto_background_tasks');
-  if (stored === 'off') return false;
-  if (stored === 'on') return true;
-  // Si el usuario tiene activo el modo de pago / saldo (Pay-as-you-go),
-  // por defecto las tareas en segundo plano están APAGADAS para resolverlo
-  // todo en un único turno y no volver a multiplicar tokens de entrada.
-  if (getStoredUsePaidTierOnly()) return false;
-  return true;
+  return localStorage.getItem('gmstudio_auto_background_tasks') !== 'off';
 }
 
 export function setStoredAutoBackgroundTasks(enabled: boolean): void {
@@ -630,15 +623,9 @@ export function setStoredBackgroundModel(modelId: string): void {
 }
 
 /**
- * Devuelve el modelo para tareas de agente y segundo plano.
- * Si el usuario está usando el modo de pago (Pay-as-you-go), utiliza el mismo
- * modelo activo principal (ej. Gemini 3.8 Flash o 3.7 Flash) para resolver
- * cualquier acción con la máxima potencia del modelo elegido.
+ * Devuelve el modelo para tareas de agente y segundo plano (fallback: gemini-2.5-flash).
  */
 export function getBackgroundTaskModel(): string {
-  if (getStoredUsePaidTierOnly()) {
-    return getStoredModel();
-  }
   return getStoredBackgroundModel();
 }
 
@@ -903,12 +890,6 @@ export function getStoredUsePaidTierOnly(): boolean {
 export function setStoredUsePaidTierOnly(enabled: boolean): void {
   localStorage.setItem('gemini_use_paid_tier_only', enabled ? 'on' : 'off');
   localStorage.setItem('gemini_paid_tier_mode', enabled ? 'on' : 'off');
-  if (enabled) {
-    // Al activar modo de pago / saldo, activa automáticamente el modo de ahorro:
-    // todo se resuelve en el propio turno de juego para evitar llamadas redundantes de entrada.
-    setStoredAutoBackgroundTasks(false);
-    setStoredAutoNovelize(false);
-  }
   try {
     window.dispatchEvent(new Event('gemini_paid_tier_changed'));
     window.dispatchEvent(new Event('storage'));
