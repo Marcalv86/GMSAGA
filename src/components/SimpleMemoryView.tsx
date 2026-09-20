@@ -286,53 +286,47 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           <button
             id="tab-btn-character-memory"
             onClick={() => handleSwitchMode('character')}
-            className={`w-11 h-10 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+            className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
               memoryMode === 'character'
-                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
+                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
             }`}
-          
-            title="Tu cuaderno: tu ficha, la mochila, el diario, los PNJs, los lugares y las tramas. Es lo que apuntarías tú en una libreta — solo que se actualiza solo, jugando."
-            aria-label="Tu cuaderno"
+            title="Diario y Ficha del PJ: la crónica día a día, mochila, ficha de personaje, PNJs conocidos, lugares y misiones."
+            aria-label="Diario y Ficha del PJ"
           >
-            <User className="w-5 h-5" />
-            </button>
-          {/*
-            EL CUADERNO DEL DIRECTOR, EN SU PROPIO SITIO.
+            <User className="w-4 h-4 shrink-0" />
+            <span className="font-cinzel text-xs font-bold whitespace-nowrap">Diario & PJ</span>
+          </button>
 
-            Los giros vivían entre las fichas del personaje, que es donde menos
-            pintan: no son suyos, son del otro lado de la pantalla. Aquí van con
-            lo que les corresponde —lo que pasa fuera de cámara y los relojes—,
-            y queda claro de un vistazo que todo esto es material del Narrador y
-            no cosas que su personaje sepa.
-          */}
           <button
             id="tab-btn-gm-memory"
             onClick={() => handleSwitchMode('gm')}
-            className={`w-11 h-10 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+            className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
               memoryMode === 'gm'
-                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
+                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
             }`}
-            title="Cuaderno del GM: los giros que aún no han salido, lo que hace la gente fuera de cámara y los relojes que corren por detrás."
+            title="Cuaderno del GM: los giros que aún no han salido, lo que pasa fuera de cámara y los relojes que corren por detrás."
             aria-label="Cuaderno del GM"
           >
-            <VenetianMask className="w-5 h-5" />
-            </button>
+            <VenetianMask className="w-4 h-4 shrink-0" />
+            <span className="font-cinzel text-xs font-bold whitespace-nowrap">Cuaderno GM</span>
+          </button>
+
           <button
             id="tab-btn-project-memory"
             onClick={() => handleSwitchMode('project')}
-            className={`w-11 h-10 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+            className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all cursor-pointer ${
               memoryMode === 'project'
-                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs'
+                ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
             }`}
-          
-            title="Memoria del proyecto: el texto de memoria general de la campaña, en Markdown."
-            aria-label="Memoria del proyecto"
+            title="Memoria Persistente: el documento maestro en Markdown de directivas aprendidas y estado global de la campaña."
+            aria-label="Memoria Persistente"
           >
-            <ScrollText className="w-5 h-5" />
-            </button>
+            <ScrollText className="w-4 h-4 shrink-0" />
+            <span className="font-cinzel text-xs font-bold whitespace-nowrap">Memoria Persistente</span>
+          </button>
         </div>
 
         {/* Botón único para sincronizar simultáneamente memoria persistente y entidades */}

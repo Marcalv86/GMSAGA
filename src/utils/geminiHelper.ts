@@ -2819,12 +2819,12 @@ ${(['conjuro', 'rasgo', 'competencia', 'mejora', 'otro'] as const)
     !movimientosRecientes.length && !relojesVivos.length && !faccionesVivas.length && !preparadoVivo.length;
 
   const bloqueCuadernoVacio = `
-### 🕯️ TU CUADERNO ESTÁ EN BLANCO — Y NO DEBERÍA (⛔ ELLA NO SABE NADA DE ESTO)
+### 🕯️ TU CUADERNO ESTÁ EN BLANCO — Y DEBES INICIALIZARLO (⛔ ELLA NO SABE NADA DE ESTO)
 Todavía no has apuntado NADA de lo que pasa mientras ella no mira. Eso significa que ahora mismo el mundo solo existe cuando ella lo está mirando, y eso se nota: nadie vuelve con nada, nadie se le adelanta, nada ha avanzado sin ella.
-- ⏳ **Abre al menos un reloj en cuanto haya algo que pueda ir a peor.** \`[RELOJ: nombre del plan | van: 1/6 | al llenarse: qué ocurre | de: quién lo mueve]\`. Sirve para lo que la persigue, lo que alguien está investigando, un plazo que corre. Y con \`sobre: Nombre\` es el reloj de una relación: adónde va lo que hay entre ella y esa persona, y qué hará esa persona al respecto.
-- 🕒 **En cuanto pase un día o más** —una noche, un salto, una jornada de viaje— la gente con algo entre manos HA HECHO ALGO: apúntalo con \`[BAMBALINAS: Quién | hizo: qué | donde: ... | resultado: ...]\`. Uno o dos por jornada, solo de quien tiene algo en marcha.
-- ⛔ Dentro de una escena continua o en combate no ha pasado un día: ahí no se apunta nada, y no pasa nada.
-- ⛔ Nada de esto se narra ni se insinúa. Es memoria del mundo, y se paga en detalles: alguien vuelve con barro en las botas, un aviso llega tarde, una puerta que estaba abierta ya no lo está.
+- ⏳ **ARRANQUE OBLIGATORIO: Abre YA en este turno al menos 1 o 2 relojes de amenaza o intriga de fondo** con \`[RELOJ: nombre del plan | van: 1/6 | al llenarse: qué ocurre | de: quién lo mueve]\` (ej: persecución, investigación de corsarios, lazos, intrigas de Bregan D'aerthe o facciones locales). Y con \`sobre: Nombre\` para relojes de relación.
+- 🏴 **Apunta las facciones y bandos en juego** con \`[FACCIÓN: Nombre | es: ... | quiere: ... | tiene: ... | con ella: ... | oculto: ...]\`.
+- 🕒 **En cuanto pase un día o más** (una noche, un salto, una jornada de viaje), apunta qué han hecho los demás fuera de cámara con \`[BAMBALINAS: Quién | hizo: qué | donde: ... | resultado: ...]\`.
+- ⛔ Nada de esto se narra ni se insinúa a la jugadora en la prosa. Es memoria viva del Director.
 `.trim();
 
   const bloqueCuaderno = cuadernoEnBlanco
