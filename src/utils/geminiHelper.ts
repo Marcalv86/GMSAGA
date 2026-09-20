@@ -159,14 +159,24 @@ export interface BackgroundModelOption {
 
 export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
   {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    desc: 'Última generación, máxima agilidad de razonamiento y lectura fiel de compendios'
+  },
+  {
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    desc: 'Razonamiento profundo, adaptativo y coherencia de canon'
+  },
+  {
     id: 'gemini-3.5-flash-lite',
     name: 'Gemini 3.5 Flash Lite',
-    desc: 'Ultra rápido y consumo mínimo de cuota (Ideal para tareas agénticas, resúmenes y memoria persistente)'
+    desc: 'Ultra rápido y consumo mínimo de cuota'
   }
 ];
 
-export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.5-flash-lite';
-export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.5-flash-lite';
+export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.8-flash';
+export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.8-flash';
 
 export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODEL_ID): string {
   if (!modelId || isModelDeprecated(modelId)) {
@@ -626,9 +636,13 @@ export function setStoredBackgroundModel(modelId: string): void {
 }
 
 /**
- * Devuelve el modelo para tareas de agente y segundo plano (fallback: gemini-2.5-flash).
+ * Devuelve el modelo para tareas auxiliares, sincronización y memoria.
+ * En modo saldo/pago, hereda directamente el modelo activo de la partida (Gemini 3.8 / 3.7 Flash).
  */
 export function getBackgroundTaskModel(): string {
+  if (isPaidTierActive() || getStoredUsePaidTierOnly()) {
+    return getStoredModel();
+  }
   return getStoredBackgroundModel();
 }
 
