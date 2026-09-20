@@ -11,7 +11,13 @@ import {
   fechaInicial,
   fechaLegible
 } from '../utils/campaignCalendar';
-import { fusionarTrama, leerElTableroDeDocumentos, tramarLaCampana } from '../utils/geminiHelper';
+import {
+  fusionarTrama,
+  leerElTableroDeDocumentos,
+  tramarLaCampana,
+  getStoredAutoBackgroundTasks,
+  getStoredUsePaidTierOnly
+} from '../utils/geminiHelper';
 import { aplicarFacciones, aplicarPreparado, aplicarRelojes, preparadoEnPie, relojesEnMarcha } from '../utils/cuadernoOculto';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
 import { sanitizePlayerCharacter, sanitizeProjectMemory } from '../utils/sanitizers';
@@ -298,6 +304,7 @@ export const MemoryManager: React.FC<{
     const hayArchivos = files.some(f => esFichaDelPj(f) || (!f.isImage && !f.isAudio && (f.content || '').trim().length > 50));
 
     if (faltaDatos && hayArchivos && !autoLecturaFichaIntentada.current && !leyendoFicha && !isGenerating) {
+      if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return;
       autoLecturaFichaIntentada.current = true;
       void handleEjecutarLecturaFicha();
     }

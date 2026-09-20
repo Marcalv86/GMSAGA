@@ -40,7 +40,9 @@ import {
   extractVisualArtStyleFromImages,
   describeApiError,
   generateImageWithFailover,
-  ExtractedImageStyle
+  ExtractedImageStyle,
+  getStoredAutoBackgroundTasks,
+  getStoredUsePaidTierOnly
 } from '../utils/geminiHelper';
 
 export interface CreativeStudioModalProps {
@@ -449,6 +451,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   // Auto-analyze once if user has uploaded images and not analyzed yet
   useEffect(() => {
     if (campaignImageFiles.length > 0 && !extractedStyle && !isAnalyzingStyle) {
+      if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return;
       handleExtractStyle();
     }
   }, [campaignImageFiles.length]);

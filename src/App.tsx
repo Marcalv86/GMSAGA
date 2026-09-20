@@ -128,6 +128,7 @@ import {
   novelizeUserMessage,
   getStoredAutoNovelize,
   getStoredAutoBackgroundTasks,
+  getStoredUsePaidTierOnly,
   generarNoticiasSaltoTemporal,
   anclarHistorialPorHud,
   consolidarCronicaAlCerrarCapitulo
@@ -801,6 +802,8 @@ export default function App() {
       .map(f => `${f.id}:${f.category || ''}:${(f.content || '').length}`)
       .join('|');
     if (autoLecturaFichaRef.current === huella) return;
+
+    if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return;
 
     autoLecturaFichaRef.current = huella;
     console.log('[AutoLectura Ficha OC] Ficha incompleta y documentos detectados. Lanzando lectura en segundo plano...');
@@ -2715,6 +2718,7 @@ export default function App() {
     proyecto: Project | null
   ): Promise<{ facciones: number; preparado: number; relojes: number } | null> => {
     if (!proyecto) return null;
+    if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return null;
 
     const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
     const documentos = (archivos || []).filter(f => esTexto(f) && (f.content || '').trim().length > 200);
@@ -3903,7 +3907,7 @@ export default function App() {
       const faltaNombreOc = !(pcRef?.name || '').trim() || nombreRes.test((pcRef?.name || '').trim());
       const faltaDatosOc = faltaNombreOc || !pcRef?.race || !pcRef?.class || !pcRef?.appearance;
 
-      if (hayFichaOTexto && faltaDatosOc) {
+      if (hayFichaOTexto && faltaDatosOc && getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
         console.log('[Upload] Ficha del OC detectada en la subida. Leyendo en segundo plano de inmediato...');
         void completarFichaDesdeDocumento(updated);
       }
@@ -3949,7 +3953,7 @@ export default function App() {
          * teje mejor con los documentos ya etiquetados.
          */
         void (async () => {
-          if (getStoredAutoBackgroundTasks()) {
+          if (getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
             await etiquetarLosQueLleguenSinEtiquetas();
             if (getStoredAutoVincular()) {
               await handleRelacionarBiblioteca({ silencioso: true });
@@ -3979,12 +3983,12 @@ export default function App() {
             const nRes = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
             return Boolean(curPc?.name && !nRes.test(curPc.name) && curPc.race && curPc.class);
           })();
-          if (getStoredAutoBackgroundTasks() && newFilesList.some(f => f.category === 'sheet_pj') && !yaCompletoOc) {
+          if (getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly() && newFilesList.some(f => f.category === 'sheet_pj') && !yaCompletoOc) {
             await completarFichaDesdeDocumento(currentFilesRef.current);
             await new Promise(r => setTimeout(r, 2000));
           }
 
-          if (getStoredAutoBackgroundTasks()) {
+          if (getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
             await montarSesionCero(
               currentFilesRef.current,
               projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
@@ -4156,7 +4160,10 @@ export default function App() {
    * no se toca nunca, ni aunque el documento diga otra cosa: para eso está el
    * botón de leer la ficha, que sí avisa antes de sustituir.
    */
-  const completarFichaDesdeDocumento = async (archivos?: ProjectFile[]) => {
+  const completarFichaDesdeDocumento = async (archivos?: ProjectFile[], forzarManual?: boolean) => {
+    if (!forzarManual && (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly())) {
+      return;
+    }
     /*
      * El proyecto se lee de la referencia viva, no del cierre.
      *
@@ -4318,8 +4325,10 @@ export default function App() {
     const updated = currentFiles.map(f => (f.id === fileId ? { ...f, category } : f));
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
-    // Marcar un documento como ficha del OC es decir quién es: se lee solo.
-    if (category === 'sheet_pj') void completarFichaDesdeDocumento(updated);
+    // Marcar un documento como ficha del OC es decir quién es: se lee solo si no estamos en modo saldo.
+    if (category === 'sheet_pj' && getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
+      void completarFichaDesdeDocumento(updated);
+    }
   };
 
   /*
@@ -4330,6 +4339,7 @@ export default function App() {
    * por minuto ni requerir bucles secuenciales con pausas artificiales.
    */
   const etiquetarLosQueLleguenSinEtiquetas = async () => {
+    if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return;
     const pid = currentPIdRef.current;
     if (!pid) return;
     const proyecto = projectsRef.current.find(pr => pr.id === pid);
@@ -4580,6 +4590,7 @@ export default function App() {
     const silencioso = Boolean(opciones?.silencioso);
     if (!currentPId || !currentProject) return;
     if (isRelacionandoBiblioteca) return;
+    if (silencioso && (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly())) return;
 
     const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
     const candidatos = currentFiles.filter(
@@ -4782,7 +4793,9 @@ export default function App() {
 
       // Reclasificar y descubrir que un documento era su ficha es decir quién
       // es: se lee sin pedirlo, igual que al etiquetarla a mano.
-      if (estrenaFichaDelOc) void completarFichaDesdeDocumento(updatedFiles);
+      if (estrenaFichaDelOc && getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
+      void completarFichaDesdeDocumento(updatedFiles);
+    }
 
       // Also auto-assign portraits to PC, NPCs and Locations if names match and portrait is missing
       let memoryModified = false;
@@ -6481,7 +6494,7 @@ export default function App() {
               onUpdateMemory={handleUpdateMemory}
               onUpdateProject={handleUpdateProjectField}
               onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
-              onCompletarFichaDesdeDocumento={() => completarFichaDesdeDocumento(currentFiles)}
+              onCompletarFichaDesdeDocumento={() => completarFichaDesdeDocumento(currentFiles, true)}
               isGenerating={isSyncingMemory}
             />
           )}
