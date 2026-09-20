@@ -2827,7 +2827,7 @@ export default function App() {
      * segundos a que se teja algo antes de escribir la primera línea.
      */
     const hayMapa = (currentFiles || []).some(f => f.name?.includes('Red Semántica'));
-    if (getStoredAutoBackgroundTasks() && !hayMapa && documentos.length >= 2 && getStoredAutoVincular()) {
+    if (getStoredAutoBackgroundTasks() && !isPaidTierActive() && !getStoredUsePaidTierOnly() && !hayMapa && documentos.length >= 2 && getStoredAutoVincular()) {
       void handleRelacionarBiblioteca({ silencioso: true });
     }
 
@@ -2837,7 +2837,7 @@ export default function App() {
      * no llega a dispararlo nunca. Aquí dentro ya se comprueba qué falta por
      * mirar, así que si está todo visto no gasta nada.
      */
-    if (getStoredAutoBackgroundTasks()) {
+    if (getStoredAutoBackgroundTasks() && !isPaidTierActive() && !getStoredUsePaidTierOnly()) {
       void montarSesionCero(currentFiles || [], currentProject || null);
     }
 
@@ -3173,6 +3173,8 @@ export default function App() {
       // Solo se ejecuta si está activada en Configuración (por defecto OFF para no consumir TPM/RPM en capa gratuita).
       // Siempre se puede novelizar bajo demanda desde el Lector de Novela.
       if (
+        !isPaidTierActive() &&
+        !getStoredUsePaidTierOnly() &&
         getStoredAutoBackgroundTasks() &&
         getStoredAutoNovelize() &&
         currentProject &&
@@ -3339,7 +3341,12 @@ export default function App() {
           currentFiles.some(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200) ||
           effectiveChats.some(c => (c.messages || []).length >= 1);
 
-        if (getStoredAutoBackgroundTasks() && (needsInitialSync || needsDailySync)) {
+        if (
+          !isPaidTierActive() &&
+          !getStoredUsePaidTierOnly() &&
+          getStoredAutoBackgroundTasks() &&
+          (needsInitialSync || needsDailySync)
+        ) {
           setTimeout(async () => {
             try {
               // 1. Estudio ágil de documentos, contexto y arranque de campaña:
@@ -3411,6 +3418,8 @@ export default function App() {
         const puedeReintentar = desdeElUltimoIntento > 20 * 60 * 1000;
 
         if (
+          !isPaidTierActive() &&
+          !getStoredUsePaidTierOnly() &&
           getStoredAutoBackgroundTasks() &&
           hayConQueTramar &&
           (sinTrazarTodavia || needsDailySync) &&

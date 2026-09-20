@@ -504,7 +504,10 @@ export function setStoredAutoNovelize(enabled: boolean): void {
  * o botones manuales de sincronizar/trazar en el cuaderno).
  */
 export function getStoredAutoBackgroundTasks(): boolean {
-  return localStorage.getItem('gmstudio_auto_background_tasks') !== 'off';
+  if (isPaidTierActive() || getStoredUsePaidTierOnly()) {
+    return false;
+  }
+  return localStorage.getItem('gmstudio_auto_background_tasks') === 'on';
 }
 
 export function setStoredAutoBackgroundTasks(enabled: boolean): void {
