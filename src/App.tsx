@@ -88,6 +88,9 @@ import {
   setStoredApiKey,
   setStoredApiKeys,
   hasConfiguredApiKey,
+  isPaidTierActive,
+  setStoredPaidTierKey,
+  setStoredUsePaidTierOnly,
   AVAILABLE_MODELS,
   getStoredModel,
   setStoredModel,
@@ -101,6 +104,7 @@ import {
   syncFullCampaignFromChats,
   fusionarTimeline,
   AVISO_TOKENS_POR_MINUTO,
+  techoDeEnvio,
   getStoredApiKeys,
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
@@ -5499,6 +5503,12 @@ export default function App() {
           if (imported.keyRotationMode) {
             setStoredKeyRotationMode(imported.keyRotationMode);
           }
+          if (typeof imported.paidTierKey === 'string' && imported.paidTierKey.trim()) {
+            setStoredPaidTierKey(imported.paidTierKey.trim());
+          }
+          if (typeof imported.usePaidTierOnly === 'boolean') {
+            setStoredUsePaidTierOnly(imported.usePaidTierOnly);
+          }
           const aiConfig = imported.geminiSettings || imported.settings;
           if (aiConfig) {
             if (aiConfig.model) setStoredModel(aiConfig.model);
@@ -5791,10 +5801,12 @@ export default function App() {
    * minuto en la clave más libre, más este turno— para que las dos no vuelvan
    * a contar cosas distintas de lo mismo, que ya pasó una vez.
    */
+  const { limite: maxTokensActual, esPayAsYouGo } = techoDeEnvio(getStoredModel());
   const effectiveChatTokens =
     tokensDelTurno +
-    presionDelMinuto(getStoredModel(), Math.max(1, getStoredApiKeys().length)).menor;
-  const isCurrentChatNearTokenLimit = effectiveChatTokens >= AVISO_TOKENS_POR_MINUTO;
+    (esPayAsYouGo ? 0 : presionDelMinuto(getStoredModel(), Math.max(1, getStoredApiKeys().length)).menor);
+  const umbralAviso = esPayAsYouGo ? Math.round(maxTokensActual * 0.85) : AVISO_TOKENS_POR_MINUTO;
+  const isCurrentChatNearTokenLimit = effectiveChatTokens >= umbralAviso;
 
   return (
     <div className="fixed inset-0 flex overflow-hidden bg-[var(--bg-color)] text-[var(--text-primary)] font-lora">
@@ -6117,12 +6129,22 @@ export default function App() {
                   }
                 }}
                 className="flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-[11px] font-cinzel transition-all duration-200 cursor-pointer border bg-[var(--glass)] border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] active:scale-95 relative"
-                title="Ajustes de Motor IA, Modelo, Filtros NSFW, Razonamiento y API Key"
+                title={
+                  isPaidTierActive()
+                    ? "Ajustes (🟢 Modo Saldo Google Cloud ACTIVO - Consumo exclusivo de crédito)"
+                    : "Ajustes de Motor IA, Modelo, Filtros NSFW, Razonamiento y API Key"
+                }
               >
                 <Sliders className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate text-[10px]">Ajustes</span>
                 <span
-                  className={`w-1.5 h-1.5 rounded-full absolute top-1 right-1 ${hasConfiguredApiKey() ? 'bg-emerald-500' : 'bg-red-500'}`}
+                  className={`w-1.5 h-1.5 rounded-full absolute top-1 right-1 ${
+                    isPaidTierActive()
+                      ? 'bg-amber-400 ring-1 ring-amber-300 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
+                      : hasConfiguredApiKey()
+                      ? 'bg-emerald-500'
+                      : 'bg-red-500'
+                  }`}
                 />
               </button>
             </div>

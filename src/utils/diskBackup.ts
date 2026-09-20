@@ -9,7 +9,9 @@ import {
   getStoredThinkingLevel,
   getStoredTemperature,
   getStoredTopP,
-  getStoredAutoFailover
+  getStoredAutoFailover,
+  getStoredPaidTierKey,
+  getStoredUsePaidTierOnly
 } from './geminiHelper';
 import { leerMesa } from './mesaStorage';
 import { logError } from './logger';
@@ -238,6 +240,8 @@ async function escribirCampanaAhora(
         files,
         mesa: mesa.length > 0 ? mesa : undefined,
         apiKeys: apiKeys.length > 0 ? apiKeys : undefined,
+        paidTierKey: getStoredPaidTierKey() || undefined,
+        usePaidTierOnly: getStoredUsePaidTierOnly(),
         keyRotationMode: getStoredKeyRotationMode(),
         geminiSettings: {
           model: getStoredModel(),

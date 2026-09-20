@@ -37,7 +37,15 @@ import {
   formatoConsulta
 } from '../utils/oracle';
 import { formatRollResult } from '../utils/rollRequests';
-import { TOPE_TOKENS_POR_MINUTO, isNarrativeIncomplete, getStoredCoNarrativa, setStoredCoNarrativa } from '../utils/geminiHelper';
+import {
+  TOPE_TOKENS_POR_MINUTO,
+  isNarrativeIncomplete,
+  getStoredCoNarrativa,
+  setStoredCoNarrativa,
+  techoDeEnvio,
+  isPaidTierActive,
+  getStoredModel
+} from '../utils/geminiHelper';
 
 import {
   BookCheck,
@@ -2222,9 +2230,12 @@ export const ChatView: React.FC<{
           lea de un golpe de vista y no haya que apuntar a nada.
         */}
         {isNearTokenLimit && !isLastMessageIncomplete && (() => {
-          const usados = chatTokensCount || TOPE_TOKENS_POR_MINUTO;
-          const porcentaje = Math.min(100, (usados / TOPE_TOKENS_POR_MINUTO) * 100);
-          const pasado = usados >= TOPE_TOKENS_POR_MINUTO;
+          const esPay = isPaidTierActive();
+          const { limite: maxTokens } = techoDeEnvio(getStoredModel());
+          const topeEfectivo = esPay ? maxTokens : TOPE_TOKENS_POR_MINUTO;
+          const usados = chatTokensCount || topeEfectivo;
+          const porcentaje = Math.min(100, (usados / topeEfectivo) * 100);
+          const pasado = usados >= topeEfectivo;
           /*
            * El tema claro es pergamino (#f4ecd8), no blanco, así que los ámbares
            * medios se le funden encima y el texto deja de leerse. En claro hace
@@ -2256,12 +2267,14 @@ export const ChatView: React.FC<{
                     {/* En el móvil no cabe la frase entera y truncada no dice nada. */}
                     <span className="sm:hidden">{pasado ? 'Sobre el tope' : 'Cerca del tope'}</span>
                     <span className="hidden sm:inline">
-                      {pasado ? 'Capítulo por encima del tope' : 'Capítulo cerca del tope'}
+                      {pasado
+                        ? (esPay ? 'Capítulo supera la ventana del modelo' : 'Capítulo por encima del tope')
+                        : (esPay ? 'Capítulo cerca de la ventana del modelo' : 'Capítulo cerca del tope')}
                     </span>
                   </span>
                   <span className="font-mono text-[11px] tabular-nums opacity-70 shrink-0">
-                    {Math.round(usados / 1000)}k/{Math.round(TOPE_TOKENS_POR_MINUTO / 1000)}k
-                    <span className="hidden sm:inline"> por minuto</span>
+                    {Math.round(usados / 1000)}k/{Math.round(topeEfectivo / 1000)}k
+                    <span className="hidden sm:inline">{esPay ? ' (Pay-as-you-go)' : ' por minuto'}</span>
                   </span>
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-[var(--glass-border)] overflow-hidden">

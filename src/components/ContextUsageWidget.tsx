@@ -149,7 +149,7 @@ export const ContextUsageWidget: React.FC<{
    * lugar de darla por hecha, que con Gemma es menos de la cuarta parte.
    */
   const modeloDeNarracion = medida?.modelo || getStoredModel();
-  const { limite: MAX_TOKENS, ventana, medido: limiteMedido, mandaLaCuota, cuota } =
+  const { limite: MAX_TOKENS, ventana, medido: limiteMedido, mandaLaCuota, cuota, esPayAsYouGo } =
     techoDeEnvio(modeloDeNarracion);
 
   /*
@@ -160,14 +160,12 @@ export const ContextUsageWidget: React.FC<{
    * 429 que cuando te pasas de tokens por minuto, sin nada que distinga un caso
    * del otro: se busca el problema en el tamaño del envío y no está ahí.
    *
-   * Cada clave lleva su propio cupo y son independientes entre sí, así que con
-   * varias claves el techo del día se multiplica. La app las rota sola, de modo
-   * que lo honesto es enseñar el total.
+   * En modo Pay-as-you-go no hay límite diario de peticiones.
    */
-  const numeroDeClaves = Math.max(1, getStoredApiKeys().length);
-  const cupoDiario = cuota.rpd * numeroDeClaves;
+  const numeroDeClaves = esPayAsYouGo ? 1 : Math.max(1, getStoredApiKeys().length);
+  const cupoDiario = esPayAsYouGo ? 1000000 : cuota.rpd * numeroDeClaves;
   const peticionesHoy = peticionesDeHoy(modeloDeNarracion);
-  const cupoApurado = peticionesHoy >= cupoDiario * 0.8;
+  const cupoApurado = !esPayAsYouGo && peticionesHoy >= cupoDiario * 0.8;
 
   /*
    * EL VEREDICTO, QUE ERA LO ÚNICO QUE FALTABA.
@@ -219,12 +217,14 @@ export const ContextUsageWidget: React.FC<{
    * cambia es qué mide la barra, que era lo que engañaba.
    */
   const presion = presionDelMinuto(modeloDeNarracion, numeroDeClaves);
-  const proyectado = presion.menor + tokensMostrados;
+  const proyectado = (esPayAsYouGo ? 0 : presion.menor) + tokensMostrados;
+  const topeMinutoReal = esPayAsYouGo ? MAX_TOKENS : TOPE_TOKENS_POR_MINUTO;
+  const avisoMinutoReal = esPayAsYouGo ? Math.round(MAX_TOKENS * 0.85) : AVISO_TOKENS_POR_MINUTO;
   const percentage = Math.min(100, (proyectado / MAX_TOKENS) * 100);
-  const pasadaDeCuota = proyectado >= TOPE_TOKENS_POR_MINUTO;
-  const cercaDeCuota = !pasadaDeCuota && proyectado >= AVISO_TOKENS_POR_MINUTO;
+  const pasadaDeCuota = proyectado >= topeMinutoReal;
+  const cercaDeCuota = !pasadaDeCuota && proyectado >= avisoMinutoReal;
   /** Cuántas claves admitirían este envío ahora mismo sin pasarse del minuto. */
-  const clavesConSitio = presion.porClave.filter(c => c + tokensMostrados < MAX_TOKENS).length;
+  const clavesConSitio = esPayAsYouGo ? 1 : presion.porClave.filter(c => c + tokensMostrados < MAX_TOKENS).length;
 
   return (
     <>
@@ -232,6 +232,11 @@ export const ContextUsageWidget: React.FC<{
         <div className="flex justify-between items-center text-xs font-cinzel font-bold text-[var(--text-secondary)] mb-1.5">
           <span className="flex items-center gap-1.5">
             <BookOpen className="w-3.5 h-3.5" /> Capacidad del Tomo
+            {esPayAsYouGo && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/40 rounded px-1.5 py-0.5 font-sans font-semibold">
+                Pay-as-you-go
+              </span>
+            )}
           </span>
           <button
             onClick={() => setIsGuideOpen(true)}
@@ -264,20 +269,27 @@ export const ContextUsageWidget: React.FC<{
               {compact(tokensMostrados)} / {compact(MAX_TOKENS)} tokens
             </span>
             {/*
-              Lo gastado en el minuto, que es la otra mitad de la barra. Sin
-              esto, un turno pequeño con la barra en rojo no se entiende: el
-              bulto no está en lo que vas a mandar, está en lo que acabas de
-              mandar y todavía cuenta.
+              Lo gastado en el minuto, que es la otra mitad de la barra en la capa gratuita.
+              En Pay-as-you-go, el límite oficial es de 4.000.000 TPM sin filtro de 250k.
             */}
-            {presion.menor > 0 && (
+            {esPayAsYouGo ? (
               <span
-                className="text-[var(--text-secondary)]"
-                title={`En los últimos 60 s ya se han gastado ${presion.menor.toLocaleString('es-ES')} fichas en la clave más libre (${presion.llamadas} llamadas a ${modeloDeNarracion}). Esta barra suma eso al turno que vas a enviar, porque el límite de Google es por minuto, no por envío. Se vacía solo conforme pasa el minuto.`}
+                className="text-amber-800 dark:text-amber-300 font-sans text-[9px]"
+                title="Clave con saldo de Google Cloud (Pay-as-you-go): cuota ampliada a 4.000.000 TPM sin el cuello de botella de 250.000."
               >
-                · +{compact(presion.menor)} del minuto
+                · 4M TPM
               </span>
+            ) : (
+              presion.menor > 0 && (
+                <span
+                  className="text-[var(--text-secondary)]"
+                  title={`En los últimos 60 s ya se han gastado ${presion.menor.toLocaleString('es-ES')} fichas en la clave más libre (${presion.llamadas} llamadas a ${modeloDeNarracion}). Esta barra suma eso al turno que vas a enviar, porque el límite de Google es por minuto, no por envío. Se vacía solo conforme pasa el minuto.`}
+                >
+                  · +{compact(presion.menor)} del minuto
+                </span>
+              )
             )}
-            {numeroDeClaves > 1 && clavesConSitio < numeroDeClaves && (
+            {!esPayAsYouGo && numeroDeClaves > 1 && clavesConSitio < numeroDeClaves && (
               <span
                 className={`font-bold ${clavesConSitio === 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-800 dark:text-amber-300'}`}
                 title={
@@ -337,15 +349,14 @@ export const ContextUsageWidget: React.FC<{
           >
             {pasadaDeCuota ? (
               <>
-                <strong>Cada turno superará la cuota por minuto.</strong> Este tomo manda{' '}
-                {compact(tokensMostrados)} tokens y la capa gratuita corta en{' '}
-                {compact(TOPE_TOKENS_POR_MINUTO)} por minuto. Dará error 429 en el primer turno,
-                también con una clave nueva sin usar: no es cuota gastada, es que no cabe.
+                <strong>{esPayAsYouGo ? 'Supera la ventana del modelo.' : 'Cada turno superará la cuota por minuto.'}</strong> Este tomo manda{' '}
+                {compact(tokensMostrados)} tokens y el límite es{' '}
+                {compact(topeMinutoReal)}. {esPayAsYouGo ? 'El envío supera la ventana máxima del modelo.' : 'La capa gratuita corta en 250.000 por minuto.'}
               </>
             ) : (
               <>
-                <strong>Cerca de la cuota por minuto.</strong> Vas por {compact(tokensMostrados)} de
-                los {compact(TOPE_TOKENS_POR_MINUTO)} tokens por minuto de la capa gratuita.
+                <strong>{esPayAsYouGo ? 'Cerca del límite de ventana del modelo.' : 'Cerca de la cuota por minuto.'}</strong> Vas por {compact(tokensMostrados)} de
+                los {compact(topeMinutoReal)} tokens {esPayAsYouGo ? 'de la ventana del modelo (Pay-as-you-go)' : 'por minuto de la capa gratuita'}.
               </>
             )}
           </div>
@@ -601,6 +612,21 @@ export const ContextUsageWidget: React.FC<{
                   )}
 
                   <div className="mt-3 pt-3 border-t border-[var(--glass-border)] space-y-1.5 text-xs text-[var(--text-secondary)]">
+                    {esPayAsYouGo && (
+                      <div className="mb-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5 space-y-1 text-xs">
+                        <div className="flex items-center gap-1.5 font-cinzel font-bold text-amber-900 dark:text-amber-200">
+                          💳 Modo Saldo / Crédito Activo (Pay-as-you-go)
+                        </div>
+                        <p className="m-0 text-[11px] leading-snug text-[var(--text-secondary)]">
+                          Esta clave tiene facturación de Google Cloud activada:
+                          <br />• <strong>Sin estrangulamiento por minuto:</strong> cuota oficial de 4.000.000 TPM (en vez de 250.000).
+                          <br />• <strong>Peticiones por minuto:</strong> 1.000 RPM (en vez de 5 RPM).
+                          <br />• <strong>Peticiones diarias:</strong> Ilimitadas (sin el tope de 20 peticiones/día de la capa gratuita).
+                          <br />• <strong>Capacidad total del tomo:</strong> Aprovecha la ventana completa de {compact(ventana)} tokens de {modeloDeNarracion}.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
                       <span>
                         Ventana de {modeloDeNarracion}: <strong>{compact(ventana)}</strong> de tokens
@@ -615,7 +641,7 @@ export const ContextUsageWidget: React.FC<{
                     </div>
                     <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
                       <span>
-                        Tokens por minuto (capa gratuita):{' '}
+                        Tokens por minuto {esPayAsYouGo ? '(Pay-as-you-go)' : '(capa gratuita)'}:{' '}
                         <strong>{compact(cuota.tpm)}</strong> de entrada
                       </span>
                       <span>
@@ -624,34 +650,38 @@ export const ContextUsageWidget: React.FC<{
                     </div>
                     <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
                       <span>
-                        Peticiones por DÍA: <strong>{cuota.rpd}</strong> por clave
-                        {numeroDeClaves > 1 ? ` · ${cupoDiario} con tus ${numeroDeClaves} claves` : ''}
+                        Peticiones por DÍA: <strong>{esPayAsYouGo ? 'Ilimitadas' : cuota.rpd}</strong> {esPayAsYouGo ? '' : 'por clave'}
+                        {!esPayAsYouGo && numeroDeClaves > 1 ? ` · ${cupoDiario} con tus ${numeroDeClaves} claves` : ''}
                       </span>
                       <span>
                         Hoy llevas{' '}
-                        <strong className={peticionesHoy >= cupoDiario ? 'text-red-500' : 'text-[var(--accent)]'}>
+                        <strong className={!esPayAsYouGo && peticionesHoy >= cupoDiario ? 'text-red-500' : 'text-[var(--accent)]'}>
                           {peticionesHoy}
                         </strong>
                       </span>
                     </div>
-                    <p className="m-0 text-[11px] leading-snug">
-                      Son dos límites distintos y se confunden con facilidad. La <strong>ventana</strong>{' '}
-                      es cuánto le cabe al modelo <em>en una petición</em>. La <strong>cuota por
-                      minuto</strong> es cuánto te deja mandar Google <em>por minuto</em>, y no se gasta
-                      con el uso: se reinicia cada minuto. Por eso un tomo demasiado grande falla en el
-                      primer turno aunque la clave sea nueva y esté sin estrenar.
-                      {mandaLaCuota
-                        ? ' Ahora mismo el que corta antes es la cuota por minuto, y es contra ese contra el que mide la barra.'
-                        : ' Ahora mismo el que corta antes es la ventana del modelo, y es contra ese contra el que mide la barra.'}
-                    </p>
-                    <p className="m-0 text-[11px] leading-snug">
-                      Y hay un tercer límite que no tiene nada que ver con el tamaño:{' '}
-                      <strong>las peticiones por día</strong>. Con {modeloDeNarracion} son {cuota.rpd} por
-                      clave, y al agotarse Google devuelve exactamente el mismo error 429 que cuando el
-                      envío es demasiado grande. Si la barra de arriba va holgada y aun así falla, mira
-                      esta cuenta antes que ninguna otra cosa. Las tareas de fondo (sincronizar memoria,
-                      novelizar, deducir fechas) también gastan de aquí.
-                    </p>
+                    {!esPayAsYouGo && (
+                      <>
+                        <p className="m-0 text-[11px] leading-snug">
+                          Son dos límites distintos y se confunden con facilidad. La <strong>ventana</strong>{' '}
+                          es cuánto le cabe al modelo <em>en una petición</em>. La <strong>cuota por
+                          minuto</strong> es cuánto te deja mandar Google <em>por minuto</em>, y no se gasta
+                          con el uso: se reinicia cada minuto. Por eso un tomo demasiado grande falla en el
+                          primer turno aunque la clave sea nueva y esté sin estrenar.
+                          {mandaLaCuota
+                            ? ' Ahora mismo el que corta antes es la cuota por minuto, y es contra ese contra el que mide la barra.'
+                            : ' Ahora mismo el que corta antes es la ventana del modelo, y es contra ese contra el que mide la barra.'}
+                        </p>
+                        <p className="m-0 text-[11px] leading-snug">
+                          Y hay un tercer límite que no tiene nada que ver con el tamaño:{' '}
+                          <strong>las peticiones por día</strong>. Con {modeloDeNarracion} son {cuota.rpd} por
+                          clave, y al agotarse Google devuelve exactamente el mismo error 429 que cuando el
+                          envío es demasiado grande. Si la barra de arriba va holgada y aun así falla, mira
+                          esta cuenta antes que ninguna otra cosa. Las tareas de fondo (sincronizar memoria,
+                          novelizar, deducir fechas) también gastan de aquí.
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   {/* Medida real contra la API */}
