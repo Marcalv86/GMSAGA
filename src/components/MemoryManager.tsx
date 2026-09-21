@@ -933,15 +933,14 @@ export const MemoryManager: React.FC<{
                   onClick={() => setActiveTab(tab.id as any)}
                   title={tab.label}
                   aria-label={tab.label}
-                  className={`font-cinzel text-xs md:text-sm px-2 sm:px-3 py-1.5 sm:py-2 rounded-md transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 shrink-0 ${
+                  className={`font-cinzel text-xs md:text-sm p-2 sm:px-3 sm:py-2 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 shrink-0 ${
                     activeTab === tab.id
                       ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-sm'
                       : 'text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--surface)_40%,transparent)] hover:bg-[var(--glass)] hover:text-[var(--accent)] border border-[var(--glass-border)]'
                   }`}
                 >
-                  <TabIcon className="w-3.5 h-3.5 shrink-0" />
+                  <TabIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="hidden sm:inline">{tab.label}</span>
-                  <span className="sm:hidden">{tab.shortLabel}</span>
                   {tab.count && <span className="text-[10px] opacity-80">{tab.count}</span>}
                 </button>
               );
@@ -955,10 +954,10 @@ export const MemoryManager: React.FC<{
               disabled={isGenerating || isSyncingAI}
               title="Analizar todas las sesiones y capítulos para sincronizar la memoria viva, PNJs, tramas y lugares con la IA"
               aria-label="Sincronizar con IA"
-              className="text-xs text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] border border-[var(--accent)] px-3 sm:px-4 py-1.5 md:py-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-sm disabled:opacity-50"
+              className="text-xs text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] border border-[var(--accent)] p-2 sm:px-4 sm:py-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-sm disabled:opacity-50"
             >
-              <Sparkles className={`w-3.5 h-3.5 ${isSyncingAI ? 'animate-spin' : ''}`} />
-              <span>{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
+              <Sparkles className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${isSyncingAI ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
             </button>
           )}
 
@@ -967,9 +966,9 @@ export const MemoryManager: React.FC<{
             disabled={isGenerating}
             title="Vaciar y restablecer toda la memoria viva de la campaña en todas las pestañas"
             aria-label="Restablecer toda la memoria"
-            className="text-xs text-red-700 hover:text-red-900 border border-red-200 bg-red-50/70 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60 dark:hover:bg-red-900/50 px-2.5 sm:px-3 py-1.5 md:py-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-xs disabled:opacity-50"
+            className="text-xs text-red-700 hover:text-red-900 border border-red-200 bg-red-50/70 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60 dark:hover:bg-red-900/50 p-2 sm:px-3 sm:py-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-xs disabled:opacity-50"
           >
-            <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Restablecer Toda la Memoria</span><span className="sm:hidden">Restablecer</span>
+            <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Restablecer Toda la Memoria</span>
           </button>
         </div>
       </div>

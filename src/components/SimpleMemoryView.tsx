@@ -278,7 +278,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           <button
             id="tab-btn-character-memory"
             onClick={() => handleSwitchMode('character')}
-            className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-md flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
+            className={`p-2 sm:px-3 sm:py-2 rounded-md flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
               memoryMode === 'character'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
@@ -286,14 +286,14 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             title="Diario y Ficha del PJ: la crónica día a día, mochila, ficha de personaje, PNJs conocidos, lugares y misiones."
             aria-label="Diario y Ficha del PJ"
           >
-            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-            <span className="font-cinzel text-[11px] sm:text-xs font-bold whitespace-nowrap">Diario & PJ</span>
+            <User className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline font-cinzel text-xs font-bold whitespace-nowrap">Diario & PJ</span>
           </button>
 
           <button
             id="tab-btn-gm-memory"
             onClick={() => handleSwitchMode('gm')}
-            className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-md flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
+            className={`p-2 sm:px-3 sm:py-2 rounded-md flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
               memoryMode === 'gm'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
@@ -301,14 +301,14 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             title="Cuaderno del GM: los giros que aún no han salido, lo que pasa fuera de cámara y los relojes que corren por detrás."
             aria-label="Cuaderno del GM"
           >
-            <VenetianMask className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-            <span className="font-cinzel text-[11px] sm:text-xs font-bold whitespace-nowrap">Cuaderno GM</span>
+            <VenetianMask className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline font-cinzel text-xs font-bold whitespace-nowrap">Cuaderno GM</span>
           </button>
 
           <button
             id="tab-btn-project-memory"
             onClick={() => handleSwitchMode('project')}
-            className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-md flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
+            className={`p-2 sm:px-3 sm:py-2 rounded-md flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
               memoryMode === 'project'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
@@ -316,11 +316,8 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             title="Memoria Persistente: el documento maestro en Markdown de directivas aprendidas y estado global de la campaña."
             aria-label="Memoria Persistente"
           >
-            <ScrollText className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-            <span className="font-cinzel text-[11px] sm:text-xs font-bold whitespace-nowrap">
-              <span className="sm:hidden">Memoria</span>
-              <span className="hidden sm:inline">Memoria Persistente</span>
-            </span>
+            <ScrollText className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline font-cinzel text-xs font-bold whitespace-nowrap">Memoria Persistente</span>
           </button>
         </div>
 
@@ -330,11 +327,12 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             id="btn-unified-sync-memory"
             onClick={onTriggerAIUpdate}
             disabled={isCurrentlyWorking}
-            className="px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] sm:text-xs font-cinzel font-bold hover:opacity-90 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
+            className="p-2 sm:px-3.5 sm:py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold hover:opacity-90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
             title="Sincroniza simultáneamente la memoria persistente del proyecto y la de personajes/entidades leyendo todos los chats y documentos."
+            aria-label="Sincronizar memoria con IA"
           >
-            <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isCurrentlyWorking ? 'animate-spin' : ''}`} />
-            <span>
+            <RefreshCw className={`w-4 h-4 shrink-0 ${isCurrentlyWorking ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">
               {isCurrentlyWorking ? (
                 'Sincronizando…'
               ) : (
@@ -390,11 +388,12 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                 <div className="flex justify-end">
                   <button
                     onClick={() => setCuadernoAbierto(false)}
-                    className="min-h-[36px] px-3 rounded-lg border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-[var(--surface)] shadow-xs"
+                    className="min-h-[36px] p-2 sm:px-3 rounded-lg border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-[var(--surface)] shadow-xs"
                     title="Vuelve a tapar el cuaderno. Se cierra solo al cambiar de pestaña."
+                    aria-label="Cerrar el cuaderno"
                   >
                     <LockIcon className="w-3.5 h-3.5" />
-                    Cerrar el cuaderno
+                    <span className="hidden sm:inline">Cerrar el cuaderno</span>
                   </button>
                 </div>
                 <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 flex items-start gap-2 shadow-xs">
@@ -488,20 +487,24 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                   <button
                     id="btn-back-to-memory"
                     onClick={() => setMemorySubView('view')}
-                    className="flex items-center gap-1.5 text-xs font-cinzel font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs font-cinzel font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer p-1.5 sm:p-0"
+                    title="Volver a la memoria"
+                    aria-label="Volver a la memoria"
                   >
                     <ChevronLeft className="w-4 h-4" />
-                    <span>Volver a la memoria</span>
+                    <span className="hidden sm:inline">Volver a la memoria</span>
                   </button>
 
                   <button
                     id="btn-clear-edits"
                     onClick={handleClearAllEdits}
                     disabled={memoryEditsCount === 0}
-                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-cinzel transition-colors disabled:opacity-40 cursor-pointer"
+                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-cinzel transition-colors disabled:opacity-40 cursor-pointer p-1.5 sm:p-0"
+                    title="Limpiar directivas"
+                    aria-label="Limpiar directivas"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Limpiar directivas</span>
+                    <span className="hidden sm:inline">Limpiar directivas</span>
                   </button>
                 </div>
 
@@ -657,11 +660,12 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                     <button
                       id="btn-manage-directives-top"
                       onClick={() => setMemorySubView('manage_edits')}
-                      className="px-2.5 py-1 text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                      className="p-1.5 sm:px-2.5 sm:py-1 text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)] rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       title="Gestionar directivas manuales"
+                      aria-label="Gestionar directivas manuales"
                     >
                       <Sliders className="w-3.5 h-3.5" />
-                      <span>Directivas {memoryEditsCount > 0 ? `(${memoryEditsCount})` : ''}</span>
+                      <span className="hidden sm:inline">Directivas {memoryEditsCount > 0 ? `(${memoryEditsCount})` : ''}</span>
                     </button>
                   </div>
                 </div>

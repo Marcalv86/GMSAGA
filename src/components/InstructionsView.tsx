@@ -864,17 +864,19 @@ export const InstructionsView: React.FC<{
             <button
               onClick={() => saveChanges()}
               disabled={saveStatus === 'saved'}
-              className="bg-[var(--accent)] text-[var(--on-accent)] rounded px-3 py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent-hover)] transition-all shadow-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
+              className="bg-[var(--accent)] text-[var(--on-accent)] rounded p-2 sm:px-3 sm:py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent-hover)] transition-all shadow-xs disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
               title="Guardar cambios manualmente"
+              aria-label="Guardar"
             >
-              <Save className="w-3.5 h-3.5" /> Guardar
+              <Save className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Guardar</span>
             </button>
             <button
               onClick={handleRestoreMasterInstructions}
-              className="bg-[var(--msg-user)] text-[var(--accent)] border border-[var(--user-border)] rounded px-3 py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-all shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+              className="bg-[var(--msg-user)] text-[var(--accent)] border border-[var(--user-border)] rounded p-2 sm:px-3 sm:py-1.5 text-xs font-cinzel font-semibold hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
               title="Restaurar las directivas y reglas por defecto de la campaña"
+              aria-label="Restaurar directivas por defecto"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Restaurar directivas por defecto</span><span className="sm:hidden">Restaurar</span>
+              <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Restaurar directivas por defecto</span>
             </button>
           </div>
         </div>

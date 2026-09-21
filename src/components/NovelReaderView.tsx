@@ -321,27 +321,29 @@ export const NovelReaderView: React.FC<NovelReaderViewProps> = ({
           <div className="flex bg-black/10 rounded-lg p-0.5 border border-black/10 text-xs font-cinzel">
             <button
               onClick={() => setSelectedScope('current')}
-              className={`px-2 sm:px-2.5 py-1 rounded transition-all cursor-pointer ${
+              className={`p-1.5 sm:px-2.5 sm:py-1 rounded transition-all cursor-pointer flex items-center justify-center gap-1 ${
                 selectedScope === 'current'
                   ? `${currentTheme.pageBg} ${currentTheme.text} font-bold shadow-xs`
                   : `${currentTheme.subtext} hover:opacity-100`
               }`}
               title="Ver solo el capítulo actual"
+              aria-label="Ver solo el capítulo actual"
             >
+              <BookOpen className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden sm:inline">Capítulo</span>
-              <span className="sm:hidden">Cap</span>
             </button>
             <button
               onClick={() => setSelectedScope('all')}
-              className={`px-2 sm:px-2.5 py-1 rounded transition-all cursor-pointer ${
+              className={`p-1.5 sm:px-2.5 sm:py-1 rounded transition-all cursor-pointer flex items-center justify-center gap-1 ${
                 selectedScope === 'all'
                   ? `${currentTheme.pageBg} ${currentTheme.text} font-bold shadow-xs`
                   : `${currentTheme.subtext} hover:opacity-100`
               }`}
               title="Ver toda la novela"
+              aria-label="Ver toda la novela"
             >
+              <FileText className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden sm:inline">Toda la Novela</span>
-              <span className="sm:hidden">Todo</span>
             </button>
           </div>
 
