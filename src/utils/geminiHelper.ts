@@ -175,8 +175,8 @@ export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
   }
 ];
 
-export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.8-flash';
-export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.8-flash';
+export const DEFAULT_BACKGROUND_MODEL_ID = 'gemini-3.5-flash-lite';
+export const BACKGROUND_LIGHTWEIGHT_MODEL_ID = 'gemini-3.5-flash-lite';
 
 export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODEL_ID): string {
   if (!modelId || isModelDeprecated(modelId)) {
@@ -640,9 +640,6 @@ export function setStoredBackgroundModel(modelId: string): void {
  * En modo saldo/pago, hereda directamente el modelo activo de la partida (Gemini 3.8 / 3.7 Flash).
  */
 export function getBackgroundTaskModel(): string {
-  if (isPaidTierActive() || getStoredUsePaidTierOnly()) {
-    return getStoredModel();
-  }
   return getStoredBackgroundModel();
 }
 
