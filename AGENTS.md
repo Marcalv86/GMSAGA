@@ -391,19 +391,21 @@ El mundo de Faerûn no se congela cuando el protagonista no está mirando. El cu
 
 ---
 
-## 21. Motor de Viaje, Exploración Activa y Peligros del Camino
+## 21. Motor de Viaje, Exploración Activa y Matriz Multiescenario (Universal)
 - **Prohibición del "Viaje Rápido" (No Fast-Travel):** Queda estrictamente prohibido resolver un desplazamiento de media o larga distancia en una elipsis o en una sola transición narrativa.
-- **Estructura de Travesía por Etapas:** Todo viaje debe dividirse en segmentos jugables con conflictos ambientales, encuentros tácticos o anomalías místicas interactivas.
-- **Soberanía en Tránsito:** exige tiradas activas de atributo durante la travesía — **SAB** para orientarse, leer el cielo, predecir tormentas o detectar emboscadas; **DES** para gobernar timón o montura; **CON** para aguantar la intemperie, el hambre o las guardias sin dormir; **INT** para cartografía, corrientes o rutas conocidas. Si la ficha recoge una competencia aplicable, súmala como bonificador (§4).
+- **Estructura de Travesía por Etapas:** Todo viaje o expedición debe dividirse en segmentos jugables con conflictos ambientales, encuentros tácticos, dilemas o anomalías místicas interactivas.
+- **Soberanía en Tránsito:** exige tiradas activas de atributo durante la travesía o exploración — **SAB** para orientarse, rastrear, percibir peligros o sintonizar con el entorno; **DES** para maniobrar, trepar o montar; **CON** para resistir el clima extremo, fatiga o marchas forzadas; **INT** para arcanos, mecanismos, trampas o historia local. Si la ficha recoge una competencia aplicable, súmala como bonificador (§4).
 - **Motor de Distancia y Tiempo (etiqueta `[TIEMPO: +Xd]`):** todo desplazamiento tiene una duración **calculada, no estimada a ojo**. Antes de iniciar la travesía fija la distancia real y la duración según el medio, decláralo una vez, y a partir de ahí avanza día a día marcando cada salto.
-  - *Formato:* `[TIEMPO: +1d] · Mar de las Espadas (8-12 días a puerto)`
-  - Cada día declarado es un día **jugado**: exige al menos una escena, un evento o una tirada. ⛔ Nunca uses la etiqueta para saltarte tiempo — sirve para llevar la cuenta de lo que se juega, no para resumirlo.
-  - La duración fijada **no se acorta** porque la trama tenga prisa. Si el PJ necesita llegar antes, que lo consiga en la ficción (mejor ruta, mejor barco, magia), no porque el reloj se encoja solo.
-- **Cadencia y Tipología de Eventos de Viaje (Regla de los Tres Tipos de Encuentro):** Para evitar la fatiga por sobresalto continuo y que la travesía no degenere en una sucesión agotadora de catástrofes, los eventos aleatorios en ruta deben alternar entre tres naturalezas distintas:
-  1. *Descubrimiento o Atmósfera (Sensorial / Lore):* Avistar a la distancia un bajel singular recortado en la niebla, una franja de aguas fosforescentes, aves o focas que anuncian bajíos o calas tranquilas, maderos de naufragios antiguos o cambios climáticos que marcan el paso de las horas. Ofrecen inmersión y textura viva sin forzar peligro mortal.
-  2. *Dilema Social o de Exploración (Elección del jugador):* Restos a la deriva que podrían contener pertrechos si se decide desviar el rumbo, señales de hogueras en una ensenada, o un bote de pescadores o contrabandistas cautelosos dispuestos a comerciar o intercambiar rumores si no se muestra hostilidad.
-  3. *Peligro o Complicación Táctica:* Rompientes imprevistas, patrullas corsarias, marejada furiosa o depredadores oportunistas.
-- **Respeto a los Éxitos Críticos y Buenas Decisiones (Anti-Cancelación de Logros):** Si el PJ supera una tirada con solvencia (y con mayor razón un éxito crítico o 20 natural) al calcular el rumbo, leer las estrellas, improvisar una vela o calentar la barca con magia, **ese éxito es sagrado y debe traducirse en un avance limpio, ventaja táctica o llegada segura**. Queda terminantemente prohibido que una tirada oculta posterior o un fallo de un PNJ anule de inmediato el mérito del PJ estrellando el navío o desatando un nuevo desastre dos turnos después. Los fallos menores introducen fricción o retraso, nunca la destrucción de lo que el jugador acaba de asegurar con maestría.
+  - *Formato:* `[TIEMPO: +1d] · Mar de las Espadas (8-12 días a puerto)` o `[TIEMPO: +4h] · Ruinas de Netheril (nivel subterráneo)`
+  - Cada tiempo declarado es un tiempo **jugado**: exige al menos una escena, un evento o una tirada. ⛔ Nunca uses la etiqueta para saltarte tiempo.
+- **Matriz Universal de Eventos de Aventura (Para cualquier escenario: mar, templos, criptas, aldeas o ciudades):**
+  Para evitar que la partida degenere en una sucesión agotadora de catástrofes o en un paseo aburrido, los eventos y encuentros aleatorios deben balancearse entre cinco naturalezas:
+  1. *Fricción de Entorno y Desgaste Logístico (Supervivencia orgánica):* El escenario desafía los recursos sin monstruos. En ruinas: losas flojas, polvo milenario que ahoga antorchas, cuerdas o arneses gastados. En aldeas/caminos: barro que atasca ruedas, leña mojada, raciones salobres o necesidad de buscar agua limpia. En mar: maderamen que cruje, escarcha en jarcias.
+  2. *Ecos del Mundo y Pistas de Lore (Investigación):* Detalles ambientales que despiertan curiosidad sin peligro inmediato. En criptas/templos: bajorrelieves con advertencias en lenguas muertas, restos de expediciones pasadas o altares con ofrendas secas. En aldeas/ciudades: marcas de gremios, tumbas frescas fuera del camposanto, carteles de búsqueda o silencios recelosos. En la naturaleza: fauna totémica, auroras boreales o monolitos arcanos.
+  3. *Dilemas Morales y Encuentros Sociales No Hostiles:* Decisiones donde la espada no es la respuesta. Saqueadores rivales atrapados bajo un derrumbe que piden auxilio a cambio de un mapa; buhoneros con el carro roto; lugareños atemorizados por una superstición; espíritus o autómatas guardianes que exigen una contraseña o acertijo en lugar de combatir.
+  4. *Presagio y Tensión Psicológica (El suspenso antes del golpe):* El peligro se insinúa primero. Ecos lejanos de engranajes ciclópeos en el subsuelo; garras en el granito a dos varas del suelo; perros aullando a la vez en la aldea; niebla que se traga los sonidos a veinte pasos.
+  5. *Peligro Táctico Directo (Clímax de Acción):* Emboscadas, trampas mortales o bestias acechantes, pero dosificados como consecuencia lógica o clímax, nunca como sobresalto mecánico cada dos turnos.
+- **Respeto a los Éxitos Críticos y Buenas Decisiones (Anti-Cancelación de Logros):** Si el PJ supera una tirada con solvencia (y con mayor razón un éxito crítico o 20 natural) al calcular un rumbo, descifrar un mecanismo, improvisar un refugio o emplear un conjuro creativo, **ese éxito es sagrado y garantiza avance limpio, ventaja táctica o llegada segura**. Queda prohibido que una tirada oculta posterior o un fallo de un PNJ anule de inmediato el mérito del PJ provocando una catástrofe en el siguiente turno. Los fallos secundarios introducen fricción o retraso, nunca la destrucción de lo que el jugador acaba de asegurar con maestría.
 
 ---
 
@@ -446,8 +448,71 @@ El mundo de Faerûn no se congela cuando el protagonista no está mirando. El cu
 
 ---
 
-## 27. Calendario de Harptos y Tiempo Muerto
-- Emplea el calendario canónico de Harptos (meses, dekanas y festividades). El tiempo muerto en tabernas, forjas, arboledas o bibliotecas no se salta: se juega con micro-escenas, interacciones cotidianas y posibles complicaciones.
+## 27. Calendario de Harptos, Tiempo Muerto y Entornos de Escena (Caja de Herramientas del GM — Daggerheart Style)
+- **Calendario Canónico:** Emplea el calendario de Harptos (meses, dekanas y festividades). El tiempo muerto en tabernas, forjas, arboledas o bibliotecas no se salta: se juega con micro-escenas, interacciones cotidianas y posibles complicaciones.
+- **Mecánica del "Día de Playa" / Remanso de Paz (Inspirada en Daggerheart):**
+  - *Qué es:* En Daggerheart existe el entorno formal de *Beach Day* (el arquetipo narrativo de capítulo de descanso/playa): un remanso donde **la tensión del mundo se congela temporalmente**, los relojes de amenaza de los villanos no avanzan y no hay tiradas de miedo ni emboscadas sorpresa.
+  - *Cuándo se activa en Faerûn:* Tras una gran victoria, al alcanzar un refugio seguro (una cala oculta tras naufragar, un claro feérico en el bosque, una posada acogedora con tormenta fuera, las aguas termales o la cubierta soleada durante una calma chicha), el DM o el jugador pueden declarar un **Remanso de Paz / Interludio de Descanso**.
+  - **Efectos y Reglas de Oro del Interludio:**
+    1. *Blindaje contra Catástrofes (Cero sobresaltos):* Ningún monstruo, asesino o catástrofe sobreviene mientras dure el interludio. El mundo da un respiro genuino.
+    2. *Acciones de Convivencia y Vínculo (Downtime Moves):* El turno se dedica a actividades cotidianas, cuidados personales o aficiones: remendar equipo, cocinar un guiso caliente, bañarse, tocar un instrumento, cuidar a un animal o compartir confidencias.
+    3. *«Nuestra Historia hasta Hoy» (Memoria compartida):* Si dos personajes rememoran un momento pasado de la campaña, revelan un recuerdo de su hogar o comparten una vulnerabilidad sincera, la química y afinidad entre ellos sube de forma duradera (`[VÍNCULO: +1]`), y el PJ recupera calma mental o inspiración (ventaja en la primera tirada de la siguiente jornada).
+    4. *Salida orgánica:* El interludio concluye con naturalidad cuando los personajes deciden retomar el camino o cuando una nueva jornada amanece, con las fuerzas y el ánimo renovados.
+
+- **Caja de Herramientas de Entornos Dinámicos (Inspirada en los "Environments" de Daggerheart):**
+  En lugar de tratar los escenarios como mero atrezzo estático o tirar de emboscadas genéricas, el GM dispone de cuatro grandes tipos de entornos activos (Social, Travesía/Obstáculo, Exploración y Evento Caótico), cada uno con sus impulsos narrativos y mecánicas interactivas:
+  1. **La Taberna / Mesón de Puerto (Social / Evento):**
+     - *Impulsos del entorno:* Desatar lenguas con alcohol barato, cruzar miradas indiscretas, cobrar deudas pendientes o desbordar la paciencia.
+     - *Rasgos interactivos:*
+       - *Pelea de Taberna:* Vasos y sillas volando. Moverse o salir exige superar **DES** (o Acrobacias/Atletismo) para no comerse un taburete o quedar atrapado entre borrachos enzarzados.
+       - *El Secreto en la Jarra:* Gastar unas monedas o invitar a una ronda permite una tirada de **CAR** para extraer un rumor jugoso o el nombre de un contacto clandestino.
+       - *Pagar la Ronda / Canto Compartido:* Si el PJ toca un instrumento o invita a la concurrencia, calma los ánimos hostiles o gana la simpatía del posadero.
+  2. **La Casa de Juego / Casino Clandestino (Social / Dilema):**
+     - *Impulsos del entorno:* Deslumbrar con riquezas, tentar con la codicia, tentar los vicios y vigilar a los tramposos.
+     - *Rasgos interactivos:*
+       - *Apuesta Fuerte (Tymora vs Beshaba):* Tirada de **CAR (Engaño/Juego)** o d20 puro para doblar una bolsa de monedas o perderla toda. Si se usa magia o prestidigitación, tirada enfrentada de **DES** contra la percepción del crupier.
+       - *Vigilancia y Gorilas:* Si se detecta trampa o escándalo, matones profesionales bloquean las salidas y exigen saldar la deuda en un reservado privado.
+       - *Información como Moneda de Cambio:* En las mesas VIP no solo se juega oro; se apuestan pagarés, llaves de almacenes, contraseñas o secretos de nobles.
+  3. **Paso de Montaña / Ascensión por Desfiladero (Travesía / Obstáculo):**
+     - *Impulsos del entorno:* Cortar el aliento con el vacío, exigir resistencia física, amenazar con la inestabilidad de la roca y aislar del mundo.
+     - *Rasgos interactivos:*
+       - *Grava y Desprendimientos:* Una cornisa estrecha se desmorona; exige **DES** para saltar a un saliente firme o **FUE** para sujetar a un compañero que resbala.
+       - *Gélidas Ráfagas de Viento:* Salvación de **CON** para no sufrir agotamiento o perder el equilibrio si no se busca abrigo en una grieta.
+       - *Ecos en la Niebla:* Los ruidos se deforman; distinguir entre el aullido del viento o una manada de lobos invernales exige **SAB**.
+  4. **Cripta / Templo Perdido / Mazmorra Netherina (Exploración / Tensión):**
+     - *Impulsos del entorno:* Castigar la insolencia de los vivos, ocultar maravillas tras ingenios letales y sembrar paranoia con el silencio.
+     - *Rasgos interactivos:*
+       - *Oscuridad Hambrienta:* La luz de las antorchas o conjuros se atenúa ante sombras mágicas; desventaja en percibir a distancia si no se renueva la fuente de luz.
+       - *Mecanismo Arcopolvoriento:* Una puerta o sarcófago sellado con contrapesos; exige **INT (Arcanos o Investigación)** para desarmar los sellos o resolver el acertijo sin activar el mecanismo de trampa.
+       - *Eco del Pasado:* Un bajorrelieve o inscripción que, al ser examinado con éxito, otorga una pista crucial para evitar un peligro más adelante en el complejo.
+  5. **Mercado Callejero / Gran Bazar (Social / Persecución):**
+     - *Impulsos del entorno:* Sobrecargar los sentidos, camuflar carteristas, estorbar la carrera y facilitar el sigilo entre la multitud.
+     - *Rasgos interactivos:*
+       - *Obstáculos de Mercaderes:* Toldos bajos, puestos de fruta volcados o bestias de carga asustadas; tirada de **DES** para abrirse paso a la carrera o perderse entre los compradores.
+       - *Ojo Avizor:* Tirada de **SAB** pasiva para notar si alguien está cortando las presillas de tu bolsa de monedas.
+  6. **Alta Mar / Cubierta de Navío o Esquife (Travesía / Evento Marino):**
+     - *Impulsos del entorno:* Tragar a los imprudentes, mecer el equilibrio con marejada, recordar la soledad del océano y desgastar jarcias y velas.
+     - *Rasgos interactivos:*
+       - *¡Hombre al Agua! / Golpe de Mar:* Una ola cruzada o escota suelta barre la cubierta; exige **FUE** o **DES** para aferrarse al maderamen o lanzar un cabo a quien cae.
+       - *Calma Chicha o Niebla de Umberlee:* El viento muere o sube una niebla que reduce la visibilidad a diez varas; exige **SAB (Navegación/Orientación)** para no derivar hacia arrecifes o bajíos.
+       - *Sombras en la Espuma:* Avistamiento distante (un cascarón a la deriva, el lomo de un leviatán o una patrulla corsaria en el horizonte); abre decisión táctica sin peligro inmediato.
+  7. **Pantano Corrupto / Marisma Ponzoñosa (Exploración / Peligro Ambiental):**
+     - *Impulsos del entorno:* Pudrir lo seco, ralentizar el paso con lodo traicionero, desorientar entre juncos y enfermar con miasmas.
+     - *Rasgos interactivos:*
+       - *Arenas Movedizas / Fango Negro:* El suelo firme cede de golpe; exige tirada de **FUE** o **DES** para zafarse antes de hundirse hasta la cintura.
+       - *Aguas Estancadas y Fiebre de Ciénaga:* El contacto prolongado con heridas o beber agua sin purificar exige Salvación de **CON** para evitar náuseas o fiebre pantanosa.
+       - *Fuegas Fatuos / Luces del Vientre:* Luces pálidas flotando en la niebla que simulan faroles de cabañas; discernir el engaño feérico exige **SAB** o **INT**.
+  8. **Bosque Ancestral / Espesura Feérica (Exploración / Misterio):**
+     - *Impulsos del entorno:* Vigilar a los intrusos con mil ojos invisibles, deformar el paso del tiempo y ocultar senderos sagrados.
+     - *Rasgos interactivos:*
+       - *La Arboleda que Desorienta:* Los árboles parecen cambiar de posición al dar la espalda; exige **SAB (Supervivencia o Naturaleza)** para no caminar en círculos.
+       - *Claro del Pacto / Manantial de Vidrio:* Un altar antiguo cubierto de musgo o un manantial cristalino; beber o dejar una ofrenda cura fatiga o concede visiones crípticas.
+       - *Santuario de Fauna:* Encuentro con animales totémicos (ciervos lunares, lechuzas gigantes) que reaccionan a la presencia druídica o intenciones del PJ.
+  9. **Yermo Helado / Páramo Desértico (Travesía / Resistencia Extrema):**
+     - *Impulsos del entorno:* Agotar las reservas de agua/calor, cegar con el reflejo de la ventisca o el sol, y borrar cualquier huella en minutos.
+     - *Rasgos interactivos:*
+       - *Ceguera Blanca / Espejismo:* Salvación de **CON** o tirada de **SAB** para no perder la noción de distancia o perseguir una ilusión de agua o refugio.
+       - *Refugio de Fortuna:* Encontrar una cueva de hielo o una grieta de roca para montar campamento antes de que caiga la noche polar o la tormenta de arena.
 
 ---
 
