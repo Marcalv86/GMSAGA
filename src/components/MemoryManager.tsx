@@ -3020,32 +3020,87 @@ export const MemoryManager: React.FC<{
               </div>
             )}
 
-            {tono === 'requisado' && onUpdateMemory && (
-              <div className="pt-1.5">
+            {onUpdateMemory && (
+              <div className="pt-2 flex items-center gap-2 flex-wrap border-t border-[var(--glass-border)] mt-1">
+                {tono === 'requisado' ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await onUpdateMemory(prev => {
+                        if (!prev.player_character) return prev;
+                        const act = (list?: InventoryItem[]) =>
+                          (list || []).map(it =>
+                            sonElMismoObjeto(it.name || '', item.name || '')
+                              ? { ...it, enPoderDe: undefined, dondeEsta: undefined, incautadoDiaAbs: undefined }
+                              : it
+                          );
+                        return {
+                          ...prev,
+                          player_character: {
+                            ...prev.player_character,
+                            inventory: act(prev.player_character.inventory)
+                          }
+                        };
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-cinzel font-medium px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer"
+                    title="Devolver o recuperar este objeto (pasa a portado/equipado en sus manos)"
+                  >
+                    <PackageCheck className="w-3.5 h-3.5" /> Devolver a sus manos
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const quien = window.prompt(`¿Quién tiene o ha requisado "${item.name}"?`, 'Bregan D\'aerthe');
+                      if (quien === null) return;
+                      const donde = window.prompt(`¿Dónde está ubicado? (opcional)`, 'pañol del navío') || undefined;
+                      await onUpdateMemory(prev => {
+                        if (!prev.player_character) return prev;
+                        const act = (list?: InventoryItem[]) =>
+                          (list || []).map(it =>
+                            sonElMismoObjeto(it.name || '', item.name || '')
+                              ? { ...it, enPoderDe: quien || 'sin saber quién', dondeEsta: donde }
+                              : it
+                          );
+                        return {
+                          ...prev,
+                          player_character: {
+                            ...prev.player_character,
+                            inventory: act(prev.player_character.inventory)
+                          }
+                        };
+                      });
+                    }}
+                    className="inline-flex items-center gap-1 text-[10px] font-cinzel px-2 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 transition-colors cursor-pointer"
+                    title="Marcar este objeto como requisado o en poder de alguien"
+                  >
+                    <PackageX className="w-3 h-3" /> Requisar / Cambiar poseedor
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={async () => {
+                    if (!window.confirm(`¿Seguro que quieres eliminar "${item.name}" del inventario?`)) return;
                     await onUpdateMemory(prev => {
                       if (!prev.player_character) return prev;
-                      const act = (list?: InventoryItem[]) =>
-                        (list || []).map(it =>
-                          sonElMismoObjeto(it.name || '', item.name || '')
-                            ? { ...it, enPoderDe: undefined, dondeEsta: undefined, incautadoDiaAbs: undefined }
-                            : it
-                        );
+                      const filtrado = (prev.player_character.inventory || []).filter(
+                        it => !sonElMismoObjeto(it.name || '', item.name || '')
+                      );
                       return {
                         ...prev,
                         player_character: {
                           ...prev.player_character,
-                          inventory: act(prev.player_character.inventory)
+                          inventory: filtrado
                         }
                       };
                     });
                   }}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-cinzel font-medium px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 transition-colors cursor-pointer"
-                  title="Devolver o recuperar este objeto (pasa a portado/equipado en sus manos)"
+                  className="inline-flex items-center gap-1 text-[10px] font-cinzel px-2 py-0.5 rounded bg-zinc-500/10 hover:bg-rose-500/20 text-[var(--text-secondary)] hover:text-rose-600 transition-colors cursor-pointer ml-auto"
+                  title="Eliminar este objeto permanentemente del inventario"
                 >
-                  <PackageCheck className="w-3.5 h-3.5" /> Devolver a sus manos
+                  <Trash2 className="w-3 h-3" /> Eliminar
                 </button>
               </div>
             )}
