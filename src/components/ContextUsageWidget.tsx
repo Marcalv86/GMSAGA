@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, ProjectFile, Chat } from '../types';
 import {
@@ -12,27 +12,17 @@ import {
   getStoredModel,
   setStoredBusquedaLocal,
   PRESUPUESTO_FRAGMENTOS_CONSULTA,
-  setStoredUsePaidTierOnly,
   getStoredAutoBackgroundTasks,
   setStoredAutoBackgroundTasks,
   techoDeEnvio
 } from '../utils/geminiHelper';
 import { peticionesDeHoy } from '../utils/usageStats';
 import { presionDelMinuto, ultimoCacheMedido, getLlamadas, suscribirseALlamadas } from '../utils/callLog';
-import {
-  formatearCosteUSD,
-  formatearSaldoUSD,
-  getEstadisticasDeGasto,
-  setStoredInitialBalance
-} from '../utils/pricing';
 
 import {
   BookOpen,
   Brain,
   ChartColumn,
-  CreditCard,
-  DollarSign,
-  Edit3,
   Gauge,
   Image,
   Info,
@@ -43,9 +33,7 @@ import {
   Paperclip,
   Search,
   Scroll,
-  Sparkles,
-  X,
-  Zap
+  X
 } from 'lucide-react';
 export const ContextUsageWidget: React.FC<{
   project: Project | null;
@@ -65,11 +53,7 @@ export const ContextUsageWidget: React.FC<{
   const [midiendo, setMidiendo] = useState(false);
   const [errorMedida, setErrorMedida] = useState('');
   const [busqueda, setBusqueda] = useState(() => getStoredBusquedaLocal());
-  const [llamadas, setLlamadas] = useState(() => getLlamadas());
-  const [editandoSaldoModal, setEditandoSaldoModal] = useState(false);
-  const [inputSaldoModal, setInputSaldoModal] = useState('');
-
-  const [balanceVersion, setBalanceVersion] = useState(0);
+  const [, setLlamadas] = useState(() => getLlamadas());
 
   /*
    * La ventana del minuto se vacía sola, y la pantalla tiene que enterarse.
@@ -83,39 +67,17 @@ export const ContextUsageWidget: React.FC<{
     const id = setInterval(() => setLatido(v => v + 1), 5000);
     const onSettingsChange = () => {
       setLatido(v => v + 1);
-      setBalanceVersion(v => v + 1);
     };
     const unsubLlamadas = suscribirseALlamadas(l => setLlamadas([...l]));
     window.addEventListener('storage', onSettingsChange);
-    window.addEventListener('gemini_paid_tier_changed', onSettingsChange);
     window.addEventListener('gemini_settings_changed', onSettingsChange);
-    window.addEventListener('gm_balance_changed', onSettingsChange);
     return () => {
       clearInterval(id);
       unsubLlamadas();
       window.removeEventListener('storage', onSettingsChange);
-      window.removeEventListener('gemini_paid_tier_changed', onSettingsChange);
       window.removeEventListener('gemini_settings_changed', onSettingsChange);
-      window.removeEventListener('gm_balance_changed', onSettingsChange);
     };
   }, []);
-
-  const statsCoste = useMemo(() => getEstadisticasDeGasto(llamadas), [llamadas, balanceVersion]);
-
-  const guardarSaldoModal = () => {
-    const limpio = inputSaldoModal.trim().replace(',', '.');
-    if (limpio === '') {
-      setStoredInitialBalance(null);
-    } else {
-      const num = parseFloat(limpio);
-      if (Number.isFinite(num) && num >= 0) {
-        setStoredInitialBalance(num);
-      }
-    }
-    setEditandoSaldoModal(false);
-    setInputSaldoModal('');
-    setBalanceVersion(v => v + 1);
-  };
 
   const medirDeVerdad = async () => {
     if (!project || !currentChatId) return;
@@ -201,7 +163,7 @@ export const ContextUsageWidget: React.FC<{
    * lugar de darla por hecha, que con Gemma es menos de la cuarta parte.
    */
   const modeloDeNarracion = medida?.modelo || getStoredModel();
-  const { limite: MAX_TOKENS, ventana, medido: limiteMedido, mandaLaCuota, cuota, esPayAsYouGo } =
+  const { limite: MAX_TOKENS, ventana, medido: limiteMedido, mandaLaCuota, cuota } =
     techoDeEnvio(modeloDeNarracion);
 
   /*
@@ -211,13 +173,11 @@ export const ContextUsageWidget: React.FC<{
    * capa gratuita. Veinte. Y cuando se acaban, Google devuelve el mismo error
    * 429 que cuando te pasas de tokens por minuto, sin nada que distinga un caso
    * del otro: se busca el problema en el tamaño del envío y no está ahí.
-   *
-   * En modo Pay-as-you-go no hay límite diario de peticiones.
    */
-  const numeroDeClaves = esPayAsYouGo ? 1 : Math.max(1, getStoredApiKeys().length);
-  const cupoDiario = esPayAsYouGo ? 1000000 : cuota.rpd * numeroDeClaves;
+  const numeroDeClaves = Math.max(1, getStoredApiKeys().length);
+  const cupoDiario = cuota.rpd * numeroDeClaves;
   const peticionesHoy = peticionesDeHoy(modeloDeNarracion);
-  const cupoApurado = !esPayAsYouGo && peticionesHoy >= cupoDiario * 0.8;
+  const cupoApurado = peticionesHoy >= cupoDiario * 0.8;
 
   /*
    * EL VEREDICTO, QUE ERA LO ÚNICO QUE FALTABA.
@@ -252,31 +212,21 @@ export const ContextUsageWidget: React.FC<{
   /*
    * LA BARRA MIDE LO QUE DE VERDAD PROVOCA EL 429.
    *
-   * Antes comparaba el tamaño de UN turno contra las 250.000 fichas por
-   * minuto, y eso no es el límite de Google: el límite es una ventana móvil de
-   * sesenta segundos sobre todo lo que se le pide. Tres turnos seguidos de
-   * 90.000 fichas salían al 36% cada uno —verde, todo en orden— y el tercero
-   * se comía el 429, porque entre los tres sumaban 270.000 en menos de un
-   * minuto. La barra decía que sobraba sitio justo cuando no lo había.
-   *
    * Ahora enseña dónde va a quedar la cuota DESPUÉS de mandar este turno: lo
    * ya gastado en el último minuto más lo que se va a enviar. Y se mide sobre
    * la clave más descargada, porque la aplicación rota al saturarse y el envío
    * acaba ahí; con varias claves solo se bloquea de verdad cuando no queda
    * ninguna con sitio.
-   *
-   * El tamaño del turno no se pierde: sigue escrito debajo en fichas. Lo que
-   * cambia es qué mide la barra, que era lo que engañaba.
    */
   const presion = presionDelMinuto(modeloDeNarracion, numeroDeClaves);
-  const proyectado = (esPayAsYouGo ? 0 : presion.menor) + tokensMostrados;
-  const topeMinutoReal = esPayAsYouGo ? MAX_TOKENS : TOPE_TOKENS_POR_MINUTO;
-  const avisoMinutoReal = esPayAsYouGo ? Math.round(MAX_TOKENS * 0.85) : AVISO_TOKENS_POR_MINUTO;
+  const proyectado = presion.menor + tokensMostrados;
+  const topeMinutoReal = TOPE_TOKENS_POR_MINUTO;
+  const avisoMinutoReal = AVISO_TOKENS_POR_MINUTO;
   const percentage = Math.min(100, (proyectado / MAX_TOKENS) * 100);
   const pasadaDeCuota = proyectado >= topeMinutoReal;
   const cercaDeCuota = !pasadaDeCuota && proyectado >= avisoMinutoReal;
   /** Cuántas claves admitirían este envío ahora mismo sin pasarse del minuto. */
-  const clavesConSitio = esPayAsYouGo ? 1 : presion.porClave.filter(c => c + tokensMostrados < MAX_TOKENS).length;
+  const clavesConSitio = presion.porClave.filter(c => c + tokensMostrados < MAX_TOKENS).length;
 
   const percentColor =
     percentage > 85
@@ -298,27 +248,6 @@ export const ContextUsageWidget: React.FC<{
         <div className="flex justify-between items-center text-xs font-cinzel font-bold text-[var(--text-secondary)] mb-1.5">
           <span className="flex items-center gap-1.5">
             <BookOpen className="w-3.5 h-3.5" /> Capacidad del Tomo
-            {esPayAsYouGo ? (
-              <span
-                onClick={() => setIsGuideOpen(true)}
-                className="text-[9px] bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-500/40 rounded px-1.5 py-0.5 font-sans font-semibold cursor-pointer hover:bg-emerald-500/30 transition-colors"
-                title="Modo Saldo / Pay-as-you-go activo (Google Cloud). Capacidad ampliada a 4M TPM sin corte por minuto de 250k. Clic para detalles."
-              >
-                💳 Pay-as-you-go
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setStoredUsePaidTierOnly(true);
-                  setLatido(v => v + 1);
-                }}
-                className="text-[9px] bg-stone-500/10 text-stone-600 dark:text-stone-400 hover:bg-emerald-500/20 hover:text-emerald-700 dark:hover:text-emerald-300 border border-[var(--glass-border)] rounded px-1.5 py-0.5 font-sans cursor-pointer transition-colors"
-                title="¿Tienes saldo o cuenta con crédito de Google Cloud? Haz clic aquí para activar el modo Pay-as-you-go y eliminar el límite por minuto de 250k."
-              >
-                ¿Tienes saldo? Activar Pay-as-you-go
-              </button>
-            )}
           </span>
           <button
             onClick={() => setIsGuideOpen(true)}
@@ -348,28 +277,15 @@ export const ContextUsageWidget: React.FC<{
               {esEstimacion ? '~' : ''}
               {compact(tokensMostrados)} / {compact(MAX_TOKENS)} tokens
             </span>
-            {/*
-              Lo gastado en el minuto, que es la otra mitad de la barra en la capa gratuita.
-              En Pay-as-you-go, el límite oficial es de 4.000.000 TPM sin filtro de 250k.
-            */}
-            {esPayAsYouGo ? (
+            {presion.menor > 0 && (
               <span
-                className="text-amber-800 dark:text-amber-300 font-sans text-[9px]"
-                title="Clave con saldo de Google Cloud (Pay-as-you-go): cuota ampliada a 4.000.000 TPM sin el cuello de botella de 250.000."
+                className="text-[var(--text-secondary)]"
+                title={`En los últimos 60 s ya se han gastado ${presion.menor.toLocaleString('es-ES')} fichas en la clave más libre (${presion.llamadas} llamadas a ${modeloDeNarracion}). Esta barra suma eso al turno que vas a enviar, porque el límite de Google es por minuto, no por envío. Se vacía solo conforme pasa el minuto.`}
               >
-                · 4M TPM
+                · +{compact(presion.menor)} del minuto
               </span>
-            ) : (
-              presion.menor > 0 && (
-                <span
-                  className="text-[var(--text-secondary)]"
-                  title={`En los últimos 60 s ya se han gastado ${presion.menor.toLocaleString('es-ES')} fichas en la clave más libre (${presion.llamadas} llamadas a ${modeloDeNarracion}). Esta barra suma eso al turno que vas a enviar, porque el límite de Google es por minuto, no por envío. Se vacía solo conforme pasa el minuto.`}
-                >
-                  · +{compact(presion.menor)} del minuto
-                </span>
-              )
             )}
-            {!esPayAsYouGo && numeroDeClaves > 1 && clavesConSitio < numeroDeClaves && (
+            {numeroDeClaves > 1 && clavesConSitio < numeroDeClaves && (
               <span
                 className={`font-bold ${clavesConSitio === 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-800 dark:text-amber-300'}`}
                 title={
@@ -384,7 +300,7 @@ export const ContextUsageWidget: React.FC<{
             {cacheMedido && cacheMedido.porcentaje > 0 && (
               <span
                 className="text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 px-1 py-0.5 rounded text-[9px] font-sans"
-                title={`En el último turno narrado, Google sirvió de caché ${cacheMedido.fichas.toLocaleString('es-ES')} fichas (${cacheMedido.porcentaje}% de la entrada) en ${cacheMedido.modelo}. Eso abarata el turno, pero OJO: las fichas servidas de caché cuentan enteras para el límite por minuto, así que esta barra no las descuenta.`}
+                title={`En el último turno narrado, Google sirvió de caché ${cacheMedido.fichas.toLocaleString('es-ES')} fichas (${cacheMedido.porcentaje}% de la entrada) en ${cacheMedido.modelo}.`}
               >
                 ⚡ {cacheMedido.porcentaje}% de caché
               </span>
@@ -429,73 +345,18 @@ export const ContextUsageWidget: React.FC<{
           >
             {pasadaDeCuota ? (
               <>
-                <strong>{esPayAsYouGo ? 'Supera la ventana del modelo.' : 'Cada turno superará la cuota por minuto.'}</strong> Este tomo manda{' '}
+                <strong>Cada turno superará la cuota por minuto.</strong> Este tomo manda{' '}
                 {compact(tokensMostrados)} tokens y el límite es{' '}
-                {compact(topeMinutoReal)}. {esPayAsYouGo ? 'El envío supera la ventana máxima del modelo.' : 'La capa gratuita corta en 250.000 por minuto.'}
+                {compact(topeMinutoReal)}. La capa gratuita corta en 250.000 por minuto.
               </>
             ) : (
               <>
-                <strong>{esPayAsYouGo ? 'Cerca del límite de ventana del modelo.' : 'Cerca de la cuota por minuto.'}</strong> Vas por {compact(tokensMostrados)} de
-                los {compact(topeMinutoReal)} tokens {esPayAsYouGo ? 'de la ventana del modelo (Pay-as-you-go)' : 'por minuto de la capa gratuita'}.
+                <strong>Cerca de la cuota por minuto.</strong> Vas por {compact(tokensMostrados)} de
+                los {compact(topeMinutoReal)} tokens por minuto de la capa gratuita.
               </>
             )}
           </div>
         )}
-        {/* Widget de Saldo & Coste de API en la barra lateral */}
-        <div
-          onClick={() => setIsGuideOpen(true)}
-          className="mt-2.5 p-2 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15 transition-all cursor-pointer group flex flex-col gap-1.5"
-          title="Haz clic para abrir la contabilidad de saldo, costes por turno y ahorro por Context Caching"
-        >
-          <div className="flex items-center justify-between gap-1 text-[11px]">
-            <div className="flex items-center gap-1.5 font-cinzel font-bold text-amber-900 dark:text-amber-200">
-              <CreditCard className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span>
-                {statsCoste.saldoRestante !== null ? (
-                  <>
-                    Saldo:{' '}
-                    <strong className="font-mono text-emerald-800 dark:text-emerald-300 font-bold">
-                      {formatearSaldoUSD(statsCoste.saldoRestante)}
-                    </strong>
-                  </>
-                ) : (
-                  <span className="text-[10px] text-amber-800 dark:text-amber-300 underline underline-offset-2">
-                    Configurar Saldo
-                  </span>
-                )}
-              </span>
-            </div>
-            {statsCoste.ultimoTurnoCoste !== null && (
-              <span className="font-mono text-[10px] text-amber-800 dark:text-amber-300 font-semibold">
-                Último: {formatearCosteUSD(statsCoste.ultimoTurnoCoste, true)}
-              </span>
-            )}
-          </div>
-
-          {/* Estado de Context Caching */}
-          <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-secondary)] font-sans">
-            <div className="flex items-center gap-1">
-              {statsCoste.ultimoTurnoPctCache > 0 ? (
-                <span className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400 font-bold">
-                  <Zap className="w-3 h-3 text-emerald-500" />
-                  <span>Caché activo ({statsCoste.ultimoTurnoPctCache}% descuento)</span>
-                </span>
-              ) : (
-                <span
-                  className="inline-flex items-center gap-0.5 text-sky-700 dark:text-sky-300 font-semibold"
-                  title="El primer turno o tras cambios de archivos es un arranque frío que crea el caché. Los siguientes turnos tendrán hasta un 75% de descuento."
-                >
-                  <span>❄️ Caché frío (1er turno)</span>
-                </span>
-              )}
-            </div>
-            {statsCoste.ahorroTotalCache > 0 && (
-              <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-[9px]">
-                +{formatearCosteUSD(statsCoste.ahorroTotalCache)} ahorrados
-              </span>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Guide & Breakdown Modal */}
@@ -509,10 +370,10 @@ export const ContextUsageWidget: React.FC<{
                   <Brain className="w-4 h-4 shrink-0 text-[var(--accent)]" />
                   <div>
                     <h3 className="font-cinzel text-base sm:text-xl text-[var(--accent)] font-bold m-0">
-                      Memoria, Saldo y Capacidad del Tomo
+                      Memoria y Capacidad del Tomo
                     </h3>
                     <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 mt-0.5">
-                      Contabilidad de crédito API, context caching y consumo de tokens
+                      Gestión de contexto, cuotas por minuto y consumo de tokens
                     </p>
                   </div>
                 </div>
@@ -526,152 +387,7 @@ export const ContextUsageWidget: React.FC<{
 
               {/* Modal Body */}
               <div className="p-3.5 sm:p-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-4 sm:space-y-5 text-sm leading-relaxed touch-pan-y">
-                {/* Módulo de Contabilidad de Saldo & Costes de API */}
-                <div className="rounded-xl border-2 border-amber-500/40 bg-amber-500/10 p-4 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 font-cinzel font-bold text-sm text-amber-900 dark:text-amber-200">
-                      <DollarSign className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                      <span>Contabilidad de Saldo y Costes de API</span>
-                    </div>
-                    {!editandoSaldoModal && (
-                      <button
-                        onClick={() => {
-                          setInputSaldoModal(
-                            statsCoste.saldoInicial !== null ? statsCoste.saldoInicial.toString() : ''
-                          );
-                          setEditandoSaldoModal(true);
-                        }}
-                        className="flex items-center gap-1 text-xs text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-100 font-cinzel px-2.5 py-1 rounded border border-amber-500/40 bg-[var(--surface)] hover:bg-amber-500/20 cursor-pointer transition-colors"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>{statsCoste.saldoInicial !== null ? 'Ajustar Saldo' : 'Fijar Saldo Inicial'}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {editandoSaldoModal ? (
-                    <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-[var(--surface)] border border-[var(--glass-border)]">
-                      <span className="text-xs text-[var(--text-secondary)]">Saldo disponible en Google Cloud ($ USD):</span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="Ej. 4.18"
-                        value={inputSaldoModal}
-                        onChange={e => setInputSaldoModal(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') guardarSaldoModal();
-                          if (e.key === 'Escape') setEditandoSaldoModal(false);
-                        }}
-                        className="w-28 px-2.5 py-1 text-xs font-mono rounded border border-[var(--user-border)] bg-[var(--bg-color)] text-[var(--text-primary)] focus:border-amber-500 focus:outline-hidden"
-                        autoFocus
-                      />
-                      <button
-                        onClick={guardarSaldoModal}
-                        className="px-3 py-1 text-xs font-cinzel font-bold bg-amber-600 text-white rounded hover:bg-amber-700 cursor-pointer"
-                      >
-                        Guardar
-                      </button>
-                      <button
-                        onClick={() => setEditandoSaldoModal(false)}
-                        className="px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                      <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-2.5 py-2">
-                        <div className="font-mono text-base font-bold text-amber-700 dark:text-amber-300">
-                          {formatearSaldoUSD(statsCoste.saldoRestante)}
-                        </div>
-                        <div className="text-[10px] font-cinzel text-[var(--text-secondary)]">
-                          Saldo Restante
-                        </div>
-                      </div>
-                      <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-2.5 py-2">
-                        <div className="font-mono text-base font-bold text-rose-700 dark:text-rose-400">
-                          {formatearCosteUSD(statsCoste.gastoTotal)}
-                        </div>
-                        <div className="text-[10px] font-cinzel text-[var(--text-secondary)]">
-                          Gasto Acumulado
-                        </div>
-                      </div>
-                      <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-2.5 py-2">
-                        <div className="font-mono text-base font-bold text-[var(--accent)]">
-                          {statsCoste.ultimoTurnoCoste !== null ? formatearCosteUSD(statsCoste.ultimoTurnoCoste, true) : '—'}
-                        </div>
-                        <div className="text-[10px] font-cinzel text-[var(--text-secondary)]">
-                          Último Turno
-                        </div>
-                      </div>
-                      <div className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] px-2.5 py-2">
-                        <div className="font-mono text-base font-bold text-emerald-700 dark:text-emerald-400">
-                          +{formatearCosteUSD(statsCoste.ahorroTotalCache)}
-                        </div>
-                        <div className="text-[10px] font-cinzel text-[var(--text-secondary)] flex items-center justify-center gap-0.5">
-                          <span>Ahorro Caché</span>
-                          <Zap className="w-2.5 h-2.5 text-emerald-500" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="rounded-lg bg-[var(--surface)] p-2.5 text-xs text-[var(--text-secondary)] space-y-1.5 border border-[var(--glass-border)]">
-                    <div className="flex items-center gap-1.5 font-cinzel font-bold text-[var(--text-primary)]">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>¿Por qué el 1er turno cuesta más que los siguientes? (Context Caching)</span>
-                    </div>
-                    <p className="m-0 text-[11px] leading-relaxed">
-                      • <strong>Primer turno (Caché frío):</strong> Al iniciar la sesión o añadir documentos nuevos, Google procesa los textos completos para crear su caché interno. Con un tomo grande (~250k fichas) esto cuesta aproximadamente <strong>~$0.018</strong>.
-                      <br />
-                      • <strong>Siguientes turnos (Caché caliente):</strong> Google reutiliza el caché y <strong>aplica un 75% de descuento</strong> directo en todos los tokens cacheados. Cada turno posterior cuesta solo unos <strong>~$0.002 a $0.005</strong>.
-                      <br />
-                      • <strong>Tareas de fondo protegidas:</strong> Todas las tareas redundantes automáticas están deshabilitadas para que ninguna llamada invisible consuma tu saldo.
-                    </p>
-                  </div>
-                </div>
-                {/* Selector / Switch de Modo: Gratuito vs Pay-as-you-go (Google Cloud) */}
-                <div
-                  className={`p-3 rounded-lg border transition-all flex items-center justify-between gap-3 ${
-                    esPayAsYouGo
-                      ? 'border-emerald-500/50 bg-emerald-500/10'
-                      : 'border-[var(--glass-border)] bg-[var(--surface-soft)]'
-                  }`}
-                >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-cinzel font-bold text-xs text-[var(--text-primary)]">
-                        Modo Facturación / Saldo Google Cloud (Pay-as-you-go)
-                      </span>
-                      {esPayAsYouGo && (
-                        <span className="text-[10px] font-sans px-1.5 py-0.2 rounded font-semibold bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30">
-                          Activo · 4M TPM
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                      {esPayAsYouGo
-                        ? 'Tu cuenta utiliza saldo de Google Cloud: cuota ampliada a 4M TPM y límite medido por la ventana completa del modelo sin corte de 250k.'
-                        : 'Activa esta opción si tu clave tiene crédito de Google Cloud (Pay-as-you-go) para eliminar el corte de 250.000 tokens por minuto.'}
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer shrink-0 select-none bg-[var(--surface)] px-2.5 py-1.5 rounded-md border border-[var(--glass-border)] hover:border-emerald-500/50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={esPayAsYouGo}
-                      onChange={e => {
-                        setStoredUsePaidTierOnly(e.target.checked);
-                        setLatido(v => v + 1);
-                      }}
-                      className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
-                    />
-                    <span className="text-xs font-semibold font-cinzel text-[var(--text-primary)]">
-                      {esPayAsYouGo ? '🟢 Pay-as-you-go' : '⚪ Capa Gratuita'}
-                    </span>
-                  </label>
-                </div>
-
-                {/* Selector de Tareas en Segundo Plano / Modo Ahorro */}
+                {/* Selector de Tareas en Segundo Plano */}
                 {(() => {
                   const autoBg = getStoredAutoBackgroundTasks();
                   return (
@@ -692,13 +408,13 @@ export const ContextUsageWidget: React.FC<{
                               ? 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border-emerald-500/30'
                               : 'bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/30 font-bold'
                           }`}>
-                            {autoBg ? 'Activas' : 'Modo Ahorro Máximo (Desactivadas)'}
+                            {autoBg ? 'Activas' : 'Desactivadas'}
                           </span>
                         </div>
                         <p className="text-[11px] text-[var(--text-secondary)] m-0">
                           {autoBg
-                            ? 'La IA ejecuta análisis de memoria y campaña en segundo plano. Si quieres proteger al 100% tu saldo, apágalo: la IA solo correrá al enviar un turno.'
-                            : 'Modo ahorro activo: la IA NUNCA consume saldo en segundo plano. Solo procesa cuando tú envías un mensaje o pulsas un botón manual.'}
+                            ? 'La IA ejecuta análisis de memoria y campaña en segundo plano con Flash Lite.'
+                            : 'Tareas en segundo plano pausadas. Solo procesa cuando tú envías un mensaje.'}
                         </p>
                       </div>
                       <label className="flex items-center gap-2 cursor-pointer shrink-0 select-none bg-[var(--surface)] px-2.5 py-1.5 rounded-md border border-[var(--glass-border)] hover:border-amber-500/50 transition-colors">
@@ -712,7 +428,7 @@ export const ContextUsageWidget: React.FC<{
                           className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
                         />
                         <span className="text-xs font-semibold font-cinzel text-[var(--text-primary)]">
-                          {autoBg ? '🟢 Activas' : '🟠 Modo Ahorro'}
+                          {autoBg ? '🟢 Activas' : '🟠 Desactivadas'}
                         </span>
                       </label>
                     </div>
@@ -726,49 +442,44 @@ export const ContextUsageWidget: React.FC<{
                 */}
                 <div
                   className={`rounded-lg border-2 p-4 ${
-                    pasadaDeCuota || (peticionesHoy >= cupoDiario && !esPayAsYouGo)
+                    pasadaDeCuota || peticionesHoy >= cupoDiario
                       ? 'border-red-600/60 bg-red-600/10'
-                      : cercaDeCuota || (cupoApurado && !esPayAsYouGo)
+                      : cercaDeCuota || cupoApurado
                       ? 'border-amber-600/60 bg-amber-500/10'
                       : 'border-emerald-600/50 bg-emerald-500/10'
                   }`}
                 >
                   <div className="font-cinzel font-bold text-base mb-1">
-                    {peticionesHoy >= cupoDiario && !esPayAsYouGo
+                    {peticionesHoy >= cupoDiario
                       ? '⛔ Se acabaron los turnos de hoy'
                       : pasadaDeCuota
                       ? '⛔ Cada turno se pasa de cuota'
                       : cercaDeCuota
                       ? '⚠️ Vas justa'
-                      : cupoApurado && !esPayAsYouGo
+                      : cupoApurado
                       ? '⚠️ Te quedan pocos turnos hoy'
                       : '✅ Vas holgada'}
                   </div>
                   <p className="text-[13px] m-0 leading-relaxed">
-                    {peticionesHoy >= cupoDiario && !esPayAsYouGo ? (
+                    {peticionesHoy >= cupoDiario ? (
                       <>
                         Llevas <strong>{peticionesHoy} de {cupoDiario}</strong> peticiones con {modeloDeNarracion}.
-                        No es por el tamaño de lo que mandas: es que se agotó el cupo del día. Cambia de modelo,
-                        activa el modo Pay-as-you-go si tienes saldo, o espera a mañana.
+                        No es por el tamaño de lo que mandas: es que se agotó el cupo del día. Cambia de modelo o espera a mañana.
                       </>
                     ) : pasadaDeCuota ? (
                       <>
-                        Cada turno manda <strong>{compact(tokensMostrados)} fichas</strong> y el límite{' '}
-                        {esPayAsYouGo ? 'del modelo' : 'por minuto'} está en {compact(topeMinutoReal)}. Va a dar error:{' '}
-                        {esPayAsYouGo
-                          ? 'el contexto supera la ventana máxima del modelo.'
-                          : 'la capa gratuita de Google corta en 250.000 tokens por minuto.'}{' '}
+                        Cada turno manda <strong>{compact(tokensMostrados)} fichas</strong> y el límite por minuto está en {compact(topeMinutoReal)}. Va a dar error:{' '}
+                        la capa gratuita de Google corta en 250.000 tokens por minuto.{' '}
                         Lo que más ocupa de lo que puedes tocar es <strong>{loQueSePuedeTocar.nombre}</strong> ({compact(loQueSePuedeTocar.chars)}).{' '}
                         {loQueSePuedeTocar.donde}
                       </>
                     ) : cercaDeCuota ? (
                       <>
-                        Vas por <strong>{compact(tokensMostrados)}</strong> de {compact(topeMinutoReal)} fichas{' '}
-                        {esPayAsYouGo ? 'de la ventana del modelo' : 'por minuto'}. Aún cabe, pero un turno largo puede pasarse. Si quieres margen, lo más gordo
+                        Vas por <strong>{compact(tokensMostrados)}</strong> de {compact(topeMinutoReal)} fichas por minuto. Aún cabe, pero un turno largo puede pasarse. Si quieres margen, lo más gordo
                         que puedes tocar es <strong>{loQueSePuedeTocar.nombre}</strong> ({compact(loQueSePuedeTocar.chars)}).{' '}
                         {loQueSePuedeTocar.donde}
                       </>
-                    ) : cupoApurado && !esPayAsYouGo ? (
+                    ) : cupoApurado ? (
                       <>
                         El tamaño de los turnos está bien, pero llevas{' '}
                         <strong>{peticionesHoy} de {cupoDiario}</strong> peticiones de hoy con {modeloDeNarracion}.
@@ -777,7 +488,7 @@ export const ContextUsageWidget: React.FC<{
                     ) : (
                       <>
                         Cada turno manda <strong>{compact(tokensMostrados)} fichas</strong>, y caben{' '}
-                        {compact(topeMinutoReal)} {esPayAsYouGo ? 'en la ventana completa del modelo (Pay-as-you-go sin corte por minuto)' : 'por minuto'}. No tienes que hacer nada.
+                        {compact(topeMinutoReal)} por minuto. No tienes que hacer nada.
                       </>
                     )}
                   </p>
@@ -942,21 +653,6 @@ export const ContextUsageWidget: React.FC<{
                   )}
 
                   <div className="mt-3 pt-3 border-t border-[var(--glass-border)] space-y-1.5 text-xs text-[var(--text-secondary)]">
-                    {esPayAsYouGo && (
-                      <div className="mb-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5 space-y-1 text-xs">
-                        <div className="flex items-center gap-1.5 font-cinzel font-bold text-amber-900 dark:text-amber-200">
-                          💳 Modo Saldo / Crédito Activo (Pay-as-you-go)
-                        </div>
-                        <p className="m-0 text-[11px] leading-snug text-[var(--text-secondary)]">
-                          Esta clave tiene facturación de Google Cloud activada:
-                          <br />• <strong>Sin estrangulamiento por minuto:</strong> cuota oficial de 4.000.000 TPM (en vez de 250.000).
-                          <br />• <strong>Peticiones por minuto:</strong> 1.000 RPM (en vez de 5 RPM).
-                          <br />• <strong>Peticiones diarias:</strong> Ilimitadas (sin el tope de 20 peticiones/día de la capa gratuita).
-                          <br />• <strong>Capacidad total del tomo:</strong> Aprovecha la ventana completa de {compact(ventana)} tokens de {modeloDeNarracion}.
-                        </p>
-                      </div>
-                    )}
-
                     <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
                       <span>
                         Ventana de {modeloDeNarracion}: <strong>{compact(ventana)}</strong> de tokens
@@ -971,7 +667,7 @@ export const ContextUsageWidget: React.FC<{
                     </div>
                     <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
                       <span>
-                        Tokens por minuto {esPayAsYouGo ? '(Pay-as-you-go)' : '(capa gratuita)'}:{' '}
+                        Tokens por minuto (capa gratuita):{' '}
                         <strong>{compact(cuota.tpm)}</strong> de entrada
                       </span>
                       <span>
@@ -980,38 +676,34 @@ export const ContextUsageWidget: React.FC<{
                     </div>
                     <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
                       <span>
-                        Peticiones por DÍA: <strong>{esPayAsYouGo ? 'Ilimitadas' : cuota.rpd}</strong> {esPayAsYouGo ? '' : 'por clave'}
-                        {!esPayAsYouGo && numeroDeClaves > 1 ? ` · ${cupoDiario} con tus ${numeroDeClaves} claves` : ''}
+                        Peticiones por DÍA: <strong>{cuota.rpd}</strong> por clave
+                        {numeroDeClaves > 1 ? ` · ${cupoDiario} con tus ${numeroDeClaves} claves` : ''}
                       </span>
                       <span>
                         Hoy llevas{' '}
-                        <strong className={!esPayAsYouGo && peticionesHoy >= cupoDiario ? 'text-red-500' : 'text-[var(--accent)]'}>
+                        <strong className={peticionesHoy >= cupoDiario ? 'text-red-500' : 'text-[var(--accent)]'}>
                           {peticionesHoy}
                         </strong>
                       </span>
                     </div>
-                    {!esPayAsYouGo && (
-                      <>
-                        <p className="m-0 text-[11px] leading-snug">
-                          Son dos límites distintos y se confunden con facilidad. La <strong>ventana</strong>{' '}
-                          es cuánto le cabe al modelo <em>en una petición</em>. La <strong>cuota por
-                          minuto</strong> es cuánto te deja mandar Google <em>por minuto</em>, y no se gasta
-                          con el uso: se reinicia cada minuto. Por eso un tomo demasiado grande falla en el
-                          primer turno aunque la clave sea nueva y esté sin estrenar.
-                          {mandaLaCuota
-                            ? ' Ahora mismo el que corta antes es la cuota por minuto, y es contra ese contra el que mide la barra.'
-                            : ' Ahora mismo el que corta antes es la ventana del modelo, y es contra ese contra el que mide la barra.'}
-                        </p>
-                        <p className="m-0 text-[11px] leading-snug">
-                          Y hay un tercer límite que no tiene nada que ver con el tamaño:{' '}
-                          <strong>las peticiones por día</strong>. Con {modeloDeNarracion} son {cuota.rpd} por
-                          clave, y al agotarse Google devuelve exactamente el mismo error 429 que cuando el
-                          envío es demasiado grande. Si la barra de arriba va holgada y aun así falla, mira
-                          esta cuenta antes que ninguna otra cosa. Las tareas de fondo (sincronizar memoria,
-                          novelizar, deducir fechas) también gastan de aquí.
-                        </p>
-                      </>
-                    )}
+                    <p className="m-0 text-[11px] leading-snug">
+                      Son dos límites distintos y se confunden con facilidad. La <strong>ventana</strong>{' '}
+                      es cuánto le cabe al modelo <em>en una petición</em>. La <strong>cuota por
+                      minuto</strong> es cuánto te deja mandar Google <em>por minuto</em>, y no se gasta
+                      con el uso: se reinicia cada minuto. Por eso un tomo demasiado grande falla en el
+                      primer turno aunque la clave sea nueva y esté sin estrenar.
+                      {mandaLaCuota
+                        ? ' Ahora mismo el que corta antes es la cuota por minuto, y es contra ese contra el que mide la barra.'
+                        : ' Ahora mismo el que corta antes es la ventana del modelo, y es contra ese contra el que mide la barra.'}
+                    </p>
+                    <p className="m-0 text-[11px] leading-snug">
+                      Y hay un tercer límite que no tiene nada que ver con el tamaño:{' '}
+                      <strong>las peticiones por día</strong>. Con {modeloDeNarracion} son {cuota.rpd} por
+                      clave, y al agotarse Google devuelve exactamente el mismo error 429 que cuando el
+                      envío es demasiado grande. Si la barra de arriba va holgada y aun así falla, mira
+                      esta cuenta antes que ninguna otra cosa. Las tareas de fondo (sincronizar memoria,
+                      novelizar, deducir fechas) también gastan de aquí.
+                    </p>
                   </div>
 
                   {/* Medida real contra la API */}

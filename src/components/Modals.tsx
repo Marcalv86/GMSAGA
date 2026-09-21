@@ -40,11 +40,7 @@ import {
   ApiKeyDiagnostic,
   HistoryWindowSetting,
   getStoredHistoryWindow,
-  setStoredHistoryWindow,
-  getStoredPaidTierKey,
-  setStoredPaidTierKey,
-  getStoredUsePaidTierOnly,
-  setStoredUsePaidTierOnly
+  setStoredHistoryWindow
 } from '../utils/geminiHelper';
 import { ResumenUso, borrarUso, resumirUso } from '../utils/usageStats';
 
@@ -56,7 +52,6 @@ import { Link2,
   Gauge,
   Loader,
   KeyRound,
-  CreditCard,
   Lightbulb,
   Settings,
   Shield,
@@ -147,24 +142,6 @@ export const ApiKeyModal: React.FC<{
       porcentajeCache: media('porcentajeCache')
     };
   };
-  /*
-   * LA CALCULADORA DE GASTO, CON PRECIOS QUE PONE LA USUARIA.
-   *
-   * Cablear la tarifa de Google en el código es garantizar que un día mienta:
-   * cambian, varían por modelo y no hay forma de que la aplicación se entere.
-   * Lo que SÍ sabemos —y nadie más sabe— son los tokens que esta campaña gasta
-   * de verdad por turno, que es la mitad difícil del cálculo. Así que se pone
-   * el precio a mano una vez, se guarda, y la cuenta sale sola.
-   */
-  const [precioEntrada, setPrecioEntrada] = useState<string>(
-    () => localStorage.getItem('gmstudio_precio_entrada') || ''
-  );
-  const [precioSalida, setPrecioSalida] = useState<string>(
-    () => localStorage.getItem('gmstudio_precio_salida') || ''
-  );
-  const [turnosAlDia, setTurnosAlDia] = useState<string>(
-    () => localStorage.getItem('gmstudio_turnos_dia') || '30'
-  );
   const [safetyLevel, setSafetyLevel] = useState<SafetyThreshold>(getStoredSafetyLevel());
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelSetting>(getStoredThinkingLevel());
   const [temperature, setTemperature] = useState<number>(getStoredTemperature());
@@ -177,11 +154,6 @@ export const ApiKeyModal: React.FC<{
   const [historyWindow, setHistoryWindow] = useState<HistoryWindowSetting>(getStoredHistoryWindow());
   const [keyRotationMode, setKeyRotationMode] = useState<KeyRotationMode>(getStoredKeyRotationMode());
   const [apiKeysList, setApiKeysList] = useState<string[]>(getStoredApiKeys());
-  const [paidTierKey, setPaidTierKey] = useState<string>(getStoredPaidTierKey());
-  const [usePaidTierOnly, setUsePaidTierOnly] = useState<boolean>(getStoredUsePaidTierOnly());
-  const [showPaidKey, setShowPaidKey] = useState(false);
-  const [paidKeyDiag, setPaidKeyDiag] = useState<ApiKeyDiagnostic | null>(null);
-  const [isTestingPaidKey, setIsTestingPaidKey] = useState(false);
   const [newKeyInput, setNewKeyInput] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [showBatchBox, setShowBatchBox] = useState(false);
@@ -385,9 +357,6 @@ export const ApiKeyModal: React.FC<{
     if (isOpen) {
       setKeyInput(currentKey || '');
       setApiKeysList(getStoredApiKeys());
-      setPaidTierKey(getStoredPaidTierKey());
-      setUsePaidTierOnly(getStoredUsePaidTierOnly());
-      setPaidKeyDiag(null);
       setKeyRotationMode(getStoredKeyRotationMode());
       setSelectedModel(currentModel || DEFAULT_MODEL_ID);
       setSelectedBackgroundModel(getStoredBackgroundModel() || DEFAULT_BACKGROUND_MODEL_ID);
@@ -414,10 +383,8 @@ export const ApiKeyModal: React.FC<{
       updatedList = [];
     }
     setStoredApiKeys(updatedList);
-    setStoredPaidTierKey(paidTierKey.trim());
-    setStoredUsePaidTierOnly(usePaidTierOnly);
     setStoredKeyRotationMode(keyRotationMode);
-    onSaveKey(usePaidTierOnly && paidTierKey.trim() ? paidTierKey.trim() : primaryKey);
+    onSaveKey(primaryKey);
     onSaveModel(selectedModel);
     setStoredBackgroundModel(selectedBackgroundModel);
     setStoredSafetyLevel(safetyLevel);
@@ -429,9 +396,6 @@ export const ApiKeyModal: React.FC<{
     setStoredAutoVincular(autoVincular);
     setStoredAutoBackgroundTasks(autoBackgroundTasks);
     setStoredBarrasAfinidad(barrasAfinidad);
-    localStorage.setItem('gmstudio_precio_entrada', precioEntrada);
-    localStorage.setItem('gmstudio_precio_salida', precioSalida);
-    localStorage.setItem('gmstudio_turnos_dia', turnosAlDia);
     setStoredHistoryWindow(historyWindow);
     setSavedSuccess(true);
     setTimeout(() => {
@@ -632,73 +596,6 @@ export const ApiKeyModal: React.FC<{
                       </div>
                     ))}
                   </div>
-
-                  {/* Calculadora de gasto: los tokens los pone la app, el precio lo pones tú */}
-                  {(() => {
-                    const pe = parseFloat(precioEntrada.replace(',', '.'));
-                    const ps = parseFloat(precioSalida.replace(',', '.'));
-                    const td = parseInt(turnosAlDia, 10);
-                    const hayPrecio = Number.isFinite(pe) && Number.isFinite(ps) && pe >= 0 && ps >= 0;
-                    const dia = Number.isFinite(td) && td > 0 ? td : 0;
-                    const eur = (n: number) =>
-                      n < 0.01 ? `${(n * 100).toFixed(2)} céntimos` : `${n.toFixed(2)} €`;
-                    return (
-                      <div className="mt-3 pt-3 border-t border-[var(--glass-border)] space-y-2">
-                        <div className="font-cinzel font-bold text-[11px] text-[var(--text-primary)]">
-                          ¿Cuánto costaría esto pagando?
-                        </div>
-                        <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                          Los tokens de arriba son reales. Pon el precio <strong>por millón de tokens</strong> de tu
-                          modelo —está en la tarifa de Google, y cambia, por eso no viene escrito aquí— y sale la
-                          cuenta. ⚠️ La caché abarata la entrada y esto <strong>no la descuenta</strong>: lo que salga
-                          es el techo, no la factura.
-                        </p>
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { v: precioEntrada, set: setPrecioEntrada, l: 'Entrada / 1M', ph: '0.10' },
-                            { v: precioSalida, set: setPrecioSalida, l: 'Salida / 1M', ph: '0.40' },
-                            { v: turnosAlDia, set: setTurnosAlDia, l: 'Turnos al día', ph: '30' }
-                          ].map(c => (
-                            <label key={c.l} className="flex flex-col gap-1">
-                              <span className="text-[10px] text-[var(--text-secondary)] font-cinzel">{c.l}</span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={c.v}
-                                placeholder={c.ph}
-                                onChange={e => c.set(e.target.value)}
-                                className="w-full px-2 py-1 text-xs rounded border border-[var(--user-border)] bg-[var(--bg-secondary)] text-[var(--text-primary)] font-mono"
-                              />
-                            </label>
-                          ))}
-                        </div>
-                        {hayPrecio && uso.length > 0 && (
-                          <div className="flex flex-col gap-1 pt-1">
-                            {uso.map(u => {
-                              const porTurno = (u.mediaEntrada * pe + u.mediaSalida * ps) / 1_000_000;
-                              return (
-                                <div
-                                  key={`coste_${u.modelo}`}
-                                  className="flex flex-wrap items-baseline justify-between gap-2 text-[11px] border-b border-[var(--glass-border)] last:border-0 pb-1 last:pb-0"
-                                >
-                                  <span className="font-mono">{u.modelo}</span>
-                                  <span className="text-[var(--text-secondary)]">
-                                    <strong className="text-[var(--accent)]">{eur(porTurno)}</strong> por turno
-                                    {dia > 0 ? (
-                                      <>
-                                        {' '}· {eur(porTurno * dia)}/día ·{' '}
-                                        <strong>{eur(porTurno * dia * 30)}/mes</strong>
-                                      </>
-                                    ) : null}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
                 </div>
               )}
             </div>
@@ -1246,153 +1143,6 @@ export const ApiKeyModal: React.FC<{
           {/* TAB 4: API KEY & KEY POOL */}
           {activeSettingsTab === 'key' && (
             <div className="space-y-4">
-              {/* ========================================================= */}
-              {/* SECCIÓN DEDICADA: CLAVE CON SALDO DE GOOGLE CLOUD (300$)  */}
-              {/* ========================================================= */}
-              <div
-                className={`p-3.5 rounded-lg border transition-all ${
-                  usePaidTierOnly && paidTierKey.trim()
-                    ? 'border-emerald-500/60 bg-emerald-950/20 shadow-xs ring-1 ring-emerald-500/30'
-                    : 'border-[var(--glass-border)] bg-[var(--glass)]'
-                }`}
-              >
-                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                      <CreditCard className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="font-cinzel font-bold text-xs text-[var(--text-primary)] m-0 flex items-center gap-2">
-                        Clave con Saldo / Crédito de Google Cloud
-                        <span className="text-[10px] font-mono px-2 py-0.2 rounded-full font-semibold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                          300$ de Prueba / Pay-as-you-go
-                        </span>
-                      </h4>
-                      <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                        Usa tu saldo exclusivo sin tener que borrar ni rotar tus otras claves.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Toggle Interruptor Exclusivo */}
-                  <label className="flex items-center gap-2 cursor-pointer select-none bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] px-2.5 py-1 rounded-md border border-[var(--glass-border)] hover:border-emerald-500/50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={usePaidTierOnly}
-                      onChange={e => setUsePaidTierOnly(e.target.checked)}
-                      className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
-                    />
-                    <span className="text-xs font-semibold font-cinzel text-[var(--text-primary)]">
-                      {usePaidTierOnly ? '🟢 Modo Saldo ACTIVO' : '⚪ Modo Saldo Apagado'}
-                    </span>
-                  </label>
-                </div>
-
-                {/* Explicación de estado */}
-                {usePaidTierOnly ? (
-                  <div className="mb-3 p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-800 dark:text-emerald-200 flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <div className="space-y-0.5">
-                      <strong className="block font-semibold">Uso 100% Exclusivo Activado:</strong>
-                      <span>
-                        El sistema dirigirá todas las peticiones única y exclusivamente a esta clave para consumir tu saldo de Google Cloud. Tus otras claves se mantendrán guardadas en reserva y no se usarán.
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-[var(--text-secondary)] mb-2.5 leading-relaxed">
-                    Si activas la casilla, la app se bloqueará para usar <strong>únicamente</strong> esta clave con saldo, ignorando el resto sin borrarlas.
-                  </p>
-                )}
-
-                {/* Campo de Texto para la Clave con Saldo */}
-                <div className="space-y-1.5">
-                  <div className="relative">
-                    <input
-                      type={showPaidKey ? 'text' : 'password'}
-                      placeholder="AIzaSy... (Pega aquí la clave de tu proyecto de Google Cloud con los 300$)"
-                      value={paidTierKey}
-                      onChange={e => {
-                        setPaidTierKey(e.target.value);
-                        setPaidKeyDiag(null);
-                      }}
-                      className="w-full bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] border border-[var(--user-border)] p-2 pr-28 rounded font-mono text-xs outline-none focus:border-emerald-500 focus:bg-[var(--surface)] shadow-inner"
-                    />
-                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      {paidTierKey && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setIsTestingPaidKey(true);
-                              try {
-                                const res = await testSingleApiKey(paidTierKey);
-                                setPaidKeyDiag(res);
-                              } catch {
-                                setPaidKeyDiag({ key: paidTierKey, status: 'error', message: 'Error al comprobar la clave' });
-                              } finally {
-                                setIsTestingPaidKey(false);
-                              }
-                            }}
-                            disabled={isTestingPaidKey}
-                            className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 cursor-pointer px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1 transition-colors"
-                            title="Probar validez de esta clave en Google AI Studio"
-                          >
-                            {isTestingPaidKey ? <Loader className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
-                            {isTestingPaidKey ? 'Probando…' : 'Probar'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPaidTierKey('');
-                              setPaidKeyDiag(null);
-                            }}
-                            className="text-xs font-mono text-stone-400 hover:text-red-500 cursor-pointer px-1 py-0.5 rounded bg-black/5"
-                            title="Borrar campo"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setShowPaidKey(!showPaidKey)}
-                        className="text-xs font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer px-1.5 py-0.5 rounded bg-black/5"
-                        title={showPaidKey ? 'Ocultar' : 'Mostrar'}
-                      >
-                        {showPaidKey ? 'Ocultar' : 'Ver'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Diagnóstico de la clave de saldo */}
-                  {paidKeyDiag && (
-                    <div className="mt-1.5 flex items-center gap-2">
-                      {paidKeyDiag.status === 'valid' && (
-                        <span className="text-[11px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 px-2 py-0.5 rounded font-mono flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Clave válida y operativa para consumir tu crédito de Google Cloud.
-                        </span>
-                      )}
-                      {paidKeyDiag.status === 'invalid' && (
-                        <span className="text-[11px] bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 px-2 py-0.5 rounded font-mono flex items-center gap-1.5">
-                          <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" /> Clave no válida ({paidKeyDiag.code || 400}) - Revisa que esté copiada completa.
-                        </span>
-                      )}
-                      {paidKeyDiag.status === 'denied' && (
-                        <span className="text-[11px] bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 px-2 py-0.5 rounded font-mono flex items-center gap-1.5">
-                          <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" /> Permiso denegado (403) - Verifica que la Gemini API esté habilitada en tu proyecto de Google Cloud.
-                        </span>
-                      )}
-                      {paidKeyDiag.status === 'quota' && (
-                        <span className="text-[11px] bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 px-2 py-0.5 rounded font-mono flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Límite de cuota momentáneo (429).
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {/* Clave Principal */}
               <div className="space-y-1.5">
                 <label className="font-cinzel font-bold text-[var(--text-primary)] flex items-center justify-between">
@@ -1447,11 +1197,6 @@ export const ApiKeyModal: React.FC<{
                     <Layers className="w-3.5 h-3.5" /> Pool de Claves (Rotación Automática Anti-Límite de Cuota)
                   </div>
                   <div className="flex items-center gap-2">
-                    {usePaidTierOnly && paidTierKey.trim() && (
-                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                        En reserva (Modo Saldo activo arriba)
-                      </span>
-                    )}
                     <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] text-[var(--accent)]">
                       {apiKeysList.length} {apiKeysList.length === 1 ? 'clave configurada' : 'claves configuradas'}
                     </span>

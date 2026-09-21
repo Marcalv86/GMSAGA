@@ -209,10 +209,6 @@ function leerAgotados(): CuposAgotados {
 export function marcarCupoDiarioAgotado(modelo: string, clave?: string): void {
   if (!modelo) return;
   try {
-    const isPaid =
-      localStorage.getItem('gemini_use_paid_tier_only') === 'on' &&
-      Boolean(localStorage.getItem('gemini_paid_tier_key'));
-    if (isPaid) return; // Las claves con facturación no tienen límite de 20 peticiones/día
     const agotados = leerAgotados();
     const par = `${modelo}|${clave ? huellaDeClave(clave) : '*'}`;
     if (!agotados.pares.includes(par)) {
@@ -226,12 +222,6 @@ export function marcarCupoDiarioAgotado(modelo: string, clave?: string): void {
 
 export function cupoDiarioAgotado(modelo: string, clave?: string): boolean {
   if (!modelo) return false;
-  try {
-    const isPaid =
-      localStorage.getItem('gemini_use_paid_tier_only') === 'on' &&
-      Boolean(localStorage.getItem('gemini_paid_tier_key'));
-    if (isPaid) return false; // En modo saldo/pago no hay cupo diario agotado
-  } catch {}
   const pares = leerAgotados().pares;
   return (
     pares.includes(`${modelo}|*`) || (clave ? pares.includes(`${modelo}|${huellaDeClave(clave)}`) : false)

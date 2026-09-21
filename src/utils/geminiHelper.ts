@@ -337,18 +337,7 @@ const LIMITES_CAPA_GRATUITA: { patron: RegExp; limites: LimitesDeCuota }[] = [
 
 const LIMITES_POR_DEFECTO: LimitesDeCuota = { rpm: 5, tpm: 250000, rpd: 20 };
 
-/**
- * Límites oficiales para cuentas con facturación de Google Cloud (Pay-As-You-Go / Tier 1):
- * - RPM: 1.000 a 2.000 peticiones por minuto (en vez de 5 o 15).
- * - TPM: 4.000.000 tokens por minuto (en vez de 250.000).
- * - RPD: Ilimitado / 1.000.000 (sin corte diario de 20 peticiones).
- */
-export const LIMITES_PAY_AS_YOU_GO: LimitesDeCuota = { rpm: 1000, tpm: 4000000, rpd: 1000000 };
-
 export function limitesGratuitos(modelId: string): LimitesDeCuota {
-  if (isPaidTierActive()) {
-    return LIMITES_PAY_AS_YOU_GO;
-  }
   const id = (modelId || '').trim();
   return LIMITES_CAPA_GRATUITA.find(l => l.patron.test(id))?.limites || LIMITES_POR_DEFECTO;
 }
@@ -386,8 +375,6 @@ export function limiteDeEnvio(modelId: string): { ventana: number; medido: boole
 /**
  * El techo que de verdad manda para un envío: el menor entre lo que le cabe al
  * modelo y lo que deja pasar la cuota por minuto.
- * Si el usuario tiene activa una clave con saldo (Pay-as-you-go), la cuota de 250k
- * no estrangula el envío y se desbloquea la ventana completa del modelo (1M+ tokens).
  */
 export function techoDeEnvio(modelId: string): {
   limite: number;
@@ -395,19 +382,16 @@ export function techoDeEnvio(modelId: string): {
   medido: boolean;
   mandaLaCuota: boolean;
   cuota: LimitesDeCuota;
-  esPayAsYouGo: boolean;
 } {
-  const esPayAsYouGo = isPaidTierActive();
   const { ventana, medido } = limiteDeEnvio(modelId);
-  const cuota = esPayAsYouGo ? LIMITES_PAY_AS_YOU_GO : limitesGratuitos(modelId);
+  const cuota = limitesGratuitos(modelId);
   const limite = Math.min(ventana, cuota.tpm);
   return {
     limite,
     ventana,
     medido,
-    mandaLaCuota: !esPayAsYouGo && cuota.tpm < ventana,
-    cuota,
-    esPayAsYouGo
+    mandaLaCuota: cuota.tpm < ventana,
+    cuota
   };
 }
 
@@ -514,9 +498,6 @@ export function setStoredAutoNovelize(enabled: boolean): void {
  * o botones manuales de sincronizar/trazar en el cuaderno).
  */
 export function getStoredAutoBackgroundTasks(): boolean {
-  if (isPaidTierActive() || getStoredUsePaidTierOnly()) {
-    return false;
-  }
   return localStorage.getItem('gmstudio_auto_background_tasks') === 'on';
 }
 
@@ -880,54 +861,6 @@ export function setStoredKeyRotationMode(mode: KeyRotationMode): void {
   localStorage.setItem('gemini_key_rotation_mode', mode);
 }
 
-// ----------------------------------------------------------------------------
-// CLAVE DEDICADA CON SALDO / PAGO POR USO (GOOGLE CLOUD 300$ / PAY-AS-YOU-GO)
-// ----------------------------------------------------------------------------
-export function getStoredPaidTierKey(): string {
-  const local = localStorage.getItem('gemini_paid_tier_key');
-  return local ? cleanApiKey(local) : '';
-}
-
-export function setStoredPaidTierKey(key: string): void {
-  const clean = cleanApiKey(key);
-  if (clean) {
-    localStorage.setItem('gemini_paid_tier_key', clean);
-  } else {
-    localStorage.removeItem('gemini_paid_tier_key');
-  }
-}
-
-export function getStoredUsePaidTierOnly(): boolean {
-  return localStorage.getItem('gemini_use_paid_tier_only') === 'on' || localStorage.getItem('gemini_paid_tier_mode') === 'on';
-}
-
-export function setStoredUsePaidTierOnly(enabled: boolean): void {
-  localStorage.setItem('gemini_use_paid_tier_only', enabled ? 'on' : 'off');
-  localStorage.setItem('gemini_paid_tier_mode', enabled ? 'on' : 'off');
-  try {
-    window.dispatchEvent(new Event('gemini_paid_tier_changed'));
-    window.dispatchEvent(new Event('storage'));
-  } catch {
-    // Ignorar en entornos sin window
-  }
-}
-
-export function isPaidTierActive(): boolean {
-  const modoPagoActivado = getStoredUsePaidTierOnly();
-  const tieneClaveSaldo = Boolean(getStoredPaidTierKey());
-  const tieneClaveGeneral = getStoredApiKeys().length > 0;
-
-  // 1. Si el interruptor de modo saldo está encendido y hay cualquier clave configurada:
-  if (modoPagoActivado && (tieneClaveSaldo || tieneClaveGeneral)) {
-    return true;
-  }
-  // 2. Si hay una clave específica guardada en el campo de saldo de Google Cloud:
-  if (tieneClaveSaldo && localStorage.getItem('gemini_use_paid_tier_only') !== 'off') {
-    return true;
-  }
-  return false;
-}
-
 // Mapa en memoria para enfriamiento temporal de claves cuando devuelven 429 (Resource Exhausted)
 const keyCooldownMap = new Map<string, number>();
 
@@ -978,23 +911,13 @@ export function segundosDeEnfriamiento(model: string): number {
 export function markKeyCooldown(key: string, durationMs: number = 60000) {
   const clean = cleanApiKey(key);
   if (clean) {
-    const efectiva = isPaidTierActive()
-      ? Math.min(durationMs, 5000)
-      : durationMs;
-    keyCooldownMap.set(clean, Date.now() + efectiva);
+    keyCooldownMap.set(clean, Date.now() + durationMs);
   }
 }
 
 export function isKeyInCooldown(key: string): boolean {
   const clean = cleanApiKey(key);
   if (!clean) return false;
-  if (isPaidTierActive()) {
-    const expiry = keyCooldownMap.get(clean);
-    if (!expiry || Date.now() > expiry) {
-      keyCooldownMap.delete(clean);
-      return false;
-    }
-  }
   const expiry = keyCooldownMap.get(clean);
   if (!expiry) return false;
   if (Date.now() > expiry) {
@@ -1285,19 +1208,6 @@ export function getRotatedApiKeys(opciones?: {
   activeOriginalIndex: number;
   totalKeys: number;
 } {
-  // Si el usuario ha activado el Modo Saldo Exclusivo (Google Cloud / Pay-as-you-go),
-  // se utiliza única y exclusivamente dicha clave, aislando por completo el resto del pool.
-  if (isPaidTierActive()) {
-    const paidKey = getStoredPaidTierKey() || getStoredApiKey();
-    if (paidKey) {
-      return {
-        keys: [paidKey],
-        activeOriginalIndex: 0,
-        totalKeys: 1
-      };
-    }
-  }
-
   const allKeys = getStoredApiKeys();
   if (allKeys.length === 0) {
     return { keys: [], activeOriginalIndex: 0, totalKeys: 0 };
@@ -1427,19 +1337,11 @@ export function getRotatedApiKeys(opciones?: {
  * el reparto de carga entre claves.
  */
 export function peekApiKeys(): string[] {
-  if (isPaidTierActive()) {
-    const paidKey = getStoredPaidTierKey() || getStoredApiKey();
-    if (paidKey) return [paidKey];
-  }
   const todas = getStoredApiKeys();
   return clavesDisponibles(todas);
 }
 
 export function getStoredApiKey(): string {
-  if (isPaidTierActive()) {
-    const paidKey = getStoredPaidTierKey();
-    if (paidKey) return paidKey;
-  }
   const keys = getStoredApiKeys();
   return keys[0] || '';
 }
@@ -1456,9 +1358,6 @@ export function setStoredApiKey(key: string): void {
 }
 
 export function hasConfiguredApiKey(): boolean {
-  if (isPaidTierActive()) {
-    return Boolean(getStoredPaidTierKey() || getStoredApiKeys().length > 0);
-  }
   return getStoredApiKeys().length > 0;
 }
 
@@ -5005,18 +4904,15 @@ export async function generateStoryTurnStream({
           }
 
           if (fallo.isDailyQuota) {
-            if (!isPaidTierActive()) {
-              marcarCupoDiarioAgotado(currentModel, currentApiKey);
-            }
+            marcarCupoDiarioAgotado(currentModel, currentApiKey);
             continue;
           }
           if (fallo.isRateLimit) {
-            markKeyCooldown(currentApiKey, fallo.retryAfterMs || (isPaidTierActive() ? 5000 : 60000));
+            markKeyCooldown(currentApiKey, fallo.retryAfterMs || 60000);
             const haySiguienteModelo = modelIndex < failoverChain.length - 1;
             // Si el límite alcanzado es de fichas de entrada por minuto (input_token_count)
             // y venimos de un reintento o ya se probó una clave, en modo gratuito saltamos de modelo.
-            // En modo Pay-as-you-go, no saltamos de modelo innecesariamente: reintentamos tras una pausa breve.
-            if (fallo.isTokenQuotaLimit && !isPaidTierActive() && haySiguienteModelo && (intento > 0 || k > 0)) {
+            if (fallo.isTokenQuotaLimit && haySiguienteModelo && (intento > 0 || k > 0)) {
               setLoadingText(`Tope de fichas por minuto alcanzado para ${modelDisplayName}. Saltando de inmediato a modelo de respaldo...`);
               saltarAlSiguienteModelo = true;
               break;
@@ -5025,14 +4921,10 @@ export async function generateStoryTurnStream({
             if (hayOtrasClaves) {
               setLoadingText(`Cuota agotada en la Clave ${nClave}. Rotando a la siguiente para ${modelDisplayName}...`);
               break;
-            } else if (((fallo.retryAfterMs > 0 && fallo.retryAfterMs <= 15000) || isPaidTierActive()) && intento < MAX_REINTENTOS_POR_SATURACION) {
-              const waitMs = fallo.retryAfterMs > 0 ? fallo.retryAfterMs + 500 : reboteMs(intento, 1000, 4000);
+            } else if (fallo.retryAfterMs > 0 && fallo.retryAfterMs <= 15000 && intento < MAX_REINTENTOS_POR_SATURACION) {
+              const waitMs = fallo.retryAfterMs + 500;
               const segs = Math.ceil(waitMs / 1000);
-              setLoadingText(
-                isPaidTierActive()
-                  ? `Pausa breve de Google (${segs}s). Reanudando automáticamente con tu clave de saldo...`
-                  : `Límite por minuto alcanzado en Google. Esperando ${segs}s para reanudar automáticamente...`
-              );
+              setLoadingText(`Límite por minuto alcanzado en Google. Esperando ${segs}s para reanudar automáticamente...`);
               await esperar(waitMs, signal);
               continue;
             }
@@ -5675,21 +5567,19 @@ export async function generateContentWithFailover({
             break;
           }
           if (fallo.isDailyQuota) {
-            if (!isPaidTierActive()) {
-              marcarCupoDiarioAgotado(model, currentKey || undefined);
-            }
+            marcarCupoDiarioAgotado(model, currentKey || undefined);
             break;
           }
           if (fallo.isRateLimit) {
-            if (currentKey) markKeyCooldown(currentKey, fallo.retryAfterMs || (isPaidTierActive() ? 5000 : 60000));
+            if (currentKey) markKeyCooldown(currentKey, fallo.retryAfterMs || 60000);
             const haySiguienteModelo = i < chain.length - 1;
-            if (fallo.isTokenQuotaLimit && !isPaidTierActive() && haySiguienteModelo && (intento > 0 || k > 0)) {
+            if (fallo.isTokenQuotaLimit && haySiguienteModelo && (intento > 0 || k > 0)) {
               saltarAlSiguienteModelo = true;
               break;
             }
             const hayOtrasClaves = disponibles.slice(k + 1).some(kk => !clavesMuertas.has(kk) && !isKeyInCooldown(kk));
-            if (!hayOtrasClaves && ((fallo.retryAfterMs > 0 && fallo.retryAfterMs <= 15000) || isPaidTierActive()) && intento < MAX_REINTENTOS_POR_SATURACION) {
-              const waitMs = fallo.retryAfterMs > 0 ? fallo.retryAfterMs + 500 : reboteMs(intento, 1000, 4000);
+            if (!hayOtrasClaves && fallo.retryAfterMs > 0 && fallo.retryAfterMs <= 15000 && intento < MAX_REINTENTOS_POR_SATURACION) {
+              const waitMs = fallo.retryAfterMs + 500;
               await esperar(waitMs, signal);
               continue;
             }

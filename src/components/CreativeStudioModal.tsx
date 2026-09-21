@@ -41,8 +41,7 @@ import {
   describeApiError,
   generateImageWithFailover,
   ExtractedImageStyle,
-  getStoredAutoBackgroundTasks,
-  getStoredUsePaidTierOnly
+  getStoredAutoBackgroundTasks
 } from '../utils/geminiHelper';
 
 export interface CreativeStudioModalProps {
@@ -451,7 +450,7 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({
   // Auto-analyze once if user has uploaded images and not analyzed yet
   useEffect(() => {
     if (campaignImageFiles.length > 0 && !extractedStyle && !isAnalyzingStyle) {
-      if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return;
+      if (!getStoredAutoBackgroundTasks()) return;
       handleExtractStyle();
     }
   }, [campaignImageFiles.length]);

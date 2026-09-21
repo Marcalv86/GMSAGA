@@ -15,8 +15,7 @@ import {
   fusionarTrama,
   leerElTableroDeDocumentos,
   tramarLaCampana,
-  getStoredAutoBackgroundTasks,
-  getStoredUsePaidTierOnly
+  getStoredAutoBackgroundTasks
 } from '../utils/geminiHelper';
 import { aplicarFacciones, aplicarPreparado, aplicarRelojes, preparadoEnPie, relojesEnMarcha } from '../utils/cuadernoOculto';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
@@ -304,7 +303,7 @@ export const MemoryManager: React.FC<{
     const hayArchivos = files.some(f => esFichaDelPj(f) || (!f.isImage && !f.isAudio && (f.content || '').trim().length > 50));
 
     if (faltaDatos && hayArchivos && !autoLecturaFichaIntentada.current && !leyendoFicha && !isGenerating) {
-      if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return;
+      if (!getStoredAutoBackgroundTasks()) return;
       autoLecturaFichaIntentada.current = true;
       void handleEjecutarLecturaFicha();
     }

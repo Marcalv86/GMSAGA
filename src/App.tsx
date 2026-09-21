@@ -88,9 +88,6 @@ import {
   setStoredApiKey,
   setStoredApiKeys,
   hasConfiguredApiKey,
-  isPaidTierActive,
-  setStoredPaidTierKey,
-  setStoredUsePaidTierOnly,
   AVAILABLE_MODELS,
   getStoredModel,
   setStoredModel,
@@ -104,7 +101,6 @@ import {
   syncFullCampaignFromChats,
   fusionarTimeline,
   AVISO_TOKENS_POR_MINUTO,
-  techoDeEnvio,
   getStoredApiKeys,
   estimarCargaDelTurno,
   generateClaudeProjectMemory,
@@ -128,7 +124,6 @@ import {
   novelizeUserMessage,
   getStoredAutoNovelize,
   getStoredAutoBackgroundTasks,
-  getStoredUsePaidTierOnly,
   generarNoticiasSaltoTemporal,
   anclarHistorialPorHud,
   consolidarCronicaAlCerrarCapitulo
@@ -803,7 +798,7 @@ export default function App() {
       .join('|');
     if (autoLecturaFichaRef.current === huella) return;
 
-    if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return;
+    if (!getStoredAutoBackgroundTasks()) return;
 
     autoLecturaFichaRef.current = huella;
     console.log('[AutoLectura Ficha OC] Ficha incompleta y documentos detectados. Lanzando lectura en segundo plano...');
@@ -2718,7 +2713,7 @@ export default function App() {
     proyecto: Project | null
   ): Promise<{ facciones: number; preparado: number; relojes: number } | null> => {
     if (!proyecto) return null;
-    if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return null;
+    if (!getStoredAutoBackgroundTasks()) return null;
 
     const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
     const documentos = (archivos || []).filter(f => esTexto(f) && (f.content || '').trim().length > 200);
@@ -2827,7 +2822,7 @@ export default function App() {
      * segundos a que se teja algo antes de escribir la primera línea.
      */
     const hayMapa = (currentFiles || []).some(f => f.name?.includes('Red Semántica'));
-    if (getStoredAutoBackgroundTasks() && !isPaidTierActive() && !getStoredUsePaidTierOnly() && !hayMapa && documentos.length >= 2 && getStoredAutoVincular()) {
+    if (getStoredAutoBackgroundTasks() && !hayMapa && documentos.length >= 2 && getStoredAutoVincular()) {
       void handleRelacionarBiblioteca({ silencioso: true });
     }
 
@@ -2837,7 +2832,7 @@ export default function App() {
      * no llega a dispararlo nunca. Aquí dentro ya se comprueba qué falta por
      * mirar, así que si está todo visto no gasta nada.
      */
-    if (getStoredAutoBackgroundTasks() && !isPaidTierActive() && !getStoredUsePaidTierOnly()) {
+    if (getStoredAutoBackgroundTasks()) {
       void montarSesionCero(currentFiles || [], currentProject || null);
     }
 
@@ -3173,8 +3168,6 @@ export default function App() {
       // Solo se ejecuta si está activada en Configuración (por defecto OFF para no consumir TPM/RPM en capa gratuita).
       // Siempre se puede novelizar bajo demanda desde el Lector de Novela.
       if (
-        !isPaidTierActive() &&
-        !getStoredUsePaidTierOnly() &&
         getStoredAutoBackgroundTasks() &&
         getStoredAutoNovelize() &&
         currentProject &&
@@ -3342,8 +3335,6 @@ export default function App() {
           effectiveChats.some(c => (c.messages || []).length >= 1);
 
         if (
-          !isPaidTierActive() &&
-          !getStoredUsePaidTierOnly() &&
           getStoredAutoBackgroundTasks() &&
           (needsInitialSync || needsDailySync)
         ) {
@@ -3418,8 +3409,6 @@ export default function App() {
         const puedeReintentar = desdeElUltimoIntento > 20 * 60 * 1000;
 
         if (
-          !isPaidTierActive() &&
-          !getStoredUsePaidTierOnly() &&
           getStoredAutoBackgroundTasks() &&
           hayConQueTramar &&
           (sinTrazarTodavia || needsDailySync) &&
@@ -3916,7 +3905,7 @@ export default function App() {
       const faltaNombreOc = !(pcRef?.name || '').trim() || nombreRes.test((pcRef?.name || '').trim());
       const faltaDatosOc = faltaNombreOc || !pcRef?.race || !pcRef?.class || !pcRef?.appearance;
 
-      if (hayFichaOTexto && faltaDatosOc && getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
+      if (hayFichaOTexto && faltaDatosOc && getStoredAutoBackgroundTasks()) {
         console.log('[Upload] Ficha del OC detectada en la subida. Leyendo en segundo plano de inmediato...');
         void completarFichaDesdeDocumento(updated);
       }
@@ -3962,7 +3951,7 @@ export default function App() {
          * teje mejor con los documentos ya etiquetados.
          */
         void (async () => {
-          if (getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
+          if (getStoredAutoBackgroundTasks()) {
             await etiquetarLosQueLleguenSinEtiquetas();
             if (getStoredAutoVincular()) {
               await handleRelacionarBiblioteca({ silencioso: true });
@@ -3992,12 +3981,12 @@ export default function App() {
             const nRes = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
             return Boolean(curPc?.name && !nRes.test(curPc.name) && curPc.race && curPc.class);
           })();
-          if (getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly() && newFilesList.some(f => f.category === 'sheet_pj') && !yaCompletoOc) {
+          if (getStoredAutoBackgroundTasks() && newFilesList.some(f => f.category === 'sheet_pj') && !yaCompletoOc) {
             await completarFichaDesdeDocumento(currentFilesRef.current);
             await new Promise(r => setTimeout(r, 2000));
           }
 
-          if (getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
+          if (getStoredAutoBackgroundTasks()) {
             await montarSesionCero(
               currentFilesRef.current,
               projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
@@ -4170,7 +4159,7 @@ export default function App() {
    * botón de leer la ficha, que sí avisa antes de sustituir.
    */
   const completarFichaDesdeDocumento = async (archivos?: ProjectFile[], forzarManual?: boolean) => {
-    if (!forzarManual && (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly())) {
+    if (!forzarManual && !getStoredAutoBackgroundTasks()) {
       return;
     }
     /*
@@ -4334,8 +4323,8 @@ export default function App() {
     const updated = currentFiles.map(f => (f.id === fileId ? { ...f, category } : f));
     setCurrentFiles(updated);
     await saveFilesToDB(currentPId, updated);
-    // Marcar un documento como ficha del OC es decir quién es: se lee solo si no estamos en modo saldo.
-    if (category === 'sheet_pj' && getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
+    // Marcar un documento como ficha del OC es decir quién es: se lee solo si las tareas en segundo plano están activadas.
+    if (category === 'sheet_pj' && getStoredAutoBackgroundTasks()) {
       void completarFichaDesdeDocumento(updated);
     }
   };
@@ -4348,7 +4337,7 @@ export default function App() {
    * por minuto ni requerir bucles secuenciales con pausas artificiales.
    */
   const etiquetarLosQueLleguenSinEtiquetas = async () => {
-    if (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly()) return;
+    if (!getStoredAutoBackgroundTasks()) return;
     const pid = currentPIdRef.current;
     if (!pid) return;
     const proyecto = projectsRef.current.find(pr => pr.id === pid);
@@ -4599,7 +4588,7 @@ export default function App() {
     const silencioso = Boolean(opciones?.silencioso);
     if (!currentPId || !currentProject) return;
     if (isRelacionandoBiblioteca) return;
-    if (silencioso && (!getStoredAutoBackgroundTasks() || getStoredUsePaidTierOnly())) return;
+    if (silencioso && !getStoredAutoBackgroundTasks()) return;
 
     const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
     const candidatos = currentFiles.filter(
@@ -4802,9 +4791,9 @@ export default function App() {
 
       // Reclasificar y descubrir que un documento era su ficha es decir quién
       // es: se lee sin pedirlo, igual que al etiquetarla a mano.
-      if (estrenaFichaDelOc && getStoredAutoBackgroundTasks() && !getStoredUsePaidTierOnly()) {
-      void completarFichaDesdeDocumento(updatedFiles);
-    }
+      if (estrenaFichaDelOc && getStoredAutoBackgroundTasks()) {
+        void completarFichaDesdeDocumento(updatedFiles);
+      }
 
       // Also auto-assign portraits to PC, NPCs and Locations if names match and portrait is missing
       let memoryModified = false;
@@ -5538,12 +5527,6 @@ export default function App() {
           if (imported.keyRotationMode) {
             setStoredKeyRotationMode(imported.keyRotationMode);
           }
-          if (typeof imported.paidTierKey === 'string' && imported.paidTierKey.trim()) {
-            setStoredPaidTierKey(imported.paidTierKey.trim());
-          }
-          if (typeof imported.usePaidTierOnly === 'boolean') {
-            setStoredUsePaidTierOnly(imported.usePaidTierOnly);
-          }
           const aiConfig = imported.geminiSettings || imported.settings;
           if (aiConfig) {
             if (aiConfig.model) setStoredModel(aiConfig.model);
@@ -5836,11 +5819,9 @@ export default function App() {
    * minuto en la clave más libre, más este turno— para que las dos no vuelvan
    * a contar cosas distintas de lo mismo, que ya pasó una vez.
    */
-  const { limite: maxTokensActual, esPayAsYouGo } = techoDeEnvio(getStoredModel());
   const effectiveChatTokens =
-    tokensDelTurno +
-    (esPayAsYouGo ? 0 : presionDelMinuto(getStoredModel(), Math.max(1, getStoredApiKeys().length)).menor);
-  const umbralAviso = esPayAsYouGo ? Math.round(maxTokensActual * 0.85) : AVISO_TOKENS_POR_MINUTO;
+    tokensDelTurno + presionDelMinuto(getStoredModel(), Math.max(1, getStoredApiKeys().length)).menor;
+  const umbralAviso = AVISO_TOKENS_POR_MINUTO;
   const isCurrentChatNearTokenLimit = effectiveChatTokens >= umbralAviso;
 
   return (
@@ -6164,19 +6145,13 @@ export default function App() {
                   }
                 }}
                 className="flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-[11px] font-cinzel transition-all duration-200 cursor-pointer border bg-[var(--glass)] border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] active:scale-95 relative"
-                title={
-                  isPaidTierActive()
-                    ? "Ajustes (🟢 Modo Saldo Google Cloud ACTIVO - Consumo exclusivo de crédito)"
-                    : "Ajustes de Motor IA, Modelo, Filtros NSFW, Razonamiento y API Key"
-                }
+                title="Ajustes de Motor IA, Modelo, Filtros NSFW, Razonamiento y API Key"
               >
                 <Sliders className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate text-[10px]">Ajustes</span>
                 <span
                   className={`w-1.5 h-1.5 rounded-full absolute top-1 right-1 ${
-                    isPaidTierActive()
-                      ? 'bg-amber-400 ring-1 ring-amber-300 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
-                      : hasConfiguredApiKey()
+                    hasConfiguredApiKey()
                       ? 'bg-emerald-500'
                       : 'bg-red-500'
                   }`}
