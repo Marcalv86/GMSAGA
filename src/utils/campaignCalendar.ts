@@ -1159,6 +1159,7 @@ const CLIMAS: [RegExp, string][] = [
  * Ahora entra también el mar por su nombre, la navegación y los aparejos.
  */
 const MARCOS: [RegExp, string, string][] = [
+  [/descanso|refugio|hoguera|campamento seguro|zona segura|santuario seguro|remanso|tiempo muerto/i, '🛡️', 'descanso / refugio seguro'],
   [/mazmorra|cripta|cueva|caverna|sima|subterrán|catacumb|tumba|mina|sótano|antípoda|infraoscur|underdark|túnel|foso|alcantarill/i, '🕳️', 'subterráneo'],
   [
     /barco|nav[ií]o|nave|cubierta|sentina|bodega del|camarote|bergant|galera|carabela|fragata|goleta|balandro|mar de |mar abierto|alta ?mar|en mitad del mar|en el mar|oc[eé]ano|navegaci[oó]n|navegando|surcando|singladura|traves[ií]a (?:mar[ií]tima|naval)|a bordo|proa|popa|jarcia|mástil|tim[oó]n|bauprés|obenque|fondeader|escollera|arrecife|marejada|oleaje|abordaje|atracad|amarrad|embarcac/i,
@@ -1166,7 +1167,8 @@ const MARCOS: [RegExp, string, string][] = [
     'travesía naval'
   ],
   [/ruinas?|yacimiento|reliquia|necr[oó]polis|antiguo templo|torre[oó]n derruido|fortaleza derruida|bastión derruido|excavaci[oó]n|vestigio/i, '🏛️', 'ruinas / travesía'],
-  [/ciudad|villa|pueblo|aldea|puerto|muelle|barrio|distrito|mercado|plaza|taberna|posada|calle|gremio|lonja/i, '🏘️', 'urbano'],
+  [/casino|taberna|posada|cantina|lupanar|casa de juegos/i, '🎲', 'ocio / taberna'],
+  [/ciudad|villa|pueblo|aldea|puerto|muelle|barrio|distrito|mercado|plaza|calle|gremio|lonja/i, '🏘️', 'urbano'],
   [/castillo|fortaleza|torre|templo|santuario|mansión|palacio|salón|biblioteca|academia|sala|cámara|capilla/i, '🕯️', 'interior'],
   [/camino|ruta|sendero|senda|marcha|bosque|selva|desierto|montaña|colina|llanura|pantano|ciénaga|páramo|estepa|valle|río|vado|campamento|yerm|traves[ií]a|expedici[oó]n/i, '🏕️', 'travesía terrestre']
 ];

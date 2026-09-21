@@ -11,7 +11,9 @@ import {
   Clock,
   Minus,
   Plus,
-  Newspaper
+  Newspaper,
+  ShieldCheck,
+  Dices
 } from 'lucide-react';
 
 export interface SceneTransitionPreset {
@@ -47,6 +49,28 @@ export interface OpcionesDeTransicion {
 export const MAX_DIAS_DE_SALTO = 60;
 
 export const SCENE_TRANSITION_PRESETS: SceneTransitionPreset[] = [
+  {
+    id: 'safe_haven',
+    title: 'Refugio Seguro / Valle de Descanso',
+    tag: 'Entorno Seguro · Calma',
+    icon: ShieldCheck,
+    description:
+      'Un remanso de paz para asimilar lo vivido, charlar sin prisas junto al fuego o en cubierta, curar heridas y afianzar vínculos.',
+    defaultPrompt:
+      '⏳ [Transición de Escena / Entorno Seguro y Valle de Descanso]: El grupo encuentra un refugio seguro, fondeadero en calma o campamento protegido.\n\n🛡️ [ETIQUETA DE ENTORNO OBLIGATORIA]: Incluye la etiqueta explícita `[ENTORNO: descanso]` para registrar este valle seguro en el sistema.\n\n🌍 [Afectación al Mundo y Vínculos]: Hay tiempo para conversar sin amenazas inminentes. Narra un momento distendido, una confidencia o una pregunta de campamento entre los presentes, con calidez y ritmo relajado.\n\n🎬 [ESTO SE JUEGA, NO SE RESUME]: Sitúa la escena con su atmósfera sensorial (📍 sitio, 🌤 clima y 👥 presentes) y termina con un diálogo o interacción lista para responder.',
+    escala: 'horas'
+  },
+  {
+    id: 'tavern_downtime',
+    title: 'Taberna o Sala de Juegos (Ocio)',
+    tag: 'Entorno Social · Taberna',
+    icon: Dices,
+    description:
+      'Tragos, dados, apuestas o música en una taberna o puerto. Rumores locales, personajes pintorescos y un ambiente vibrante.',
+    defaultPrompt:
+      '⏳ [Transición de Escena / Entorno de Taberna y Ocio]: El grupo pasa un tiempo en una taberna, casa de juegos o cantina portuaria concurrida.\n\n🎲 [ETIQUETA DE ENTORNO OBLIGATORIA]: Incluye la etiqueta explícita `[ENTORNO: taberna]` en tu respuesta.\n\n🌍 [Afectación al Mundo y Rumores]: Describe el bullicio, el humo de las pipas, la música o partidas de dados en marcha, y cómo reaccionan los acompañantes al entorno social y los chismes que corren.\n\n🎬 [ESTO SE JUEGA, NO SE RESUME]: Abre la escena en una mesa o barra con una situación tangible y un PNJ dirigiéndose al grupo.',
+    escala: 'horas'
+  },
   {
     id: 'long_rest',
     title: 'Amanecer y Nuevo Día (Descanso Largo)',

@@ -4150,7 +4150,36 @@ ${bloqueVivo}`;
     ? `\n\n[⛔ TURNO 1 DE CAMPAÑA - ESCANEO INICIAL OBLIGATORIO DE DOCUMENTOS DE ARRANQUE]: Este es el primer turno de la campaña. Has recibido documentos adjuntos de arranque y premisa. Analízalos a fondo. Si la premisa o el documento de arranque sitúa al grupo en alta mar, en un barco, o en trayecto hacia un destino, ES OBLIGATORIO que declares en este primer turno las etiquetas [ESTAMOS: ...], [LUGAR: ...] y [VIAJE: Destino | jornadas: N] (ej. [VIAJE: Luskan | jornadas: 10]) para que la aplicación configure la travesía y el HUD correctamente. No dejes estos campos vacíos ni omitas el viaje si la premisa es marítima.`
     : '';
 
-  const finalUserPayload = userText + diceContext + recordatorioDeTurno + turnOneScanPrompt;
+  /*
+   * 🌊 MODULADOR AUTOMÁTICO DE INTENSIDAD Y PROBABILIDAD DE ENCUENTROS:
+   * Analizamos los últimos mensajes del Narrador en busca de palabras clave de peligro,
+   * daño, choque, rompientes, emboscadas o desastres. Si la escena viene de alta tensión
+   * continuada, obligamos al Narrador a entrar en un valle de descanso o encuentro neutro.
+   */
+  const ultimosMensajesDM = (currentChat.messages || [])
+    .filter(m => m.role === 'model')
+    .slice(-3)
+    .map(m => m.content.toLowerCase())
+    .join(' ');
+
+  const palabrasPeligro = [
+    'emboscada', 'combate', 'iniciativa', 'daño', 'quiebra', 'rompiente', 'arrecife',
+    'salvación', 'desastre', 'revent', 'ataque', 'herida', 'peligro', 'choque',
+    'petición de salvación', 'babor o reventamos', 'se hunde', 'naufragio'
+  ];
+  let peligroPuntos = 0;
+  for (const p of palabrasPeligro) {
+    if (ultimosMensajesDM.includes(p)) peligroPuntos++;
+  }
+
+  const promptModuladorIntensidad = peligroPuntos >= 2
+    ? `\n\n[⚖️ MODULADOR DE RITMO Y PROBABILIDAD DE ENCUENTRO: ALTA TENSIÓN ACUMULADA DETECTADA (${peligroPuntos} indicadores de peligro en los últimos turnos).
+⛔ PROHIBIDO INTRODUCIR NUEVOS PELIGROS TÁCTICOS, EMBOSCADAS, ROTURAS O DESASTRES ESTE TURNO (Probabilidad de peligro táctico = 0%).
+✅ ES OBLIGATORIO UN ENCUENTRO NEUTRO, DE LORE O VALLE DE DESCANSO / ENTORNO SEGURO: Permite que el grupo alcance tierra firme/refugio seguro, encallen la embarcación sin daños, se sequen al fuego, o interactúen con calma. La curva dramática exige respiración y asimilación.
+🏷️ Emite la etiqueta explícita [ENTORNO: descanso] para registrar este valle seguro en el sistema.]`
+    : '';
+
+  const finalUserPayload = userText + diceContext + recordatorioDeTurno + turnOneScanPrompt + promptModuladorIntensidad;
 
   if (lastRole === 'user') {
     contents[contents.length - 1].parts.push({ text: '\n\n' + finalUserPayload });

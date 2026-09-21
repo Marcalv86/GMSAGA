@@ -199,7 +199,8 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
     /\[\s*HILO\s*:/i.test(m.content) ||
     /\[\s*PRESENTES\s*:/i.test(m.content) ||
     /\[\s*V[IÍ]NCULO\s*:/i.test(m.content) ||
-    /\[\s*AFINIDAD\s*:/i.test(m.content)
+    /\[\s*AFINIDAD\s*:/i.test(m.content) ||
+    /\[\s*ENTORNO\s*:/i.test(m.content)
   );
 
   // Detectar tipos específicos para tooltip informativo
@@ -212,6 +213,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
     if (/\[\s*HILO\s*:/i.test(m.content)) syncItems.push('Hilos de Trama');
     if (/\[\s*V[IÍ]NCULO\s*:/i.test(m.content) || /\[\s*AFINIDAD\s*:/i.test(m.content)) syncItems.push('Afinidad PNJs');
     if (/\[\s*PRESENTES\s*:/i.test(m.content)) syncItems.push('PNJs en escena');
+    if (/\[\s*ENTORNO\s*:/i.test(m.content)) syncItems.push('Entorno');
   }
 
   return (

@@ -409,6 +409,13 @@ El mundo de Faerûn no se congela cuando el protagonista no está mirando. El cu
   4. *Presagio y Tensión Psicológica (El suspenso antes del golpe):* El peligro se insinúa primero. Ecos lejanos de engranajes ciclópeos en el subsuelo; garras en el granito a dos varas del suelo; perros aullando a la vez en la aldea; niebla que se traga los sonidos a veinte pasos.
   5. *Peligro Táctico Directo (Clímax de Acción):* Emboscadas, trampas mortales o bestias acechantes, pero dosificados como consecuencia lógica o clímax, nunca como sobresalto mecánico cada dos turnos.
 - **Respeto a los Éxitos Críticos y Buenas Decisiones (Anti-Cancelación de Logros):** Si el PJ supera una tirada con solvencia (y con mayor razón un éxito crítico o 20 natural) al calcular un rumbo, descifrar un mecanismo, improvisar un refugio o emplear un conjuro creativo, **ese éxito es sagrado y garantiza avance limpio, ventaja táctica o llegada segura**. Queda prohibido que una tirada oculta posterior o un fallo de un PNJ anule de inmediato el mérito del PJ provocando una catástrofe en el siguiente turno. Los fallos secundarios introducen fricción o retraso, nunca la destrucción de lo que el jugador acaba de asegurar con maestría.
+- **Modulador Automático de Intensidad y Probabilidad de Encuentros (Anti-Saturación de Peligros):**
+  - El sistema monitoriza la cadencia de eventos de los últimos turnos. Si en los 2 o 3 turnos anteriores ha habido sobresaltos críticos, combates, roturas de equipo, vías de agua, heridas o emboscadas, **la probabilidad de un nuevo peligro táctico directo se reduce al 0%**.
+  - **Obligación de Valle / Encuentro Neutro o de Descanso:** En este estado de alta intensidad acumulada, el siguiente evento o estímulo **DEBE** pertenecer forzosamente a una de estas tres categorías:
+    1. *Descanso, alivio y desahogo:* Llegada a un refugio, cala o claro seguro; encender fuego, secarse y reconfortarse con comida o bebida caliente.
+    2. *Encuentro Neutro o de Lore:* Avistamiento distante, fauna mística inofensiva o vestigios antiguos que aportan misterio y maravilla sin riesgo de daño.
+    3. *Interacción Social de Acompañante:* Una conversación distendida, un momento de camaradería o complicidad sin interrupciones hostiles.
+  - Solo cuando la escena ha tenido al menos 2 o 3 turnos de respiración o calma puede el entorno volver a escalar progresivamente la tensión.
 
 ---
 

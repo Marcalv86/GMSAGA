@@ -11,6 +11,7 @@ import {
   ThermometerSnowflake,
   Skull,
   ShieldAlert,
+  ShieldCheck,
   Anchor,
   Award
 } from 'lucide-react';
@@ -27,6 +28,7 @@ export interface SceneHUDData {
   characters: string[];
   hp?: string;
   conditions: string[];
+  entorno?: string;
   rawText: string;
 }
 
@@ -149,6 +151,7 @@ function parseHUDContent(raw: string): SceneHUDData {
   const characters: string[] = [];
   let hp = '';
   const conditions: string[] = [];
+  let entorno = '';
 
   const rawLines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
@@ -156,8 +159,17 @@ function parseHUDContent(raw: string): SceneHUDData {
     const line = rawLine.replace(/^(?:[-*#_~—–]+\s*)+/, '').replace(/^\*\*|\*\*$/g, '').trim();
     if (!line) continue;
 
+    // Etiqueta explícita de Entorno [ENTORNO: descanso | taberna | etc]
+    if (/^\[\s*ENTORNO\s*:/i.test(line) || /^Entorno:/i.test(line)) {
+      const clean = line
+        .replace(/^\[\s*ENTORNO\s*:\s*/i, '')
+        .replace(/^Entorno:\s*/i, '')
+        .replace(/\]$/, '')
+        .trim();
+      if (clean) entorno = clean;
+    }
     // Línea de Ubicación y Tiempo (📍 ...)
-    if (line.includes('📍') || /^Lugar:/i.test(line) || /^\[\s*(?:ESTAMOS|LUGAR)\s*:/i.test(line)) {
+    else if (line.includes('📍') || /^Lugar:/i.test(line) || /^\[\s*(?:ESTAMOS|LUGAR)\s*:/i.test(line)) {
       const clean = line
         .replace(/^.*📍\s*/, '')
         .replace(/^Lugar:\s*/i, '')
@@ -269,6 +281,7 @@ function parseHUDContent(raw: string): SceneHUDData {
     characters,
     hp,
     conditions,
+    entorno: entorno || undefined,
     rawText: raw
   };
 }
@@ -396,6 +409,17 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud, project }) => {
               acaso, la pastilla se encoge y corta en vez de desbordar. La
               cadena entera sigue estando en el `title` para quien la quiera.
             */}
+            {/* Pastilla de Entorno Seguro / Descanso */}
+            {(hud.entorno && /descanso|seguro|refugio|hoguera|santuario/i.test(hud.entorno)) && (
+              <span
+                className="inline-flex items-center gap-1 min-w-0 px-2 py-0.5 rounded-full text-[10px] font-cinzel font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shrink-0"
+                title="Entorno Seguro / Descanso Activo (Valle de calma y recuperación)"
+              >
+                <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                <span className="hidden sm:inline">Refugio Seguro</span>
+              </span>
+            )}
+
             {fullTime && (
               <span
                 className="inline-flex items-center gap-1 min-w-0 max-w-full px-2 py-0.5 rounded-full text-[11px] font-cinzel font-medium bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)] border border-[var(--accent)]/20"
@@ -484,6 +508,11 @@ export const SceneHUDCard: React.FC<SceneHUDCardProps> = ({ hud, project }) => {
                         {isMaritime && (
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 text-[9px] font-bold border border-blue-500/30" title="Condiciones Marítimas / Marejada">
                             Mar
+                          </span>
+                        )}
+                        {hud.entorno && /descanso|seguro|refugio/i.test(hud.entorno) && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-bold border border-emerald-500/30" title="Refugio Seguro / Descanso Activo">
+                            <ShieldCheck className="w-2.5 h-2.5" /> Seguro
                           </span>
                         )}
                       </div>
