@@ -49,39 +49,85 @@ function partirPorComas(lista: string): string[] {
   return trozos;
 }
 
-/** `[INVENTARIO: ...]`, con o sin tildes y en cualquier caja. */
-const INVENTARIO_RE = /\[\s*INVENTARIO\s*:\s*([^\]]*)\]/gi;
+export function esRequisado(i?: { enPoderDe?: string } | null): boolean {
+  if (!i || !i.enPoderDe) return false;
+  const p = i.enPoderDe.trim().toLowerCase();
+  return !/^(nadie|ningun|ninguno|ninguna|devuelto|recuperado|la protagonista|el protagonista|ella|el|yo|en sus manos)$/i.test(p);
+}
+
+export function esDetalleReal(d?: string): boolean {
+  if (!d) return false;
+  const t = d.trim().toLowerCase();
+  return !/^(?:recuperad[oa]s?|devuelt[oa]s?|restituid[oa]s?|de vuelta|en sus manos)$/i.test(t);
+}
+
+/** `[INVENTARIO: ...]`, así como variantes directas como `[REQUISADO: ...]`, `[RECUPERADO: ...]`, `[ELIMINADO: ...]`, `[ADQUIRIDO: ...]`. */
+const INVENTARIO_RE = /\[\s*(INVENTARIO|REQUISAD[OA]S?|INCAUTAD[OA]S?|CONFISCAD[OA]S?|RECUPERAD[OA]S?|DEVUELT[OA]S?|RESTITUID[OA]S?|ELIMINAD[OA]S?|BAJAS?|ADQUIRID[OA]S?|OBTENID[OA]S?|GANAD[OA]S?)\s*:\s*([^\]]*)\]/gi;
 
 /**
- * Lee `[INVENTARIO: +1 Máscara de Disfraz (mágica), -3 Buenas Bayas, -15 PO]`.
- *
- * Acepta varias etiquetas en el mismo turno y las acumula. Una entrada sin
- * signo se toma como alta, que es lo que el Narrador quiere decir cuando
- * escribe el nombre a secas.
+ * Lee `[INVENTARIO: +1 Máscara de Disfraz (mágica), -3 Buenas Bayas, -15 PO]`,
+ * así como formatos narrativos naturales:
+ * - Adquiridos: `+1 Espada`, `Adquirido: 1 Espada`, `Obtenido: Escudo`, `[ADQUIRIDO: Espada]`
+ * - Eliminados: `-1 Flecha`, `Eliminado: 1 Flecha`, `Baja: Poción`, `Consumido: 1 Poción`, `[ELIMINADO: Flecha]`
+ * - Requisados: `~1 Violín (en poder de: Jarlaxle)`, `Requisado: 1 Violín`, `Incautado: Diario`, `[REQUISADO: Violín]`
+ * - Recuperados: `Recuperado: 1 Violín`, `Devuelto: Diario`, `+1 Violín (recuperado)`, `[RECUPERADO: Violín]`
  */
 export function leerInventario(texto: string): CambioDeInventario {
   const cambio: CambioDeInventario = { altas: [], bajas: [], incautadas: [], monedas: {} };
-  if (!texto || !/INVENTARIO/i.test(texto)) return cambio;
+  if (!texto || !/(?:INVENTARIO|REQUISAD|INCAUTAD|CONFISCAD|RECUPERAD|DEVUELT|RESTITUID|ELIMINAD|BAJA|ADQUIRID|OBTENID|GANAD)/i.test(texto)) {
+    return cambio;
+  }
 
   INVENTARIO_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = INVENTARIO_RE.exec(texto)) !== null) {
-    for (const trozo of partirPorComas(m[1])) {
+    const nombreEtiqueta = (m[1] || 'INVENTARIO').toUpperCase();
+    let modoPorDefecto: 'auto' | 'alta' | 'baja' | 'requisado' | 'recuperado' = 'auto';
+
+    if (/^(?:REQUISAD|INCAUTAD|CONFISCAD)/i.test(nombreEtiqueta)) {
+      modoPorDefecto = 'requisado';
+    } else if (/^(?:RECUPERAD|DEVUELT|RESTITUID)/i.test(nombreEtiqueta)) {
+      modoPorDefecto = 'recuperado';
+    } else if (/^(?:ELIMINAD|BAJA)/i.test(nombreEtiqueta)) {
+      modoPorDefecto = 'baja';
+    } else if (/^(?:ADQUIRID|OBTENID|GANAD)/i.test(nombreEtiqueta)) {
+      modoPorDefecto = 'alta';
+    }
+
+    for (const trozo of partirPorComas(m[2])) {
       const entrada = trozo.trim();
       if (!entrada) continue;
 
-      /*
-       * Tres signos, no dos. `~` es «se lo han quitado»: sigue siendo suyo,
-       * pero lo tiene otro. Sin ese tercer signo, una requisa solo se podía
-       * apuntar como baja, y una baja BORRA — que es como la mochila se quedó
-       * vacía después de un registro y el Narrador dejó de ver sus cosas.
-       */
-      const signo = entrada.startsWith('-') ? -1 : 1;
-      let incautado = entrada.startsWith('~');
-      let resto = entrada.replace(/^[+~-]\s*/, '').trim();
+      let modo = modoPorDefecto;
+
+      // 1. Detectar acción según prefijos o palabras clave de inicio
+      if (/^(?:~|requisad[oa]s?|incautad[oa]s?|confiscad[oa]s?|retenid[oa]s?)\b/i.test(entrada)) {
+        modo = 'requisado';
+      } else if (/^(?:recuperad[oa]s?|devuelt[oa]s?|restituid[oa]s?|recobrad[oa]s?|de vuelta)\b/i.test(entrada)) {
+        modo = 'recuperado';
+      } else if (/^(?:-|eliminad[oa]s?|bajas?|gastad[oa]s?|consumid[oa]s?|perdid[oa]s?|vendid[oa]s?|destruid[oa]s?|quitad[oa]s?)\b/i.test(entrada)) {
+        modo = 'baja';
+      } else if (/^(?:\+|adquirid[oa]s?|obtenid[oa]s?|ganad[oa]s?|recibid[oa]s?|encontrad[oa]s?|comprad[oa]s?|añadid[oa]s?)\b/i.test(entrada)) {
+        modo = 'alta';
+      } else if (modo === 'auto') {
+        if (entrada.startsWith('-')) modo = 'baja';
+        else if (entrada.startsWith('~')) modo = 'requisado';
+        else modo = 'alta';
+      }
+
+      // 2. Limpiar prefijos de control y palabras clave del texto de la entrada
+      let resto = entrada
+        .replace(/^[+~-]\s*/, '')
+        .replace(
+          /^(?:requisad[oa]s?|incautad[oa]s?|confiscad[oa]s?|retenid[oa]s?|recuperad[oa]s?|devuelt[oa]s?|restituid[oa]s?|recobrad[oa]s?|de vuelta|eliminad[oa]s?|bajas?|gastad[oa]s?|consumid[oa]s?|perdid[oa]s?|vendid[oa]s?|destruid[oa]s?|quitad[oa]s?|adquirid[oa]s?|obtenid[oa]s?|ganad[oa]s?|recibid[oa]s?|encontrad[oa]s?|comprad[oa]s?|añadid[oa]s?)\s*[:\-–—]?\s*/i,
+          ''
+        )
+        .replace(/^[+~-]\s*/, '')
+        .trim();
+
       if (!resto) continue;
 
-      // «3 Buenas Bayas» → cantidad 3; «Máscara de Disfraz» → cantidad 1.
+      // 3. Extraer cantidad si existe: «3 Buenas Bayas» → cantidad 3; «Máscara» → 1
       let cantidad = 1;
       const conNumero = resto.match(/^(\d{1,6})\s+(.*)$/);
       if (conNumero) {
@@ -90,7 +136,7 @@ export function leerInventario(texto: string): CambioDeInventario {
       }
       if (!resto || !Number.isFinite(cantidad) || cantidad <= 0) continue;
 
-      // Los detalles entre paréntesis son del objeto, no de su nombre.
+      // 4. Los detalles entre paréntesis son metadatos, no parte del nombre del objeto
       let detalles: string | undefined;
       const conParentesis = resto.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
       if (conParentesis && conParentesis[1].trim()) {
@@ -98,9 +144,11 @@ export function leerInventario(texto: string): CambioDeInventario {
         detalles = conParentesis[2].trim() || undefined;
       }
 
+      // 5. Monedas
       const moneda = claveDeMoneda(resto);
       if (moneda) {
-        cambio.monedas[moneda] = (cambio.monedas[moneda] || 0) + signo * cantidad;
+        const factor = modo === 'baja' ? -1 : 1;
+        cambio.monedas[moneda] = (cambio.monedas[moneda] || 0) + factor * cantidad;
         continue;
       }
 
@@ -109,17 +157,19 @@ export function leerInventario(texto: string): CambioDeInventario {
       // Detectar si el texto o los detalles indican recuperación/devolución
       const textoDevolucion = `${resto} ${detalles || ''}`.toLowerCase();
       const esDevolucion =
+        modo === 'recuperado' ||
         /devuelt[oa]s?|recuperad[oa]s?|de vuelta|en sus manos|restituid[oa]s?|rescatad[oa]s?/i.test(textoDevolucion) ||
-        (campos.enPoderDe && /^(nadie|ninguno|ninguna|devuelto|recuperado|la protagonista|el protagonista|ella|yo)$/i.test(campos.enPoderDe.trim()));
+        (campos.enPoderDe && /^(nadie|ningun|ninguno|ninguna|devuelto|recuperado|la protagonista|el protagonista|ella|el|yo|en sus manos)$/i.test(campos.enPoderDe.trim()));
 
       if (esDevolucion) {
-        incautado = false;
         campos.enPoderDe = undefined;
         campos.dondeEsta = undefined;
+        if (modo === 'requisado') modo = 'alta';
       }
 
       // Limpiar coletillas de devolución del nombre del objeto
       const nombreLimpio = resto
+        .replace(/^[:\-–—]\s*/, '')
         .replace(/\b(?:devuelt[oa]s?|recuperad[oa]s?|restituid[oa]s?|de vuelta)\b(?:\s+(?:por|de)\s+[^,)]+)?/gi, '')
         .replace(/\s+/g, ' ')
         .trim();
@@ -130,17 +180,27 @@ export function leerInventario(texto: string): CambioDeInventario {
         Boolean(detalles && /equipada|equipado|puesto|puesta|empuñad|al cinto|al cuello/i.test(detalles)) ||
         Boolean(/equipada|equipado|puesto|puesta|empuñad|al cinto|al cuello/i.test(resto));
 
-      /*
-       * Y una red por si el Narrador escribe la requisa como baja. Pasa: la
-       * etiqueta lleva meses con dos signos y la costumbre tira. Si en el
-       * paréntesis dice quién lo tiene, es una requisa aunque lleve un menos.
-       */
-      if (incautado || (!esDevolucion && signo < 0 && campos.enPoderDe)) {
-        cambio.incautadas.push({ nombre, cantidad, enPoderDe: campos.enPoderDe, dondeEsta: campos.dondeEsta });
-      } else if (signo > 0 || esDevolucion) {
-        cambio.altas.push({ nombre, cantidad, equipped: equipped || undefined, ...campos });
+      const detalleLimpio = esDetalleReal(detalles) ? detalles : undefined;
+
+      // Clasificación final en la estructura CambioDeInventario
+      if (modo === 'requisado' || (!esDevolucion && campos.enPoderDe)) {
+        cambio.incautadas.push({
+          nombre,
+          cantidad,
+          enPoderDe: campos.enPoderDe || 'sin saber quién',
+          dondeEsta: campos.dondeEsta
+        });
+      } else if (modo === 'baja') {
+        cambio.bajas.push({ nombre, cantidad, motivo: detalleLimpio });
       } else {
-        cambio.bajas.push({ nombre, cantidad });
+        // modo === 'alta' o esDevolucion
+        cambio.altas.push({
+          nombre,
+          cantidad,
+          equipped: equipped || undefined,
+          ...campos,
+          detalles: detalleLimpio
+        });
       }
     }
   }
@@ -293,9 +353,16 @@ export function deduplicarInventario(items: InventoryItem[]): InventoryItem[] {
 
     if (idx >= 0) {
       const existente = resultado[idx];
-      // Si cualquiera de las dos entradas lo da por recuperado / en sus manos, queda en sus manos
-      const estaEnSusManos = !it.enPoderDe || !existente.enPoderDe;
-      const enPoderDe = estaEnSusManos ? undefined : (it.enPoderDe || existente.enPoderDe);
+
+      // Prioridad 1: Activo en manos > Requisado > Eliminado
+      const algunActivo = (!it.eliminado && !esRequisado(it)) || (!existente.eliminado && !esRequisado(existente));
+      const algunRequisado = (!it.eliminado && esRequisado(it)) || (!existente.eliminado && esRequisado(existente));
+
+      const estaEnSusManos = algunActivo;
+      const esReq = !estaEnSusManos && algunRequisado;
+      const esElim = !estaEnSusManos && !esReq && Boolean(it.eliminado || existente.eliminado);
+
+      const enPoderDe = estaEnSusManos ? undefined : (esReq ? (it.enPoderDe || existente.enPoderDe) : undefined);
       const dondeEsta = enPoderDe ? (it.dondeEsta || existente.dondeEsta) : undefined;
       const incautadoDiaAbs = enPoderDe ? (existente.incautadoDiaAbs ?? it.incautadoDiaAbs) : undefined;
 
@@ -307,10 +374,13 @@ export function deduplicarInventario(items: InventoryItem[]): InventoryItem[] {
         id: existente.id || it.id,
         name: nombreMasCompleto,
         quantity: Math.max(existente.quantity || 1, it.quantity || 1),
-        equipped: Boolean(existente.equipped || it.equipped),
+        equipped: estaEnSusManos && Boolean(existente.equipped || it.equipped),
         enPoderDe,
         dondeEsta,
         incautadoDiaAbs,
+        eliminado: esElim ? true : undefined,
+        motivoBaja: esElim ? (it.motivoBaja || existente.motivoBaja) : undefined,
+        eliminadoDiaAbs: esElim ? (it.eliminadoDiaAbs || existente.eliminadoDiaAbs) : undefined,
         resuelto: Boolean(existente.resuelto && it.resuelto),
         deMision: Boolean(existente.deMision || it.deMision),
         encargo: existente.encargo || it.encargo,
@@ -397,25 +467,30 @@ export function aplicarInventario(
 
   for (const alta of cambio.altas) {
     // 1. Buscar si hay algún objeto requisado que coincida
-    const iReq = fuera.findIndex(it => it && it.enPoderDe && sonElMismoObjeto(it.name || '', alta.nombre));
-    // 2. Buscar si hay algún objeto en sus manos que coincida
-    const iActivo = fuera.findIndex(it => it && !it.enPoderDe && sonElMismoObjeto(it.name || '', alta.nombre));
+    const iReq = fuera.findIndex(it => it && esRequisado(it) && sonElMismoObjeto(it.name || '', alta.nombre));
+    // 2. Buscar si hay algún objeto eliminado que coincida
+    const iElim = fuera.findIndex(it => it && it.eliminado && sonElMismoObjeto(it.name || '', alta.nombre));
+    // 3. Buscar si hay algún objeto en sus manos que coincida
+    const iActivo = fuera.findIndex(it => it && !it.eliminado && !esRequisado(it) && sonElMismoObjeto(it.name || '', alta.nombre));
 
     const estaEquipado = alta.equipped ||
       Boolean(alta.detalles && /equipada|equipado|puesto|puesta|empuñad|al cinto|al cuello/i.test(alta.detalles)) ||
       Boolean(/equipada|equipado|puesto|puesta|empuñad|al cinto|al cuello/i.test(alta.nombre));
 
+    const detalleLimpio = esDetalleReal(alta.detalles) ? alta.detalles : undefined;
+
     if (iReq >= 0 && iActivo >= 0) {
-      // Había dos copias (una requisada y una activa). La requisada se borra y la activa se actualiza limpia.
+      // Había dos copias (una requisada y una activa). La requisada se purga y la activa se actualiza limpia.
       fuera[iActivo] = {
         ...fuera[iActivo],
         quantity: Math.max(fuera[iActivo].quantity || 1, fuera[iReq].quantity || 1, alta.cantidad),
         enPoderDe: undefined,
         dondeEsta: undefined,
         incautadoDiaAbs: undefined,
-        equipped: estaEquipado || fuera[iActivo].equipped || fuera[iReq].equipped,
+        eliminado: undefined,
         resuelto: false,
-        description: fuera[iActivo].description || fuera[iReq].description || alta.detalles
+        equipped: estaEquipado || fuera[iActivo].equipped || fuera[iReq].equipped,
+        description: fuera[iActivo].description || fuera[iReq].description || detalleLimpio
       };
       fuera.splice(iReq, 1);
     } else if (iReq >= 0) {
@@ -424,23 +499,42 @@ export function aplicarInventario(
         ...fuera[iReq],
         quantity: Math.max(1, alta.cantidad > 1 ? alta.cantidad : (fuera[iReq].quantity || 1)),
         resuelto: false,
+        eliminado: undefined,
         enPoderDe: undefined,
         dondeEsta: undefined,
         incautadoDiaAbs: undefined,
         equipped: estaEquipado || fuera[iReq].equipped,
-        description: fuera[iReq].description || alta.detalles,
+        description: fuera[iReq].description || detalleLimpio,
         encargo: fuera[iReq].encargo || alta.encargo,
         origen: fuera[iReq].origen || alta.origen,
         deMision: fuera[iReq].deMision || alta.deMision
+      };
+    } else if (iElim >= 0) {
+      // Estaba marcado como eliminado: ¡se recupera o adquiere de nuevo!
+      fuera[iElim] = {
+        ...fuera[iElim],
+        quantity: Math.max(1, alta.cantidad),
+        eliminado: undefined,
+        resuelto: false,
+        motivoBaja: undefined,
+        eliminadoDiaAbs: undefined,
+        enPoderDe: undefined,
+        dondeEsta: undefined,
+        equipped: estaEquipado || fuera[iElim].equipped,
+        description: fuera[iElim].description || detalleLimpio,
+        encargo: fuera[iElim].encargo || alta.encargo,
+        origen: fuera[iElim].origen || alta.origen,
+        deMision: fuera[iElim].deMision || alta.deMision
       };
     } else if (iActivo >= 0) {
       // Ya estaba en sus manos: actualizar cantidad y detalles
       fuera[iActivo] = {
         ...fuera[iActivo],
-        quantity: Math.max(1, alta.cantidad > 1 ? alta.cantidad : (fuera[iActivo].quantity || 1)),
+        quantity: Math.max(1, (fuera[iActivo].quantity || 1) + (alta.cantidad > 1 ? alta.cantidad : 0)),
         resuelto: false,
+        eliminado: undefined,
         equipped: estaEquipado || fuera[iActivo].equipped,
-        description: fuera[iActivo].description || alta.detalles,
+        description: fuera[iActivo].description || detalleLimpio,
         encargo: fuera[iActivo].encargo || alta.encargo,
         origen: fuera[iActivo].origen || alta.origen,
         deMision: fuera[iActivo].deMision || alta.deMision
@@ -451,7 +545,7 @@ export function aplicarInventario(
         id: `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
         name: alta.nombre,
         quantity: alta.cantidad,
-        description: alta.detalles,
+        description: detalleLimpio,
         encargo: alta.encargo,
         origen: alta.origen,
         deMision: alta.deMision,
@@ -478,7 +572,8 @@ export function aplicarInventario(
         enPoderDe: quitado.enPoderDe || fuera[i].enPoderDe || 'sin saber quién',
         dondeEsta: quitado.dondeEsta || fuera[i].dondeEsta,
         incautadoDiaAbs: fuera[i].incautadoDiaAbs ?? diaAbs,
-        equipped: false // Un objeto requisado deja de estar equipado
+        equipped: false, // Un objeto requisado deja de estar equipado
+        eliminado: undefined
       };
     } else {
       fuera.push({
@@ -495,16 +590,28 @@ export function aplicarInventario(
   }
 
   for (const baja of cambio.bajas) {
-    const i = fuera.findIndex(it => it && sonElMismoObjeto(it.name || '', baja.nombre));
-    if (i < 0) continue;
-    const restante = Math.max(0, (fuera[i].quantity || 0) - baja.cantidad);
-    if (restante > 0) {
-      fuera[i] = { ...fuera[i], quantity: restante };
-    } else if (fuera[i].deMision) {
-      // Entregado o usado: deja de pesar, pero el rastro se queda.
-      fuera[i] = { ...fuera[i], quantity: 0, resuelto: true };
-    } else {
-      fuera.splice(i, 1);
+    let cantRestanteABajar = baja.cantidad;
+    for (let i = fuera.length - 1; i >= 0 && cantRestanteABajar > 0; i--) {
+      if (fuera[i] && !fuera[i].eliminado && sonElMismoObjeto(fuera[i].name || '', baja.nombre)) {
+        const cantItem = fuera[i].quantity || 1;
+        if (cantItem <= cantRestanteABajar) {
+          cantRestanteABajar -= cantItem;
+          if (fuera[i].deMision) {
+            fuera[i] = { ...fuera[i], quantity: 0, resuelto: true };
+          } else {
+            fuera[i] = {
+              ...fuera[i],
+              quantity: 0,
+              eliminado: true,
+              eliminadoDiaAbs: diaAbs,
+              motivoBaja: baja.motivo || 'Consumido, gastado o eliminado'
+            };
+          }
+        } else {
+          fuera[i] = { ...fuera[i], quantity: cantItem - cantRestanteABajar };
+          cantRestanteABajar = 0;
+        }
+      }
     }
   }
 
@@ -601,3 +708,46 @@ export function reconstruirInventario(
     objetosVistos
   };
 }
+
+const ICONOS: [string[], string][] = [
+  [['violin', 'viol[ií]n', 'lira', 'arpa', 'la[uú]d', 'flauta', 'tambor', 'instrumento', 'c[ií]tara'], '🎻'],
+  [['diario', 'cuaderno', 'libreta', 'bit[aá]cora', 'libro', 'tomo', 'grimorio', 'c[oó]dice'], '📓'],
+  [['carta', 'misiva', 'nota', 'mensaje', 'sobre', 'pergamino', 'rollo', 'manuscrito', 'documento'], '📜'],
+  [['mapa', 'plano', 'derrotero', 'carta de navegaci[oó]n'], '🗺️'],
+  [['espada', 'sable', 'estoque', 'hoja', 'acero', 'cimitarra', 'mandoble'], '⚔️'],
+  [['daga', 'pu[ñn]al', 'cuchillo', 'estilete', 'navaja'], '🗡️'],
+  [['arco', 'ballesta', 'flecha', 'virote', 'carcaj'], '🏹'],
+  [['escudo', 'broquel', 'rodela'], '🛡️'],
+  [['armadura', 'coraza', 'cota', 'peto', 'casco', 'yelmo'], '🥋'],
+  [['capa', 'manto', 'piwafwi', 'tabardo', 'ropa', 'vestido', 't[uú]nica', 'bota', 'guante'], '🧥'],
+  [['poci[oó]n', 'elixir', 'brebaje', 'ampolla', 'vial', 'frasco', 'ant[ií]?doto'], '🧪'],
+  [['hierba', 'planta', 'flor', 'semilla', 'ra[ií]z', 'baya', 'hongo', 'seta', 'mu[eé]rdago'], '🌿'],
+  [['anillo', 'sortija', 'colgante', 'amuleto', 'medall[oó]n', 'joya', 'gema', 'collar', 'broche', 'pendiente', 'talism[aá]n'], '💍'],
+  [['llave', 'ganz[uú]a', 'cerradura'], '🗝️'],
+  [['moneda', 'monedero', 'oro', 'plata', 'tesoro', 'bolsa de monedas'], '💰'],
+  [['vara', 'bast[oó]n', 'cetro', 'b[aá]culo', 'runa', '[oó]gham', 'ogham', 'talla'], '🪄'],
+  [['vela', 'farol', 'l[aá]mpara', 'antorcha', 'linterna'], '🕯️'],
+  [['comida', 'raci[oó]n', 'pan', 'queso', 'carne', 'provisi[oó]n', 'v[ií]ver'], '🍞'],
+  [['agua', 'odre', 'cantimplora', 'vino', 'cerveza', 'licor', 'petaca'], '🍶'],
+  [['cuerda', 'soga', 'garfio', 'saco', 'mochila', 'zurr[oó]n', 'morral', 'petate'], '🎒'],
+  [['m[aá]scara', 'disfraz', 'antifaz', 'peluca'], '🎭'],
+  [['espejo', 'cristal', 'lente', 'catalejo', 'orbe', 'esfera'], '🔮'],
+  [['hueso', 'cr[aá]neo', 'calavera', 'reliquia', 'urna'], '💀'],
+  [['concha', 'caracola', 'perla', 'coral', 'red', 'ancla', 'remo'], '🐚'],
+  [['pluma', 'tinta', 'tintero', 'papel', 'c[aá]lamo'], '🪶'],
+  [['sello', 'lacre', 'insignia', 'emblema', 'estandarte', 'bandera'], '🏅'],
+  [['pipa', 'tabaco', 'incienso', 'perfume', 'aceite'], '🫗'],
+  [['piel', 'pelaje', 'cuero', 'foca', 'lobo', 'garra', 'colmillo'], '🐾']
+];
+
+const PATRONES: [RegExp, string][] = ICONOS.map(([raices, emoji]) => [
+  new RegExp(`\\b(?:${raices.join('|')})(?:e?s)?\\b`, 'i'),
+  emoji
+]);
+
+export function iconoDe(item: InventoryItem): string {
+  const donde = `${item.name || ''} ${item.description || ''}`;
+  for (const [patron, emoji] of PATRONES) if (patron.test(donde)) return emoji;
+  return item.deMision ? '📌' : '📦';
+}
+

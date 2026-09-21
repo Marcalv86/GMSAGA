@@ -2228,6 +2228,7 @@ ${bloqueElenco}
   return `
 ### 👥 PERSONAJES HABITUALES QUE YA CONOCES (dosier del Director)
 Esta es tu ficha interna de la gente recurrente de la campaña. Úsala: son sus datos, no sugerencias.
+- 🧠 INTELIGENCIA EMOCIONAL Y LECTURA DE SUBTEXTO (VITAL): No dirijas a estos personajes como autómatas planos ni dispensadores transaccionales de datos. Haz que perciban activamente el subtexto del protagonista: vacilación en la voz, miradas esquivas, orgullo herido tras una bravata, fatiga o miedo disimulado tras una pose de entereza. Responden con tacto psicológico, silencios elocuentes, miradas cargadas y gestos de cuidado, complicidad o desafío propios de Faerûn (cero jerga de terapeuta moderno).
 - 🔒 ES TUYO, NO DEL PROTAGONISTA. No se narra, no se insinúa gratis, ningún PNJ lo suelta sin un motivo ganado en escena y NUNCA aparece en el HUD, en la crónica ni en un resumen. Que tú lo sepas no es que ella lo sepa: si lo sueltas, has destripado el giro y ya no hay vuelta atrás.
 - 🔒 SE DESTAPA JUGÁNDOLO: investigando, ganándose la confianza, una indiscreción de un tercero, un descuido, una prueba física. Cuando de verdad salga a la luz en la escena, y SOLO entonces, cierra el mensaje con \`[REVELADO: Nombre — cómo se ha sabido]\`. A partir de ahí pasa a ser algo con lo que el protagonista puede contar.
 - 🔓 YA SE SUPO: eso ya no es un secreto. Puede mencionarse, tener consecuencias y salir en boca de quien corresponda. No hagas como si el protagonista no lo supiera.

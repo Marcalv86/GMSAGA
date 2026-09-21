@@ -210,6 +210,12 @@ export interface InventoryItem {
   dondeEsta?: string;
   /** Día absoluto de campaña en que se lo quitaron. */
   incautadoDiaAbs?: number;
+  /** Si fue eliminado o consumido del inventario activo */
+  eliminado?: boolean;
+  /** Razón de la baja: «consumido», «destruido», «perdido», «eliminado a mano». */
+  motivoBaja?: string;
+  /** Día absoluto de campaña en que se dio de baja. */
+  eliminadoDiaAbs?: number;
 }
 
 /** Un cambio de inventario leído de la etiqueta `[INVENTARIO: ...]` de un turno. */
@@ -217,7 +223,7 @@ export interface CambioDeInventario {
   /** Objetos que entran, con su cantidad. */
   altas: { nombre: string; cantidad: number; detalles?: string; encargo?: string; origen?: string; deMision?: boolean; equipped?: boolean }[];
   /** Objetos que salen, con su cantidad. */
-  bajas: { nombre: string; cantidad: number }[];
+  bajas: { nombre: string; cantidad: number; motivo?: string }[];
   /** Objetos que siguen siendo suyos pero los tiene otro: requisados, robados, empeñados. */
   incautadas: { nombre: string; cantidad: number; enPoderDe?: string; dondeEsta?: string }[];
   /** Monedas que entran o salen, en su propia denominación. */

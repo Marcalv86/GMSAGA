@@ -50,6 +50,8 @@ import {
   Coins,
   PackageCheck,
   PackageX,
+  ArchiveRestore,
+  X,
   Users,
   Footprints,
   Timer,
@@ -61,7 +63,7 @@ import {
 } from 'lucide-react';
 import { esNombreDeProtagonista } from '../utils/sanitizers';
 import { obtenerOGenerarFichaNpc, asegurarFichaCompletaNpc } from '../utils/canonicalNpcStats';
-import { deduplicarInventario, sonElMismoObjeto } from '../utils/inventoryTag';
+import { deduplicarInventario, sonElMismoObjeto, esRequisado, iconoDe } from '../utils/inventoryTag';
 import { extraerIdentidadDeDocumentos, esFichaDelPj } from '../utils/geminiHelper';
 
 // `getAtrInfo` se retiró con la escala 0-20: el deseo ya no tiene tramos —
@@ -237,6 +239,21 @@ export const MemoryManager: React.FC<{
 
   // Protagonist (OC) State
   const [isSyncingAI, setIsSyncingAI] = useState(false);
+
+  // Modales de acciones de inventario (Requisar, Dar de baja/Eliminar, Adquirir)
+  const [itemParaRequisar, setItemParaRequisar] = useState<InventoryItem | null>(null);
+  const [quienRequisa, setQuienRequisa] = useState('');
+  const [dondeRequisa, setDondeRequisa] = useState('');
+  const [itemParaEliminar, setItemParaEliminar] = useState<InventoryItem | null>(null);
+  const [motivoEliminar, setMotivoEliminar] = useState('');
+  const [mostrarModalNuevoItem, setMostrarModalNuevoItem] = useState(false);
+  const [nuevoItemNombre, setNuevoItemNombre] = useState('');
+  const [nuevoItemCantidad, setNuevoItemCantidad] = useState(1);
+  const [nuevoItemTipo, setNuevoItemTipo] = useState<'propio' | 'mision'>('propio');
+  const [nuevoItemEncargo, setNuevoItemEncargo] = useState('');
+  const [nuevoItemOrigen, setNuevoItemOrigen] = useState('');
+  const [nuevoItemDetalles, setNuevoItemDetalles] = useState('');
+  const [nuevoItemEquipado, setNuevoItemEquipado] = useState(false);
 
   // Portrait Linker Modal state
   const [targetForPortraitPicker, setTargetForPortraitPicker] = useState<ImagePickerTarget | null>(null);
@@ -2872,46 +2889,6 @@ export const MemoryManager: React.FC<{
           `\bpocion\b` caza «Pociones», porque el límite de palabra cae dentro.
           Se cierra cada raíz con un plural opcional en vez de a mano.
         */
-        const ICONOS: [string[], string][] = [
-          [['violin', 'viol[ií]n', 'lira', 'arpa', 'la[uú]d', 'flauta', 'tambor', 'instrumento', 'c[ií]tara'], '🎻'],
-          [['diario', 'cuaderno', 'libreta', 'bit[aá]cora', 'libro', 'tomo', 'grimorio', 'c[oó]dice'], '📓'],
-          [['carta', 'misiva', 'nota', 'mensaje', 'sobre', 'pergamino', 'rollo', 'manuscrito', 'documento'], '📜'],
-          [['mapa', 'plano', 'derrotero', 'carta de navegaci[oó]n'], '🗺️'],
-          [['espada', 'sable', 'estoque', 'hoja', 'acero', 'cimitarra', 'mandoble'], '⚔️'],
-          [['daga', 'pu[ñn]al', 'cuchillo', 'estilete', 'navaja'], '🗡️'],
-          [['arco', 'ballesta', 'flecha', 'virote', 'carcaj'], '🏹'],
-          [['escudo', 'broquel', 'rodela'], '🛡️'],
-          [['armadura', 'coraza', 'cota', 'peto', 'casco', 'yelmo'], '🥋'],
-          [['capa', 'manto', 'piwafwi', 'tabardo', 'ropa', 'vestido', 't[uú]nica', 'bota', 'guante'], '🧥'],
-          [['poci[oó]n', 'elixir', 'brebaje', 'ampolla', 'vial', 'frasco', 'ant[ií]?doto'], '🧪'],
-          [['hierba', 'planta', 'flor', 'semilla', 'ra[ií]z', 'baya', 'hongo', 'seta', 'mu[eé]rdago'], '🌿'],
-          [['anillo', 'sortija', 'colgante', 'amuleto', 'medall[oó]n', 'joya', 'gema', 'collar', 'broche', 'pendiente', 'talism[aá]n'], '💍'],
-          [['llave', 'ganz[uú]a', 'cerradura'], '🗝️'],
-          [['moneda', 'monedero', 'oro', 'plata', 'tesoro', 'bolsa de monedas'], '💰'],
-          [['vara', 'bast[oó]n', 'cetro', 'b[aá]culo', 'runa', '[oó]gham', 'ogham', 'talla'], '🪄'],
-          [['vela', 'farol', 'l[aá]mpara', 'antorcha', 'linterna'], '🕯️'],
-          [['comida', 'raci[oó]n', 'pan', 'queso', 'carne', 'provisi[oó]n', 'v[ií]ver'], '🍞'],
-          [['agua', 'odre', 'cantimplora', 'vino', 'cerveza', 'licor', 'petaca'], '🍶'],
-          [['cuerda', 'soga', 'garfio', 'saco', 'mochila', 'zurr[oó]n', 'morral', 'petate'], '🎒'],
-          [['m[aá]scara', 'disfraz', 'antifaz', 'peluca'], '🎭'],
-          [['espejo', 'cristal', 'lente', 'catalejo', 'orbe', 'esfera'], '🔮'],
-          [['hueso', 'cr[aá]neo', 'calavera', 'reliquia', 'urna'], '💀'],
-          [['concha', 'caracola', 'perla', 'coral', 'red', 'ancla', 'remo'], '🐚'],
-          [['pluma', 'tinta', 'tintero', 'papel', 'c[aá]lamo'], '🪶'],
-          [['sello', 'lacre', 'insignia', 'emblema', 'estandarte', 'bandera'], '🏅'],
-          [['pipa', 'tabaco', 'incienso', 'perfume', 'aceite'], '🫗'],
-          [['piel', 'pelaje', 'cuero', 'foca', 'lobo', 'garra', 'colmillo'], '🐾']
-        ];
-        const PATRONES: [RegExp, string][] = ICONOS.map(([raices, emoji]) => [
-          new RegExp(`\\b(?:${raices.join('|')})(?:e?s)?\\b`, 'i'),
-          emoji
-        ]);
-        const iconoDe = (item: InventoryItem): string => {
-          const donde = `${item.name || ''} ${item.description || ''}`;
-          for (const [patron, emoji] of PATRONES) if (patron.test(donde)) return emoji;
-          return item.deMision ? '📌' : '📦';
-        };
-
         const aprendido = memory.player_character?.aprendido || [];
         const ETIQUETA_APRENDIZAJE: Record<string, string> = {
           conjuro: 'conjuro',
@@ -2921,25 +2898,23 @@ export const MemoryManager: React.FC<{
           otro: 'otro'
         };
 
-        const esRequisado = (i: InventoryItem) => {
-          if (!i.enPoderDe) return false;
-          const p = i.enPoderDe.trim().toLowerCase();
-          return !/^(nadie|ningun|ninguno|ninguna|devuelto|recuperado|la protagonista|el protagonista|ella|el|yo|en sus manos)$/i.test(p);
-        };
-
-        const requisados = todo.filter(i => esRequisado(i));
-        const enSusManos = todo.filter(i => !esRequisado(i));
+        const eliminados = todo.filter(i => Boolean(i.eliminado));
+        const noEliminados = todo.filter(i => !i.eliminado);
+        const requisados = noEliminados.filter(i => esRequisado(i));
+        const enSusManos = noEliminados.filter(i => !esRequisado(i));
         const deMision = enSusManos.filter(i => i.deMision && !i.resuelto);
         const resueltos = enSusManos.filter(i => i.deMision && i.resuelto);
         const propios = enSusManos.filter(i => !i.deMision);
 
-        const Tarjeta: React.FC<{ item: InventoryItem; tono: 'mision' | 'propio' | 'hecho' | 'requisado' }> = ({ item, tono }) => (
+        const Tarjeta: React.FC<{ item: InventoryItem; tono: 'mision' | 'propio' | 'hecho' | 'requisado' | 'eliminado' }> = ({ item, tono }) => (
           <div
             className={`p-3.5 rounded-xl border flex items-start gap-3 group transition-all hover:shadow-md ${
               tono === 'mision'
                 ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60'
                 : tono === 'requisado'
                 ? 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/60'
+                : tono === 'eliminado'
+                ? 'bg-zinc-500/5 border-zinc-500/30 hover:border-zinc-500/50 opacity-80'
                 : tono === 'hecho'
                 ? 'bg-[var(--surface-soft)] border-[var(--user-border)] opacity-70'
                 : 'bg-[var(--surface-soft)] border-[var(--user-border)] hover:border-[var(--accent)]/40'
@@ -2953,7 +2928,7 @@ export const MemoryManager: React.FC<{
             <span
               aria-hidden
               className={`text-3xl sm:text-4xl leading-none shrink-0 self-stretch flex items-center pr-3 border-r ${
-                tono === 'hecho' ? 'opacity-40 grayscale border-[var(--user-border)]' : 'border-[var(--user-border)]'
+                tono === 'hecho' || tono === 'eliminado' ? 'opacity-40 grayscale border-[var(--user-border)]' : 'border-[var(--user-border)]'
               }`}
             >
               {iconoDe(item)}
@@ -2961,7 +2936,9 @@ export const MemoryManager: React.FC<{
             <div className="flex flex-col gap-1.5 min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                <span className={`font-cinzel font-bold text-xs sm:text-sm break-words ${tono === 'hecho' ? 'text-[var(--text-secondary)] line-through' : 'text-[var(--accent)]'}`}>
+                <span className={`font-cinzel font-bold text-xs sm:text-sm break-words ${
+                  tono === 'hecho' || tono === 'eliminado' ? 'text-[var(--text-secondary)] line-through' : 'text-[var(--accent)]'
+                }`}>
                   {item.name}
                 </span>
                 {(item.quantity ?? 0) > 1 && (
@@ -2969,11 +2946,11 @@ export const MemoryManager: React.FC<{
                     ×{item.quantity}
                   </span>
                 )}
-                {item.equipped ? (
+                {item.equipped && tono !== 'eliminado' && !esRequisado(item) ? (
                   <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
                     equipado
                   </span>
-                ) : !esRequisado(item) ? (
+                ) : !esRequisado(item) && tono !== 'eliminado' && tono !== 'hecho' ? (
                   <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--glass-border)]">
                     portado
                   </span>
@@ -2986,6 +2963,11 @@ export const MemoryManager: React.FC<{
                 {esRequisado(item) && (
                   <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
                     lo tiene {item.enPoderDe}
+                  </span>
+                )}
+                {tono === 'eliminado' && (
+                  <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border border-zinc-500/30">
+                    baja / consumido
                   </span>
                 )}
               </div>
@@ -3006,6 +2988,11 @@ export const MemoryManager: React.FC<{
                 Está en: {item.dondeEsta}
               </p>
             )}
+            {item.motivoBaja && (
+              <p className="text-[11px] font-lora italic text-[var(--text-secondary)] m-0 leading-relaxed">
+                <strong className="font-cinzel text-[10px] not-italic">Motivo de baja:</strong> {item.motivoBaja}
+              </p>
+            )}
             {item.description && (
               <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed whitespace-pre-wrap">
                 {item.description}
@@ -3022,86 +3009,152 @@ export const MemoryManager: React.FC<{
 
             {onUpdateMemory && (
               <div className="pt-2 flex items-center gap-2 flex-wrap border-t border-[var(--glass-border)] mt-1">
-                {tono === 'requisado' ? (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await onUpdateMemory(prev => {
-                        if (!prev.player_character) return prev;
-                        const act = (list?: InventoryItem[]) =>
-                          (list || []).map(it =>
-                            sonElMismoObjeto(it.name || '', item.name || '')
-                              ? { ...it, enPoderDe: undefined, dondeEsta: undefined, incautadoDiaAbs: undefined }
-                              : it
-                          );
-                        return {
-                          ...prev,
-                          player_character: {
-                            ...prev.player_character,
-                            inventory: act(prev.player_character.inventory)
-                          }
-                        };
-                      });
-                    }}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-cinzel font-medium px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer"
-                    title="Devolver o recuperar este objeto (pasa a portado/equipado en sus manos)"
-                  >
-                    <PackageCheck className="w-3.5 h-3.5" /> Devolver a sus manos
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const quien = window.prompt(`¿Quién tiene o ha requisado "${item.name}"?`, 'Bregan D\'aerthe');
-                      if (quien === null) return;
-                      const donde = window.prompt(`¿Dónde está ubicado? (opcional)`, 'pañol del navío') || undefined;
-                      await onUpdateMemory(prev => {
-                        if (!prev.player_character) return prev;
-                        const act = (list?: InventoryItem[]) =>
-                          (list || []).map(it =>
-                            sonElMismoObjeto(it.name || '', item.name || '')
-                              ? { ...it, enPoderDe: quien || 'sin saber quién', dondeEsta: donde }
-                              : it
-                          );
-                        return {
-                          ...prev,
-                          player_character: {
-                            ...prev.player_character,
-                            inventory: act(prev.player_character.inventory)
-                          }
-                        };
-                      });
-                    }}
-                    className="inline-flex items-center gap-1 text-[10px] font-cinzel px-2 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 transition-colors cursor-pointer"
-                    title="Marcar este objeto como requisado o en poder de alguien"
-                  >
-                    <PackageX className="w-3 h-3" /> Requisar / Cambiar poseedor
-                  </button>
-                )}
+                {tono === 'eliminado' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await onUpdateMemory(prev => {
+                          if (!prev.player_character) return prev;
+                          const act = (list?: InventoryItem[]) =>
+                            (list || []).map(it =>
+                              sonElMismoObjeto(it.name || '', item.name || '')
+                                ? {
+                                    ...it,
+                                    eliminado: undefined,
+                                    quantity: Math.max(1, it.quantity || 1),
+                                    motivoBaja: undefined,
+                                    eliminadoDiaAbs: undefined,
+                                    enPoderDe: undefined,
+                                    dondeEsta: undefined
+                                  }
+                                : it
+                            );
+                          return {
+                            ...prev,
+                            player_character: {
+                              ...prev.player_character,
+                              inventory: act(prev.player_character.inventory)
+                            }
+                          };
+                        });
+                      }}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-cinzel font-medium px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer"
+                      title="Recuperar o restaurar este objeto a la mochila"
+                    >
+                      <PackageCheck className="w-3.5 h-3.5" /> Recuperar / Restaurar
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!window.confirm(`¿Seguro que quieres eliminar "${item.name}" del inventario?`)) return;
-                    await onUpdateMemory(prev => {
-                      if (!prev.player_character) return prev;
-                      const filtrado = (prev.player_character.inventory || []).filter(
-                        it => !sonElMismoObjeto(it.name || '', item.name || '')
-                      );
-                      return {
-                        ...prev,
-                        player_character: {
-                          ...prev.player_character,
-                          inventory: filtrado
-                        }
-                      };
-                    });
-                  }}
-                  className="inline-flex items-center gap-1 text-[10px] font-cinzel px-2 py-0.5 rounded bg-zinc-500/10 hover:bg-rose-500/20 text-[var(--text-secondary)] hover:text-rose-600 transition-colors cursor-pointer ml-auto"
-                  title="Eliminar este objeto permanentemente del inventario"
-                >
-                  <Trash2 className="w-3 h-3" /> Eliminar
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setItemParaEliminar(item);
+                        setMotivoEliminar(item.motivoBaja || '');
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-cinzel px-2 py-0.5 rounded bg-zinc-500/10 hover:bg-rose-500/20 text-[var(--text-secondary)] hover:text-rose-600 transition-colors cursor-pointer ml-auto"
+                      title="Eliminar este objeto permanentemente del archivo"
+                    >
+                      <Trash2 className="w-3 h-3" /> Borrar
+                    </button>
+                  </>
+                ) : tono === 'requisado' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await onUpdateMemory(prev => {
+                          if (!prev.player_character) return prev;
+                          const act = (list?: InventoryItem[]) =>
+                            (list || []).map(it =>
+                              sonElMismoObjeto(it.name || '', item.name || '')
+                                ? { ...it, enPoderDe: undefined, dondeEsta: undefined, incautadoDiaAbs: undefined, eliminado: undefined }
+                                : it
+                            );
+                          return {
+                            ...prev,
+                            player_character: {
+                              ...prev.player_character,
+                              inventory: act(prev.player_character.inventory)
+                            }
+                          };
+                        });
+                      }}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-cinzel font-medium px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer"
+                      title="Devolver o recuperar este objeto a sus manos"
+                    >
+                      <PackageCheck className="w-3.5 h-3.5" /> Devolver a sus manos
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setItemParaEliminar(item);
+                        setMotivoEliminar('Requisado y dado por perdido');
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-cinzel px-2 py-0.5 rounded bg-zinc-500/10 hover:bg-rose-500/20 text-[var(--text-secondary)] hover:text-rose-600 transition-colors cursor-pointer ml-auto"
+                      title="Dar de baja o eliminar este objeto"
+                    >
+                      <Trash2 className="w-3 h-3" /> Dar de baja
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await onUpdateMemory(prev => {
+                          if (!prev.player_character) return prev;
+                          const act = (list?: InventoryItem[]) =>
+                            (list || []).map(it =>
+                              sonElMismoObjeto(it.name || '', item.name || '')
+                                ? { ...it, equipped: !it.equipped }
+                                : it
+                            );
+                          return {
+                            ...prev,
+                            player_character: {
+                              ...prev.player_character,
+                              inventory: act(prev.player_character.inventory)
+                            }
+                          };
+                        });
+                      }}
+                      className={`inline-flex items-center gap-1 text-[10px] font-cinzel px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                        item.equipped
+                          ? 'bg-teal-500/15 hover:bg-teal-500/25 text-teal-700 dark:text-teal-300 border-teal-500/30'
+                          : 'bg-[var(--surface)] hover:bg-[var(--surface-soft)] text-[var(--text-secondary)] border-[var(--glass-border)]'
+                      }`}
+                      title={item.equipped ? "Desequipar objeto (pasa a portado)" : "Equipar objeto"}
+                    >
+                      <Shield className="w-3 h-3" /> {item.equipped ? 'Desequipar' : 'Equipar'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setItemParaRequisar(item);
+                        setQuienRequisa(item.enPoderDe || 'Bregan D\'aerthe');
+                        setDondeRequisa(item.dondeEsta || '');
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-cinzel px-2 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 transition-colors cursor-pointer"
+                      title="Marcar este objeto como requisado o en poder de alguien"
+                    >
+                      <PackageX className="w-3 h-3" /> Requisar
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setItemParaEliminar(item);
+                        setMotivoEliminar('');
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-cinzel px-2 py-0.5 rounded bg-zinc-500/10 hover:bg-rose-500/20 text-[var(--text-secondary)] hover:text-rose-600 transition-colors cursor-pointer ml-auto"
+                      title="Dar de baja, consumir o eliminar este objeto"
+                    >
+                      <Trash2 className="w-3 h-3" /> Dar de baja
+                    </button>
+                  </>
+                )}
               </div>
             )}
             </div>
@@ -3110,51 +3163,81 @@ export const MemoryManager: React.FC<{
 
         return (
           <div className="flex flex-col gap-5">
-            {/*
-              El monedero, de SOLO LECTURA.
-
-              Es dinero de partida: lo lleva el juego, no la jugadora. Poder
-              teclear el saldo convierte la cuenta en una sugerencia —y entonces
-              da igual que el Narrador apunte lo que cuesta cada cosa—. Sube y
-              baja con lo que se gana y se gasta EN ESCENA, y punto.
-            */}
+            {/* Cabecera de Inventario: Bolsa + Acciones directas (Adquirir, Sincronizar) */}
             <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)] flex items-center justify-between gap-3 flex-wrap">
-              <span
-                className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5"
-                title="Lo que lleva encima. Sube y baja sola con lo que gana y gasta jugando: no se teclea a mano."
-              >
-                <Coins className="w-3.5 h-3.5 text-[var(--accent)]" /> Bolsa
-              </span>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {([
-                  ['pp', 'PP', 'text-slate-500', '⚪'],
-                  ['gp', 'PO', 'text-amber-600', '🟡'],
-                  ['ep', 'PE', 'text-cyan-600', '🔵'],
-                  ['sp', 'PA', 'text-zinc-500', '⚫'],
-                  ['cp', 'PC', 'text-orange-700', '🟤']
-                ] as ['cp' | 'sp' | 'ep' | 'gp' | 'pp', string, string, string][])
-                  .filter(([k]) => (monedas?.[k] ?? 0) > 0)
-                  .map(([k, etiqueta, color, ficha]) => (
-                    <span
-                      key={k}
-                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
-                    >
-                      <span aria-hidden className="mr-0.5">{ficha}</span>
-                      {monedas?.[k]} {etiqueta}
-                    </span>
-                  ))}
-                {!monedas || Object.values(monedas).every(v => !v) ? (
-                  <span className="text-[11px] font-lora italic text-[var(--text-secondary)]">Sin blanca.</span>
-                ) : null}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span
+                  className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5"
+                  title="Lo que lleva encima en monedas."
+                >
+                  <Coins className="w-3.5 h-3.5 text-[var(--accent)]" /> Bolsa
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {([
+                    ['pp', 'PP', 'text-slate-500', '⚪'],
+                    ['gp', 'PO', 'text-amber-600', '🟡'],
+                    ['ep', 'PE', 'text-cyan-600', '🔵'],
+                    ['sp', 'PA', 'text-zinc-500', '⚫'],
+                    ['cp', 'PC', 'text-orange-700', '🟤']
+                  ] as ['cp' | 'sp' | 'ep' | 'gp' | 'pp', string, string, string][])
+                    .filter(([k]) => (monedas?.[k] ?? 0) > 0)
+                    .map(([k, etiqueta, color, ficha]) => (
+                      <span
+                        key={k}
+                        className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
+                      >
+                        <span aria-hidden className="mr-0.5">{ficha}</span>
+                        {monedas?.[k]} {etiqueta}
+                      </span>
+                    ))}
+                  {!monedas || Object.values(monedas).every(v => !v) ? (
+                    <span className="text-[11px] font-lora italic text-[var(--text-secondary)]">Sin blanca.</span>
+                  ) : null}
+                </div>
               </div>
+
+              {onUpdateMemory && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNuevoItemNombre('');
+                      setNuevoItemCantidad(1);
+                      setNuevoItemTipo('propio');
+                      setNuevoItemEncargo('');
+                      setNuevoItemOrigen('');
+                      setNuevoItemDetalles('');
+                      setNuevoItemEquipado(false);
+                      setMostrarModalNuevoItem(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-cinzel font-bold px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] transition-colors cursor-pointer shadow-xs"
+                    title="Adquirir o registrar un nuevo objeto en la mochila"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Adquirir objeto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await onUpdateMemory(prev => {
+                        if (!prev.player_character) return prev;
+                        return {
+                          ...prev,
+                          player_character: {
+                            ...prev.player_character,
+                            inventory: deduplicarInventario(prev.player_character.inventory || [])
+                          }
+                        };
+                      });
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-cinzel px-2.5 py-1.5 rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] hover:bg-[var(--surface-soft)] text-[var(--text-secondary)] transition-colors cursor-pointer"
+                    title="Deduplicar y normalizar el inventario"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Sincronizar
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/*
-              Aquí había un formulario para meter objetos a mano, y se ha
-              quitado a propósito: al Director no se le abre el cuaderno. Si
-              falta el violín en la lista, se le dice en el Chat con el GM y lo
-              mete él, que además puede preguntar de dónde ha salido.
-            */}
             {/* Objetos de misión */}
             <div className="flex flex-col gap-2.5">
               <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-amber-500/30">
@@ -3191,20 +3274,12 @@ export const MemoryManager: React.FC<{
               </div>
               {propios.length === 0 ? (
                 <div className="text-[var(--text-secondary)] py-5 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs flex flex-col gap-2">
-                  {/*
-                    Un vacío que explica por qué está vacío y qué hacer.
-                    La lista se llena sola con lo que el Narrador vaya apuntando
-                    en sus turnos, así que al estrenarla está vacía aunque la
-                    campaña lleve meses — y sin decirlo parece que no funciona.
-                  */}
                   <span className="italic">
                     Aquí aparece lo que gane, compre o le den <strong>jugando</strong>, según lo vaya apuntando el
                     Narrador. Si la campaña es anterior a esta pantalla, estará vacía hasta el próximo botín.
                   </span>
                   <span className="not-italic font-cinzel text-[11px] text-[var(--accent)]">
-                    ¿Empiezas campaña? Dale a <strong>Sincronizar Memoria Completa con IA</strong>: lee tu ficha subida
-                    y mete aquí lo que llevas encima. Es lo que el Narrador consulta en cada turno, así que conviene
-                    hacerlo antes de la primera escena.
+                    ¿Empiezas campaña? Dale a <strong>Sincronizar Memoria Completa con IA</strong> o añade tus cosas con <strong>+ Adquirir objeto</strong>.
                   </span>
                   <span className="not-italic font-lora text-[11px] text-[var(--text-secondary)]">
                     Y si falta algo suelto, pídeselo al GM en el Chat: «mete en mi mochila el violín del Filí y mi
@@ -3218,15 +3293,7 @@ export const MemoryManager: React.FC<{
               )}
             </div>
 
-            {/*
-              Lo aprendido jugando: el hueco más silencioso que tenía la app.
-
-              La ficha se sube una vez y se queda congelada en el nivel de aquel
-              día. La aplicación llevaba el NÚMERO de nivel y nada más, así que
-              los conjuros, rasgos y competencias ganados subiendo no constaban
-              en ningún sitio: un personaje de nivel 5 jugando con la lista del
-              3 sin que nadie se entere.
-            */}
+            {/* Lo aprendido jugando */}
             {aprendido.length > 0 && (
               <div className="flex flex-col gap-2.5">
                 <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-sky-500/30">
@@ -3285,6 +3352,24 @@ export const MemoryManager: React.FC<{
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                   {requisados.map(i => <Tarjeta key={i.id} item={i} tono="requisado" />)}
+                </div>
+              </div>
+            )}
+
+            {/* Lo que ha consumido o dado de baja: se conserva en archivo para poder restaurarlo */}
+            {eliminados.length > 0 && (
+              <div className="flex flex-col gap-2.5">
+                <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-zinc-500/30">
+                  <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
+                    <ArchiveRestore className="w-3.5 h-3.5 text-zinc-500" />
+                    Lo que ha consumido o dado de baja ({eliminados.length})
+                  </span>
+                  <p className="text-[11px] text-[var(--text-secondary)] opacity-80 m-0 mt-0.5 leading-relaxed">
+                    Pociones bebidas, flechas gastadas, raciones o pertenencias dadas de baja. Se conservan aquí con su motivo para que no se pierdan de vista y puedas recuperarlas a la mochila con un solo clic.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {eliminados.map(i => <Tarjeta key={i.id} item={i} tono="eliminado" />)}
                 </div>
               </div>
             )}
@@ -3534,6 +3619,430 @@ export const MemoryManager: React.FC<{
                 }`}
               >
                 {confirmModal.confirmText || 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Requisar / Confiscar Objeto */}
+      {itemParaRequisar && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-2xs">
+          <div className="bg-[var(--bg-color)] p-5 sm:p-6 rounded-xl shadow-2xl border border-rose-500/30 w-[480px] max-w-full font-lora animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-2 border-b border-[var(--glass-border)] pb-3">
+              <div>
+                <h4 className="font-cinzel text-base sm:text-lg text-rose-600 dark:text-rose-400 font-bold flex items-center gap-2">
+                  <PackageX className="w-5 h-5 text-rose-500" /> Requisar / Cambiar poseedor
+                </h4>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  El objeto no se borra: se registra quién lo retiene o custodia.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setItemParaRequisar(null)}
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-md cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 bg-[var(--surface-soft)] p-2.5 rounded-lg border border-[var(--glass-border)]">
+              <span className="text-2xl">{iconoDe(itemParaRequisar)}</span>
+              <div>
+                <span className="font-cinzel font-bold text-sm text-[var(--text-primary)]">{itemParaRequisar.name}</span>
+                {(itemParaRequisar.quantity ?? 1) > 1 && (
+                  <span className="ml-2 text-xs font-mono text-[var(--text-secondary)]">×{itemParaRequisar.quantity}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="font-cinzel text-xs text-[var(--text-secondary)] font-semibold">
+                ¿Quién lo retiene o custodia?
+              </label>
+              <input
+                type="text"
+                value={quienRequisa}
+                onChange={e => setQuienRequisa(e.target.value)}
+                placeholder="Ej. Jarlaxle, Bregan D'aerthe, guardia de la ciudad..."
+                className="w-full text-xs sm:text-sm bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] rounded-lg p-2.5 focus:outline-hidden focus:border-rose-500"
+              />
+              <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                <span className="text-[10px] font-cinzel text-[var(--text-secondary)]">Sugerencias:</span>
+                {["Bregan D'aerthe", "Jarlaxle", "Tripulación", "Guardia de Luskan"].map(sug => (
+                  <button
+                    key={sug}
+                    type="button"
+                    onClick={() => setQuienRequisa(sug)}
+                    className="text-[10px] font-cinzel px-2 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-rose-600 cursor-pointer"
+                  >
+                    {sug}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="font-cinzel text-xs text-[var(--text-secondary)] font-semibold">
+                ¿Dónde está guardado o depositado? (opcional)
+              </label>
+              <input
+                type="text"
+                value={dondeRequisa}
+                onChange={e => setDondeRequisa(e.target.value)}
+                placeholder="Ej. Camarote del capitán, pañol de armas, bodega, cofre..."
+                className="w-full text-xs sm:text-sm bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] rounded-lg p-2.5 focus:outline-hidden focus:border-rose-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--glass-border)]">
+              <button
+                type="button"
+                onClick={() => setItemParaRequisar(null)}
+                className="px-3.5 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded-lg hover:bg-[var(--surface)] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!onUpdateMemory) return;
+                  const poseedor = quienRequisa.trim() || 'Bregan D\'aerthe';
+                  const ubicacion = dondeRequisa.trim() || undefined;
+                  await onUpdateMemory(prev => {
+                    if (!prev.player_character) return prev;
+                    const act = (list?: InventoryItem[]) =>
+                      (list || []).map(it =>
+                        sonElMismoObjeto(it.name || '', itemParaRequisar.name || '')
+                          ? { ...it, enPoderDe: poseedor, dondeEsta: ubicacion, eliminado: undefined }
+                          : it
+                      );
+                    return {
+                      ...prev,
+                      player_character: {
+                        ...prev.player_character,
+                        inventory: act(prev.player_character.inventory)
+                      }
+                    };
+                  });
+                  setItemParaRequisar(null);
+                }}
+                className="px-4 py-1.5 text-xs font-cinzel font-bold rounded-lg bg-rose-600 hover:bg-rose-700 text-white cursor-pointer shadow-xs transition-colors"
+              >
+                Confirmar requisa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Dar de Baja / Eliminar Objeto */}
+      {itemParaEliminar && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-2xs">
+          <div className="bg-[var(--bg-color)] p-5 sm:p-6 rounded-xl shadow-2xl border border-red-500/30 w-[480px] max-w-full font-lora animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-2 border-b border-[var(--glass-border)] pb-3">
+              <div>
+                <h4 className="font-cinzel text-base sm:text-lg text-red-600 dark:text-red-400 font-bold flex items-center gap-2">
+                  <Trash2 className="w-5 h-5 text-red-500" /> Dar de baja o eliminar objeto
+                </h4>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  Elige si deseas conservarlo en el archivo de bajas (para poder recuperarlo) o borrarlo definitivamente.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setItemParaEliminar(null)}
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-md cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 bg-[var(--surface-soft)] p-2.5 rounded-lg border border-[var(--glass-border)]">
+              <span className="text-2xl">{iconoDe(itemParaEliminar)}</span>
+              <div>
+                <span className="font-cinzel font-bold text-sm text-[var(--text-primary)]">{itemParaEliminar.name}</span>
+                {(itemParaEliminar.quantity ?? 1) > 1 && (
+                  <span className="ml-2 text-xs font-mono text-[var(--text-secondary)]">×{itemParaEliminar.quantity}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="font-cinzel text-xs text-[var(--text-secondary)] font-semibold">
+                Motivo de la baja (opcional)
+              </label>
+              <input
+                type="text"
+                value={motivoEliminar}
+                onChange={e => setMotivoEliminar(e.target.value)}
+                placeholder="Ej. Consumido en combate, gastado, vendido, extraviado..."
+                className="w-full text-xs sm:text-sm bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] rounded-lg p-2.5 focus:outline-hidden focus:border-red-500"
+              />
+              <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                <span className="text-[10px] font-cinzel text-[var(--text-secondary)]">Sugerencias:</span>
+                {["Consumido", "Gastado", "Vendido", "Perdido", "Entregado"].map(sug => (
+                  <button
+                    key={sug}
+                    type="button"
+                    onClick={() => setMotivoEliminar(sug)}
+                    className="text-[10px] font-cinzel px-2 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-red-600 cursor-pointer"
+                  >
+                    {sug}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--glass-border)] flex-wrap">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!onUpdateMemory) return;
+                  await onUpdateMemory(prev => {
+                    if (!prev.player_character) return prev;
+                    const filtrado = (prev.player_character.inventory || []).filter(
+                      it => !sonElMismoObjeto(it.name || '', itemParaEliminar.name || '')
+                    );
+                    return {
+                      ...prev,
+                      player_character: {
+                        ...prev.player_character,
+                        inventory: filtrado
+                      }
+                    };
+                  });
+                  setItemParaEliminar(null);
+                }}
+                className="px-3 py-1.5 text-xs font-cinzel text-red-600 hover:text-red-700 hover:underline cursor-pointer"
+                title="Eliminar del todo sin dejar rastro en el archivo"
+              >
+                Borrar definitivamente
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setItemParaEliminar(null)}
+                  className="px-3.5 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded-lg hover:bg-[var(--surface)] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!onUpdateMemory) return;
+                    const motivo = motivoEliminar.trim() || 'Dado de baja / consumido';
+                    await onUpdateMemory(prev => {
+                      if (!prev.player_character) return prev;
+                      const act = (list?: InventoryItem[]) =>
+                        (list || []).map(it =>
+                          sonElMismoObjeto(it.name || '', itemParaEliminar.name || '')
+                            ? { ...it, eliminado: true, quantity: 0, motivoBaja: motivo }
+                            : it
+                        );
+                      return {
+                        ...prev,
+                        player_character: {
+                          ...prev.player_character,
+                          inventory: act(prev.player_character.inventory)
+                        }
+                      };
+                    });
+                    setItemParaEliminar(null);
+                  }}
+                  className="px-4 py-1.5 text-xs font-cinzel font-bold rounded-lg bg-zinc-700 hover:bg-zinc-800 text-white cursor-pointer shadow-xs transition-colors"
+                >
+                  Dar de baja (archivar)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Adquirir / Registrar Nuevo Objeto */}
+      {mostrarModalNuevoItem && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-2xs">
+          <div className="bg-[var(--bg-color)] p-5 sm:p-6 rounded-xl shadow-2xl border border-[var(--accent)]/40 w-[500px] max-w-full font-lora animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-2 border-b border-[var(--glass-border)] pb-3">
+              <div>
+                <h4 className="font-cinzel text-base sm:text-lg text-[var(--accent)] font-bold flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-[var(--accent)]" /> Adquirir / Añadir a la mochila
+                </h4>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  Registra un objeto encontrado, comprado, regalado o traído de casa.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarModalNuevoItem(false)}
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-md cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2 flex flex-col gap-1.5">
+                <label className="font-cinzel text-xs text-[var(--text-secondary)] font-semibold">
+                  Nombre del objeto *
+                </label>
+                <input
+                  type="text"
+                  value={nuevoItemNombre}
+                  onChange={e => setNuevoItemNombre(e.target.value)}
+                  placeholder="Ej. Violín de las Moonshae, Daga de plata..."
+                  className="w-full text-xs sm:text-sm bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] rounded-lg p-2.5 focus:outline-hidden focus:border-[var(--accent)]"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="font-cinzel text-xs text-[var(--text-secondary)] font-semibold">
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="999"
+                  value={nuevoItemCantidad}
+                  onChange={e => setNuevoItemCantidad(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  className="w-full text-xs sm:text-sm bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] rounded-lg p-2.5 focus:outline-hidden focus:border-[var(--accent)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="font-cinzel text-xs text-[var(--text-secondary)] font-semibold">
+                Tipo de pertenencia
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNuevoItemTipo('propio')}
+                  className={`p-2.5 rounded-lg border text-left flex flex-col gap-0.5 cursor-pointer transition-colors ${
+                    nuevoItemTipo === 'propio'
+                      ? 'bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]'
+                      : 'bg-[var(--surface)] border-[var(--glass-border)] text-[var(--text-secondary)]'
+                  }`}
+                >
+                  <span className="font-cinzel text-xs font-bold flex items-center gap-1.5">
+                    <Backpack className="w-3.5 h-3.5" /> Sus cosas
+                  </span>
+                  <span className="text-[10px] opacity-80">Equipo personal que le pertenece</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNuevoItemTipo('mision')}
+                  className={`p-2.5 rounded-lg border text-left flex flex-col gap-0.5 cursor-pointer transition-colors ${
+                    nuevoItemTipo === 'mision'
+                      ? 'bg-amber-500/10 border-amber-500 text-amber-700 dark:text-amber-300'
+                      : 'bg-[var(--surface)] border-[var(--glass-border)] text-[var(--text-secondary)]'
+                  }`}
+                >
+                  <span className="font-cinzel text-xs font-bold flex items-center gap-1.5">
+                    <Scroll className="w-3.5 h-3.5 text-amber-600" /> Por encargo / misión
+                  </span>
+                  <span className="text-[10px] opacity-80">Carta, reliquia, tarea que entregar</span>
+                </button>
+              </div>
+            </div>
+
+            {nuevoItemTipo === 'mision' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-amber-500/5 p-3 rounded-lg border border-amber-500/20">
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-cinzel text-[11px] text-amber-700 dark:text-amber-300 font-semibold">
+                    ¿Qué hay que hacer? (encargo)
+                  </label>
+                  <input
+                    type="text"
+                    value={nuevoItemEncargo}
+                    onChange={e => setNuevoItemEncargo(e.target.value)}
+                    placeholder="Ej. Entregar sin abrir al capitán..."
+                    className="w-full text-xs bg-[var(--surface)] text-[var(--text-primary)] border border-amber-500/30 rounded-lg p-2 focus:outline-hidden"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-cinzel text-[11px] text-amber-700 dark:text-amber-300 font-semibold">
+                    ¿De parte de quién? (origen)
+                  </label>
+                  <input
+                    type="text"
+                    value={nuevoItemOrigen}
+                    onChange={e => setNuevoItemOrigen(e.target.value)}
+                    placeholder="Ej. Lord Neverember, el viejo marinero..."
+                    className="w-full text-xs bg-[var(--surface)] text-[var(--text-primary)] border border-amber-500/30 rounded-lg p-2 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <label className="font-cinzel text-xs text-[var(--text-secondary)] font-semibold">
+                Detalles / Descripción (opcional)
+              </label>
+              <textarea
+                value={nuevoItemDetalles}
+                onChange={e => setNuevoItemDetalles(e.target.value)}
+                placeholder="Propiedades, historia, notas sobre el objeto..."
+                rows={2}
+                className="w-full text-xs sm:text-sm bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--glass-border)] rounded-lg p-2.5 focus:outline-hidden focus:border-[var(--accent)] resize-none"
+              />
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-[var(--text-secondary)]">
+              <input
+                type="checkbox"
+                checked={nuevoItemEquipado}
+                onChange={e => setNuevoItemEquipado(e.target.checked)}
+                className="rounded border-[var(--glass-border)] text-[var(--accent)] focus:ring-[var(--accent)]"
+              />
+              <span className="font-cinzel">Llevar equipado o empuñado de inicio</span>
+            </label>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--glass-border)]">
+              <button
+                type="button"
+                onClick={() => setMostrarModalNuevoItem(false)}
+                className="px-3.5 py-1.5 text-xs font-cinzel border border-[var(--glass-border)] rounded-lg hover:bg-[var(--surface)] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!nuevoItemNombre.trim()}
+                onClick={async () => {
+                  if (!onUpdateMemory || !nuevoItemNombre.trim()) return;
+                  const itemNuevo: InventoryItem = {
+                    id: `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+                    name: nuevoItemNombre.trim(),
+                    quantity: nuevoItemCantidad,
+                    equipped: nuevoItemEquipado,
+                    deMision: nuevoItemTipo === 'mision',
+                    encargo: nuevoItemTipo === 'mision' ? nuevoItemEncargo.trim() || undefined : undefined,
+                    origen: nuevoItemTipo === 'mision' ? nuevoItemOrigen.trim() || undefined : undefined,
+                    description: nuevoItemDetalles.trim() || undefined
+                  };
+                  await onUpdateMemory(prev => {
+                    if (!prev.player_character) return prev;
+                    const previo = prev.player_character.inventory || [];
+                    return {
+                      ...prev,
+                      player_character: {
+                        ...prev.player_character,
+                        inventory: deduplicarInventario([...previo, itemNuevo])
+                      }
+                    };
+                  });
+                  setMostrarModalNuevoItem(false);
+                }}
+                className={`px-4 py-1.5 text-xs font-cinzel font-bold rounded-lg transition-colors cursor-pointer shadow-xs ${
+                  nuevoItemNombre.trim()
+                    ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)]'
+                    : 'bg-zinc-500/20 text-zinc-400 cursor-not-allowed'
+                }`}
+              >
+                Añadir a la mochila
               </button>
             </div>
           </div>
