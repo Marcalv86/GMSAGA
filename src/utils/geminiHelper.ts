@@ -8206,7 +8206,8 @@ export async function extraerIdentidadDeDocumentos({
     const bEsFicha = esFichaDelPj(b) ? 1 : 0;
     return bEsFicha - aEsFicha;
   });
-  const fuentes = (fichas.length ? fichas : candidatosOrdenados).slice(0, 6);
+  // Si hay ficha(s) marcada(s), con ella(s) basta (máximo 2). Si no, hasta 3 documentos candidatos.
+  const fuentes = fichas.length > 0 ? fichas.slice(0, 2) : candidatosOrdenados.slice(0, 3);
   if (fuentes.length === 0) {
     throw new Error('No hay documentos de texto de los que leer la ficha. Sube la ficha del personaje en Archivos.');
   }

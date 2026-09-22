@@ -4368,6 +4368,13 @@ export default function App() {
     const nombreDeReserva = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
     const nombreActual = (pc?.name || '').trim();
     const faltaNombre = !nombreActual || nombreDeReserva.test(nombreActual);
+
+    // Si ya se ha procesado la ficha automáticamente y el personaje tiene nombre y atributos o clase,
+    // no volvemos a lanzar otra llamada pesada en segundo plano a menos que sea forzado a mano o se hayan subido fichas nuevas.
+    if (!forzarManual && (pc as any)?.fichaProcesadaDeDocumentos && !faltaNombre && (pc?.attributes || pc?.class)) {
+      return;
+    }
+
     const faltaAlgo =
       faltaNombre ||
       !pc?.race ||
@@ -4379,7 +4386,7 @@ export default function App() {
       // Y sus atributos: sin ellos no se puede pedir una sola tirada bien.
       !pc?.attributes ||
       !pc?.skillProficienciesDetalle?.length;
-    if (!faltaAlgo) return;
+    if (!faltaAlgo && !forzarManual) return;
 
     const arranqueFicha = Date.now();
     setTopProgress({
@@ -4468,6 +4475,7 @@ export default function App() {
           nuevo.skillProficienciesDetalle = id.skillProficiencies;
           puestos.push(`${id.skillProficiencies.length} competencias entrenadas`);
         }
+        (nuevo as any).fichaProcesadaDeDocumentos = true;
         return { ...mem, player_character: nuevo };
       });
       if (puestos.length) {
