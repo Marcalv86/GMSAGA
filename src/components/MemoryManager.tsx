@@ -917,9 +917,8 @@ export const MemoryManager: React.FC<{
       title: 'Restablecer Toda la Memoria',
       message:
         'Vacía del todo la memoria de la campaña: Protagonista, cronología e hilos, PNJs y sus afinidades, Lugares, Tramas, Resumen, Estado y Notas.\n\n' +
-        '✅ TU CRÓNICA Y TUS DOCUMENTOS NO SE TOCAN. Por eso esto se puede deshacer: dale luego a «Sincronizar Memoria Completa con IA» y lo reconstruye leyendo el chat entero —gente, lugares, tramas, diario, mochila y afinidades—.\n\n' +
-        '🖼️ Los retratos de los PNJs se guardan aparte y se vuelven a pegar solos cuando la sincronización los fiche de nuevo. Tu retrato y tu memoria visual se conservan.\n\n' +
-        '⚠️ LO QUE SÍ SE PIERDE DE VERDAD es lo que nunca estuvo escrito en el chat: los secretos del Director, el plan de campaña y la lista de «esto no es un PNJ». Eso no hay crónica que lo devuelva.',
+        '✅ TU CRÓNICA Y TUS DOCUMENTOS NO SE TOCAN. Por eso esto se puede reconstruir: dale luego a «Sincronizar Memoria Completa con IA» y lo reconstruirá leyendo cronológicamente todos los chats y todos los documentos subidos (ficha del PJ, trasfondo, facciones, mundo) —gente, lugares, tramas, diario, mochila, afinidades, cuaderno del GM y tramado de campaña—.\n\n' +
+        '🖼️ Los retratos de los PNJs se guardan aparte y se vuelven a pegar solos cuando la sincronización los fiche de nuevo. Tu retrato y tu memoria visual se conservan.',
       onConfirm: async () => {
         setExpandedLocIds(new Set());
         setExpandedQuestIds(new Set());

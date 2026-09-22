@@ -127,7 +127,8 @@ import {
   getStoredAutoBackgroundTasks,
   generarNoticiasSaltoTemporal,
   anclarHistorialPorHud,
-  consolidarCronicaAlCerrarCapitulo
+  consolidarCronicaAlCerrarCapitulo,
+  ordenarChatsCronologicamente
 } from './utils/geminiHelper';
 import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo, desarchivarCapitulo } from './utils/chapterArchiver';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
@@ -694,10 +695,10 @@ export default function App() {
       }
 
       if (!isCancelled) {
-        chs.sort((a, b) => a.id.localeCompare(b.id));
-        setCurrentChats(chs);
-        if (chs.length > 0 && (!currentChatId || !chs.some(c => c.id === currentChatId))) {
-          setCurrentChatId(chs[0].id);
+        const ordenados = ordenarChatsCronologicamente(chs);
+        setCurrentChats(ordenados);
+        if (ordenados.length > 0 && (!currentChatId || !ordenados.some(c => c.id === currentChatId))) {
+          setCurrentChatId(ordenados[0].id);
         }
       }
     };
@@ -2866,34 +2867,20 @@ export default function App() {
    */
   const montarSesionCero = async (
     archivos: ProjectFile[],
-    proyecto: Project | null
+    proyecto: Project | null,
+    options?: { forzar?: boolean }
   ): Promise<{ facciones: number; preparado: number; relojes: number } | null> => {
     if (!proyecto) return null;
-    if (!getStoredAutoBackgroundTasks()) return null;
+    if (!options?.forzar && !getStoredAutoBackgroundTasks()) return null;
 
     const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
-    const documentos = (archivos || []).filter(f => esTexto(f) && (f.content || '').trim().length > 200);
+    const documentos = (archivos || []).filter(f => esTexto(f) && (f.content || '').trim().length > 100);
     if (!documentos.length) return null;
 
-    /*
-     * QUÉ HAY SIN MIRAR, QUE NO ES LO MISMO QUE «EL CUADERNO ESTÁ VACÍO».
-     *
-     * La primera versión solo montaba la mesa con el cuaderno en blanco, y esa
-     * regla da por supuesto que la biblioteca se sube de una sentada. No se
-     * sube así: el material está repartido en carpetas y entra en dos o tres
-     * tandas, y más tarde se corrige un compendio y se vuelve a subir. Con la
-     * regla vieja, la primera tanda montaba el tablero y **todo lo demás no se
-     * miraba jamás**: el resto de la biblioteca existía para el buscador pero
-     * no para el Director.
-     *
-     * Ahora se lleva la cuenta de qué se ha mirado y en qué estado estaba, así
-     * que una tanda nueva —o un documento corregido— vuelve a ser «por mirar»
-     * y se revisa buscando lo que traiga de nuevo.
-     */
     const vistos = new Map(
-      (proyecto.memory?.documentos_del_tablero || []).map(d => [d.id, d.huella])
+      (options?.forzar ? [] : (proyecto.memory?.documentos_del_tablero || [])).map(d => [d.id, d.huella])
     );
-    const porMirar = documentos.filter(f => vistos.get(f.id) !== huellaDeDocumento(f));
+    const porMirar = options?.forzar ? documentos : documentos.filter(f => vistos.get(f.id) !== huellaDeDocumento(f));
     if (!porMirar.length) return null;
 
     const arranque = Date.now();
@@ -5164,8 +5151,7 @@ export default function App() {
        * gratis —ni una llamada más— y se puede repetir, porque siempre se parte
        * de cero sobre los mismos mensajes.
        */
-      const mensajesDeLaCronica = [...currentChats]
-        .sort((a, b) => a.id.localeCompare(b.id))
+      const mensajesDeLaCronica = ordenarChatsCronologicamente(currentChats)
         .flatMap(c => c.messages || []);
       const mochila = reconstruirInventario(
         mensajesDeLaCronica,
@@ -5410,7 +5396,8 @@ export default function App() {
         await new Promise(r => setTimeout(r, 1200));
         tableroMontado = await montarSesionCero(
           currentFilesRef.current,
-          projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null
+          projectsRef.current.find(pr => pr.id === currentPIdRef.current) || null,
+          { forzar: true }
         );
       } catch (err) {
         logWarn('memory_sync', 'No se pudo montar el tablero durante la sincronización', describeApiError(err));

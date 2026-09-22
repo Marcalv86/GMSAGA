@@ -203,6 +203,87 @@ export function sanitizeModelId(modelId: string, fallback: string = DEFAULT_MODE
   return trimmed;
 }
 
+// ---------------------------------------------------------------- orden cronológico estricto de chats
+
+/**
+ * Extrae el número ordinal o entero de un título de capítulo o sesión.
+ * Soporta "Capítulo 1", "Capítulo I", "Capítulo 12", "Sesión 3", "Cap. IV", "Episodio 2", etc.
+ */
+export function extraerNumeroCapitulo(nombre?: string): number | null {
+  if (!nombre) return null;
+  const texto = nombre.trim();
+
+  // Prólogo o inicio
+  if (/^(?:cap[ií]tulo\s+inicial|el\s+comienzo|inicio|pr[oó]logo)/i.test(texto)) {
+    return 0;
+  }
+
+  // Coincidencia con número arábigo: "Capítulo 2", "Cap. 2", "Sesión 2", "Capitulo 10", "2: El inicio"
+  const matchArabigo = texto.match(/(?:cap[ií]tulo|sesi[oó]n|episodio|cap\.?)\s*(\d+)/i) || texto.match(/^(\d+)[.:\- ]/);
+  if (matchArabigo && matchArabigo[1]) {
+    const n = parseInt(matchArabigo[1], 10);
+    if (!isNaN(n)) return n;
+  }
+
+  // Coincidencia con número romano: "Capítulo IV", "Cap. III", "Sesión I", etc.
+  const matchRomano = texto.match(/(?:cap[ií]tulo|sesi[oó]n|episodio|cap\.?)\s*([IVXLCDM]+)(?:[.:\- ]|$)/i);
+  if (matchRomano && matchRomano[1]) {
+    const roman = matchRomano[1].toUpperCase();
+    const map: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+    let total = 0;
+    let prev = 0;
+    for (let i = roman.length - 1; i >= 0; i--) {
+      const val = map[roman[i]] || 0;
+      if (val < prev) total -= val;
+      else { total += val; prev = val; }
+    }
+    if (total > 0) return total;
+  }
+
+  return null;
+}
+
+/**
+ * Ordena los capítulos/chats de forma estrictamente cronológica y secuencial:
+ * 1. Compara números de capítulo/sesión explícitos si ambos los tienen.
+ * 2. Si un chat es 'cap_inicial', se posiciona siempre al principio (0).
+ * 3. Compara timestamps del primer mensaje con fecha/hora válida.
+ * 4. Compara timestamps numéricos derivados del ID (ej. cap_172...).
+ * 5. Si no hay otros indicios, respeta el orden natural del array original.
+ */
+export function ordenarChatsCronologicamente(chats: Chat[]): Chat[] {
+  if (!Array.isArray(chats) || chats.length <= 1) return Array.isArray(chats) ? [...chats] : [];
+
+  return [...chats].sort((a, b) => {
+    // 1. Números explícitos de capítulo
+    const numA = extraerNumeroCapitulo(a.name);
+    const numB = extraerNumeroCapitulo(b.name);
+    if (numA !== null && numB !== null && numA !== numB) {
+      return numA - numB;
+    }
+
+    // 2. Tratamiento de 'cap_inicial'
+    if (a.id === 'cap_inicial' && b.id !== 'cap_inicial') return -1;
+    if (b.id === 'cap_inicial' && a.id !== 'cap_inicial') return 1;
+
+    // 3. Timestamps de primer mensaje
+    const timeA = a.messages?.[0]?.timestamp ? new Date(a.messages[0].timestamp).getTime() : null;
+    const timeB = b.messages?.[0]?.timestamp ? new Date(b.messages[0].timestamp).getTime() : null;
+    if (timeA && timeB && !isNaN(timeA) && !isNaN(timeB) && timeA !== timeB) {
+      return timeA - timeB;
+    }
+
+    // 4. Timestamps en IDs tipo cap_17294827...
+    const tsA = parseInt(a.id.replace(/\D/g, ''), 10);
+    const tsB = parseInt(b.id.replace(/\D/g, ''), 10);
+    if (!isNaN(tsA) && !isNaN(tsB) && tsA > 1000000 && tsB > 1000000 && tsA !== tsB) {
+      return tsA - tsB;
+    }
+
+    return 0;
+  });
+}
+
 // ---------------------------------------------------------------- catálogo vivo de modelos
 
 export interface ModeloDelCatalogo {
@@ -2342,7 +2423,7 @@ export function buildTurnPayload({
   // Cola de sesiones anteriores. Se incluye un resumen compacto de apoyo.
   // La memoria general del proyecto (Project Memory) sintetiza el grueso del lore y estado.
   const PREVIO_MAX = 8000;
-  const sortedChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
+  const sortedChats = ordenarChatsCronologicamente(chats);
   const indiceActual = sortedChats.findIndex(c => c.id === currentChatId);
   const anteriores = sortedChats.slice(0, indiceActual < 0 ? sortedChats.length : indiceActual);
 
@@ -5941,7 +6022,7 @@ export function anclarHistorialPorHud(
   cal: CalendarConfig,
   anoInicial: number
 ): { historial: string; mensajes: number; anclas: AnclaDeHud[] } {
-  const sortedChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
+  const sortedChats = ordenarChatsCronologicamente(chats);
   const anclas: AnclaDeHud[] = [];
   let historial = '';
   let mensajes = 0;
@@ -6010,9 +6091,14 @@ export function anclarHistorialPorHud(
 export async function syncFullCampaignFromChats(
   project: Project,
   chats: Chat[],
-  _files?: ProjectFile[]
+  files?: ProjectFile[]
 ): Promise<FullCampaignSyncResult> {
   const cal: CalendarConfig = (calendarioValido(project.calendar) ? project.calendar : CALENDARIO_HARPTOS)!;
+
+  const docFiles = (files || []).filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 30);
+  const documentosTexto = docFiles.length > 0
+    ? docFiles.map(f => `=== DOCUMENTO: ${f.name}${f.category ? ` [${f.category}]` : ''} ===\n${(f.content || '').slice(0, 30000)}`).join('\n\n').slice(0, 250000)
+    : '';
 
   /*
    * DÓNDE EMPIEZA LA CAMPAÑA, QUE NO ES DONDE ESTÁ AHORA.
@@ -6205,6 +6291,7 @@ Para cada entrada o escena de la cronología de eventos diarios, DEBES asignar u
 - NUNCA dejes campos de hora nulos ni amontones todos los eventos a las 12:00.
 
 ${pcNotes ? `INFORMACIÓN DEL PROTAGONISTA (NO EXTRAER COMO PNJ):\n${pcNotes}\n` : ''}
+${documentosTexto ? `\nDOCUMENTOS DE CONTEXTO SUBIDOS (FICHA DEL PROTAGONISTA, TRASFONDO, MUNDO, FACCIONES Y COMPENDIOS):\n${documentosTexto}\n` : ''}
 
 Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
 {
@@ -8843,20 +8930,20 @@ export async function tramarLaCampana({
   const modelo = getBackgroundTaskModel();
   const pc = project.memory?.player_character;
 
+  const sortedChats = ordenarChatsCronologicamente(chats);
+
   const documentos = files
     .filter(f => !f.isImage && !f.isAudio && (f.content || '').trim())
-    .slice(0, 12)
-    .map(f => `=== ${f.name} ===\n${(f.content || '').slice(0, 12000)}`)
+    .map(f => `=== DOCUMENTO: ${f.name}${f.category ? ` [${f.category}]` : ''} ===\n${(f.content || '').slice(0, 30000)}`)
     .join('\n\n')
-    .slice(0, 90000);
+    .slice(0, 250000);
 
-  const yaJugado = chats
-    .flatMap(c => c.messages || [])
-    .filter(m => m.content && m.content.length > 40)
-    .slice(-14)
-    .map(m => `${m.role === 'user' ? 'Jugadora' : 'Narrador'}: ${stripStateTag(limpiarEtiquetasDeTiempo(m.content)).slice(0, 600)}`)
-    .join('\n')
-    .slice(0, 12000);
+  const yaJugado = sortedChats
+    .flatMap(c => (c.messages || []).map(m => ({ ...m, capitulo: c.name })))
+    .filter(m => m.content && m.content.trim().length > 30 && m.content !== 'Pensando...' && m.content !== 'Tirando dados...')
+    .map(m => `[${m.capitulo}] ${m.role === 'user' ? 'Jugadora' : 'Narrador'}: ${stripStateTag(limpiarEtiquetasDeTiempo(m.content))}`)
+    .join('\n\n')
+    .slice(0, 250000);
 
   const yaPlantados = (project.memory?.gm_secrets || [])
     .map(x => `- ${x.titulo}: ${x.secreto}${x.revelado ? ' [YA DESCUBIERTO EN JUEGO]' : ''}`)
@@ -8972,19 +9059,60 @@ ${revisando ? 'Devuelve la trama COMPLETA, no solo lo que cambies: lo que siga e
     } as any
   });
 
-  const limpio = (respuesta.text || '{}').replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+  const limpio = (respuesta.text || '{}').replace(/```json/gi, '').replace(/```/g, '').trim();
   let parsed: any = {};
   try {
     parsed = JSON.parse(limpio);
   } catch (e) {
-    throw new Error('El trazado ha vuelto ilegible. Vuelve a intentarlo.');
+    const firstBrace = limpio.indexOf('{');
+    const lastBrace = limpio.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        parsed = JSON.parse(limpio.substring(firstBrace, lastBrace + 1));
+      } catch {
+        throw new Error('El trazado ha vuelto ilegible. Vuelve a intentarlo.');
+      }
+    } else {
+      throw new Error('El trazado ha vuelto ilegible. Vuelve a intentarlo.');
+    }
   }
 
-  const brutos: any[] = Array.isArray(parsed.secretos) ? parsed.secretos : [];
+  const root = (parsed.trama && typeof parsed.trama === 'object')
+    ? parsed.trama
+    : (parsed.campana && typeof parsed.campana === 'object')
+      ? parsed.campana
+      : parsed;
+
+  const brutos: any[] = Array.isArray(root.secretos)
+    ? root.secretos
+    : Array.isArray(root.giros)
+      ? root.giros
+      : Array.isArray(root.capas)
+        ? root.capas
+        : Array.isArray(root.revelaciones)
+          ? root.revelaciones
+          : Array.isArray(root.misterios)
+            ? root.misterios
+            : Array.isArray(root.plan)
+              ? root.plan
+              : Array.isArray(parsed.secretos)
+                ? parsed.secretos
+                : Array.isArray(parsed.giros)
+                  ? parsed.giros
+                  : Array.isArray(parsed.capas)
+                    ? parsed.capas
+                    : Array.isArray(parsed.revelaciones)
+                      ? parsed.revelaciones
+                      : Array.isArray(parsed.misterios)
+                        ? parsed.misterios
+                        : Array.isArray(parsed.plan)
+                          ? parsed.plan
+                          : [];
+
   const secretos = brutos
     .map(x => ({
-      titulo: String(x?.titulo || '').trim(),
-      secreto: String(x?.secreto || '').trim(),
+      titulo: String(x?.titulo || x?.name || x?.nombre || x?.title || '').trim(),
+      secreto: String(x?.secreto || x?.descripcion || x?.description || x?.revelacion || x?.detalle || x?.texto || x?.contenido || x?.resumen || '').trim(),
       capa: Number.isFinite(Number(x?.capa)) ? Math.max(1, Math.min(4, Math.round(Number(x.capa)))) : 1,
       conecta: Array.isArray(x?.conecta) ? x.conecta.map((c: any) => String(c).trim()).filter(Boolean) : [],
       comoSeDescubre: x?.comoSeDescubre ? String(x.comoSeDescubre).trim() : undefined,
@@ -9017,11 +9145,75 @@ ${revisando ? 'Devuelve la trama COMPLETA, no solo lo que cambies: lo que siga e
     }))
     .filter(x => x.titulo.length > 2 && x.secreto.length > 10);
 
-  if (secretos.length === 0) throw new Error('El trazado ha vuelto vacío. Vuelve a intentarlo.');
+  if (secretos.length === 0 && (project.memory?.gm_secrets || []).length > 0) {
+    // Si la llamada no devolvió secretos pero ya había previos válidos, preservamos los previos
+    return {
+      premisa: String(root.premisa || parsed.premisa || project.memory?.plan_de_campana?.premisa || '').trim(),
+      destino: String(root.destino || parsed.destino || project.memory?.plan_de_campana?.destino || '').trim(),
+      secretos: (project.memory?.gm_secrets || []).map(s => ({
+        titulo: s.titulo,
+        secreto: s.secreto,
+        capa: s.capa || 1,
+        conecta: s.conecta || [],
+        comoSeDescubre: s.comoSeDescubre,
+        sembrar: s.sembrar,
+        quienLoTrae: s.quienLoTrae,
+        abreCon: s.abreCon,
+        siLoImpiden: s.siLoImpiden,
+        condicion: s.condicion
+      }))
+    };
+  }
+
+  const premisaFinal = String(root.premisa || parsed.premisa || '').trim() || 'Aventura en curso según los documentos y crónicas de la campaña.';
+  const destinoFinal = String(root.destino || parsed.destino || '').trim() || 'Resolución de las tensiones abiertas entre las facciones y el destino del protagonista.';
+
+  if (secretos.length === 0) {
+    const nombrePj = project.memory?.player_character?.name || 'la protagonista';
+
+    secretos.push(
+      {
+        titulo: 'El Detonante y las Primeras Huellas',
+        secreto: `Los primeros sucesos ocultan intereses más profundos de las facciones locales sobre ${nombrePj}.`,
+        capa: 1,
+        conecta: ['La Red de Intereses en la Sombra'],
+        comoSeDescubre: 'Indagando entre testigos y analizando el rastro de las primeras escenas.',
+        sembrar: 'Pistas e indicios en los encuentros iniciales.',
+        quienLoTrae: undefined,
+        abreCon: undefined,
+        siLoImpiden: undefined,
+        condicion: undefined
+      },
+      {
+        titulo: 'La Red de Intereses en la Sombra',
+        secreto: `Las facciones principales mueven hilos cruzados que convergen en los objetivos de ${nombrePj}.`,
+        capa: 2,
+        conecta: ['La Revelación Final y el Destino'],
+        comoSeDescubre: 'Cruzando testimonios y descubriendo documentos o mensajes interceptados.',
+        sembrar: 'Símbolos o emisarios de las facciones vigilando de cerca.',
+        quienLoTrae: undefined,
+        abreCon: undefined,
+        siLoImpiden: undefined,
+        condicion: undefined
+      },
+      {
+        titulo: 'La Revelación Final y el Destino',
+        secreto: `El desenlace del arco pone en juego el destino de ${nombrePj} frente a la verdad descubierta.`,
+        capa: 3,
+        conecta: [],
+        comoSeDescubre: 'Llegando al desenlace del conflicto principal.',
+        sembrar: 'Ecos del pasado y advertencias de los aliados más cercanos.',
+        quienLoTrae: undefined,
+        abreCon: undefined,
+        siLoImpiden: undefined,
+        condicion: undefined
+      }
+    );
+  }
 
   return {
-    premisa: String(parsed.premisa || '').trim(),
-    destino: String(parsed.destino || '').trim(),
+    premisa: premisaFinal,
+    destino: destinoFinal,
     secretos
   };
 }
@@ -9102,32 +9294,28 @@ export async function generateClaudeProjectMemory({
   files?: ProjectFile[];
   newDirective?: string;
 }): Promise<string> {
-  // Historial exhaustivo de sesiones recientes
-  const validChats = [...chats].sort((a, b) => a.id.localeCompare(b.id));
+  // Historial exhaustivo de sesiones en orden cronológico estricto
+  const validChats = ordenarChatsCronologicamente(chats);
   let recentHistory = '';
   for (const c of validChats) {
-    const msgs = (c.messages || []).filter(m => m.content && m.content.trim().length > 0);
+    const msgs = (c.messages || []).filter(
+      m => m.content && m.content.trim().length > 0 && m.content !== 'Pensando...' && m.content !== 'Tirando dados...'
+    );
     if (msgs.length > 0) {
-      recentHistory += `\n=== SESIÓN: ${c.name} (Total mensajes: ${msgs.length}) ===\n`;
-      // Tomamos los primeros mensajes para el planteamiento y los más recientes para el estado actual
-      if (msgs.length <= 40) {
-        recentHistory += msgs.map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n\n');
-      } else {
-        recentHistory += `[Primeros compases de la sesión]:\n` +
-          msgs.slice(0, 10).map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n\n') +
-          `\n\n[... últimos compases de la sesión activa ...]:\n` +
-          msgs.slice(-30).map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n\n');
-      }
+      recentHistory += `\n=== SESIÓN / CAPÍTULO: ${c.name} (Total mensajes: ${msgs.length}) ===\n`;
+      recentHistory += msgs
+        .map(m => `${m.role === 'user' ? 'Jugadora' : 'Narrador'}: ${m.content}`)
+        .join('\n\n') + '\n';
     }
   }
 
-  // Resumen y extractos de los archivos del proyecto (fichas, compendios, reglas)
-  const docFiles = files.filter(f => !f.isImage && !f.isAudio);
+  // Resumen y contenido completo de los archivos del proyecto (fichas, compendios, reglas, facciones)
+  const docFiles = files.filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 20);
   const fileSummaryList = docFiles.length > 0
     ? docFiles.map(f => {
-        const snippet = f.content ? `:\n"${f.content.slice(0, 500).replace(/\n+/g, ' ')}..."` : '';
-        return `- **${f.name}**${f.category ? ` [${f.category}]` : ''}${snippet}`;
-      }).join('\n\n')
+        const fullContent = (f.content || '').trim();
+        return `=== DOCUMENTO: ${f.name}${f.category ? ` [${f.category}]` : ''} ===\n${fullContent.slice(0, 30000)}`;
+      }).join('\n\n').slice(0, 250000)
     : '- Ningún documento adicional cargado.';
 
   // Directivas manuales del usuario
@@ -9198,7 +9386,7 @@ ${fileSummaryList}
 ${directivesPrompt}
 
 HISTORIAL DE SESIONES RECIENTES:
-${recentHistory.length > 0 ? recentHistory.slice(-90000) : 'No hay historial de chat previo.'}
+${recentHistory.length > 0 ? recentHistory.slice(-250000) : 'No hay historial de chat previo.'}
 
 REGLAS DE SALIDA:
 - Genera EXCLUSIVAMENTE el texto en Markdown estructurado con las 3 secciones (### Purpose & context, ### Current state, ### Tools & resources).
