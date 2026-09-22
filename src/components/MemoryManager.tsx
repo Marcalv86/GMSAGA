@@ -65,7 +65,7 @@ import {
 import { esNombreDeProtagonista } from '../utils/sanitizers';
 import { obtenerOGenerarFichaNpc, asegurarFichaCompletaNpc } from '../utils/canonicalNpcStats';
 import { deduplicarInventario, esRequisado, sonElMismoObjeto } from '../utils/inventoryTag';
-import { InventoryItemIcon, CoinBadgeDot, classifyInventoryItem } from './InventoryIcons';
+import { InventoryItemIcon, CoinBadgeDot, classifyInventoryItem, IconSword, IconShield, IconGem, IconPotion, IconMagicItem, IconOther } from './InventoryIcons';
 import { extraerIdentidadDeDocumentos, esFichaDelPj } from '../utils/geminiHelper';
 
 // `getAtrInfo` se retiró con la escala 0-20: el deseo ya no tiene tramos —
@@ -195,6 +195,7 @@ export const MemoryManager: React.FC<{
     : ['character', 'inventario', 'diary', 'npcs', 'locs', 'quests', 'story', 'status'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
+  const [inventoryFilter, setInventoryFilter] = useState<'todos' | 'armas' | 'armaduras' | 'joyas' | 'consumibles' | 'magicos'>('todos');
   /*
    * 🃏 LA JUGADORA TAMBIÉN PREPARA COSAS.
    *
@@ -3003,6 +3004,17 @@ export const MemoryManager: React.FC<{
           otro: 'otro'
         };
 
+        const matchesInventoryFilter = (item: InventoryItem, filter: string) => {
+          if (filter === 'todos') return true;
+          const k = classifyInventoryItem(item);
+          if (filter === 'armas') return ['main_hand', 'off_hand', 'two_handed', 'sword', 'bow', 'staff', 'spear'].includes(k);
+          if (filter === 'armaduras') return ['armor', 'shield'].includes(k);
+          if (filter === 'joyas') return ['jewelry', 'gem', 'gold'].includes(k);
+          if (filter === 'consumibles') return ['potion', 'scroll', 'herbs'].includes(k);
+          if (filter === 'magicos') return ['grimoire', 'wand', 'magic_item', 'instrument', 'key', 'other'].includes(k);
+          return true;
+        };
+
         const eliminados = todo.filter(i => Boolean(i.eliminado));
         const noEliminados = todo.filter(i => !i.eliminado);
         const requisados = noEliminados.filter(i => esRequisado(i));
@@ -3010,6 +3022,10 @@ export const MemoryManager: React.FC<{
         const deMision = enSusManos.filter(i => i.deMision && !i.resuelto);
         const resueltos = enSusManos.filter(i => i.deMision && i.resuelto);
         const propios = enSusManos.filter(i => !i.deMision);
+
+        const deMisionFiltrados = deMision.filter(i => matchesInventoryFilter(i, inventoryFilter));
+        const propiosFiltrados = propios.filter(i => matchesInventoryFilter(i, inventoryFilter));
+        const requisadosFiltrados = requisados.filter(i => matchesInventoryFilter(i, inventoryFilter));
 
         const Tarjeta: React.FC<{ item: InventoryItem; tono: 'mision' | 'propio' | 'hecho' | 'requisado' | 'eliminado' }> = ({ item, tono }) => (
           <div
@@ -3249,25 +3265,60 @@ export const MemoryManager: React.FC<{
               )}
             </div>
 
+            {/* Pestañas de Filtro por Categoría con Iconos Vectoriales */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-[var(--user-border)]">
+              {[
+                { id: 'todos', label: 'Todos', icon: IconOther, count: noEliminados.length },
+                { id: 'armas', label: 'Armas', icon: IconSword, count: noEliminados.filter(i => matchesInventoryFilter(i, 'armas')).length },
+                { id: 'armaduras', label: 'Armaduras', icon: IconShield, count: noEliminados.filter(i => matchesInventoryFilter(i, 'armaduras')).length },
+                { id: 'joyas', label: 'Joyas y Gemas', icon: IconGem, count: noEliminados.filter(i => matchesInventoryFilter(i, 'joyas')).length },
+                { id: 'consumibles', label: 'Consumibles', icon: IconPotion, count: noEliminados.filter(i => matchesInventoryFilter(i, 'consumibles')).length },
+                { id: 'magicos', label: 'Mágicos y Varios', icon: IconMagicItem, count: noEliminados.filter(i => matchesInventoryFilter(i, 'magicos')).length }
+              ].map(tab => {
+                const IconComp = tab.icon;
+                const isActive = inventoryFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setInventoryFilter(tab.id as any)}
+                    className={`inline-flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                      isActive
+                        ? 'bg-[var(--accent)] text-[var(--accent-contrast)] border-[var(--accent)] shadow-xs font-bold'
+                        : 'bg-[var(--surface-soft)] text-[var(--text-secondary)] border-[var(--user-border)] hover:bg-[var(--surface)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <IconComp className="w-3.5 h-3.5 shrink-0" />
+                    <span>{tab.label}</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      isActive ? 'bg-black/20 text-white' : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--glass-border)]'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Objetos de misión */}
             <div className="flex flex-col gap-2.5">
               <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-amber-500/30">
                 <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
                   <Scroll className="w-3.5 h-3.5 text-amber-600" />
-                  Lo que lleva por encargo ({deMision.length})
+                  Lo que lleva por encargo ({deMisionFiltrados.length})
                 </span>
                 <p className="text-[11px] text-[var(--text-secondary)] opacity-80 m-0 mt-0.5 leading-relaxed">
                   Una carta que entregar, un pergamino que traducir, algo que ha tenido que robar. No es equipo: es
                   trama con forma de objeto, y por eso va aparte.
                 </p>
               </div>
-              {deMision.length === 0 ? (
+              {deMisionFiltrados.length === 0 ? (
                 <div className="text-[var(--text-secondary)] italic py-5 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs">
-                  Ahora mismo no lleva nada por encargo de nadie.
+                  {inventoryFilter === 'todos' ? 'Ahora mismo no lleva nada por encargo de nadie.' : `No hay objetos de misión en la categoría "${inventoryFilter}".`}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  {deMision.map(i => <Tarjeta key={i.id} item={i} tono="mision" />)}
+                  {deMisionFiltrados.map(i => <Tarjeta key={i.id} item={i} tono="mision" />)}
                 </div>
               )}
             </div>
@@ -3277,29 +3328,39 @@ export const MemoryManager: React.FC<{
               <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-[var(--user-border)]">
                 <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
                   <Backpack className="w-3.5 h-3.5 text-[var(--accent)]" />
-                  Sus cosas ({propios.length})
+                  Sus cosas ({propiosFiltrados.length})
                 </span>
                 <p className="text-[11px] text-[var(--text-secondary)] opacity-80 m-0 mt-0.5 leading-relaxed">
                   Su violín, su diario, las pociones, lo que ha comprado. Lo que es suyo y no le debe nada a nadie.
                 </p>
               </div>
-              {propios.length === 0 ? (
+              {propiosFiltrados.length === 0 ? (
                 <div className="text-[var(--text-secondary)] py-5 px-5 text-center bg-[var(--surface-soft)] rounded-lg border border-[var(--user-border)] leading-relaxed text-xs flex flex-col gap-2">
                   <span className="italic">
-                    Aquí aparece lo que gane, compre o le den <strong>jugando</strong>, según lo vaya apuntando el
-                    Narrador. Si la campaña es anterior a esta pantalla, estará vacía hasta el próximo botín.
+                    {inventoryFilter === 'todos' ? (
+                      <>
+                        Aquí aparece lo que gane, compre o le den <strong>jugando</strong>, según lo vaya apuntando el
+                        Narrador. Si la campaña es anterior a esta pantalla, estará vacía hasta el próximo botín.
+                      </>
+                    ) : (
+                      <>No hay objetos en esta categoría ({inventoryFilter}) en sus cosas.</>
+                    )}
                   </span>
-                  <span className="not-italic font-cinzel text-[11px] text-[var(--accent)]">
-                    ¿Empiezas campaña? Dale a <strong>Sincronizar Memoria Completa con IA</strong> o añade tus cosas con <strong>+ Adquirir objeto</strong>.
-                  </span>
-                  <span className="not-italic font-lora text-[11px] text-[var(--text-secondary)]">
-                    Y si falta algo suelto, pídeselo al GM en el Chat: «mete en mi mochila el violín del Filí y mi
-                    diario, que ya los llevaba». Lo hace él.
-                  </span>
+                  {inventoryFilter === 'todos' && (
+                    <>
+                      <span className="not-italic font-cinzel text-[11px] text-[var(--accent)]">
+                        ¿Empiezas campaña? Dale a <strong>Sincronizar Memoria Completa con IA</strong> o añade tus cosas con <strong>+ Adquirir objeto</strong>.
+                      </span>
+                      <span className="not-italic font-lora text-[11px] text-[var(--text-secondary)]">
+                        Y si falta algo suelto, pídeselo al GM en el Chat: «mete en mi mochila el violín del Filí y mi
+                        diario, que ya los llevaba». Lo hace él.
+                      </span>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  {propios.map(i => <Tarjeta key={i.id} item={i} tono="propio" />)}
+                  {propiosFiltrados.map(i => <Tarjeta key={i.id} item={i} tono="propio" />)}
                 </div>
               )}
             </div>
@@ -3359,12 +3420,12 @@ export const MemoryManager: React.FC<{
             )}
 
             {/* Lo que le han quitado: sigue siendo suyo, y alguien lo tiene */}
-            {requisados.length > 0 && (
+            {requisadosFiltrados.length > 0 && (
               <div className="flex flex-col gap-2.5">
                 <div className="bg-[var(--sidebar-bg)] p-3 rounded-lg border border-rose-500/30">
                   <span className="text-xs text-[var(--text-secondary)] font-cinzel font-semibold flex items-center gap-1.5">
                     <PackageX className="w-3.5 h-3.5 text-rose-600" />
-                    Lo que le han quitado ({requisados.length})
+                    Lo que le han quitado ({requisadosFiltrados.length})
                   </span>
                   <p className="text-[11px] text-[var(--text-secondary)] opacity-80 m-0 mt-0.5 leading-relaxed">
                     Requisado, robado o dejado en prenda. Sigue siendo suyo: no está en su mochila, pero está en algún
@@ -3372,7 +3433,7 @@ export const MemoryManager: React.FC<{
                   </p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  {requisados.map(i => <Tarjeta key={i.id} item={i} tono="requisado" />)}
+                  {requisadosFiltrados.map(i => <Tarjeta key={i.id} item={i} tono="requisado" />)}
                 </div>
               </div>
             )}
