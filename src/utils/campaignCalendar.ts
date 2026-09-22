@@ -1763,6 +1763,14 @@ export interface VinculoLeido {
   /** Hacia quién siente atracción, cuando la escena o sus documentos lo dejan claro. */
   orientacion?: string;
   accion?: 'crear' | 'modificar' | 'borrar' | 'eliminar';
+  /** Promesa o juramento mutuo entre este PNJ y la protagonista */
+  promesa?: string;
+  /** Confidencia o secreto íntimo revelado en la escena */
+  confidencia?: string;
+  /** Habilidad, don, lección o idioma aprendido de la protagonista */
+  aprendio?: string;
+  /** Evolución interna de su juicio, mirada o pensamiento sobre ella */
+  impresion?: string;
 }
 
 /**
@@ -1886,6 +1894,14 @@ export function leerVinculos(texto: string): VinculoLeido[] {
         } else if (campo === 'con' || campo === 'confianza') {
           const num = parseInt(valor, 10);
           if (!isNaN(num)) v.con = Math.max(0, Math.min(20, num));
+        } else if (campo === 'promesa' || campo === 'juramento' || campo === 'pacto') {
+          v.promesa = valor;
+        } else if (campo === 'confidencia' || campo === 'secreto_compartido' || campo === 'confeso' || campo === 'confesion') {
+          v.confidencia = valor;
+        } else if (campo === 'aprendio' || campo === 'habilidad' || campo === 'ensenado' || campo === 'leccion') {
+          v.aprendio = valor;
+        } else if (campo === 'impresion' || campo === 'evolucion' || campo === 'mirada' || campo === 'pensamiento' || campo === 'juicio') {
+          v.impresion = valor;
         }
       }
       out.push(v);

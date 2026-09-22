@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { interesPorLaProtagonista, NPC, ProjectFile } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { interesPorLaProtagonista, NPC, ProjectFile, RecuerdoEpisodicoNPC } from '../types';
 import {
   X,
   User,
@@ -14,7 +14,12 @@ import {
   Calendar,
   BookOpen,
   VenetianMask,
-  Languages
+  Languages,
+  Brain,
+  Pencil,
+  Trash2,
+  Plus,
+  Quote
 } from 'lucide-react';
 
 interface NpcDossierModalProps {
@@ -33,15 +38,153 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
   vinculosDestapados,
   onToggleDestaparVinculo,
   onChangePortrait,
+  onUpdateNpc,
   onClose
 }) => {
   const [npc, setNpc] = useState<NPC>(initialNpc);
-  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'sheet'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'sheet' | 'memories'>('overview');
+
+  // Estado para gestión manual de Recuerdos y Promesas
+  const [newMemoryText, setNewMemoryText] = useState('');
+  const [newMemoryType, setNewMemoryType] = useState<'promesa' | 'confidencia' | 'aprendizaje' | 'evolucion'>('promesa');
+  const [isAddingMemory, setIsAddingMemory] = useState(false);
+  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+  const [editingMemoryText, setEditingMemoryText] = useState('');
+  const [editingImpresion, setEditingImpresion] = useState(false);
+  const [impresionDraft, setImpresionDraft] = useState(initialNpc.impresionActual || '');
 
   // Sincronizar si cambia initialNpc
-  React.useEffect(() => {
+  useEffect(() => {
     setNpc(initialNpc);
+    setImpresionDraft(initialNpc.impresionActual || '');
   }, [initialNpc]);
+
+  // Lista unificada de recuerdos y promesas
+  const allMemories = useMemo(() => {
+    const list: RecuerdoEpisodicoNPC[] = [];
+    const registeredTexts = new Set<string>();
+
+    (npc.recuerdosEpisodicos || []).forEach(r => {
+      list.push(r);
+      registeredTexts.add(r.texto.trim().toLowerCase());
+    });
+
+    (npc.promesas || []).forEach((p, i) => {
+      if (!registeredTexts.has(p.trim().toLowerCase())) {
+        list.push({ id: `promesa_leg_${i}`, tipo: 'promesa', texto: p });
+        registeredTexts.add(p.trim().toLowerCase());
+      }
+    });
+
+    (npc.confidencias || []).forEach((c, i) => {
+      if (!registeredTexts.has(c.trim().toLowerCase())) {
+        list.push({ id: `confidencia_leg_${i}`, tipo: 'confidencia', texto: c });
+        registeredTexts.add(c.trim().toLowerCase());
+      }
+    });
+
+    (npc.habilidadesAprendidas || []).forEach((h, i) => {
+      if (!registeredTexts.has(h.trim().toLowerCase())) {
+        list.push({ id: `aprendizaje_leg_${i}`, tipo: 'aprendizaje', texto: h });
+        registeredTexts.add(h.trim().toLowerCase());
+      }
+    });
+
+    return list;
+  }, [npc.recuerdosEpisodicos, npc.promesas, npc.confidencias, npc.habilidadesAprendidas]);
+
+  const handleSaveImpresion = () => {
+    const text = impresionDraft.trim();
+    const updatedNpc: NPC = {
+      ...npc,
+      impresionActual: text || undefined
+    };
+    setNpc(updatedNpc);
+    onUpdateNpc?.(updatedNpc);
+    setEditingImpresion(false);
+  };
+
+  const handleAddMemory = () => {
+    if (!newMemoryText.trim()) return;
+    const text = newMemoryText.trim();
+    const id = `rec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const nuevoRecuerdo: RecuerdoEpisodicoNPC = {
+      id,
+      tipo: newMemoryType,
+      texto: text
+    };
+    const updatedRecuerdos = [...(npc.recuerdosEpisodicos || []), nuevoRecuerdo];
+    let updatedPromesas = [...(npc.promesas || [])];
+    let updatedConfidencias = [...(npc.confidencias || [])];
+    let updatedAprendizajes = [...(npc.habilidadesAprendidas || [])];
+
+    if (newMemoryType === 'promesa' && !updatedPromesas.includes(text)) {
+      updatedPromesas.push(text);
+    } else if (newMemoryType === 'confidencia' && !updatedConfidencias.includes(text)) {
+      updatedConfidencias.push(text);
+    } else if (newMemoryType === 'aprendizaje' && !updatedAprendizajes.includes(text)) {
+      updatedAprendizajes.push(text);
+    }
+
+    const updatedNpc: NPC = {
+      ...npc,
+      recuerdosEpisodicos: updatedRecuerdos,
+      promesas: updatedPromesas,
+      confidencias: updatedConfidencias,
+      habilidadesAprendidas: updatedAprendizajes
+    };
+
+    setNpc(updatedNpc);
+    onUpdateNpc?.(updatedNpc);
+    setNewMemoryText('');
+    setIsAddingMemory(false);
+  };
+
+  const handleDeleteMemory = (id: string, text: string) => {
+    const updatedRecuerdos = (npc.recuerdosEpisodicos || []).filter(r => r.id !== id);
+    const updatedPromesas = (npc.promesas || []).filter(p => p !== text);
+    const updatedConfidencias = (npc.confidencias || []).filter(c => c !== text);
+    const updatedAprendizajes = (npc.habilidadesAprendidas || []).filter(a => a !== text);
+
+    const updatedNpc: NPC = {
+      ...npc,
+      recuerdosEpisodicos: updatedRecuerdos,
+      promesas: updatedPromesas,
+      confidencias: updatedConfidencias,
+      habilidadesAprendidas: updatedAprendizajes
+    };
+
+    setNpc(updatedNpc);
+    onUpdateNpc?.(updatedNpc);
+    if (editingMemoryId === id) {
+      setEditingMemoryId(null);
+      setEditingMemoryText('');
+    }
+  };
+
+  const handleSaveEditedMemory = (id: string, oldText: string) => {
+    if (!editingMemoryText.trim()) return;
+    const newText = editingMemoryText.trim();
+    const updatedRecuerdos = (npc.recuerdosEpisodicos || []).map(r =>
+      r.id === id ? { ...r, texto: newText } : r
+    );
+    const updatedPromesas = (npc.promesas || []).map(p => (p === oldText ? newText : p));
+    const updatedConfidencias = (npc.confidencias || []).map(c => (c === oldText ? newText : c));
+    const updatedAprendizajes = (npc.habilidadesAprendidas || []).map(a => (a === oldText ? newText : a));
+
+    const updatedNpc: NPC = {
+      ...npc,
+      recuerdosEpisodicos: updatedRecuerdos,
+      promesas: updatedPromesas,
+      confidencias: updatedConfidencias,
+      habilidadesAprendidas: updatedAprendizajes
+    };
+
+    setNpc(updatedNpc);
+    onUpdateNpc?.(updatedNpc);
+    setEditingMemoryId(null);
+    setEditingMemoryText('');
+  };
 
   // Match portrait file
   const matchingFile = npc.portrait
@@ -214,6 +357,23 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
           >
             <Scroll className="w-4 h-4" />
             <span>Perfil & Afinidad</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('memories')}
+            className={`py-2.5 px-3 text-xs sm:text-sm font-cinzel font-bold border-b-2 flex items-center gap-1.5 cursor-pointer transition-all shrink-0 whitespace-nowrap ${
+              activeTab === 'memories'
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Brain className="w-4 h-4 text-purple-400" />
+            <span>Recuerdos & Promesas</span>
+            {allMemories.length > 0 && (
+              <span className="text-[10px] bg-purple-500/20 text-purple-700 dark:text-purple-300 px-1.5 py-0.2 rounded-full font-sans font-bold">
+                {allMemories.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -512,12 +672,341 @@ export const NpcDossierModal: React.FC<NpcDossierModalProps> = ({
                 </div>
               )}
 
+              {/* 5. Memoria Viva & Evolución */}
+              <div className="bg-[var(--surface-soft)] p-4 rounded-xl border border-[var(--accent)]/30 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-cinzel text-xs font-bold text-[var(--accent)] uppercase tracking-wider flex items-center gap-1.5">
+                    <Brain className="w-4 h-4 text-purple-400" /> Recuerdos & Promesas con la Protagonista
+                  </span>
+                  <button
+                    onClick={() => setActiveTab('memories')}
+                    className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1 font-cinzel font-semibold cursor-pointer"
+                  >
+                    <Pencil className="w-3 h-3" /> Gestionar / Escribir
+                  </button>
+                </div>
+
+                {npc.impresionActual && (
+                  <div className="text-xs text-[var(--text-primary)] italic bg-[var(--surface)] p-2.5 rounded-lg border border-[var(--glass-border)]">
+                    <strong className="text-[var(--accent)] not-italic font-cinzel block mb-0.5">💭 Juicio / Impresión interna actual:</strong>
+                    «{npc.impresionActual}»
+                  </div>
+                )}
+
+                {npc.promesas && npc.promesas.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-cinzel font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                      🤝 Promesas y pactos mutuos:
+                    </span>
+                    <ul className="list-disc list-inside space-y-0.5 text-xs text-[var(--text-secondary)] pl-1">
+                      {npc.promesas.map((p, i) => (
+                        <li key={i} className="leading-snug"><span className="text-[var(--text-primary)] font-medium">«{p}»</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {npc.confidencias && npc.confidencias.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-cinzel font-bold text-violet-700 dark:text-violet-400 flex items-center gap-1">
+                      🤫 Confidencias íntimas compartidas:
+                    </span>
+                    <ul className="list-disc list-inside space-y-0.5 text-xs text-[var(--text-secondary)] pl-1">
+                      {npc.confidencias.map((c, i) => (
+                        <li key={i} className="leading-snug"><span className="text-[var(--text-primary)] font-medium">«{c}»</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {npc.habilidadesAprendidas && npc.habilidadesAprendidas.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-cinzel font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                      🎓 Habilidades y saberes aprendidos de ella:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {npc.habilidadesAprendidas.map((h, i) => (
+                        <span key={i} className="text-[11px] bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-md font-medium border border-emerald-500/30">
+                          {h}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {allMemories.length === 0 && !npc.impresionActual && (
+                  <p className="text-xs text-[var(--text-secondary)] italic m-0">
+                    Aún no hay recuerdos o promesas fijadas. Puedes añadirlas con el botón «Gestionar / Escribir» o desde el botón «Recordar» en el chat.
+                  </p>
+                )}
+              </div>
+
               {/* If no data yet */}
               {!npc.description && !npc.notes && !physicalDesc && (
                 <div className="text-center py-8 text-xs text-[var(--text-secondary)] italic">
                   Este personaje aún no tiene descripción o notas ampliadas. Puedes añadirlas pulsando en «Editar Datos».
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: Recuerdos & Promesas con el Protagonista (Editable, sin diales) */}
+          {activeTab === 'memories' && (
+            <div className="space-y-4">
+              {/* Encabezado explicativo con botón para añadir */}
+              <div className="bg-[var(--surface-soft)] p-4 rounded-xl border border-[var(--accent)]/30 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-cinzel font-bold text-sm text-[var(--accent)] flex items-center gap-2">
+                      <Brain className="w-4 h-4 text-purple-400" /> Recuerdos y Promesas con el Protagonista
+                    </h4>
+                    <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
+                      Pactos, confidencias íntimas, habilidades compartidas y citas memorables fijadas en la memoria de este PNJ. No se diluyen ni se olvidan entre capítulos.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsAddingMemory(!isAddingMemory)}
+                    className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-cinzel font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isAddingMemory ? 'Cerrar Formulario' : 'Añadir Recuerdo / Promesa'}</span>
+                  </button>
+                </div>
+
+                {/* Formulario desplegable para añadir */}
+                {isAddingMemory && (
+                  <div className="mt-3 pt-3 border-t border-[var(--glass-border)] space-y-3 bg-[var(--surface)] p-3 rounded-lg">
+                    <span className="text-xs font-cinzel font-bold text-[var(--text-primary)] block">
+                      Nuevo pacto, confidencia o momento especial:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(
+                        [
+                          { type: 'promesa', label: '🤝 Promesa / Juramento', color: 'border-amber-500/50 text-amber-600 dark:text-amber-400' },
+                          { type: 'confidencia', label: '🤫 Confidencia Íntima', color: 'border-purple-500/50 text-purple-600 dark:text-purple-400' },
+                          { type: 'aprendizaje', label: '🎓 Habilidad / Idioma', color: 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400' },
+                          { type: 'evolucion', label: '📜 Momento Especial / Cita', color: 'border-blue-500/50 text-blue-600 dark:text-blue-400' }
+                        ] as const
+                      ).map(opt => (
+                        <button
+                          key={opt.type}
+                          type="button"
+                          onClick={() => setNewMemoryType(opt.type)}
+                          className={`px-2.5 py-1 text-xs rounded-md border font-cinzel transition-all cursor-pointer ${
+                            newMemoryType === opt.type
+                              ? 'bg-[var(--accent)] text-white border-[var(--accent)] font-bold shadow-xs'
+                              : `bg-[var(--surface-soft)] ${opt.color} hover:bg-[var(--surface)] opacity-80`
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <textarea
+                      value={newMemoryText}
+                      onChange={e => setNewMemoryText(e.target.value)}
+                      placeholder={
+                        newMemoryType === 'promesa'
+                          ? 'Ej: «Prometió no permitir que nadie tocase el violín ni revelar su secreto a la tripulación»...'
+                          : newMemoryType === 'confidencia'
+                          ? 'Ej: «Confesó en privado su temor a las represalias de su matrona en Menzoberranzan»...'
+                          : newMemoryType === 'aprendizaje'
+                          ? 'Ej: «Aryendell le enseñó palabras y códigos básicos en druídico durante la guardia»...'
+                          : 'Ej: «Bajo el templo de Sune, intercambiaron miradas tras el duelo y se juraron lealtad...»'
+                      }
+                      className="w-full h-20 p-2.5 text-xs sm:text-sm rounded-lg bg-[var(--surface-soft)] border border-[var(--glass-border)] text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] resize-none"
+                    />
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setIsAddingMemory(false);
+                          setNewMemoryText('');
+                        }}
+                        className="px-3 py-1 text-xs rounded bg-[var(--surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleAddMemory}
+                        disabled={!newMemoryText.trim()}
+                        className="px-3.5 py-1 text-xs rounded bg-[var(--accent)] text-white font-cinzel font-semibold hover:opacity-90 disabled:opacity-40 cursor-pointer"
+                      >
+                        Guardar en su Memoria
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Juicio / Impresión Interior Actual */}
+              <div className="bg-[var(--surface-soft)] p-3.5 rounded-xl border border-[var(--glass-border)] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5">
+                    💭 Juicio / Impresión Interior hacia la Protagonista
+                  </span>
+                  {!editingImpresion && (
+                    <button
+                      onClick={() => setEditingImpresion(true)}
+                      className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent)] flex items-center gap-1 font-cinzel cursor-pointer"
+                    >
+                      <Pencil className="w-3 h-3" /> Editar
+                    </button>
+                  )}
+                </div>
+
+                {editingImpresion ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={impresionDraft}
+                      onChange={e => setImpresionDraft(e.target.value)}
+                      placeholder="¿Cómo percibe internamente este PNJ a la protagonista ahora mismo? (Ej: «La mira con fascinación y respeto contenido tras verla tocar el violín...»)"
+                      className="w-full h-16 p-2 text-xs rounded-lg bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] resize-none"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setImpresionDraft(npc.impresionActual || '');
+                          setEditingImpresion(false);
+                        }}
+                        className="px-2.5 py-1 text-xs rounded bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleSaveImpresion}
+                        className="px-3 py-1 text-xs rounded bg-[var(--accent)] text-white font-cinzel font-semibold hover:opacity-90 cursor-pointer"
+                      >
+                        Guardar Impresión
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs sm:text-sm text-[var(--text-primary)] italic m-0 p-2 rounded-lg bg-[var(--surface)] border border-[var(--glass-border)]">
+                    {npc.impresionActual ? `«${npc.impresionActual}»` : (
+                      <span className="text-[var(--text-secondary)] not-italic">
+                        Sin impresión interior registrada. Pulsa «Editar» para fijar cómo la percibe.
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+
+              {/* Lista de Recuerdos, Promesas y Confidencias */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-cinzel font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                    Pactos y Momentos Registrados ({allMemories.length})
+                  </span>
+                </div>
+
+                {allMemories.length === 0 ? (
+                  <div className="text-center py-8 p-4 rounded-xl border border-dashed border-[var(--glass-border)] bg-[var(--surface)]/40 space-y-1">
+                    <Quote className="w-6 h-6 mx-auto text-[var(--text-secondary)]/50" />
+                    <p className="text-xs text-[var(--text-secondary)] italic m-0">
+                      Aún no hay pactos ni recuerdos especiales registrados con {npc.name}.
+                    </p>
+                    <p className="text-[11px] text-[var(--text-secondary)]/80 m-0">
+                      Puedes añadir uno con el botón superior o usar el botón <strong className="text-[var(--accent)]">«Recordar»</strong> directamente en el texto del chat.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {allMemories.map(recuerdo => {
+                      const isEditing = editingMemoryId === recuerdo.id;
+                      const badgeConfig =
+                        recuerdo.tipo === 'promesa'
+                          ? { label: '🤝 Promesa', bg: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' }
+                          : recuerdo.tipo === 'confidencia'
+                          ? { label: '🤫 Confidencia', bg: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30' }
+                          : recuerdo.tipo === 'aprendizaje'
+                          ? { label: '🎓 Aprendizaje', bg: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' }
+                          : { label: '📜 Momento Especial', bg: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30' };
+
+                      return (
+                        <div
+                          key={recuerdo.id}
+                          className="bg-[var(--surface-soft)] p-3 rounded-xl border border-[var(--glass-border)] space-y-2 hover:border-[var(--accent)]/40 transition-all shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`text-[10px] font-cinzel font-bold px-2 py-0.5 rounded border ${badgeConfig.bg}`}>
+                                {badgeConfig.label}
+                              </span>
+                              {recuerdo.capitulo && (
+                                <span className="text-[10px] text-[var(--text-secondary)] font-mono">
+                                  {recuerdo.capitulo}
+                                </span>
+                              )}
+                              {recuerdo.fecha && (
+                                <span className="text-[10px] text-[var(--text-secondary)]">
+                                  • {recuerdo.fecha}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {!isEditing && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEditingMemoryId(recuerdo.id);
+                                      setEditingMemoryText(recuerdo.texto);
+                                    }}
+                                    className="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-all cursor-pointer"
+                                    title="Editar este recuerdo con un clic"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteMemory(recuerdo.id, recuerdo.texto)}
+                                    className="p-1 rounded text-[var(--text-secondary)] hover:text-red-500 hover:bg-[var(--surface)] transition-all cursor-pointer"
+                                    title="Eliminar este recuerdo con un clic"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {isEditing ? (
+                            <div className="space-y-2 pt-1">
+                              <textarea
+                                value={editingMemoryText}
+                                onChange={e => setEditingMemoryText(e.target.value)}
+                                className="w-full h-16 p-2 text-xs sm:text-sm rounded-lg bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] resize-none"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingMemoryId(null);
+                                    setEditingMemoryText('');
+                                  }}
+                                  className="px-2.5 py-1 text-xs rounded bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  onClick={() => handleSaveEditedMemory(recuerdo.id, recuerdo.texto)}
+                                  className="px-3 py-1 text-xs rounded bg-[var(--accent)] text-white font-cinzel font-semibold hover:opacity-90 cursor-pointer"
+                                >
+                                  Guardar Cambios
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs sm:text-sm text-[var(--text-primary)] leading-relaxed m-0 whitespace-pre-wrap font-serif">
+                              «{recuerdo.texto}»
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

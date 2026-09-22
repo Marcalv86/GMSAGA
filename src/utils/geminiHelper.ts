@@ -2126,6 +2126,31 @@ ${bloqueElenco}
       );
     }
 
+    /*
+     * 🧠 MEMORIA VIVA Y VÍNCULO CON LA PROTAGONISTA (NO SE PIERDE ENTRE CAPÍTULOS):
+     * Promesas juradas, confidencias íntimas, habilidades o lenguas aprendidas juntos,
+     * y cómo evoluciona su juicio interior sobre ella.
+     */
+    const tieneMemoriaViva = (n.promesas && n.promesas.length > 0) ||
+      (n.confidencias && n.confidencias.length > 0) ||
+      (n.habilidadesAprendidas && n.habilidadesAprendidas.length > 0) ||
+      n.impresionActual;
+    if (tieneMemoriaViva) {
+      lineas.push(`- 🧠 MEMORIA VIVA DEL PNJ CON LA PROTAGONISTA:`);
+      if (n.promesas && n.promesas.length > 0) {
+        lineas.push(`  • 🤝 Promesas / Juramentos mutuos: ${n.promesas.map(p => `«${corta(p, 180)}»`).join('; ')}`);
+      }
+      if (n.confidencias && n.confidencias.length > 0) {
+        lineas.push(`  • 🤫 Confidencias íntimas reveladas: ${n.confidencias.map(c => `«${corta(c, 180)}»`).join('; ')}`);
+      }
+      if (n.habilidadesAprendidas && n.habilidadesAprendidas.length > 0) {
+        lineas.push(`  • 🎓 Habilidades / Dotes aprendidas de ella: ${n.habilidadesAprendidas.map(h => corta(h, 120)).join(', ')}`);
+      }
+      if (n.impresionActual) {
+        lineas.push(`  • 💭 Impresión interior actual: ${corta(n.impresionActual, 250)}`);
+      }
+    }
+
     // Idiomas del personaje y nivel de dominio
     const idiomasPnj = n.idiomas || (n.characterSheet?.languages || []).join(', ');
     if (idiomasPnj) {
@@ -2325,8 +2350,11 @@ export function buildTurnPayload({
   let acumulado = 0;
   for (let i = anteriores.length - 1; i >= 0 && acumulado < PREVIO_MAX; i--) {
     const c = anteriores[i];
+    const esFuturoRelativo = (typeof c.anoCampana === 'number' && typeof currentChat.anoCampana === 'number' && c.anoCampana > currentChat.anoCampana);
+    const epocaEtiqueta = c.epoca ? ` [Época: ${c.epoca}]` : '';
+    const avisoFuturo = esFuturoRelativo ? ' (⚠️ SUCEDERÁ EN EL FUTURO: Este capítulo actual ocurre cronológicamente ANTES)' : '';
     const texto =
-      `\n--- Sesión previa: ${c.name} ---\n` +
+      `\n--- Sesión previa: ${c.name}${epocaEtiqueta}${avisoFuturo} ---\n` +
       (c.messages || []).slice(-10).map(m => `${m.role === 'user' ? 'Jugador' : 'Narrador'}: ${m.content}`).join('\n');
     const hueco = PREVIO_MAX - acumulado;
     const recorte = texto.length > hueco ? texto.slice(-hueco) : texto;
@@ -2334,6 +2362,15 @@ export function buildTurnPayload({
     acumulado += recorte.length;
   }
   const allPreviousHistory = trozos.join('');
+
+  let marcoTemporalBlock = '';
+  if (currentChat.epoca || currentChat.esFlashback || typeof currentChat.anoCampana === 'number') {
+    const epocaNombre = currentChat.epoca || (currentChat.anoCampana ? `Año ${currentChat.anoCampana}` : 'Pasado / Flashback');
+    marcoTemporalBlock = `
+=== ⏳ MARCO TEMPORAL DEL CAPÍTULO ACTUAL: ${epocaNombre} ===
+${currentChat.esFlashback ? '⛔ **ADVERTENCIA DE ANALLEPSIS / FLASHBACK**: Este capítulo transcurre en el PASADO respecto a otros capítulos de la campaña. Los acontecimientos de épocas posteriores TODAVÍA NO HAN SUCEDIDO. Los PNJs solo conocen a la protagonista si ya se habían conocido en este punto temporal, no conocen secretos revelados en el futuro y NO poseen habilidades o idiomas que aprenderán años más tarde (ej. si Aryendell les enseña druídico en el futuro, aquí aún NO lo hablan).' : '📌 **ÉPOCA NARRATIVA**: Este capítulo se sitúa en este marco temporal específico. Mantén la coherencia con el estado del mundo y las relaciones en este momento.'}
+`;
+  }
 
   let rawProjectMemBlock = '';
   if (project.memory?.raw_project_memory) {
@@ -3113,6 +3150,7 @@ ${lista
 
   const memoryContext = project.memory
     ? `
+${marcoTemporalBlock}
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
 ${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${bloqueMochila ? `${bloqueMochila}\n` : ''}${bloqueAprendido ? `${bloqueAprendido}\n` : ''}${bloqueCuaderno ? `${bloqueCuaderno}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueCoNarrativa ? `${bloqueCoNarrativa}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
@@ -3949,8 +3987,12 @@ Al final de la entrada del turno se adjunta la reserva de dados reales tirados p
 7. [REGISTROS INTERNOS - ACTUALIZACIÓN ESTRICTAMENTE ESENCIAL Y CONDICIONAL]:
    Después de la narración, añade las siguientes líneas según corresponda. Son registros internos de la aplicación que el jugador no ve. REGLA FUNDAMENTAL DE SINCRONIZACIÓN ACTIVA: Mantén siempre sincronizadas las fichas, estados y relaciones de los PNJs presentes mediante [VÍNCULO: ...] en cada turno, asegurando que los paneles nunca queden vacíos ni requieran acciones manuales.
    - [PRESENTES: nombres separados por comas] — quién ha estado en escena de forma reconocible, con nombre propio. No incluyas figurantes sin nombre («un marinero», «la multitud»). Sirve para saber quién vuelve: alguien que reaparece deja de ser un extra y se le abre una ficha de vínculo con el protagonista.
-   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | orientacion: hacia quién le tira, si consta | atr: desea/interés/ninguna | previo: sí | vin: 0-20 | con: 0-20] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea. ⭐ **EXCEPCIÓN, y es la que más se incumple:** si el dosier marca a alguien con «RELACIÓN SIN ESTABLECER» o «ATRACCIÓN SIN DECIDIR», **eso ya es motivo suficiente y la emites este turno**, haya movido la escena algo o no. No estás registrando un cambio: estás rellenando un hueco que lleva vacío desde el principio. ⛔ Y ojo al fallo clásico: escribir en la prosa que un personaje la devora con la mirada y no emitir nada **no cuenta**. Lo que no lleva etiqueta no existe cuando el capítulo se cierre —la escena se olvida, la etiqueta no—.
+   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | orientacion: hacia quién le tira, si consta | atr: desea/interés/ninguna | previo: sí | vin: 0-20 | con: 0-20 | promesa: pacto o juramento mutuo | confidencia: secreto o confesión íntima | aprendio: habilidad o idioma aprendido de ella | impresion: evolución de su mirada interior] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea. ⭐ **EXCEPCIÓN, y es la que más se incumple:** si el dosier marca a alguien con «RELACIÓN SIN ESTABLECER» o «ATRACCIÓN SIN DECIDIR», **eso ya es motivo suficiente y la emites este turno**, haya movido la escena algo o no. No estás registrando un cambio: estás rellenando un hueco que lleva vacío desde el principio. ⛔ Y ojo al fallo clásico: escribir en la prosa que un personaje la devora con la mirada y no emitir nada **no cuenta**. Lo que no lleva etiqueta no existe cuando el capítulo se cierre —la escena se olvida, la etiqueta no—.
      «aparenta» es lo que el protagonista podría percibir observándolo. «oculta» es lo que hay debajo: sus reservas, sus intenciones, lo que calla.
+     «promesa» registra un pacto o palabra dada que no debe olvidarse de un capítulo a otro (ej: «promesa: no dejar que nadie toque su laúd»).
+     «confidencia» registra un secreto íntimo, temor o vulnerabilidad que el PNJ le confiesa a la protagonista (ej: «confidencia: teme ser repudiado por su casa»).
+     «aprendio» registra una habilidad, saber o idioma que ella le enseña (ej: «aprendio: rudimentos de druídico» o «aprendio: tocar acordes»). Si es una lengua, ¡la aplicación la incorporará automáticamente a sus idiomas conocidos!
+     «impresion» registra cómo madura o cambia su juicio interno sobre la protagonista (ej: «impresion: empieza a admirar su orgullo y la respeta»).
      «grado» debe comenzar indicando el tipo para que la interfaz muestre el icono adecuado:
        - ⚔️ Rivalidad: «grado: rivalidad — ...»
        - ❇️ Amistad: «grado: amistad — ...»

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import {
+  ArchiveRestore,
   BookOpen,
   Check,
   FolderSync,
@@ -128,7 +129,7 @@ import {
   anclarHistorialPorHud,
   consolidarCronicaAlCerrarCapitulo
 } from './utils/geminiHelper';
-import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo } from './utils/chapterArchiver';
+import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo, desarchivarCapitulo } from './utils/chapterArchiver';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa, leerMesa, hayMensajesSinLeerEnMesa, marcarMesaLeida, MensajeDeMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
@@ -1361,6 +1362,71 @@ export default function App() {
         // Lógica de progresión escalonada (1-20 / 5 corazones) con límite diario de subidas
         const afinidadActualizada = actualizarAfinidadNpc(cambiado, v, dias, marca);
 
+        // Memoria viva del PNJ: promesas, confidencias, habilidades aprendidas y evolución
+        let promesas = cambiado.promesas || [];
+        if (v.promesa && v.promesa.trim().length > 0 && !promesas.some(p => p.toLowerCase() === v.promesa!.toLowerCase())) {
+          promesas = [...promesas, v.promesa.trim()];
+        }
+
+        let confidencias = cambiado.confidencias || [];
+        if (v.confidencia && v.confidencia.trim().length > 0 && !confidencias.some(c => c.toLowerCase() === v.confidencia!.toLowerCase())) {
+          confidencias = [...confidencias, v.confidencia.trim()];
+        }
+
+        let habilidades = cambiado.habilidadesAprendidas || [];
+        let idiomasActualizados = v.idiomas ?? cambiado.idiomas;
+        if (v.aprendio && v.aprendio.trim().length > 0 && !habilidades.some(h => h.toLowerCase() === v.aprendio!.toLowerCase())) {
+          const nuevaHab = v.aprendio.trim();
+          habilidades = [...habilidades, nuevaHab];
+          // Si Aryendell o la experiencia le enseña una lengua (ej: druídico, silvano, común, etc.), se añade a sus idiomas
+          if (/dru[ií]dic|silvan|elf|enano|orco|com[uú]n|infracom[uú]n|drac[oó]nic|lengua|idioma/i.test(nuevaHab)) {
+            const nombreIdioma = nuevaHab.replace(/^(idioma|lengua|habla|rudimentos de|nociones de):?\s*/i, '').trim();
+            if (nombreIdioma && !(idiomasActualizados || '').toLowerCase().includes(nombreIdioma.toLowerCase())) {
+              idiomasActualizados = idiomasActualizados
+                ? `${idiomasActualizados}, ${nombreIdioma} (aprendido de la protagonista)`
+                : `${nombreIdioma} (aprendido de la protagonista)`;
+            }
+          }
+        }
+
+        const impresion = v.impresion ?? cambiado.impresionActual;
+
+        // Recuerdos episódicos estructurados
+        let recuerdos = cambiado.recuerdosEpisodicos || [];
+        const fechaActualTexto = (calendarioValido(p.calendar) && p.currentDate) ? fechaLegible(p.calendar, p.currentDate) : undefined;
+        if (v.promesa && !recuerdos.some(r => r.texto === v.promesa)) {
+          recuerdos = [...recuerdos, {
+            id: `rec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            fecha: fechaActualTexto,
+            tipo: 'promesa',
+            texto: v.promesa.trim()
+          }];
+        }
+        if (v.confidencia && !recuerdos.some(r => r.texto === v.confidencia)) {
+          recuerdos = [...recuerdos, {
+            id: `rec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            fecha: fechaActualTexto,
+            tipo: 'confidencia',
+            texto: v.confidencia.trim()
+          }];
+        }
+        if (v.aprendio && !recuerdos.some(r => r.texto === v.aprendio)) {
+          recuerdos = [...recuerdos, {
+            id: `rec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            fecha: fechaActualTexto,
+            tipo: 'aprendizaje',
+            texto: v.aprendio.trim()
+          }];
+        }
+        if (v.impresion && !recuerdos.some(r => r.texto === v.impresion)) {
+          recuerdos = [...recuerdos, {
+            id: `rec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            fecha: fechaActualTexto,
+            tipo: 'evolucion',
+            texto: v.impresion.trim()
+          }];
+        }
+
         cambiado = {
           ...cambiado,
           name: nombreMasCompleto,
@@ -1368,7 +1434,12 @@ export default function App() {
           aparenta: v.aparenta ?? cambiado.aparenta,
           oculta: v.oculta ?? cambiado.oculta,
           vinculo: v.vinculo ?? cambiado.vinculo,
-          idiomas: v.idiomas ?? cambiado.idiomas,
+          idiomas: idiomasActualizados,
+          promesas,
+          confidencias,
+          habilidadesAprendidas: habilidades,
+          impresionActual: impresion,
+          recuerdosEpisodicos: recuerdos,
           ...afinidadActualizada,
           // Que el Narrador se moleste en escribir un vínculo ya dice que este
           // personaje cuenta, aunque la cuenta de días aún no haya llegado.
@@ -2396,6 +2467,37 @@ export default function App() {
       setCurrentFiles(updatedFiles);
       await saveFilesToDB(currentPId, updatedFiles);
 
+      // Si estaba reabierto, al volver a archivarlo se marca como cerrado
+      const updatedChats = currentChats.map(c => (c.id === chat.id ? { ...c, reabierto: false } : c));
+      setCurrentChats(updatedChats);
+      saveLocalChats(currentPId, updatedChats);
+
+      // Cierre de capítulo como hito narrativo clave: actualización de memoria persistente en segundo plano
+      if (getStoredAutoBackgroundTasks() && currentProject && hasConfiguredApiKey()) {
+        setTimeout(async () => {
+          try {
+            const rawMem = await generateClaudeProjectMemory({
+              project: currentProject,
+              chats: updatedChats,
+              files: updatedFiles
+            });
+            if (rawMem && rawMem.trim().length > 0) {
+              const totalMsgs = updatedChats.reduce((acc, c) => acc + (c.messages || []).length, 0);
+              await handleUpdateProjectField(p => ({
+                lastMemoryUpdate: Date.now(),
+                lastMemoryMessageCount: totalMsgs,
+                memory: {
+                  ...(p.memory || {}),
+                  raw_project_memory: rawMem
+                }
+              }));
+            }
+          } catch (e) {
+            console.warn('[Archiver] Actualización de memoria tras cierre de capítulo omitida:', e);
+          }
+        }, 1000);
+      }
+
       logInfo(
         'general',
         `Capítulo archivado como documento: ${archivedFile.name}`,
@@ -2427,6 +2529,60 @@ export default function App() {
     } finally {
       if (!options?.silent) {
         setTopProgress({ active: false, label: '', type: 'general' });
+      }
+    }
+  };
+
+  const handleUnarchiveChat = async (
+    targetChat?: Chat,
+    options?: { silent?: boolean }
+  ) => {
+    const chat = targetChat || currentChat;
+    if (!currentPId || !currentProject || !chat) return;
+
+    try {
+      // 1. Quitar el archivo de crónica de la biblioteca si existe
+      const refreshedFiles = await loadFilesFromDB(currentPId);
+      const { updatedFiles, archivoEliminado } = desarchivarCapitulo(refreshedFiles, chat.id);
+
+      if (archivoEliminado) {
+        setCurrentFiles(updatedFiles);
+        await saveFilesToDB(currentPId, updatedFiles);
+        logInfo(
+          'general',
+          `Capítulo desarchivado: ${chat.name}`,
+          `Se ha retirado el archivo de consulta "${archivoEliminado.name}" de la biblioteca para permitir seguir jugando.`
+        );
+      }
+
+      // 2. Marcar el chat como reabierto / activo para poder seguir jugando
+      const updatedChats = currentChats.map(c =>
+        c.id === chat.id ? { ...c, reabierto: true } : c
+      );
+      setCurrentChats(updatedChats);
+      saveLocalChats(currentPId, updatedChats);
+
+      if (!options?.silent) {
+        setAlertConfig({
+          isOpen: true,
+          title: '🔓 Capítulo Desmarcado y Reabierto',
+          message:
+            `El capítulo "${chat.name}" se ha desmarcado como archivado y vuelve a estar activo para seguir jugando.\n\n` +
+            (archivoEliminado
+              ? `• Se ha retirado el documento "${archivoEliminado.name}" de la biblioteca para evitar que el Narrador consulte un resumen antiguo desfasado mientras juegas nuevas escenas.\n`
+              : '') +
+            `• Ya puedes continuar la narrativa y enviar mensajes en este capítulo normalmente.\n` +
+            `• Cuando decidas darlo por concluido de nuevo, podrás volver a archivarlo en la biblioteca con un clic.`
+        });
+      }
+    } catch (err: any) {
+      logError('general', `Error al desarchivar capítulo ${chat.name}`, err);
+      if (!options?.silent) {
+        setAlertConfig({
+          isOpen: true,
+          title: 'Error al Desarchivar',
+          message: `No se pudo desmarcar el capítulo: ${err?.message || 'Error desconocido'}`
+        });
       }
     }
   };
@@ -2845,8 +3001,17 @@ export default function App() {
     if (!(await revisarBibliotecaAlEstrenar())) return;
 
     if (currentChat) {
+      // Si el capítulo estaba archivado en biblioteca y el jugador envía un mensaje nuevo,
+      // se retira la crónica vieja de la biblioteca y se asegura reabierto: true
+      const archivoPrevio = buscarArchivoDeCapitulo(currentFiles, currentChat.id);
+      if (archivoPrevio) {
+        const { updatedFiles } = desarchivarCapitulo(currentFiles, currentChat.id);
+        setCurrentFiles(updatedFiles);
+        void saveFilesToDB(currentPId, updatedFiles);
+      }
+
       const updatedMessages = [...currentChat.messages, { role: 'user' as const, content: text }];
-      const updatedChat = { ...currentChat, messages: updatedMessages };
+      const updatedChat = { ...currentChat, messages: updatedMessages, reabierto: true };
       const chs = currentChats.map(c => (c.id === currentChatId ? updatedChat : c));
       setCurrentChats(chs);
       saveLocalChats(currentPId, chs);
@@ -3316,8 +3481,12 @@ export default function App() {
         const effectiveChats = latestChats.length > 0 ? latestChats : currentChats;
         const lastSyncTime = currentProject.lastMemoryUpdate || 0;
         const msSinceLastSync = Date.now() - lastSyncTime;
+        const totalMensajes = effectiveChats.reduce((acc, c) => acc + (c.messages || []).length, 0);
+        const lastMsgCount = currentProject.lastMemoryMessageCount || 0;
+        const msgsSinceSync = totalMensajes - lastMsgCount;
         const needsInitialSync = !currentProject.memory?.raw_project_memory;
         const needsDailySync = msSinceLastSync > 24 * 60 * 60 * 1000; // 24 horas
+        const needsMilestoneSync = msgsSinceSync >= 25; // Hito narrativo cada 25 turnos
 
         /*
          * La trama de la campaña se traza sola, al mismo ritmo que la memoria.
@@ -3336,7 +3505,7 @@ export default function App() {
 
         if (
           getStoredAutoBackgroundTasks() &&
-          (needsInitialSync || needsDailySync)
+          (needsInitialSync || needsDailySync || needsMilestoneSync)
         ) {
           setTimeout(async () => {
             try {
@@ -3380,6 +3549,7 @@ export default function App() {
               if (newRawMem && newRawMem.trim().length > 0) {
                 await handleUpdateProjectField(p => ({
                   lastMemoryUpdate: Date.now(),
+                  lastMemoryMessageCount: totalMensajes,
                   memory: {
                     ...(p.memory || {}),
                     raw_project_memory: newRawMem
@@ -6178,13 +6348,10 @@ export default function App() {
           {currentChats.map((c, idx) => {
             const isSelected = c.id === currentChatId;
             /*
-             * Un capítulo está cerrado cuando ya hay otro después: cerrar es
-             * justamente abrir el siguiente. Se deduce de la posición en lugar
-             * de guardar una marca nueva, para que los capítulos que ya
-             * existían aparezcan sellados sin tener que tocar nada de lo
-             * guardado.
+             * Un capítulo está cerrado cuando ya hay otro después y no ha sido
+             * desmarcado/reabierto para seguir jugando.
              */
-            const estaCerrado = idx < currentChats.length - 1;
+            const estaCerrado = idx < currentChats.length - 1 && !c.reabierto;
             const archivoArchivado = buscarArchivoDeCapitulo(currentFiles, c.id);
             const tieneMensajes = (c.messages || []).length > 0;
 
@@ -6211,14 +6378,23 @@ export default function App() {
                 
                 <div className="flex items-center gap-1 shrink-0">
                   {archivoArchivado && (
-                    <span
-                      title="Archivado en los Archivos del Tomo (De consulta On-Demand en biblioteca)"
-                      className={`inline-flex items-center text-[10px] px-1 py-0.5 rounded opacity-80 ${
-                        isSelected ? 'bg-black/20 text-white' : 'bg-teal-500/15 text-teal-700 dark:text-teal-300'
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        void handleUnarchiveChat(c);
+                      }}
+                      title="Archivado en los Archivos del Tomo. Clic para desmarcar y volver a jugar"
+                      aria-label="Desmarcar capítulo archivado"
+                      className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-black/20 hover:bg-black/40 text-white'
+                          : 'bg-teal-500/15 hover:bg-teal-500/30 text-teal-700 dark:text-teal-300'
                       }`}
                     >
                       <Library className="w-3 h-3 shrink-0" />
-                    </span>
+                      <span className="hidden group-hover:inline text-[9px] font-medium font-sans">Desmarcar</span>
+                    </button>
                   )}
                   {estaCerrado && (
                     <BookCheck
@@ -6227,20 +6403,39 @@ export default function App() {
                     />
                   )}
                   {tieneMensajes && (
-                    <button
-                      type="button"
-                      onClick={e => {
-                        e.stopPropagation();
-                        void handleArchiveChatAsFile(c);
-                      }}
-                      className={`opacity-0 group-hover:opacity-100 p-1 text-xs hover:scale-110 transition-all cursor-pointer ${
-                        isSelected ? 'text-white/80 hover:text-white' : 'text-teal-600 hover:text-teal-700'
-                      }`}
-                      title={archivoArchivado ? 'Recompilar y actualizar archivo de consulta' : 'Archivar como documento de consulta (On-Demand)'}
-                      aria-label="Archivar capítulo"
-                    >
-                      <Paperclip className="w-3 h-3" />
-                    </button>
+                    <>
+                      {archivoArchivado ? (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            void handleUnarchiveChat(c);
+                          }}
+                          className={`opacity-0 group-hover:opacity-100 p-1 text-xs hover:scale-110 transition-all cursor-pointer ${
+                            isSelected ? 'text-white/80 hover:text-white' : 'text-amber-600 hover:text-amber-700'
+                          }`}
+                          title="Desmarcar capítulo archivado para seguir jugando"
+                          aria-label="Desmarcar capítulo"
+                        >
+                          <ArchiveRestore className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            void handleArchiveChatAsFile(c);
+                          }}
+                          className={`opacity-0 group-hover:opacity-100 p-1 text-xs hover:scale-110 transition-all cursor-pointer ${
+                            isSelected ? 'text-white/80 hover:text-white' : 'text-teal-600 hover:text-teal-700'
+                          }`}
+                          title="Archivar como documento de consulta (On-Demand)"
+                          aria-label="Archivar capítulo"
+                        >
+                          <Paperclip className="w-3 h-3" />
+                        </button>
+                      )}
+                    </>
                   )}
                   <button
                     type="button"
@@ -6423,11 +6618,14 @@ export default function App() {
               chatTokensCount={effectiveChatTokens}
               onCreateNewChat={handleCreateChat}
               onArchiveChatAsFile={handleArchiveChatAsFile}
+              onUnarchiveChatAsFile={() => void handleUnarchiveChat(currentChat)}
+              isArchived={!!buscarArchivoDeCapitulo(currentFiles, currentChat?.id || '')}
               onOpenMesa={() => setActiveTab('mesa')}
               tieneNovedadMesa={tieneNovedadMesa}
               estaCerrado={
                 currentChats.length > 1 &&
-                currentChats.findIndex(c => c.id === currentChatId) < currentChats.length - 1
+                currentChats.findIndex(c => c.id === currentChatId) < currentChats.length - 1 &&
+                !currentChat?.reabierto
               }
             />
           )}

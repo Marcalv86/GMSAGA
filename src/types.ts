@@ -8,6 +8,8 @@ export interface Project {
   files: ProjectFile[];
   chats: Chat[];
   lastMemoryUpdate?: number;
+  /** Conteo acumulado de mensajes en la última síntesis de memoria persistente para disparar hitos narrativos */
+  lastMemoryMessageCount?: number;
   combatStatus?: CombatStatus;
   /** Definición del calendario de la campaña. Sin ella, el tiempo no se lleva. */
   calendar?: CalendarConfig;
@@ -1076,6 +1078,23 @@ export interface NPC {
     vin?: number;
     con?: number;
   };
+  /**
+   * MEMORIA VIVA Y VÍNCULO CON LA PROTAGONISTA:
+   * Lo que han vivido, prometido o aprendido juntos y que no debe perderse de un capítulo a otro.
+   */
+  promesas?: string[];
+  confidencias?: string[];
+  habilidadesAprendidas?: string[];
+  impresionActual?: string;
+  recuerdosEpisodicos?: RecuerdoEpisodicoNPC[];
+}
+
+export interface RecuerdoEpisodicoNPC {
+  id: string;
+  fecha?: string;
+  capitulo?: string;
+  tipo: 'promesa' | 'confidencia' | 'aprendizaje' | 'evolucion';
+  texto: string;
 }
 
 export interface Location {
@@ -1174,6 +1193,16 @@ export interface Chat {
   name: string;
   messages: Message[];
   autoTitled?: boolean;
+  /** Si se ha desmarcado como archivado/cerrado para volver a él y seguir jugando */
+  reabierto?: boolean;
+  /** Marco temporal o época del capítulo (ej. "Año 1495 CV (+5 años)", "Año 1492 CV (Flashback)") */
+  epoca?: string;
+  /** Si este capítulo transcurre en el pasado (analepsis / flashback) respecto al presente de la campaña */
+  esFlashback?: boolean;
+  /** Año de cómputo de la campaña asignado al capítulo */
+  anoCampana?: number;
+  /** Fecha textual de referencia de la época */
+  fechaTexto?: string;
 }
 
 export interface Message {

@@ -242,3 +242,20 @@ export function buscarArchivoDeCapitulo(files: ProjectFile[], chatId: string): P
       (f.name.includes('Crónica — ') && f.content && f.content.includes(fileId))
   );
 }
+
+/**
+ * Elimina el archivo de crónica archivada de un capítulo si existe en la biblioteca.
+ * Devuelve la lista actualizada de archivos y el archivo eliminado si lo hubo.
+ */
+export function desarchivarCapitulo(
+  files: ProjectFile[],
+  chatId: string
+): { updatedFiles: ProjectFile[]; archivoEliminado?: ProjectFile } {
+  if (!files || !chatId) return { updatedFiles: files || [] };
+  const target = buscarArchivoDeCapitulo(files, chatId);
+  if (!target) return { updatedFiles: files };
+
+  const updatedFiles = files.filter(f => f.id !== target.id);
+  return { updatedFiles, archivoEliminado: target };
+}
+

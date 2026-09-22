@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Chat, PlayerCharacter, Project, ProjectFile } from '../types';
+import { Chat, PlayerCharacter, Project, ProjectFile, RecuerdoEpisodicoNPC, NPC } from '../types';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
 import { CreativeStudioModal } from './CreativeStudioModal';
@@ -45,6 +45,7 @@ import {
 } from '../utils/geminiHelper';
 
 import {
+  ArchiveRestore,
   BookCheck,
   BookOpen,
   Dices,
@@ -73,7 +74,8 @@ import {
   MoreHorizontal,
   Copy,
   MicOff,
-  FileText
+  FileText,
+  Pin
 } from 'lucide-react';
 interface ChatMessageItemProps {
   m: { role: 'user' | 'model'; content: string; cortadoEnSegundoPlano?: boolean };
@@ -87,6 +89,7 @@ interface ChatMessageItemProps {
   isSearchHit: boolean;
   copiedIndex: number | null;
   handleCopyMessage: (idx: number, content: string) => void;
+  handlePinMemory: (idx: number, content: string) => void;
   handleStartEditing: (idx: number, content: string) => void;
   handleCancelEditing: () => void;
   handleSaveEditOnly: (idx: number) => void;
@@ -133,6 +136,7 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   isSearchHit,
   copiedIndex,
   handleCopyMessage,
+  handlePinMemory,
   handleStartEditing,
   handleCancelEditing,
   handleSaveEditOnly,
@@ -583,6 +587,15 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                 <Copy className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">{copiedIndex === idx ? 'Copiado' : 'Copiar'}</span>
               </button>
               <button
+                onClick={() => handlePinMemory(idx, m.content)}
+                disabled={isGenerating}
+                className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-purple-600 dark:hover:text-purple-400 transition-colors cursor-pointer disabled:opacity-40"
+                aria-label="Fijar recuerdo o promesa a un PNJ"
+                title="Fijar frase, promesa o momento en la memoria viva de un PNJ"
+              >
+                <Pin className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Recordar</span>
+              </button>
+              <button
                 onClick={() =>
                   setDeleteModal({ index: idx, role: m.role, isLast: isLastMessage })
                 }
@@ -633,6 +646,7 @@ interface ChatMessagesListProps {
   copiedIndex: number | null;
   acciones: {
     handleCopyMessage: (idx: number, content: string) => void;
+    handlePinMemory: (idx: number, content: string) => void;
     handleStartEditing: (idx: number, content: string) => void;
     handleCancelEditing: () => void;
     handleSaveEditOnly: (idx: number) => void;
@@ -695,6 +709,7 @@ const ChatMessagesList = React.memo<ChatMessagesListProps>(({
             isSearchHit={isSearchHit}
             copiedIndex={copiedIndex === idx ? idx : null}
             handleCopyMessage={acciones.handleCopyMessage}
+            handlePinMemory={acciones.handlePinMemory}
             handleStartEditing={acciones.handleStartEditing}
             handleCancelEditing={acciones.handleCancelEditing}
             handleSaveEditOnly={acciones.handleSaveEditOnly}
@@ -753,6 +768,8 @@ export const ChatView: React.FC<{
   chatTokensCount?: number;
   onCreateNewChat?: () => void;
   onArchiveChatAsFile?: () => void;
+  onUnarchiveChatAsFile?: () => void;
+  isArchived?: boolean;
   onOpenMesa?: () => void;
   /** Si hay mensajes nuevos o reacciones espontáneas del DM sin leer en la Mesa. */
   tieneNovedadMesa?: boolean;
@@ -789,6 +806,8 @@ export const ChatView: React.FC<{
   chatTokensCount,
   onCreateNewChat,
   onArchiveChatAsFile,
+  onUnarchiveChatAsFile,
+  isArchived,
   onOpenMesa,
   tieneNovedadMesa,
   estaCerrado
@@ -834,6 +853,117 @@ export const ChatView: React.FC<{
     tab: 'music' | 'image' | 'video' | 'voice';
     sceneText?: string;
   } | null>(null);
+
+  // Modal Roleplay: Pin / Recordar frase a un PNJ
+  const [pinModal, setPinModal] = useState<{
+    isOpen: boolean;
+    messageIndex: number;
+    text: string;
+    selectedNpcId: string;
+    tipo: 'promesa' | 'confidencia' | 'aprendizaje' | 'evolucion';
+  } | null>(null);
+  const [pinToast, setPinToast] = useState<string | null>(null);
+
+  const handlePinMemory = useCallback((idx: number, content: string) => {
+    let textoParaPin = '';
+    const seleccion = window.getSelection()?.toString().trim();
+    if (seleccion && seleccion.length > 2) {
+      textoParaPin = seleccion;
+    } else {
+      const matchComillas = content.match(/«([^»]+)»/) || content.match(/"([^"]+)"/);
+      if (matchComillas && matchComillas[1]) {
+        textoParaPin = matchComillas[1].trim();
+      } else {
+        const clean = formatNarrativeText(content);
+        const oraciones = clean.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
+        textoParaPin = oraciones.slice(0, 2).join('. ') + (oraciones.length > 2 ? '.' : '');
+      }
+    }
+
+    const npcs = project?.memory?.npcs || [];
+    let npcAdivinado = npcs[0]?.id || '';
+    for (const n of npcs) {
+      if (
+        n.name.length > 2 &&
+        (content.toLowerCase().includes(n.name.toLowerCase()) ||
+          textoParaPin.toLowerCase().includes(n.name.toLowerCase()))
+      ) {
+        npcAdivinado = n.id;
+        break;
+      }
+    }
+
+    setPinModal({
+      isOpen: true,
+      messageIndex: idx,
+      text: textoParaPin,
+      selectedNpcId: npcAdivinado,
+      tipo: 'promesa'
+    });
+  }, [project?.memory?.npcs]);
+
+  const handleSavePinMemory = useCallback(async () => {
+    if (!pinModal || !pinModal.text.trim() || !pinModal.selectedNpcId) return;
+
+    const targetId = pinModal.selectedNpcId;
+    const texto = pinModal.text.trim();
+    const tipo = pinModal.tipo;
+
+    if (onUpdateProject) {
+      await onUpdateProject(prev => {
+        const npcs = prev.memory?.npcs || [];
+        const targetNpc = npcs.find(n => n.id === targetId);
+        if (!targetNpc) return prev;
+
+        const fechaStr = (calendarioValido(prev.calendar) && prev.currentDate)
+          ? fechaLegible(prev.calendar, prev.currentDate)
+          : undefined;
+
+        const nuevoRecuerdo: RecuerdoEpisodicoNPC = {
+          id: `rec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          fecha: fechaStr,
+          capitulo: chat?.name,
+          tipo,
+          texto
+        };
+
+        const updatedRecuerdos = [...(targetNpc.recuerdosEpisodicos || []), nuevoRecuerdo];
+        let updatedPromesas = [...(targetNpc.promesas || [])];
+        let updatedConfidencias = [...(targetNpc.confidencias || [])];
+        let updatedAprendizajes = [...(targetNpc.habilidadesAprendidas || [])];
+
+        if (tipo === 'promesa' && !updatedPromesas.includes(texto)) {
+          updatedPromesas.push(texto);
+        } else if (tipo === 'confidencia' && !updatedConfidencias.includes(texto)) {
+          updatedConfidencias.push(texto);
+        } else if (tipo === 'aprendizaje' && !updatedAprendizajes.includes(texto)) {
+          updatedAprendizajes.push(texto);
+        }
+
+        const updatedNpc: NPC = {
+          ...targetNpc,
+          recuerdosEpisodicos: updatedRecuerdos,
+          promesas: updatedPromesas,
+          confidencias: updatedConfidencias,
+          habilidadesAprendidas: updatedAprendizajes
+        };
+
+        return {
+          ...prev,
+          memory: {
+            ...prev.memory,
+            npcs: npcs.map(n => n.id === updatedNpc.id ? updatedNpc : n)
+          }
+        };
+      });
+
+      const targetNpcName = (project?.memory?.npcs || []).find(n => n.id === targetId)?.name || 'el personaje';
+      setPinToast(`¡Guardado en la memoria de ${targetNpcName}!`);
+      setTimeout(() => setPinToast(null), 3500);
+    }
+
+    setPinModal(null);
+  }, [pinModal, onUpdateProject, project?.memory?.npcs, chat?.name]);
 
   /*
    * Cuántas jornadas lleva el capítulo.
@@ -1219,6 +1349,7 @@ export const ChatView: React.FC<{
    */
   const ultimasAcciones = useRef({
     handleCopyMessage,
+    handlePinMemory,
     handleStartEditing,
     handleCancelEditing,
     handleSaveEditOnly,
@@ -1229,6 +1360,7 @@ export const ChatView: React.FC<{
   });
   ultimasAcciones.current = {
     handleCopyMessage,
+    handlePinMemory,
     handleStartEditing,
     handleCancelEditing,
     handleSaveEditOnly,
@@ -1242,6 +1374,8 @@ export const ChatView: React.FC<{
     () => ({
       handleCopyMessage: (idx: number, content: string) =>
         ultimasAcciones.current.handleCopyMessage(idx, content),
+      handlePinMemory: (idx: number, content: string) =>
+        ultimasAcciones.current.handlePinMemory(idx, content),
       handleStartEditing: (idx: number, content: string) =>
         ultimasAcciones.current.handleStartEditing(idx, content),
       handleCancelEditing: () => ultimasAcciones.current.handleCancelEditing(),
@@ -1508,14 +1642,27 @@ export const ChatView: React.FC<{
         siguiera tres capítulos más adelante. Aquí queda claro dónde termina lo
         vivido, en la misma línea donde el relato da paso a los controles.
       */}
-      {estaCerrado && (
+      {(estaCerrado || isArchived) && (
         <div className="px-2.5 sm:px-4 md:px-8 pt-3">
-          <div className="max-w-[900px] mx-auto flex items-center gap-3 text-[var(--accent)]">
+          <div className="max-w-[900px] mx-auto flex items-center justify-between gap-2 sm:gap-3 text-[var(--accent)]">
             <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[var(--accent)]/35" />
-            <span className="flex items-center gap-1.5 font-cinzel text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.18em] opacity-75 shrink-0">
-              <BookCheck className="w-3.5 h-3.5" />
-              Fin del capítulo
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="flex items-center gap-1.5 font-cinzel text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.18em] opacity-75">
+                {isArchived ? <Library className="w-3.5 h-3.5" /> : <BookCheck className="w-3.5 h-3.5" />}
+                {isArchived ? 'Capítulo archivado' : 'Fin del capítulo'}
+              </span>
+              {onUnarchiveChatAsFile && isArchived && (
+                <button
+                  type="button"
+                  onClick={onUnarchiveChatAsFile}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-cinzel font-bold rounded-full bg-[var(--accent)]/15 hover:bg-[var(--accent)] text-[var(--accent)] hover:text-[var(--on-accent)] transition-all cursor-pointer border border-[var(--accent)]/30 active:scale-95 shadow-2xs"
+                  title="Desmarcar capítulo archivado para volver a él y seguir jugando"
+                >
+                  <ArchiveRestore className="w-3 h-3 shrink-0" />
+                  <span>Desmarcar para seguir jugando</span>
+                </button>
+              )}
+            </div>
             <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[var(--accent)]/35" />
           </div>
         </div>
@@ -2512,7 +2659,30 @@ export const ChatView: React.FC<{
                       </button>
                     )}
 
-                    {/* Opción 5: Archivar Capítulo en Biblioteca (On-Demand) */}
+                    {/* Opción 5: Desmarcar / Archivar Capítulo en Biblioteca (On-Demand) */}
+                    {onUnarchiveChatAsFile && isArchived && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsActionsMenuOpen(false);
+                          onUnarchiveChatAsFile();
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group border-t border-[var(--glass-border)] mt-0.5 pt-1.5"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                          <ArchiveRestore className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                            Desmarcar Capítulo Archivado
+                          </div>
+                          <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                            Quitar de la biblioteca para seguir jugando en él
+                          </div>
+                        </div>
+                      </button>
+                    )}
+
                     {onArchiveChatAsFile && chat?.messages && chat.messages.length > 0 && (
                       <button
                         type="button"
@@ -2520,17 +2690,19 @@ export const ChatView: React.FC<{
                           setIsActionsMenuOpen(false);
                           onArchiveChatAsFile();
                         }}
-                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group border-t border-[var(--glass-border)] mt-0.5 pt-1.5"
+                        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[var(--surface-soft)] text-left transition-colors cursor-pointer group ${
+                          !isArchived ? 'border-t border-[var(--glass-border)] mt-0.5 pt-1.5' : ''
+                        }`}
                       >
                         <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                           <FileText className="w-3.5 h-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-cinzel text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
-                            Archivar en Biblioteca
+                            {isArchived ? 'Actualizar Crónica en Biblioteca' : 'Archivar en Biblioteca'}
                           </div>
                           <div className="text-[11px] text-[var(--text-secondary)] truncate">
-                            Memoria persistente de consulta (On-Demand)
+                            {isArchived ? 'Recompilar resumen con los últimos mensajes' : 'Memoria persistente de consulta (On-Demand)'}
                           </div>
                         </div>
                       </button>
@@ -2643,6 +2815,142 @@ export const ChatView: React.FC<{
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Roleplay Pin Modal: Recordar / Fijar momento en la memoria viva del PNJ */}
+      {pinModal?.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--bg-color)] p-5 sm:p-6 rounded-2xl shadow-2xl border border-[var(--glass-border)] max-w-lg w-full font-lora space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-[var(--glass-border)] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                  <Pin className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-cinzel text-base font-bold text-[var(--text-primary)] m-0 flex items-center gap-2">
+                    Fijar en la Memoria del Personaje
+                  </h4>
+                  <span className="text-xs text-[var(--text-secondary)] font-sans">
+                    No se diluirá ni se olvidará entre capítulos
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setPinModal(null)}
+                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)] transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Selector de PNJ */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] uppercase tracking-wider block">
+                ¿Qué PNJ dijo o compartió esto?
+              </label>
+              {(!project?.memory?.npcs || project.memory.npcs.length === 0) ? (
+                <p className="text-xs text-amber-600 italic">No hay personajes registrados en la campaña aún.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-[var(--surface-soft)] rounded-lg border border-[var(--glass-border)]">
+                  {project.memory.npcs.map(n => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => setPinModal(prev => prev ? { ...prev, selectedNpcId: n.id } : null)}
+                      className={`px-2.5 py-1 text-xs rounded-md font-cinzel transition-all cursor-pointer flex items-center gap-1.5 ${
+                        pinModal.selectedNpcId === n.id
+                          ? 'bg-[var(--accent)] text-white font-bold shadow-xs'
+                          : 'bg-[var(--surface)] text-[var(--text-primary)] hover:bg-[var(--surface-soft)] border border-[var(--glass-border)]'
+                      }`}
+                    >
+                      <span>{n.name}</span>
+                      {n.relation && (
+                        <span className="text-[10px] opacity-80 font-sans">({n.relation})</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Selector de Tipo */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] uppercase tracking-wider block">
+                Naturaleza del Recuerdo:
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {(
+                  [
+                    { type: 'promesa', label: '🤝 Promesa' },
+                    { type: 'confidencia', label: '🤫 Confidencia' },
+                    { type: 'aprendizaje', label: '🎓 Habilidad' },
+                    { type: 'evolucion', label: '📜 Momento' }
+                  ] as const
+                ).map(opt => (
+                  <button
+                    key={opt.type}
+                    type="button"
+                    onClick={() => setPinModal(prev => prev ? { ...prev, tipo: opt.type } : null)}
+                    className={`p-1.5 text-xs text-center rounded-lg border font-cinzel transition-all cursor-pointer ${
+                      pinModal.tipo === opt.type
+                        ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-xs'
+                        : 'bg-[var(--surface-soft)] text-[var(--text-secondary)] border-[var(--glass-border)] hover:bg-[var(--surface)]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Texto de la frase o promesa */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-cinzel font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                  Frase o pacto exacto:
+                </label>
+                <span className="text-[11px] text-[var(--text-secondary)] font-sans italic">
+                  Editable libremente
+                </span>
+              </div>
+              <textarea
+                value={pinModal.text}
+                onChange={e => setPinModal(prev => prev ? { ...prev, text: e.target.value } : null)}
+                rows={3}
+                className="w-full p-2.5 text-xs sm:text-sm rounded-xl bg-[var(--surface-soft)] border border-[var(--glass-border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] resize-none"
+                placeholder="Escribe la frase o promesa dicha por el PNJ..."
+              />
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--glass-border)]">
+              <button
+                type="button"
+                onClick={() => setPinModal(null)}
+                className="px-3.5 py-1.5 text-xs rounded-lg bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePinMemory}
+                disabled={!pinModal.text.trim() || !pinModal.selectedNpcId}
+                className="px-4 py-1.5 text-xs rounded-lg bg-[var(--accent)] text-white font-cinzel font-semibold hover:opacity-90 disabled:opacity-40 shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Pin className="w-3.5 h-3.5" />
+                <span>Fijar en su Ficha</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast flotante */}
+      {pinToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface)] text-[var(--text-primary)] px-4 py-2 rounded-full shadow-lg border border-[var(--accent)] text-xs font-cinzel font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <Pin className="w-4 h-4 text-purple-400" />
+          <span>{pinToast}</span>
         </div>
       )}
 
