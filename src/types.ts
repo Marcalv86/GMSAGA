@@ -155,7 +155,8 @@ export interface VisualMemoryItem {
 export interface InventoryItem {
   id: string;
   name: string;
-  category?: 'weapon' | 'armor' | 'potion' | 'scroll' | 'magic' | 'equipment' | 'treasure' | 'other';
+  category?: 'weapon' | 'armor' | 'potion' | 'scroll' | 'magic' | 'equipment' | 'treasure' | 'gem' | 'jewelry' | 'other' | string;
+  slot?: 'main_hand' | 'off_hand' | 'two_hands' | 'armor' | 'shield' | 'head' | 'ring' | 'amulet' | 'cloak' | 'boots' | 'gloves' | 'belt' | 'bag' | 'other' | string;
   quantity: number;
   weight?: number; // lbs
   equipped?: boolean;

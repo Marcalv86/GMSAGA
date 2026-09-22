@@ -45,6 +45,8 @@ import {
   Shield,
   Sparkles,
   Trash2,
+  RotateCcw,
+  X,
   User,
   Backpack,
   Coins,
@@ -62,7 +64,8 @@ import {
 } from 'lucide-react';
 import { esNombreDeProtagonista } from '../utils/sanitizers';
 import { obtenerOGenerarFichaNpc, asegurarFichaCompletaNpc } from '../utils/canonicalNpcStats';
-import { deduplicarInventario, esRequisado, iconoDe } from '../utils/inventoryTag';
+import { deduplicarInventario, esRequisado, sonElMismoObjeto } from '../utils/inventoryTag';
+import { InventoryItemIcon, CoinBadgeDot, classifyInventoryItem } from './InventoryIcons';
 import { extraerIdentidadDeDocumentos, esFichaDelPj } from '../utils/geminiHelper';
 
 // `getAtrInfo` se retiró con la escala 0-20: el deseo ya no tiene tramos —
@@ -235,6 +238,123 @@ export const MemoryManager: React.FC<{
   React.useEffect(() => {
     if (!seccionesVisibles.includes(activeTab)) setActiveTab(seccionesVisibles[0]);
   }, [secciones]);
+
+  // --- INVENTARIO: BORRADO RÁPIDO Y RECUPERACIÓN ---
+  const [inventarioToast, setInventarioToast] = useState<string | null>(null);
+  const [itemParaDeshacer, setItemParaDeshacer] = useState<InventoryItem | null>(null);
+
+  useEffect(() => {
+    if (!inventarioToast) return;
+    const t = setTimeout(() => {
+      setInventarioToast(null);
+      setItemParaDeshacer(null);
+    }, 4500);
+    return () => clearTimeout(t);
+  }, [inventarioToast]);
+
+  const handleDeleteInventoryItem = async (itemToDelete: InventoryItem) => {
+    if (!onUpdateMemory) return;
+    setItemParaDeshacer(itemToDelete);
+    setInventarioToast(`«${itemToDelete.name}» eliminado del inventario`);
+
+    await onUpdateMemory(prev => {
+      if (!prev.player_character) return prev;
+      const items = prev.player_character.inventory || [];
+      const nuevo = items.filter(it => {
+        if (it.id && itemToDelete.id && it.id === itemToDelete.id) return false;
+        if (sonElMismoObjeto(it.name || '', itemToDelete.name || '')) return false;
+        return true;
+      });
+      return {
+        ...prev,
+        player_character: {
+          ...prev.player_character,
+          inventory: nuevo
+        }
+      };
+    });
+  };
+
+  const handleDeshacerBorradoInventario = async () => {
+    if (!itemParaDeshacer || !onUpdateMemory) return;
+    const itemARecuperar = itemParaDeshacer;
+    setItemParaDeshacer(null);
+    setInventarioToast(null);
+
+    await onUpdateMemory(prev => {
+      if (!prev.player_character) return prev;
+      const items = prev.player_character.inventory || [];
+      return {
+        ...prev,
+        player_character: {
+          ...prev.player_character,
+          inventory: [itemARecuperar, ...items]
+        }
+      };
+    });
+  };
+
+  const handleDecreaseItemQuantity = async (item: InventoryItem) => {
+    if (!onUpdateMemory) return;
+    await onUpdateMemory(prev => {
+      if (!prev.player_character) return prev;
+      const items = prev.player_character.inventory || [];
+      const nuevo = items.map(it => {
+        if ((it.id && item.id && it.id === item.id) || sonElMismoObjeto(it.name || '', item.name || '')) {
+          const q = Math.max(1, (it.quantity || 1) - 1);
+          return { ...it, quantity: q };
+        }
+        return it;
+      });
+      return {
+        ...prev,
+        player_character: {
+          ...prev.player_character,
+          inventory: nuevo
+        }
+      };
+    });
+  };
+
+  const handleRestoreItem = async (item: InventoryItem) => {
+    if (!onUpdateMemory) return;
+    await onUpdateMemory(prev => {
+      if (!prev.player_character) return prev;
+      const items = prev.player_character.inventory || [];
+      const nuevo = items.map(it => {
+        if ((it.id && item.id && it.id === item.id) || sonElMismoObjeto(it.name || '', item.name || '')) {
+          const copia = { ...it };
+          delete copia.eliminado;
+          delete copia.motivoBaja;
+          return copia;
+        }
+        return it;
+      });
+      return {
+        ...prev,
+        player_character: {
+          ...prev.player_character,
+          inventory: nuevo
+        }
+      };
+    });
+    setInventarioToast(`«${item.name}» devuelto a la mochila`);
+  };
+
+  const handleDeleteAprendido = async (aprendidoId: string) => {
+    if (!onUpdateMemory) return;
+    await onUpdateMemory(prev => {
+      if (!prev.player_character) return prev;
+      const ap = prev.player_character.aprendido || [];
+      return {
+        ...prev,
+        player_character: {
+          ...prev.player_character,
+          aprendido: ap.filter(a => a.id !== aprendidoId)
+        }
+      };
+    });
+  };
 
   // Protagonist (OC) State
   const [isSyncingAI, setIsSyncingAI] = useState(false);
@@ -2906,18 +3026,24 @@ export const MemoryManager: React.FC<{
             }`}
           >
             {/*
-              El emoji manda en su propia columna, como en el boceto: grande, a
-              la izquierda y separado por una línea, para que la tarjeta se lea
-              de un vistazo sin tener que leerla.
+              Icono SVG vectorial según slot (mano derecha/izq/dos manos),
+              tipo de arma (espada, escudo, arco, bastón, lanza, grimorio, varita,
+              objeto mágico, joya, armadura, gema, poción, pergamino, etc.).
             */}
-            <span
+            <div
               aria-hidden
-              className={`text-3xl sm:text-4xl leading-none shrink-0 self-stretch flex items-center pr-3 border-r ${
-                tono === 'hecho' || tono === 'eliminado' ? 'opacity-40 grayscale border-[var(--user-border)]' : 'border-[var(--user-border)]'
+              className={`w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-lg flex items-center justify-center border transition-colors ${
+                tono === 'hecho' || tono === 'eliminado'
+                  ? 'opacity-40 grayscale bg-[var(--surface)] border-[var(--user-border)]'
+                  : tono === 'mision'
+                  ? 'bg-amber-500/10 border-amber-500/30'
+                  : tono === 'requisado'
+                  ? 'bg-rose-500/10 border-rose-500/30'
+                  : 'bg-[var(--surface)] border-[var(--glass-border)] shadow-2xs'
               }`}
             >
-              {iconoDe(item)}
-            </span>
+              <InventoryItemIcon item={item} className="w-6 h-6 sm:w-7 sm:h-7" />
+            </div>
             <div className="flex flex-col gap-1.5 min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-1.5 flex-wrap min-w-0">
@@ -2940,6 +3066,39 @@ export const MemoryManager: React.FC<{
                     portado
                   </span>
                 ) : null}
+                {/* Insignias de Slot o Categoría especial */}
+                {(() => {
+                  const k = classifyInventoryItem(item);
+                  if (k === 'main_hand') {
+                    return (
+                      <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                        mano derecha
+                      </span>
+                    );
+                  }
+                  if (k === 'off_hand') {
+                    return (
+                      <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20">
+                        mano izquierda
+                      </span>
+                    );
+                  }
+                  if (k === 'two_handed') {
+                    return (
+                      <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-red-500/10 text-red-700 dark:text-red-300 border border-red-500/20">
+                        a dos manos
+                      </span>
+                    );
+                  }
+                  if (k === 'gem') {
+                    return (
+                      <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20">
+                        gema (venta)
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
                 {item.durationNote && (
                   <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]">
                     ⏳ {item.durationNote}
@@ -2955,6 +3114,39 @@ export const MemoryManager: React.FC<{
                     baja / consumido
                   </span>
                 )}
+              </div>
+
+              {/* Botonera de acciones rápidas (1 clic) */}
+              <div className="flex items-center gap-1 shrink-0">
+                {tono === 'eliminado' && (
+                  <button
+                    type="button"
+                    onClick={() => handleRestoreItem(item)}
+                    className="p-1 rounded-md text-[var(--text-secondary)] hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                    title={`Restaurar "${item.name}" a la mochila activa`}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {(item.quantity ?? 0) > 1 && tono !== 'eliminado' && (
+                  <button
+                    type="button"
+                    onClick={() => handleDecreaseItemQuantity(item)}
+                    className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-[var(--surface)] hover:bg-[var(--surface-soft)] border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                    title={`Restar 1 unidad (quedarán ${(item.quantity ?? 1) - 1})`}
+                  >
+                    -1
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteInventoryItem(item)}
+                  className="p-1 rounded-md text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                  title={`Eliminar "${item.name}" del inventario con 1 clic`}
+                  aria-label={`Eliminar ${item.name}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
@@ -3010,19 +3202,19 @@ export const MemoryManager: React.FC<{
                 </span>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {([
-                    ['pp', 'PP', 'text-slate-500', '⚪'],
-                    ['gp', 'PO', 'text-amber-600', '🟡'],
-                    ['ep', 'PE', 'text-cyan-600', '🔵'],
-                    ['sp', 'PA', 'text-zinc-500', '⚫'],
-                    ['cp', 'PC', 'text-orange-700', '🟤']
-                  ] as ['cp' | 'sp' | 'ep' | 'gp' | 'pp', string, string, string][])
+                    ['pp', 'PP', 'text-slate-500'],
+                    ['gp', 'PO', 'text-amber-600'],
+                    ['ep', 'PE', 'text-cyan-600'],
+                    ['sp', 'PA', 'text-zinc-500'],
+                    ['cp', 'PC', 'text-orange-700']
+                  ] as ['cp' | 'sp' | 'ep' | 'gp' | 'pp', string, string][])
                     .filter(([k]) => (monedas?.[k] ?? 0) > 0)
-                    .map(([k, etiqueta, color, ficha]) => (
+                    .map(([k, etiqueta, color]) => (
                       <span
                         key={k}
-                        className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] ${color}`}
+                        className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] flex items-center ${color}`}
                       >
-                        <span aria-hidden className="mr-0.5">{ficha}</span>
+                        <CoinBadgeDot type={k} />
                         {monedas?.[k]} {etiqueta}
                       </span>
                     ))}
@@ -3132,18 +3324,28 @@ export const MemoryManager: React.FC<{
                       key={a.id}
                       className="p-3.5 rounded-lg border bg-[var(--surface-soft)] border-sky-500/25 flex flex-col gap-1.5"
                     >
-                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                        <span className="font-cinzel font-bold text-xs sm:text-sm break-words text-sky-700 dark:text-sky-300">
-                          {a.name}
-                        </span>
-                        <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
-                          {ETIQUETA_APRENDIZAJE[a.tipo] || 'otro'}
-                        </span>
-                        {a.nivel && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]">
-                            nivel {a.nivel}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                          <span className="font-cinzel font-bold text-xs sm:text-sm break-words text-sky-700 dark:text-sky-300">
+                            {a.name}
                           </span>
-                        )}
+                          <span className="text-[10px] font-cinzel px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                            {ETIQUETA_APRENDIZAJE[a.tipo] || 'otro'}
+                          </span>
+                          {a.nivel && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--text-secondary)]">
+                              nivel {a.nivel}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAprendido(a.id)}
+                          className="p-1 rounded-md text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
+                          title={`Eliminar "${a.name}" con 1 clic`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                       {a.notas && (
                         <p className="text-[11px] font-lora text-[var(--text-secondary)] m-0 leading-relaxed">
@@ -3208,6 +3410,34 @@ export const MemoryManager: React.FC<{
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                   {resueltos.map(i => <Tarjeta key={i.id} item={i} tono="hecho" />)}
                 </div>
+              </div>
+            )}
+
+            {/* Toast flotante de confirmación y deshacer borrado de inventario */}
+            {inventarioToast && (
+              <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface)] text-[var(--text-primary)] px-4 py-2.5 rounded-xl shadow-2xl border border-rose-500/40 text-xs font-cinzel flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <Trash2 className="w-4 h-4 text-rose-500 shrink-0" />
+                <span className="font-semibold">{inventarioToast}</span>
+                {itemParaDeshacer && (
+                  <button
+                    type="button"
+                    onClick={handleDeshacerBorradoInventario}
+                    className="ml-2 px-2.5 py-1 rounded-lg bg-[var(--accent)] text-white font-bold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1 shadow-xs"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Deshacer</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInventarioToast(null);
+                    setItemParaDeshacer(null);
+                  }}
+                  className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
           </div>
