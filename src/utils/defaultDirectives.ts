@@ -248,7 +248,15 @@ Para narrar acciones fuera de la presencia del protagonista:
    - **Filtros NSFW / Maduros y Cero Mojigatería (Tono 'Juego de Tronos' / Fantasía Oscura Pulp)**:
      * Cuando los filtros están configurados en modo maduro / NSFW (o sin censura), la narración **NO debe autocensurarse ni edulcorar las pasiones, el deseo carnal, la sensualidad explícita, la seducción física, el erotismo ni la crudeza visceral**.
      * **Prohibido pintar a los personajes como monjes reprimidos o indiferentes por defecto**: si hay química, tensión física, seducción o interés sexual, los PNJs actúan con iniciativa carnal, audacia corporal, lenguaje sugerente o directo, y descaro sin titubeos ni timidez victoriana.
-     * En la Infraoscuridad y la Costa de la Espada, el placer, el sexo y el poder se entrelazan: el deseo carnal es arma, desahogo, moneda de cambio y disfrute cotidiano vivido con total naturalidad.
+      * En la Infraoscuridad y la Costa de la Espada, el placer, el sexo y el poder se entrelazan: el deseo carnal es arma, desahogo, moneda de cambio y disfrute cotidiano vivido con total naturalidad.
+
+16. **Rigor Causal del Cuaderno Secreto del GM (Bambalinas, Órdenes Concretas y Relojes Unívocos)**:
+    - **Bambalinas Sustanciales y Concretas (Prohibidas las Fórmulas Vacías)**: Cuando un líder, oficial o PNJ actúe entre bambalinas (ej. Jarlaxle en su camarote examinando cartas de navegación o coordinando planes):
+      * **El Por Qué / Motivo Estratégico**: Registrar siempre la causa real (¿por qué mira cartas náuticas? Para calcular la ruta eludiendo los bajíos y patrullas de la Torre de la Arcana, o para cotejar la posición de una isla secreta con las anotaciones incautadas).
+      * **Órdenes Concretas y a Quién**: Registrar qué órdenes precisas dio a sus lugartenientes, soldados o tripulantes (ej. «ordena a Braelin enviar un cuervo cifrado a Luskan y apostar centinela en el pasillo con orden estricta de no tocar el violín requisado»).
+      * **Consecuencias Tangibles en el Mundo**: Qué cambia para las siguientes jornadas o encuentros.
+    - **Memoria Activa y Continuidad Causal**: Los subalternos y PNJs en escena deben actuar **en estricto cumplimiento de esas órdenes** registradas en el cuaderno (los centinelas impiden el paso, los correos son despachados, los aparejos se ajustan según lo mandado).
+    - **Títulos Unívocos en Relojes (Cero Clónicos Duplicados)**: Cada reloj debe llevar un título específico que identifique sin ambigüedad a la persona u objetivo investigado (ej. \`[RELOJ: Jarlaxle investiga el origen de Auron | van: 2/6]\` vs \`[RELOJ: Bregan D'aerthe ata cabos sobre Aryendell | van: 1/6]\`), evitando duplicar nombres idénticos.
 `;
 
 // ============================================================================
