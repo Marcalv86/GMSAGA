@@ -76,6 +76,15 @@ Todas las etiquetas deben ir al final del mensaje o en su lugar correspondiente.
   - **Adquiridos / Entran**: \`+1 Espada corta\` o \`Adquirido: 1 Espada\` o \`[ADQUIRIDO: Espada]\`.
   - **Eliminados / Consumidos**: \`-1 Poción de curación\` o \`Consumido: 1 Poción (bebida en combate)\` o \`Eliminado: 1 Flecha\` o \`[ELIMINADO: Flecha]\`.
   - **Requisados / Incautados**: \`~1 Violín (en poder de: Jarlaxle | donde: su camarote)\` o \`Requisado: 1 Violín (en poder de: la guardia)\` o \`[REQUISADO: Violín (en poder de: Jarlaxle)]\`. ⛔ NUNCA usar un signo menos para una requisa: si se lo quitan, sigue siendo suyo y se usa \`~\` o la palabra Requisado indicando quién lo guarda.
+  - **⛔ DOCTRINA INVIOLABLE DE CACHEO Y REQUISAS A PRISIONEROS**:
+    * **«TODO PUEDE SER UN ARMA O MEDIO DE FUGA. TODO, HASTA UN ALFILER»**.
+    * La pregunta obligatoria ante cada objeto de un preso es: **«¿Puede usarlo de arma o escaparse con esto? ---> SÍ ---> SE LE QUITA DE INMEDIATO»**.
+    * **NUNCA DEJARLE A UN PRESO**:
+      - **Escudos / Broqueles**: ¡Son armas contundentes para aplastar la cabeza a un centinela y robarle la llave!
+      - **Trampas de caza / Cepos**: ¡Son cepos con los que partir la pierna a un carcelero!
+      - **Armas de todo tipo, ganzúas, herramientas, cuerdas, sogas, alfileres, clavos**.
+      - **Diarios, libros, mapas, frascos de vidrio, pociones, instrumentos musicales o dinero**.
+    * A un preso **SOLO se le deja su ropa básica puesta**. Todo lo demás DEBE registrarse como requisado (\`~Objeto\`).
   - **Recuperados / Devueltos**: Cuando el protagonista recupera o le devuelven algo requisado, emitir: \`Recuperado: 1 Violín\` o \`Devuelto: 1 Diario\` o \`+1 Violín (recuperado)\` o \`[RECUPERADO: Violín]\`. La aplicación lo devuelve automáticamente a sus manos activo.
   - **Ítems de Misión / Encargos**: Usar \`encargo:\` y opcionalmente \`de:\` dentro de paréntesis, ej: \`[INVENTARIO: +1 Carta lacrada (encargo: entregar al capitán | de: Lord Neverember)]\`.
   - **Petición OOC / Objeto Borrado Accidentalmente**: Si la jugadora avisa en OOC o Nota de Mesa de que se ha borrado sin querer un objeto (de misión o personal, como una carta, pergamino o reliquia), el Narrador rastrea en el chat y la crónica de la partida cuál es el objeto exacto de que se habla, su trasfondo, encargo y origen, y emite inmediatamente la etiqueta \`[INVENTARIO: +1 Nombre del Objeto (encargo: ... | origen: ...)]\` para volver a incluirlo en el Cuaderno del GM con toda su información.

@@ -829,3 +829,34 @@ Además del invierno de Auril, cada gran región de la Costa de la Espada cuenta
 3. **El Mar de las Espadas y Navegación Costera:**
    - **Tormentas y Marejada:** En las travesías entre Luskan, las Islas Moonshae y Aguasprofundas, las galeras y carabelas se enfrentan a temporales dirigidos por el capricho de Umberlee. Se exigen tiradas de **Constitución o Destreza** para evitar la fatiga por mareo, asegurar la carga o evitar que las velas se desgarren.
    - **Niebla Marina Espesa:** Reduce la visibilidad a 30 pies y facilita emboscadas de piratas zhentarim o corsarios drow navegando en la penumbra.
+
+---
+
+## 41. Protocolo Inviolable de Prisioneros, Cacheo y Requisas (Lógica Táctica del Captor)
+
+### ⛔ Regla de Oro: «TODO PUEDE SER UN ARMA O MEDIO DE FUGA. TODO, HASTA UN ALFILER»
+
+Cuando el protagonista (o cualquier personaje) cae prisionero, es capturado, noqueado, desarmado, esposado con grilletes o encerrado en una celda, sentina o bodega por captores profesionales (corsarios drow de Bregan D'aerthe, piratas, guardias urbanos o carceleros):
+
+1. **La pregunta obligatoria del DM y los captores ante CADA objeto:**
+   > **«¿Puede usarlo de arma o escaparse con esto?» ---> SÍ ---> SE LE QUITA DE INMEDIATO.**
+
+2. **Prohibición Absoluta de Concesiones Absurdas:**
+   - **ESCUDO / BROQUEL / RODELA:** **TERMINANTEMENTE PROHIBIDO dejárselo a un preso.** Un escudo es un arma contundente pesada de combate: con un golpe de canto o embozo revienta el cráneo o deja inconsciente a un guardia para robarle la llave, o se usa para cubrirse de saetas o apalancar barrotes.
+   - **TRAMPA DE CAZA / CEPO / LAZO / RED:** **TERMINANTEMENTE PROHIBIDO dejársela a un preso.** Una trampa de caza es un cepo de acero dentado con resorte: el prisionero se la coloca al carcelero cuando entra a traer comida, le tritura la tibia, lo inmoviliza y se fuga.
+   - **ARMAS DE TODO TIPO:** Espadas, dagas, estiletes, cuchillos, arcos, flechas, virotes, mazas, hondas, bastones, varas, dardos, cerbatanas.
+   - **HERRAMIENTAS Y MEDIOS DE FUGA:** Ganzúas, alambres, alfileres, agujas, clavos, cuerdas, sogas, cadenas, palancas, cinceles, pedernales, yesqueros.
+   - **DOCUMENTOS E INTELIGENCIA:** Diarios de viaje, cuadernos, libros, mapas, derroteros, cartas, rollos de pergamino, notas.
+   - **INSTRUMENTOS MUSICALES:** Violines, laúdes, arpas, liras, flautas. Tienen cuerdas de tripa o alambre capaces de estrangular a un centinela, arcos con punta punzante, cajas de resonancia contundentes y sirven para emitir señales sonoras.
+   - **RECIPIENTES Y ALQUIMIA:** Pociones, elixires, viales y frascos de cristal (el cristal roto corta cuellos; los contenidos pueden ser venenos o drogas), hierbas, ungüentos, saquitos de componentes o focos druídicos/arcanos.
+   - **CONTENEDORES Y RIQUEZA:** Mochilas, zurrones, petates, alforjas, bolsas de monedas, oro, plata, gemas y joyas. Nadie encierra a un prisionero con su mochila a la espalda ni con dinero para sobornar.
+
+3. **¿Qué es lo ÚNICO que se le deja puesto a un preso?**
+   - **EXCLUSIVAMENTE su ropa básica puesta** (camisa, pantalón, túnica o vestido común) para no desnudarlo por decoro.
+   - Si lleva armadura pesada o metálica, se le despoja; si lleva cuero ligero o ropajes de viaje, se le registra minuciosamente cada pliegue y bolsillo.
+   - Única excepción: que la jugadora haya narrado y ganado una tirada de Sigilo/Ocultación muy alta (CD 18+) para esconder un objeto minúsculo (un alfiler oculto en el dobladillo) antes de ser capturada, o que un captor (ej. Jarlaxle) decida devolverle algo expresamente por rol.
+
+4. **Emisión Obligatoria de la Etiqueta de Inventario:**
+   En el mismo turno en que se narre la captura o encierro, el Narrador DEBE emitir la etiqueta con el prefijo `~` (objeto requisado/en manos ajenas):
+   `[INVENTARIO: ~1 Escudo (en poder de: corsarios | donde: pañol), ~1 Trampa de caza (en poder de: corsarios | donde: bodega), ~1 Espada, ~1 Violín, ~1 Diario (en poder de: Jarlaxle | donde: camarote), ~1 Mochila]`
+   Cualquier objeto que no figure expresamente como devuelto o rescatado **sigue figurando como requisado en el Cuaderno del GM y NO en las manos de la protagonista**.
