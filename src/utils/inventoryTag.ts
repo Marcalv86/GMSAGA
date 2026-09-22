@@ -339,9 +339,10 @@ export function sonElMismoObjeto(a: string, b: string): boolean {
 
 /**
  * Deduplica una lista de objetos de inventario combinando duplicados.
- * REGLA FUNDAMENTAL: Si un objeto figura a la vez en manos de la jugadora
- * (enPoderDe es undefined) y requisado (enPoderDe definido), manda que lo
- * tiene la jugadora: el objeto se desrequisita y queda en sus manos (portado o equipado).
+ * Si un objeto figura como requisado en poder de alguien (enPoderDe definido),
+ * ese estado prevalece sobre un registro base neutral sin dueño, evitando que
+ * el inventario inicial de la ficha anule las requisas ocurridas en la trama.
+ * Solo vuelve a las manos del personaje si hay indicación expresa de devolución o recuperación.
  */
 export function deduplicarInventario(items: InventoryItem[]): InventoryItem[] {
   const resultado: InventoryItem[] = [];
@@ -354,17 +355,24 @@ export function deduplicarInventario(items: InventoryItem[]): InventoryItem[] {
     if (idx >= 0) {
       const existente = resultado[idx];
 
-      // Prioridad 1: Activo en manos > Requisado > Eliminado
-      const algunActivo = (!it.eliminado && !esRequisado(it)) || (!existente.eliminado && !esRequisado(existente));
-      const algunRequisado = (!it.eliminado && esRequisado(it)) || (!existente.eliminado && esRequisado(existente));
+      const itReq = !it.eliminado && esRequisado(it);
+      const extReq = !existente.eliminado && esRequisado(existente);
+      const algunRequisado = itReq || extReq;
 
-      const estaEnSusManos = algunActivo;
-      const esReq = !estaEnSusManos && algunRequisado;
-      const esElim = !estaEnSusManos && !esReq && Boolean(it.eliminado || existente.eliminado);
+      // Se considera devuelto a sus manos solo si expresamente se marca como devuelto/recuperado
+      const esDevuelto =
+        it.enPoderDe === 'devuelto' ||
+        it.enPoderDe === 'recuperado' ||
+        existente.enPoderDe === 'devuelto' ||
+        existente.enPoderDe === 'recuperado';
 
-      const enPoderDe = estaEnSusManos ? undefined : (esReq ? (it.enPoderDe || existente.enPoderDe) : undefined);
-      const dondeEsta = enPoderDe ? (it.dondeEsta || existente.dondeEsta) : undefined;
-      const incautadoDiaAbs = enPoderDe ? (existente.incautadoDiaAbs ?? it.incautadoDiaAbs) : undefined;
+      const esReq = algunRequisado && !esDevuelto;
+      const estaEnSusManos = !esReq && !it.eliminado && !existente.eliminado;
+      const esElim = !esReq && !estaEnSusManos && Boolean(it.eliminado || existente.eliminado);
+
+      const enPoderDe = esReq ? (itReq ? it.enPoderDe : existente.enPoderDe) : undefined;
+      const dondeEsta = esReq ? (itReq ? (it.dondeEsta || existente.dondeEsta) : (existente.dondeEsta || it.dondeEsta)) : undefined;
+      const incautadoDiaAbs = esReq ? (existente.incautadoDiaAbs ?? it.incautadoDiaAbs) : undefined;
 
       const nombreMasCompleto = (existente.name?.length || 0) >= (it.name?.length || 0) ? existente.name : it.name;
 
@@ -448,6 +456,71 @@ export function detectarDevolucionesEnTexto(
   }
 
   return devueltos;
+}
+
+/**
+ * Detecta si el texto de la narración describe la requisa, desarme o confiscación
+ * de pertenencias del personaje (ej. apresamiento por corsarios, guardias, piratas, etc.).
+ */
+export function detectarRequisasEnTexto(
+  texto: string,
+  candidatos: InventoryItem[]
+): { nombre: string; cantidad: number; enPoderDe?: string; dondeEsta?: string }[] {
+  if (!texto || candidatos.length === 0) return [];
+  const incautadas: { nombre: string; cantidad: number; enPoderDe?: string; dondeEsta?: string }[] = [];
+
+  // Detección de captor en el texto
+  let captor = 'Bregan D\'aerthe';
+  if (/\b(?:jarlaxle)\b/i.test(texto)) captor = 'Jarlaxle';
+  else if (/\b(?:corsarios?|tripulaci[oó]n|drows?)\b/i.test(texto)) captor = 'Tripulación corsaria';
+  else if (/\b(?:guardias?|soldados?|carceleros?)\b/i.test(texto)) captor = 'Guardia';
+
+  let ubicacion = 'pañol del navío';
+  if (/\b(?:camarote)\b/i.test(texto)) ubicacion = 'camarote de Jarlaxle';
+  else if (/\b(?:bodega|sentina)\b/i.test(texto)) ubicacion = 'bodega del navío';
+
+  const patronRequisaGlobal =
+    /(?:te\s+(?:requisan|confiscan|despojan|quitan|retiran)|desarmad[ao]|arrojad[ao]\s+a\s+la\s+sentina|confinad[ao]\s+en\s+el\s+calabozo|registran\s+tu\s+(?:equipaje|mochila|petate)|bajo\s+custodia\s+de\s+(?:los\s+corsarios|bregan|d'aerthe|jarlaxle|la\s+guardia))/i;
+
+  if (patronRequisaGlobal.test(texto)) {
+    // En requisa global o captura, confiscan todo lo peligroso o relevante:
+    // armas, escudos, libros/diarios, herramientas, trampas, instrumentos, gemas
+    for (const c of candidatos) {
+      if (esRequisado(c)) continue;
+      const nom = (c.name || '').toLowerCase();
+      const esConfiscable = /\b(?:espada|daga|arco|ballesta|bast[oó]n|vara|arma|escudo|trampa|cepo|diario|libro|almanaque|cuaderno|bit[aá]cora|viol[ií]n|lira|instrumento|herramienta|ganz[uú]a|mochila|monedas?|oro|joya|gema)\b/i.test(nom);
+      if (esConfiscable) {
+        incautadas.push({
+          nombre: c.name,
+          cantidad: c.quantity || 1,
+          enPoderDe: /\b(?:diario|almanaque|cuaderno|libro)\b/i.test(nom) ? (captor === 'Jarlaxle' ? 'Jarlaxle' : 'Jarlaxle') : captor,
+          dondeEsta: /\b(?:diario|almanaque|cuaderno|libro)\b/i.test(nom) ? 'camarote de Jarlaxle' : ubicacion
+        });
+      }
+    }
+  }
+
+  // Detección por mención específica de retención o requisa en la escena
+  for (const c of candidatos) {
+    if (esRequisado(c) || incautadas.some(inc => sonElMismoObjeto(inc.nombre, c.name))) continue;
+    const palabras = normalizarNombreObjeto(c.name).split(' ').filter(w => w.length >= 4);
+    if (palabras.length === 0) continue;
+    const palabraClave = palabras[0];
+    const regexIncautado = new RegExp(
+      `(?:(?:confisc|requisa|arrebata|retiene|custodia|apoder|arrebatad|incautad)[\\wáéíóúñ]*\\s+(?:el|la|los|las|tu|tus)?\\s*(?:[\\wáéíóúñ]+\\s+){0,3}${palabraClave}|${palabraClave}\\s+(?:requirad[oa]|confiscad[oa]|en\\s+(?:su|el)\\s+camarote|en\\s+manos\\s+de|sobre\\s+el\\s+escritorio))`,
+      'i'
+    );
+    if (regexIncautado.test(texto)) {
+      incautadas.push({
+        nombre: c.name,
+        cantidad: c.quantity || 1,
+        enPoderDe: captor,
+        dondeEsta: ubicacion
+      });
+    }
+  }
+
+  return incautadas;
 }
 
 /**
@@ -682,6 +755,22 @@ export function reconstruirInventario(
             cantidad: d.cantidad || 1,
             equipped: d.equipped,
             detalles: d.detalles
+          });
+        }
+      }
+    }
+
+    // Detección de requisa, desarme o confiscación en el texto narrativo
+    const candidatosRequisa = [...inventario, ...aMano].filter(i => !i.enPoderDe && !i.eliminado);
+    if (candidatosRequisa.length > 0) {
+      const incautadasNarrativas = detectarRequisasEnTexto(m.content, candidatosRequisa);
+      for (const inc of incautadasNarrativas) {
+        if (!cambio.incautadas.some(ci => sonElMismoObjeto(ci.nombre, inc.nombre))) {
+          cambio.incautadas.push({
+            nombre: inc.nombre,
+            cantidad: inc.cantidad,
+            enPoderDe: inc.enPoderDe,
+            dondeEsta: inc.dondeEsta
           });
         }
       }

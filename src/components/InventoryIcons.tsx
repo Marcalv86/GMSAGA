@@ -482,6 +482,7 @@ export function IconOther({ className = 'w-6 h-6', size }: IconSvgProps) {
 export function classifyInventoryItem(item: Partial<InventoryItem>): InventoryIconKind {
   const slot = (item as any)?.slot?.toString().toLowerCase() || '';
   const cat = item.category?.toString().toLowerCase() || '';
+  const name = (item.name || '').toLowerCase();
   const text = `${item.name || ''} ${item.description || ''} ${item.damageOrAc || ''} ${slot}`.toLowerCase();
 
   // 1. Detección explícita de agarres/slots de armas
@@ -499,11 +500,18 @@ export function classifyInventoryItem(item: Partial<InventoryItem>): InventoryIc
     return 'two_handed';
   }
 
-  // 2. Gemas y joyas (crucial para drops y venta por oro)
+  // 1b. Libros, diarios, grimorios y almanaques (prioridad por nombre para no confundirlos con gemas incrustadas)
+  if (
+    /\b(?:grimorio|libro de conjuros|libro|tomo|diario|cuaderno|libreta|bit[aá]cora|c[oó]dice|manual|volumen|almanaque)\b/i.test(name)
+  ) {
+    return 'grimoire';
+  }
+
+  // 2. Gemas y joyas (crucial para drops y venta por oro; comprobación por nombre o categoría explícita)
   if (
     cat === 'gem' ||
     cat === 'treasure' ||
-    /\b(?:gema|gemas|diamante|rub[ií]|zafiro|esmeralda|[oó]palo|topacio|amatista|perla|jade|turquesa|aguamarina|circ[oó]n|piedra preciosa|piedras preciosas)\b/i.test(text)
+    /\b(?:gema|gemas|diamante|rub[ií]|zafiro|esmeralda|[oó]palo|topacio|amatista|perla|jade|turquesa|aguamarina|circ[oó]n|piedra preciosa|piedras preciosas)\b/i.test(name)
   ) {
     return 'gem';
   }

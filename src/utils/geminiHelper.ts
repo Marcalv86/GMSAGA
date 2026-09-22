@@ -73,7 +73,7 @@ import {
   VinculoLeido,
   HiloLeido
 } from './campaignCalendar';
-import { cambioVacio, leerInventario } from './inventoryTag';
+import { cambioVacio, leerInventario, sonElMismoObjeto, deduplicarInventario } from './inventoryTag';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
 import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa } from './cuadernoOculto';
 import { leerEstado, leerEtiquetados, leerOlvidos, OrdenDeEtiquetado } from './ordenesDeMesa';
@@ -6146,6 +6146,11 @@ ${listExisting(project.memory?.npcs || [], n => `"${n.name}" — ${n.relation ||
 
 - LUGARES REGISTRADOS:
 ${listExisting(project.memory?.locations || [], l => `"${l.name}"`)}
+
+- OBJETOS Y PERTENENCIAS REGISTRADAS DEL PROTAGONISTA EN FICHA / INVENTARIO:
+${(project.memory?.player_character?.inventory || [])
+  .map(it => `- "${it.name}" (cantidad: ${it.quantity || 1}${it.enPoderDe ? ` | en poder de: ${it.enPoderDe}` : ' | en sus manos'}${it.dondeEsta ? ` | ubicación: ${it.dondeEsta}` : ''}${it.description ? ` | notas: ${it.description}` : ''})`)
+  .join('\n') || '(ninguno registrado aún)'}
 `.trim();
 
   const prompt = `Eres el Gran Archivero, Cronista y Maestro de Campaña de este juego de rol en los Reinos Olvidados (D&D 5e / Forgotten Realms).
@@ -6213,7 +6218,7 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
   "inventory": [
     { "name": "Objeto", "quantity": 1, "notas": "Qué es o para qué sirve, si hace falta", "deMision": false, "encargo": "", "origen": "", "enPoderDe": "", "dondeEsta": "" }
   ],
-  "_nota_inventory": "LA MOCHILA DEL PROTAGONISTA, LEÍDA DE LO JUGADO. Repasa la crónica y devuelve TODO LO QUE SIGUE SIENDO SUYO, no solo lo que lleva puesto: lo que le dieron y no ha entregado, lo que compró, lo que cogió, lo que traía y se menciona en escena. ⛔ Lo consumido, lo gastado y lo entregado para siempre NO se pone. ⭐⭐ PERO LO QUE LE HAN QUITADO SÍ SE PONE, Y ES IMPORTANTE: si la capturaron, la registraron, la detuvieron o la robaron, sus cosas NO desaparecen —cambian de manos—. Devuélvelas con 'enPoderDe' (quién las tiene: la tripulación, el capitán, la aduana) y 'dondeEsta' si se sabe. Borrarlas es hacer desaparecer al personaje: sus documentos, sus herramientas y sus reliquias son lo que la define, y alguien las está mirando ahora mismo. ⛔ Y no te inventes equipo estándar de aventurero que nadie ha nombrado: si no sale en el texto, no existe. Marca deMision:true y rellena 'encargo' SOLO si es una tarea con forma de objeto —una carta que entregar, algo que traducir, algo que hay que devolver— con lo que hay que hacer con él; 'origen' es de quién salió. Lo demás son sus cosas. Devuelve la lista vacía si en la crónica no se ve que lleve nada.",
+  "_nota_inventory": "AUDITORÍA COMPLETA Y RECONCILIACIÓN DE PERTENENCIAS DEL PROTAGONISTA, LEÍDA DE TODO EL HISTORIAL DE LA PARTIDA Y DE SU INVENTARIO PREVIO. Repasa exhaustivamente la crónica desde el primer capítulo y la lista previa de objetos: 1. SI FUE CAPTURADA, DETENIDA, DESARMADA O ENCARCELADA (ej. asalto de corsarios drows de Bregan D'aerthe, Jarlaxle, guardias, piratas): ¡NINGÚN CAPTOR DEJA ARMAS, ESCUDOS, TRAMPAS NI DIARIOS O LIBROS A UN PRISIONERO! Es OBLIGATORIO marcar como requisados (con 'enPoderDe' y 'dondeEsta') TODOS los objetos confiscables: armas, escudos, trampas de caza, diarios, libros, pergaminos, herramientas, instrumentos y dinero. Especifica 'enPoderDe' (ej. 'Jarlaxle', 'Bregan D'aerthe', 'la tripulación', 'los guardias') y 'dondeEsta' (ej. 'camarote de Jarlaxle', 'pañol del navío', 'bodega'). Solo queda en sus manos (sin 'enPoderDe') lo que le hayan dejado expresamente puesto (armadura básica o ropajes para no desnudarla) o lo que haya ocultado con éxito o recuperado después. 2. SI RECUPERÓ O LE DEVOLVIERON ALGO: Si en el texto se narra que le devuelven algo o lo recupera, 'enPoderDe' y 'dondeEsta' quedan vacíos. 3. OBJETOS NUEVOS Y GASTADOS: Añade cualquier objeto adquirido durante las sesiones. No pongas objetos consumidos o gastados definitivamente.",
   "learned": [
     { "name": "Nombre", "tipo": "conjuro | rasgo | competencia | mejora | otro", "notas": "detalle corto", "nivel": "al que lo ganó, si se sabe" }
   ],
@@ -6711,6 +6716,159 @@ ${historyToAnalyze}`;
 export async function syncMemoryFromChats(project: Project, chats: Chat[], files?: ProjectFile[]): Promise<Partial<Memory>> {
   const result = await syncFullCampaignFromChats(project, chats, files);
   return result.memory;
+}
+
+/**
+ * Sincroniza y audita específicamente la mochila e inventario del personaje
+ * contra todo el historial de chats usando la IA de Gemini.
+ * Identifica con rigor objetos requisados (enPoderDe, dondeEsta), devoluciones,
+ * adquisiciones y saldo de monedas basándose en los sucesos de la trama.
+ */
+export async function sincronizarInventarioConIA({
+  project,
+  chats
+}: {
+  project: Project;
+  chats: Chat[];
+}): Promise<{
+  inventory: InventoryItem[];
+  currencies?: PlayerCurrencies;
+  resumen: string;
+}> {
+  const pc = project.memory?.player_character;
+  const currentInventory: InventoryItem[] = pc?.inventory || [];
+  const currentCurrencies = pc?.currencies || { gp: 0, sp: 0, cp: 0, ep: 0, pp: 0 };
+
+  // Recopilar crónica de todos los chats ordenados
+  const historyText = (chats || [])
+    .map((c, i) => {
+      const msgs = (c.messages || [])
+        .filter(m => m.content && m.content.trim())
+        .map(m => `${m.role === 'user' ? 'JUGADOR' : 'NARRADOR'}: ${m.content.trim()}`)
+        .join('\n\n');
+      return `=== CAPÍTULO / SESIÓN ${i + 1}: ${c.name || 'Sin título'} ===\n${msgs}`;
+    })
+    .join('\n\n=========================\n\n');
+
+  if (!historyText.trim()) {
+    return {
+      inventory: currentInventory,
+      currencies: currentCurrencies,
+      resumen: 'No hay mensajes en el historial de chat para auditar el inventario.'
+    };
+  }
+
+  const itemsList = currentInventory.length
+    ? currentInventory
+        .map(
+          it =>
+            `- "${it.name}" (cantidad: ${it.quantity || 1}, equipado: ${Boolean(it.equipped)}, enPoderDe: "${it.enPoderDe || 'en sus manos'}", dondeEsta: "${it.dondeEsta || ''}", notas: "${it.description || ''}")`
+        )
+        .join('\n')
+    : '(La ficha actual no tiene objetos registrados todavía)';
+
+  const prompt = `Eres el Auditor de Campaña e Inventario para esta partida de rol en los Reinos Olvidados (D&D 5e).
+Tu ÚNICA labor es auditar y reconstruir con fidelidad absoluta el inventario de la protagonista (${pc?.name || 'la protagonista'}) leyendo TODO el historial de la partida y contrastándolo con su lista actual de pertenencias.
+
+OBJETOS ACTUALMENTE REGISTRADOS EN SU FICHA:
+${itemsList}
+
+MONEDAS ACTUALES:
+PO: ${currentCurrencies.gp || 0}, PP: ${currentCurrencies.pp || 0}, PA: ${currentCurrencies.sp || 0}, PC: ${currentCurrencies.cp || 0}, PE: ${currentCurrencies.ep || 0}
+
+INSTRUCCIONES DE AUDITORÍA CRUCIALES:
+1. SI LA PROTAGONISTA FUE CAPTURADA, APRESADA, DESARMADA O ENCERRADA (ej: corsarios drows de Bregan D'aerthe, Jarlaxle, guardias, piratas):
+   - ¡NINGÚN CAPTOR DEJA ARMAS, ESCUDOS, TRAMPAS DE CAZA, LIBROS O DIARIOS A UN PRISIONERO!
+   - Es OBLIGATORIO que todos estos objetos figuren como REQUISADOS:
+     * "enPoderDe": quién lo tiene (ej: "Jarlaxle", "Bregan D'aerthe", "la guardia", etc.)
+     * "dondeEsta": dónde está (ej: "camarote de Jarlaxle", "pañol del navío", "bodega", etc.)
+     * "equipped": false
+   - El diario personal de viaje/almanaque de peregrina, instrumentos musicales, armas, escudos y trampas fueron confiscados durante el apresamiento.
+   - Solo queda en sus manos (sin "enPoderDe") lo que expresamente le hayan dejado puesto (armadura o ropa para no desnudarla) o lo que haya conseguido ocultar o recuperar después.
+2. DEVOLUCIONES Y RECUPERACIÓN:
+   - Si en el texto se describe que un PNJ le devuelve algo o que ella lo roba o recupera de vuelta, elimina "enPoderDe" y "dondeEsta" para que vuelva a estar en sus manos.
+3. OBJETOS NUEVOS Y GASTADOS:
+   - Si adquirió objetos nuevos durante las escenas (regalos, botín, compras, objetos de misión), añádelos con su descripción.
+   - Si consumió o perdió definitivamente algún objeto, márcalo como eliminado o no lo incluyas.
+4. MONEDAS:
+   - Calcula el saldo final neto según lo gastado, cobrado o confiscado.
+
+RESPONDE ESTRICTAMENTE EN ESTE FORMATO JSON:
+{
+  "resumen": "Explicación breve y clara de los cambios detectados (ej: 'Se han marcado como requisados por Bregan D\\'aerthe el diario de viaje, la trampa de caza y las armas...')",
+  "inventory": [
+    {
+      "name": "Nombre del objeto",
+      "quantity": 1,
+      "equipped": false,
+      "enPoderDe": "Jarlaxle o vacío si está en sus manos",
+      "dondeEsta": "camarote de Jarlaxle o vacío",
+      "description": "descripción o notas",
+      "deMision": false,
+      "encargo": "",
+      "origen": ""
+    }
+  ],
+  "currencies": { "gp": 0, "sp": 0, "cp": 0, "ep": 0, "pp": 0 }
+}`;
+
+  const activeModel = getBackgroundTaskModel();
+  const safetySetting = getStoredSafetyLevel();
+
+  const response = await generateContentWithFailover({
+    proposito: 'Auditoría y sincronización de inventario con chat',
+    primaryModel: activeModel,
+    contents: prompt,
+    config: {
+      responseMimeType: 'application/json',
+      temperature: 0.1,
+      ...(esModeloAbierto(activeModel) ? {} : { safetySettings: buildSafetySettings(safetySetting) })
+    }
+  });
+
+  const resultText = response.text || '';
+  let cleanText = resultText.trim();
+  if (cleanText.startsWith('```')) {
+    cleanText = cleanText
+      .replace(/^```(?:json)?\n?/, '')
+      .replace(/\n?```$/, '')
+      .trim();
+  }
+
+  const firstBrace = cleanText.indexOf('{');
+  const lastBrace = cleanText.lastIndexOf('}');
+  let parsed: any = {};
+  if (firstBrace !== -1 && lastBrace !== -1) {
+    try {
+      parsed = JSON.parse(cleanText.substring(firstBrace, lastBrace + 1));
+    } catch (e) {
+      console.error('Error al parsear auditoría de inventario:', e);
+    }
+  }
+
+  const rawList: any[] = Array.isArray(parsed.inventory) ? parsed.inventory : [];
+  const newInventory: InventoryItem[] = rawList.map((it: any) => {
+    // Buscar si ya existía para mantener su ID original
+    const existente = currentInventory.find(c => sonElMismoObjeto(c.name || '', it.name || ''));
+    return {
+      id: existente?.id || `inv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+      name: it.name || 'Objeto',
+      quantity: typeof it.quantity === 'number' ? it.quantity : 1,
+      equipped: Boolean(it.equipped),
+      enPoderDe: it.enPoderDe ? String(it.enPoderDe).trim() : undefined,
+      dondeEsta: it.dondeEsta ? String(it.dondeEsta).trim() : undefined,
+      description: it.description || it.notas || existente?.description,
+      deMision: Boolean(it.deMision),
+      encargo: it.encargo || undefined,
+      origen: it.origen || undefined
+    };
+  });
+
+  return {
+    inventory: deduplicarInventario(newInventory),
+    currencies: parsed.currencies || currentCurrencies,
+    resumen: parsed.resumen || 'Inventario sincronizado con el historial de la partida.'
+  };
 }
 
 /**

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { interesPorLaProtagonista, Project, Memory, NPC, Location, ProjectFile, TimelineEntry, InventoryItem, CartaPreparada } from '../types';
+import { interesPorLaProtagonista, Project, Memory, NPC, Location, ProjectFile, TimelineEntry, InventoryItem, CartaPreparada, Chat } from '../types';
 import {
   obtenerInfoRelacion,
   CALENDARIO_FANTASTICO,
@@ -15,7 +15,8 @@ import {
   fusionarTrama,
   leerElTableroDeDocumentos,
   tramarLaCampana,
-  getStoredAutoBackgroundTasks
+  getStoredAutoBackgroundTasks,
+  sincronizarInventarioConIA
 } from '../utils/geminiHelper';
 import { aplicarFacciones, aplicarPreparado, aplicarRelojes, preparadoEnPie, relojesEnMarcha } from '../utils/cuadernoOculto';
 import { deduplicarListaNpcs } from '../utils/npcMatcher';
@@ -167,6 +168,7 @@ export const MemoryManager: React.FC<{
   onCompletarFichaDesdeDocumento?: () => Promise<void>;
   isGenerating?: boolean;
   hasChats?: boolean;
+  chats?: Chat[];
   /** Qué secciones mostrar. Sin esto, se muestran todas. */
   secciones?: SeccionMemoria[];
   /** Banner opcional fijo arriba al hacer scroll */
@@ -182,6 +184,7 @@ export const MemoryManager: React.FC<{
   onCompletarFichaDesdeDocumento,
   isGenerating = false,
   hasChats = false,
+  chats,
   secciones,
   topBanner
 }) => {
@@ -243,6 +246,67 @@ export const MemoryManager: React.FC<{
   // --- INVENTARIO: BORRADO RÁPIDO Y RECUPERACIÓN ---
   const [inventarioToast, setInventarioToast] = useState<string | null>(null);
   const [itemParaDeshacer, setItemParaDeshacer] = useState<InventoryItem | null>(null);
+  const [isSyncingInventory, setIsSyncingInventory] = useState(false);
+
+  const handleSyncInventoryWithAI = async () => {
+    if (isSyncingInventory || !onUpdateMemory) return;
+    setIsSyncingInventory(true);
+    try {
+      if (chats && chats.length > 0) {
+        const res = await sincronizarInventarioConIA({ project, chats });
+        await onUpdateMemory(prev => {
+          if (!prev.player_character) return prev;
+          return {
+            ...prev,
+            player_character: {
+              ...prev.player_character,
+              inventory: deduplicarInventario(res.inventory),
+              currencies: res.currencies || prev.player_character.currencies
+            }
+          };
+        });
+        setConfirmModal({
+          isOpen: true,
+          title: 'Mochila Sincronizada con IA',
+          message: res.resumen,
+          confirmText: 'Entendido',
+          cancelText: '',
+          onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        });
+      } else {
+        await onUpdateMemory(prev => {
+          if (!prev.player_character) return prev;
+          return {
+            ...prev,
+            player_character: {
+              ...prev.player_character,
+              inventory: deduplicarInventario(prev.player_character.inventory || [])
+            }
+          };
+        });
+        setConfirmModal({
+          isOpen: true,
+          title: 'Inventario Normalizado',
+          message: 'Se ha deduplicado y normalizado el inventario correctamente.',
+          confirmText: 'Entendido',
+          cancelText: '',
+          onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        });
+      }
+    } catch (err: any) {
+      console.error('Error al sincronizar inventario:', err);
+      setConfirmModal({
+        isOpen: true,
+        title: 'Error al Sincronizar',
+        message: 'No se pudo sincronizar el inventario: ' + (err?.message || String(err)),
+        confirmText: 'Cerrar',
+        cancelText: '',
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      });
+    } finally {
+      setIsSyncingInventory(false);
+    }
+  };
 
   useEffect(() => {
     if (!inventarioToast) return;
@@ -3240,33 +3304,22 @@ export const MemoryManager: React.FC<{
                 </div>
               </div>
 
-              {onUpdateMemory && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await onUpdateMemory(prev => {
-                        if (!prev.player_character) return prev;
-                        return {
-                          ...prev,
-                          player_character: {
-                            ...prev.player_character,
-                            inventory: deduplicarInventario(prev.player_character.inventory || [])
-                          }
-                        };
-                      });
-                    }}
-                    className="inline-flex items-center gap-1 text-xs font-cinzel px-2.5 py-1.5 rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] hover:bg-[var(--surface-soft)] text-[var(--text-secondary)] transition-colors cursor-pointer"
-                    title="Deduplicar y normalizar el inventario"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" /> Sincronizar
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isSyncingInventory}
+                  onClick={handleSyncInventoryWithAI}
+                  className="inline-flex items-center gap-1.5 text-xs font-cinzel px-2.5 py-1.5 rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] hover:bg-[var(--surface-soft)] text-[var(--accent)] hover:border-[var(--accent)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                  title="Auditar y sincronizar la mochila con toda la crónica del chat usando IA"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingInventory ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingInventory ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Pestañas de Filtro por Categoría con Iconos Vectoriales */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-[var(--user-border)]">
+            <div id="inventory-category-filters" className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-[var(--user-border)]">
               {[
                 { id: 'todos', label: 'Todos', icon: IconOther, count: noEliminados.length },
                 { id: 'armas', label: 'Armas', icon: IconSword, count: noEliminados.filter(i => matchesInventoryFilter(i, 'armas')).length },
@@ -3280,17 +3333,20 @@ export const MemoryManager: React.FC<{
                 return (
                   <button
                     key={tab.id}
+                    id={`inventory-filter-${tab.id}`}
                     type="button"
                     onClick={() => setInventoryFilter(tab.id as any)}
-                    className={`inline-flex items-center gap-1.5 text-xs font-cinzel px-3 py-1.5 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                    title={`${tab.label} (${tab.count})`}
+                    aria-label={`${tab.label} (${tab.count})`}
+                    className={`inline-flex items-center justify-center gap-1.5 text-xs font-cinzel p-2 sm:px-3 sm:py-1.5 rounded-lg border transition-all shrink-0 cursor-pointer ${
                       isActive
-                        ? 'bg-[var(--accent)] text-[var(--accent-contrast)] border-[var(--accent)] shadow-xs font-bold'
+                        ? 'bg-[var(--accent)] text-[var(--on-accent,#fff)] border-[var(--accent)] shadow-xs font-bold'
                         : 'bg-[var(--surface-soft)] text-[var(--text-secondary)] border-[var(--user-border)] hover:bg-[var(--surface)] hover:text-[var(--text-primary)]'
                     }`}
                   >
-                    <IconComp className="w-3.5 h-3.5 shrink-0" />
-                    <span>{tab.label}</span>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                    <IconComp className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className={`hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                       isActive ? 'bg-black/20 text-white' : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--glass-border)]'
                     }`}>
                       {tab.count}

@@ -132,7 +132,7 @@ import {
 import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo, desarchivarCapitulo } from './utils/chapterArchiver';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa, leerMesa, hayMensajesSinLeerEnMesa, marcarMesaLeida, MensajeDeMesa } from './utils/mesaStorage';
-import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario } from './utils/inventoryTag';
+import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario, sonElMismoObjeto, deduplicarInventario } from './utils/inventoryTag';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
 import { aplicarOlvidos, fijarEstadoEnMemoria, nadaQueOlvidar, resumirOlvidos } from './utils/ordenesDeMesa';
@@ -5213,13 +5213,30 @@ export default function App() {
          * donde la hay, y lo leído rellena lo que falta.
          */
         const porEtiquetas = mochila.inventario;
-        const yaEstan = new Set(porEtiquetas.map(i => (i.name || '').trim().toLowerCase()));
-        const inventory = [
-          ...porEtiquetas,
-          ...(memoriaSincronizada.player_character?.inventory || []).filter(
-            i => !yaEstan.has((i.name || '').trim().toLowerCase())
-          )
-        ];
+        const inventarioIA = memoriaSincronizada.player_character?.inventory || [];
+
+        // Conciliar: si la IA ha leído del texto de la crónica que un objeto está requisado
+        // (enPoderDe) o tiene ubicación (dondeEsta), enriquecer el objeto de porEtiquetas
+        // en lugar de ignorar la deducción de la IA.
+        const reconciliado = porEtiquetas.map(item => {
+          const matchingIA = inventarioIA.find(aiItem => sonElMismoObjeto(aiItem.name || '', item.name || ''));
+          if (!matchingIA) return item;
+
+          return {
+            ...item,
+            enPoderDe: matchingIA.enPoderDe || item.enPoderDe,
+            dondeEsta: matchingIA.dondeEsta || item.dondeEsta,
+            encargo: matchingIA.encargo || item.encargo,
+            origen: matchingIA.origen || item.origen,
+            description: item.description || matchingIA.description
+          };
+        });
+
+        const nuevosDeIA = inventarioIA.filter(
+          aiItem => !reconciliado.some(rec => sonElMismoObjeto(rec.name || '', aiItem.name || ''))
+        );
+
+        const inventory = deduplicarInventario([...reconciliado, ...nuevosDeIA]);
         return {
           memory: {
             ...memoriaSincronizada,

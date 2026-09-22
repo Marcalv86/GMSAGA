@@ -376,6 +376,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           <MemoryManager
             project={project}
             files={files}
+            chats={chats}
             onUpdateMemory={onUpdateMemory}
             onUpdateProject={onUpdateProject}
             onTriggerAIUpdate={onTriggerAIUpdate ? async () => { onTriggerAIUpdate(); } : undefined}
@@ -414,6 +415,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
           <MemoryManager
             project={project}
             files={files}
+            chats={chats}
             onUpdateMemory={onUpdateMemory}
             onUpdateProject={onUpdateProject}
             onTriggerAIUpdate={onTriggerAIUpdate ? async () => { onTriggerAIUpdate(); } : undefined}
