@@ -146,9 +146,16 @@ export function aplicarBambalinas(
   previo: MovimientoOculto[] | undefined,
   nuevos: MovimientoOculto[]
 ): MovimientoOculto[] {
-  const fuera = [...(previo || [])];
-  for (const mov of nuevos) {
-    if (fuera.some(x => x.id === mov.id)) continue;
+  const fuera: MovimientoOculto[] = [];
+  const todos = [...(previo || []), ...nuevos];
+  for (const mov of todos) {
+    if (!mov || !mov.quien || !mov.que) continue;
+    const yaExiste = fuera.some(
+      x =>
+        x.id === mov.id ||
+        (x.diaAbs === mov.diaAbs && mismoNombre(x.quien, mov.quien) && mismoNombre(x.que, mov.que))
+    );
+    if (yaExiste) continue;
     fuera.push(mov);
   }
   // Ordenados por día, y con tope: esto es un cuaderno de trabajo, no un archivo.
@@ -162,15 +169,40 @@ export function aplicarBambalinas(
  * Un reloj que ya existe se actualiza sin perder lo que no se vuelve a decir:
  * de cuántos segmentos era y qué pasa al llenarse se escribieron una vez, y no
  * hay que repetirlos para avanzarlo. Un `+1` suma sobre lo que hubiera.
+ * Armoniza y elimina duplicados por nombre normalizado.
  */
 export function aplicarRelojes(
   previo: RelojOculto[] | undefined,
   leidos: RelojLeido[],
   diaAbs?: number
 ): RelojOculto[] {
-  const fuera = [...(previo || [])];
+  const fuera: RelojOculto[] = [];
+
+  // 1. Limpiar y desduplicar lo que ya había en memoria
+  for (const p of (previo || [])) {
+    if (!p || !p.nombre) continue;
+    const existenteIdx = fuera.findIndex(x => x.id === p.id || mismoNombre(x.nombre, p.nombre));
+    if (existenteIdx < 0) {
+      fuera.push(p);
+    } else {
+      const ant = fuera[existenteIdx];
+      fuera[existenteIdx] = {
+        ...ant,
+        segmentos: p.segmentos || ant.segmentos || 6,
+        llenos: Math.max(ant.llenos || 0, p.llenos || 0),
+        alLlenarse: p.alLlenarse || ant.alLlenarse,
+        deQuien: p.deQuien || ant.deQuien,
+        sobre: p.sobre || ant.sobre,
+        loIntuye: p.loIntuye || ant.loIntuye,
+        cumplidoDiaAbs: ant.cumplidoDiaAbs ?? p.cumplidoDiaAbs
+      };
+    }
+  }
+
+  // 2. Aplicar los relojes leídos / actualizados
   for (const r of leidos) {
-    const i = fuera.findIndex(x => x.id === r.id);
+    if (!r || !r.nombre) continue;
+    const i = fuera.findIndex(x => x.id === r.id || mismoNombre(x.nombre, r.nombre));
     if (i < 0) {
       const segmentos = r.segmentos || 6;
       // Un reloj nuevo que llega como «+1» empieza en ese uno.
@@ -388,8 +420,18 @@ export function leerPreparado(texto: string): CartaPreparada[] {
 
 /** Funde facciones nuevas con las que había, completando en vez de pisar. */
 export function aplicarFacciones(previo: Faccion[] | undefined, leidas: Faccion[]): Faccion[] {
-  const fuera = [...(previo || [])];
+  const fuera: Faccion[] = [];
+  // 1. Desduplicar previo
+  for (const f of (previo || [])) {
+    if (!f || !f.name) continue;
+    const existenteIdx = fuera.findIndex(x => x.id === f.id || mismoNombre(x.name, f.name));
+    if (existenteIdx < 0) {
+      fuera.push(f);
+    }
+  }
+
   for (const f of leidas) {
+    if (!f || !f.name) continue;
     const i = fuera.findIndex(x => x.id === f.id || mismoNombre(x.name, f.name));
     if (i < 0) {
       fuera.push(f);
@@ -440,8 +482,18 @@ export function aplicarPreparado(
   leidas: CartaPreparada[],
   diaAbs?: number
 ): CartaPreparada[] {
-  const fuera = [...(previo || [])];
+  const fuera: CartaPreparada[] = [];
+  // 1. Desduplicar previo
+  for (const c of (previo || [])) {
+    if (!c || !c.titulo) continue;
+    const existenteIdx = fuera.findIndex(x => x.id === c.id || mismoNombre(x.titulo, c.titulo));
+    if (existenteIdx < 0) {
+      fuera.push(c);
+    }
+  }
+
   for (const c of leidas) {
+    if (!c || !c.titulo) continue;
     const i = fuera.findIndex(x => x.id === c.id || mismoNombre(x.titulo, c.titulo));
     if (i < 0) {
       // Se fecha al nacer: es lo que luego permite decir «esto lleva doce
@@ -481,9 +533,23 @@ export function aplicarPreparado(
   return fuera.slice(-40);
 }
 
-const mismoNombre = (a: string, b: string) =>
-  sinTildes(a || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() ===
-  sinTildes(b || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+export const normalizarTextoClave = (t: string): string =>
+  sinTildes(t || '')
+    .toLowerCase()
+    .replace(/['"`«»“”[\]()]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+export const mismoNombre = (a: string, b: string): boolean => {
+  const ca = normalizarTextoClave(a);
+  const cb = normalizarTextoClave(b);
+  if (!ca || !cb) return false;
+  if (ca === cb) return true;
+  if (ca.length > 12 && cb.length > 12 && (ca.startsWith(cb) || cb.startsWith(ca))) {
+    return true;
+  }
+  return false;
+};
 
 /** Lo que sigue sin usarse. */
 export const preparadoEnPie = (c: CartaPreparada[] | undefined): CartaPreparada[] =>

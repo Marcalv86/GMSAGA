@@ -75,7 +75,7 @@ import {
 } from './campaignCalendar';
 import { cambioVacio, leerInventario, sonElMismoObjeto, deduplicarInventario } from './inventoryTag';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
-import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa } from './cuadernoOculto';
+import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa, mismoNombre } from './cuadernoOculto';
 import { leerEstado, leerEtiquetados, leerOlvidos, OrdenDeEtiquetado } from './ordenesDeMesa';
 import { leerMesa } from './mesaStorage';
 import { coincidenNombresNpc, fusionarDosNpcs, deduplicarListaNpcs } from './npcMatcher';
@@ -8669,7 +8669,7 @@ JSON:
     .map((r: any) => {
       const nombre = txt(r?.nombre, 160);
       if (!nombre) return null;
-      const actual = relojes.find(x => x.nombre.toLowerCase().trim() === nombre.toLowerCase().trim());
+      const actual = relojes.find(x => mismoNombre(x.nombre, nombre));
       if (!actual) return null;
       const avance = Math.max(1, Math.min(2, Number(r?.avance) || 1));
       const llenos = Math.min(actual.segmentos, actual.llenos + avance);
@@ -8702,7 +8702,7 @@ JSON:
       const titulo = txt(c?.titulo, 160);
       const cuando = txt(c?.cuando, 200);
       if (!titulo || !cuando) return null;
-      const actual = preparado.find(x => x.titulo.toLowerCase().trim() === titulo.toLowerCase().trim());
+      const actual = preparado.find(x => mismoNombre(x.titulo, titulo));
       if (!actual) return null;
       return { ...actual, cuando };
     })

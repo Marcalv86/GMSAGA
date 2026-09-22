@@ -47,10 +47,37 @@ export const ETIQUETAS_INTERNAS = [
   'MEMORIA',
   'OLVIDA',
   'APRENDE',
+  'APRENDIDO',
   'BAMBALINAS',
   'RELOJ',
   'FACCI[OÓ]N',
-  'PREPARADO'
+  'FACCIONES',
+  'PREPARADO',
+  'ENTORNO',
+  'MISI[OÓ]N',
+  'MISIONES',
+  'TRAMA',
+  'ENCARGO',
+  'OBJETIVO',
+  'FICHA',
+  'DOLENCIA',
+  'DOLENCIAS',
+  'GRUPO',
+  'PUENTE',
+  'CLIMA',
+  'CAMBIO',
+  'CONOCIMIENTO',
+  'CORREGIR',
+  'CORREGIR_[A-Z_]+',
+  'SISTEMA',
+  'SITUACI[OÓ]N',
+  'PLAN',
+  'NPC',
+  'PNJ',
+  'MODIFICAR_PNJ',
+  'REHACER_ULTIMO_TURNO',
+  'COMENTARIO_DM',
+  'HUD'
 ] as const;
 
 /**
@@ -61,14 +88,21 @@ export const ETIQUETAS_INTERNAS = [
  * existe para poder comprobarlo aparte y para que quien toque esto mañana sepa
  * cuáles no se pueden fallar.
  */
-export const ETIQUETAS_SPOILER = ['SECRETO', 'REVELADO', 'BAMBALINAS', 'RELOJ', 'HILO', 'PREPARADO'] as const;
+export const ETIQUETAS_SPOILER = ['SECRETO', 'REVELADO', 'BAMBALINAS', 'RELOJ', 'HILO', 'PREPARADO', 'FACCI[OÓ]N'] as const;
 
-const EXPRESIONES = ETIQUETAS_INTERNAS.map(t => new RegExp(`\\[\\s*${t}\\s*:[^\\]]*\\]`, 'gi'));
+const EXPRESIONES = ETIQUETAS_INTERNAS.map(
+  t => new RegExp(`(?:\\*\\*|__|_|\\*|\\x60)?\\[\\s*${t}\\s*:[^\\]]*\\](?:\\*\\*|__|_|\\*|\\x60)?`, 'gi')
+);
 
 /** Deja el texto tal y como debe leerlo la jugadora: sin una sola etiqueta interna. */
 export function quitarEtiquetasInternas(texto: string): string {
   if (!texto) return '';
   let limpio = texto;
   for (const re of EXPRESIONES) limpio = limpio.replace(re, '');
+  // Limpieza adicional de directivas o etiquetas auxiliares con corchetes
+  limpio = limpio
+    .replace(/(?:\*\*|__|_|\*|\x60)?\[\s*ESTO SE JUEGA[^\\]]*\](?:\*\*|__|_|\*|\x60)?/gi, '')
+    .replace(/(?:\*\*|__|_|\*|\x60)?\[\s*DURACI[OÓ]N EXACTA[^\\]]*\](?:\*\*|__|_|\*|\x60)?/gi, '')
+    .replace(/(?:\*\*|__|_|\*|\x60)?\[\s*TRANSICI[OÓ]N[^\\]]*\](?:\*\*|__|_|\*|\x60)?/gi, '');
   return limpio;
 }

@@ -1229,33 +1229,65 @@ export default function App() {
   };
 
   const conMisiones = (mem: Project['memory'], misiones?: MisionLeida[]): Project['memory'] => {
-    if (!mem || !misiones?.length) return mem;
-    const clave = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (!mem) return mem;
+    const clave = (v: string) =>
+      (v || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/['"`«»“”[\]()]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+
     let lista = [...(mem.quests || [])];
-    for (const m of misiones) {
-      const i = lista.findIndex(q => clave(q.title || '') === clave(m.titulo));
-      if (i >= 0) {
-        lista[i] = {
-          ...lista[i],
-          objective: m.objetivo || lista[i].objective,
-          progress: m.progreso || lista[i].progress,
-          origin: m.origen || lista[i].origin,
-          status: m.estado || lista[i].status,
-          type: m.tipo || lista[i].type
-        };
-      } else {
-        lista.push({
-          id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          title: m.titulo,
-          origin: m.origen || '',
-          objective: m.objetivo || '',
-          progress: m.progreso || '',
-          status: m.estado || 'Activa',
-          type: m.tipo || 'secundaria'
-        });
+    if (misiones?.length) {
+      for (const m of misiones) {
+        if (!m.titulo) continue;
+        const cTitulo = clave(m.titulo);
+        const i = lista.findIndex(q => clave(q.title || '') === cTitulo || (cTitulo.length > 12 && clave(q.title || '').startsWith(cTitulo)));
+        if (i >= 0) {
+          lista[i] = {
+            ...lista[i],
+            objective: m.objetivo || lista[i].objective,
+            progress: m.progreso || lista[i].progress,
+            origin: m.origen || lista[i].origin,
+            status: m.estado || lista[i].status,
+            type: m.tipo || lista[i].type
+          };
+        } else {
+          lista.push({
+            id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            title: m.titulo,
+            origin: m.origen || '',
+            objective: m.objetivo || '',
+            progress: m.progreso || '',
+            status: m.estado || 'Activa',
+            type: m.tipo || 'secundaria'
+          });
+        }
       }
     }
-    return { ...mem, quests: lista };
+
+    // Desduplicar misiones existentes
+    const deduplicadas: typeof lista = [];
+    for (const q of lista) {
+      if (!q.title) continue;
+      const c = clave(q.title);
+      const idx = deduplicadas.findIndex(x => clave(x.title || '') === c);
+      if (idx < 0) {
+        deduplicadas.push(q);
+      } else {
+        deduplicadas[idx] = {
+          ...deduplicadas[idx],
+          objective: q.objective || deduplicadas[idx].objective,
+          progress: q.progress || deduplicadas[idx].progress,
+          origin: q.origin || deduplicadas[idx].origin,
+          status: q.status || deduplicadas[idx].status,
+          type: q.type || deduplicadas[idx].type
+        };
+      }
+    }
+    return { ...mem, quests: deduplicadas };
   };
 
   const conAvanceDeNivel = (mem: Project['memory'], avance?: AvanceDeNivel): Project['memory'] => {
