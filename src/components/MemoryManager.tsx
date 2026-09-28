@@ -1160,12 +1160,16 @@ export const MemoryManager: React.FC<{
             <button
               onClick={handleSyncWithAI}
               disabled={isGenerating || isSyncingAI}
-              title="Analizar todas las sesiones y capítulos para sincronizar la memoria viva, PNJs, tramas y lugares con la IA"
-              aria-label="Sincronizar con IA"
+              title={
+                memory.documentos_vivos
+                  ? 'Relee los chats para poner al día el Diario & Agenda y la fecha, rellena huecos de la ficha del PJ y revisa los giros. PNJs, lugares, tramas y mochila salen de los documentos vivos.'
+                  : 'Analizar todas las sesiones y capítulos para sincronizar la memoria viva, PNJs, tramas y lugares con la IA'
+              }
+              aria-label={memory.documentos_vivos ? 'Repasar diario, ficha y giros' : 'Sincronizar con IA'}
               className="text-xs text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] border border-[var(--accent)] p-2 sm:px-4 sm:py-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-sm disabled:opacity-50"
             >
               <Sparkles className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${isSyncingAI ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isSyncingAI ? 'Sincronizando...' : 'Sincronizar con IA'}</span>
+              <span className="hidden sm:inline">{isSyncingAI ? 'Sincronizando...' : memory.documentos_vivos ? 'Repasar diario, ficha y giros' : 'Sincronizar con IA'}</span>
             </button>
           )}
 

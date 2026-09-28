@@ -334,8 +334,12 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             onClick={onTriggerAIUpdate}
             disabled={isCurrentlyWorking}
             className="p-2 sm:px-3.5 sm:py-1.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold hover:opacity-90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
-            title="Sincroniza simultáneamente la memoria persistente del proyecto y la de personajes/entidades leyendo todos los chats y documentos."
-            aria-label="Sincronizar memoria con IA"
+            title={
+              conDocumentos
+                ? 'Relee los chats para poner al día el Diario & Agenda y la fecha, rellena huecos de la ficha del PJ con tu documento y revisa los giros. PNJs, lugares, tramas y mochila salen de los documentos vivos.'
+                : 'Sincroniza simultáneamente la memoria persistente del proyecto y la de personajes/entidades leyendo todos los chats y documentos.'
+            }
+            aria-label={conDocumentos ? 'Repasar diario, ficha y giros' : 'Sincronizar memoria con IA'}
           >
             <RefreshCw className={`w-4 h-4 shrink-0 ${isCurrentlyWorking ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">
@@ -343,7 +347,15 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                 'Sincronizando…'
               ) : (
                 <>
-                  <span className="hidden md:inline">Sincronizar </span>Memoria con IA
+                  {conDocumentos ? (
+                    <>
+                      <span className="hidden md:inline">Repasar </span>diario, ficha y giros
+                    </>
+                  ) : (
+                    <>
+                      <span className="hidden md:inline">Sincronizar </span>Memoria con IA
+                    </>
+                  )}
                 </>
               )}
             </span>

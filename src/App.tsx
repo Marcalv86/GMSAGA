@@ -5298,6 +5298,14 @@ export default function App() {
       return;
     }
     setIsSyncingMemory(true);
+    /*
+     * 📚 Con documentos vivos, el repaso se queda en lo que aporta: el diario y
+     * la fecha, la ficha del PJ y los giros. La memoria general y el tablero
+     * (facciones, relojes, cartas) viven ya en el Cuaderno y no se leen, así
+     * que esas dos llamadas se ahorran.
+     */
+    const conDocs = hayDocumentosVivos(currentProject.memory);
+    const totalPasos = conDocs ? 3 : 5;
     setTopProgress({
       active: true,
       label: 'Sincronizando memoria completa con la IA (proyecto y entidades)...',
@@ -5314,7 +5322,7 @@ export default function App() {
        */
       setTopProgress({
         active: true,
-        label: 'Sincronizando entidades, crónica y cronología (paso 1/5)...',
+        label: `Sincronizando entidades, crónica y cronología (paso 1/${totalPasos})...`,
         type: 'sync'
       });
       const syncResult = await syncFullCampaignFromChats(currentProject, currentChats, currentFiles);
@@ -5322,26 +5330,29 @@ export default function App() {
       // Breve pausa para no saturar tokens por minuto
       await new Promise(r => setTimeout(r, 1200));
 
-      setTopProgress({
-        active: true,
-        label: 'Sintetizando memoria general del proyecto (paso 2/5)...',
-        type: 'sync'
-      });
-      const claudeProjectMem = await generateClaudeProjectMemory({
-        project: currentProject,
-        chats: currentChats,
-        files: currentFiles
-      }).catch(err => {
-        logWarn('memory_sync', 'No se pudo generar la memoria persistente del proyecto en formato Claude', describeApiError(err));
-        return null;
-      });
+      let claudeProjectMem: string | null = null;
+      if (!conDocs) {
+        setTopProgress({
+          active: true,
+          label: 'Sintetizando memoria general del proyecto (paso 2/5)...',
+          type: 'sync'
+        });
+        claudeProjectMem = await generateClaudeProjectMemory({
+          project: currentProject,
+          chats: currentChats,
+          files: currentFiles
+        }).catch(err => {
+          logWarn('memory_sync', 'No se pudo generar la memoria persistente del proyecto en formato Claude', describeApiError(err));
+          return null;
+        });
+      }
 
       // Breve pausa para no saturar tokens por minuto
       await new Promise(r => setTimeout(r, 1200));
 
       setTopProgress({
         active: true,
-        label: 'Verificando ficha e identidad en documentos (paso 3/5)...',
+        label: `Verificando ficha e identidad en documentos (paso ${conDocs ? 2 : 3}/${totalPasos})...`,
         type: 'sync'
       });
       const fichaLeida = await extraerIdentidadDeDocumentos({ project: currentProject, files: currentFiles }).catch(err => {
@@ -5586,7 +5597,7 @@ export default function App() {
       try {
         setTopProgress({
           active: true,
-          label: 'Tramando historia y giros de la campaña (paso 4/5)...',
+          label: `Tramando historia y giros de la campaña (paso ${conDocs ? 3 : 4}/${totalPasos})...`,
           type: 'sync'
         });
         await new Promise(r => setTimeout(r, 1200));
@@ -5638,7 +5649,7 @@ export default function App() {
        * mirar, esto se sale solo y no gasta ni una petición.
        */
       let tableroMontado: { facciones: number; preparado: number; relojes: number } | null = null;
-      try {
+      if (!conDocs) try {
         setTopProgress({
           active: true,
           label: 'Montando el tablero con los documentos (paso 5/5)...',
@@ -5656,8 +5667,15 @@ export default function App() {
 
       setAlertConfig({
         isOpen: true,
-        title: '¡Sincronización Total con IA Completada!',
-        message:
+        title: conDocs ? '📚 Repaso completado' : '¡Sincronización Total con IA Completada!',
+        message: conDocs
+          ? `• ${anotacionesNuevas} ${anotacionesNuevas === 1 ? 'anotación nueva' : 'anotaciones nuevas'} en el Diario & Agenda, y la fecha de campaña al día.\n` +
+            `• Ficha del PJ: se han rellenado los huecos con tu documento de ficha, si los había.\n` +
+            (girosTrazados > 0
+              ? `• ${girosTrazados} ${girosTrazados === 1 ? 'giro' : 'giros'} en la estructura de la historia (pestaña Giros).\n`
+              : `• La estructura de la historia no se ha podido trazar esta vez; mira el registro de errores.\n`) +
+            `\nPNJs, lugares, tramas, mochila y Cuaderno salen de los documentos vivos: se ponen al día al cerrar capítulo o con «Volcar ahora».`
+          :
           `Se ha actualizado de forma unificada la memoria del proyecto y las entidades a partir de las sesiones y documentos:\n\n` +
           (claudeProjectMem ? `• Memoria persistente del proyecto sintetizada (Purpose & context, Current state, Key entities & tools).\n` : '') +
           `• ${anotacionesNuevas} ${anotacionesNuevas === 1 ? 'anotación nueva' : 'anotaciones nuevas'} en el diario, con sus horas deducidas` +
