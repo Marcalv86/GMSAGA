@@ -1,3 +1,4 @@
+import type { CambioDeDocumento } from '../utils/documentosVivos';
 import React, { useEffect, useRef, useState } from 'react';
 import { MensajeDeMesa, TOPE_MENSAJES, leerMesa, guardarMesa, borrarMesa, leerModeloDeMesa, guardarModeloDeMesa } from '../utils/mesaStorage';
 
@@ -128,6 +129,7 @@ export const MesaView: React.FC<{
     plan?: PlanLeido | null;
     corregirCronica?: string | null;
     rehacerUltimoTurno?: string | null;
+    documentos?: CambioDeDocumento[];
   }) => Promise<string[]> | string[];
 }> = ({ project, chats, currentChatId, files, onVolverAJugar, onAbrirNovela, onAnotarEnMemoria, onPlantarSecretos, onCorregirDesdeLaMesa }) => {
   const [mensajes, setMensajes] = useState<MensajeDeMesa[]>(() => leerMesa(project.id));
@@ -288,7 +290,8 @@ export const MesaView: React.FC<{
           lugares: respuesta.lugares,
           plan: respuesta.plan,
           corregirCronica: respuesta.corregirCronica,
-          rehacerUltimoTurno: respuesta.rehacerUltimoTurno
+          rehacerUltimoTurno: respuesta.rehacerUltimoTurno,
+          documentos: respuesta.documentos
         });
         /*
          * Y se enseña lo que DE VERDAD ha cambiado.

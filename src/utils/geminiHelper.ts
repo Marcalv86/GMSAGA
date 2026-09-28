@@ -76,7 +76,14 @@ import {
   HiloLeido
 } from './campaignCalendar';
 import { cambioVacio, leerInventario, sonElMismoObjeto, deduplicarInventario } from './inventoryTag';
-import { bloqueDocumentosParaNarrador, hayDocumentosVivos, SECCIONES_CUADERNO } from './documentosVivos';
+import {
+  bloqueDocumentosParaNarrador,
+  hayDocumentosVivos,
+  SECCIONES_CUADERNO,
+  leerCambiosDeDocumento,
+  limpiarEtiquetasDeDocumento,
+  type CambioDeDocumento
+} from './documentosVivos';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
 import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa, mismoNombre } from './cuadernoOculto';
 import { leerEstado, leerEtiquetados, leerOlvidos, OrdenDeEtiquetado } from './ordenesDeMesa';
@@ -3939,7 +3946,7 @@ Tus Directivas de campaña (más arriba) mandan en tono, PNJs, asimetría de inf
    - **AUTOLIMITACIÓN DE TOKENS, ECONOMÍA DE METADATOS Y PREVENCIÓN INTELIGENTE DE TRUNCAMIENTOS (OBLIGATORIO)**:
      * **Prohibido el Truncamiento a Mitad de Frase**: Toda intervención debe cerrar sus oraciones completas y terminar en un punto y aparte, una línea de diálogo cerrada o una petición formal de tirada, sin palabras a medio escribir ni ideas colgadas.
      * **Detención Inmediata ante Peligro o Tirada**: Si una acción entraña riesgo o incertidumbre, narra el detonante sensorial en 1 o 2 párrafos y detén el turno en seco con la petición de tirada antes de describir desenlaces hipotéticos.
-     * **Economía de Etiquetas y Tarjetas de Cierre**: Emite ÚNICAMENTE las etiquetas entre corchetes de datos (${docsVivos ? '\`[ESTADO: ...]\`, \`[TIEMPO: ...]\`, \`[CUADERNO: ...]\`' : '\`[VÍNCULO: ...]\`, \`[ESTADO: ...]\`, \`[INVENTARIO: ...]\`'}, etc.) que hayan sufrido una modificación **real y tangible** durante este turno. Queda prohibido escupir bloques repetitivos de 6 a 8 tarjetas al final si el estado sigue igual.
+     * **Economía de Etiquetas y Tarjetas de Cierre**: Emite ÚNICAMENTE las etiquetas entre corchetes de datos (\`[ESTADO: ...]\`, \`[TIEMPO: ...]\`, \`[CUADERNO: ...]\`, etc.) que hayan sufrido una modificación **real y tangible** durante este turno. Queda prohibido escupir bloques repetitivos de 6 a 8 tarjetas al final si el estado sigue igual.
 3. Consulta la MEMORIA VIVA y la BASE DE CONOCIMIENTO antes de escribir para no contradecir hechos pasados ni inventar datos si ya existen.
    [QUÉ HACER CUANDO NO SABES ALGO]: sabes mucho de ambientaciones publicadas, pero ESTA campaña no es ninguna de ellas: es la que está en estos documentos y en esta memoria. Ante un dato que no tengas, distingue tres casos.
    - Si lo que ibas a decir podría contradecir el material de la jugadora, no lo digas. Rodéalo: describe lo que el protagonista percibe sin afirmar el dato, o deja que el personaje que lo sabría no lo suelte todavía.
@@ -4002,37 +4009,10 @@ Tus Directivas de campaña (más arriba) mandan en tono, PNJs, asimetría de inf
      ✂️ **Y la pregunta va CORTA: una o dos líneas y directa.** La aplicación la pinta en una tarjeta aparte, así que no necesita preámbulo, ni contexto, ni justificarse. *«¿Qué encuentra en tu diario, según lo que está buscando?»* — ya está. Y **el turno que la lleva también es corto**: si lo que toca es preguntar, no le cuelgues encima tres párrafos de atmósfera, porque entonces la pregunta se lee como el remate de una parrafada y no como lo que es. Turno de preguntar = turno breve.
      ⚠️ **Presupuesto:** como mucho UNA por escena, y **nunca dos turnos seguidos**. Si dudas, la respuesta es que no toca: haz que lo pregunte un PNJ dentro de la ficción, que no gasta presupuesto, no saca a nadie de la escena y casi siempre funciona mejor.
 7. [REGISTROS INTERNOS - ACTUALIZACIÓN ESTRICTAMENTE ESENCIAL Y CONDICIONAL]:
-   Después de la narración, añade las siguientes líneas según corresponda. Son registros internos de la aplicación que el jugador no ve. ${docsVivos ? 'Las relaciones, la mochila y las tramas NO se apuntan aquí: las escribe el volcado de cierre en los documentos vivos.' : 'REGLA FUNDAMENTAL DE SINCRONIZACIÓN ACTIVA: Mantén siempre sincronizadas las fichas, estados y relaciones de los PNJs presentes mediante [VÍNCULO: ...] en cada turno, asegurando que los paneles nunca queden vacíos ni requieran acciones manuales.'}
+   Después de la narración, añade las siguientes líneas según corresponda. Son registros internos de la aplicación que el jugador no ve. Las relaciones, la mochila y las tramas NO se apuntan aquí: las escribe el volcado de cierre en los documentos vivos.
    - [PRESENTES: nombres separados por comas] — quién ha estado en escena de forma reconocible, con nombre propio. No incluyas figurantes sin nombre («un marinero», «la multitud»). Sirve para saber quién vuelve: alguien que reaparece deja de ser un extra y se le abre una ficha de vínculo con el protagonista.
-${docsVivos ? '' : `   - [VÍNCULO: nombre | aparenta: cómo trata al protagonista y qué deja ver | oculta: lo que de verdad piensa y no dice | grado: tipo — descripción | orientacion: hacia quién le tira, si consta | atr: desea/interés/ninguna | previo: sí | vin: 0-20 | con: 0-20 | promesa: pacto o juramento mutuo | confidencia: secreto o confesión íntima | aprendio: habilidad o idioma aprendido de ella | impresion: evolución de su mirada interior] — SOLO para los personajes que la aplicación ya te ha listado arriba como habituales, y ÚNICAMENTE cuando la escena haya movido algo real entre ellos o se inicie un nuevo vínculo. Si nada ha cambiado en su relación o química en este turno, NO emitas esta línea. ⭐ **EXCEPCIÓN, y es la que más se incumple:** si el dosier marca a alguien con «RELACIÓN SIN ESTABLECER» o «ATRACCIÓN SIN DECIDIR», **eso ya es motivo suficiente y la emites este turno**, haya movido la escena algo o no. No estás registrando un cambio: estás rellenando un hueco que lleva vacío desde el principio. ⛔ Y ojo al fallo clásico: escribir en la prosa que un personaje la devora con la mirada y no emitir nada **no cuenta**. Lo que no lleva etiqueta no existe cuando el capítulo se cierre —la escena se olvida, la etiqueta no—.
-     «aparenta» es lo que el protagonista podría percibir observándolo. «oculta» es lo que hay debajo: sus reservas, sus intenciones, lo que calla.
-     «promesa» registra un pacto o palabra dada que no debe olvidarse de un capítulo a otro (ej: «promesa: no dejar que nadie toque su laúd»).
-     «confidencia» registra un secreto íntimo, temor o vulnerabilidad que el PNJ le confiesa a la protagonista (ej: «confidencia: teme ser repudiado por su casa»).
-     «aprendio» registra una habilidad, saber o idioma que ella le enseña (ej: «aprendio: rudimentos de druídico» o «aprendio: tocar acordes»). Si es una lengua, ¡la aplicación la incorporará automáticamente a sus idiomas conocidos!
-     «impresion» registra cómo madura o cambia su juicio interno sobre la protagonista (ej: «impresion: empieza a admirar su orgullo y la respeta»).
-     «grado» debe comenzar indicando el tipo para que la interfaz muestre el icono adecuado:
-       - ⚔️ Rivalidad: «grado: rivalidad — ...»
-       - ❇️ Amistad: «grado: amistad — ...»
-       - 💘 Interés Romántico / Romance: «grado: romance — ...» (atracción, flirteo, insinuación o declaración sentimental/sexual)
-       - 💀 Enemistad: «grado: enemistad — ...»
-       - 🤝 Alianza: «grado: alianza — ...»
-       - 🛡️ Mentor: «grado: mentor — ...»
-     «vin» (0-20) y «con» (0-20) representan el Vínculo y la Confianza que el PNJ siente hacia el protagonista. **«atr» NO es un número: es «desea» o «interés»**, y si no hay nada, NO SE PONE. El Narrador los actualiza de forma autónoma según las vivencias y la química; son de solo lectura para el jugador.
-     «orientacion» es OPCIONAL y se manda UNA VEZ, la primera, cuando sus documentos lo digan o el juego lo haya dejado claro: «hombres», «mujeres», «le da igual», «asexual», «casado y va en serio», «no le interesa nadie ahora mismo». Se queda guardado en su ficha y vuelve a ti en todos los turnos siguientes, así que **no hace falta repetirlo** y NO te lo inventes para rellenar: si no consta, lo dejas fuera, y sin que conste la atracción no sube (ver el protocolo de la atracción).
-      ⚠️ **«atr» no es un número: es «desea», «interés» o nada.** · \`desea\` → la desea, y **cómo se le nota lo dice SU ficha**, no una intensidad. · \`interés\` → hay algo y aún no es deseo. · Si no siente nada, **no emitas nada**: es lo que se da por hecho, y reconocer que es guapa no es desearla. · \`ninguna\` es distinto: APAGA lo que hubiera, y se usa solo para corregir un error o algo que se enfrió en escena de verdad. ⭐ Emítelo **solo cuando cambie**, o cuando la ficha de alguien en el dosier te lo pida a la cara. ⭐ **Y la decisión mira las DOS fichas**: los rasgos de ella que dicen cómo reacciona el mundo ante ella —su porte, su rareza, una belleza que incomoda— son mecánica activa y entran aquí. ⚡ **RIGOR CANÓNICO DROW Y ADULTO (NSFW / CERO MOJIGATERÍA):** Los drows NO son asexuales ni tienen hastío sexual crónico. En Menzoberranzan, Sshamath y Ched Nasad abundan lupanares (ej. «El Beso de la Araña»), y corsarios/nobles como Jarlaxle son hedonistas carnalmente activos y conquistadores sin timidez victoriana. Cuando los filtros están en modo maduro/NSFW (sin censura), narra la pasión física, la química carnal y la seducción con total naturalidad y audacia. ⛔ Y no lo decides por lo que te convenga a ti ni por si el personaje es importante: **cuando toque decidirlo, el dosier de ese personaje te dice cómo** —su personalidad si consta en los documentos, y un d20 ya tirado por la aplicación si te lo acabas de inventar—.
-     ✅ Lo que SÍ se gana día a día son «vin» y «con»: ahí manda el trato acumulado y suben despacio.
-`}
-${docsVivos ? '' : `     - [INVENTARIO: +X Nombre (detalles opcionales), -Y Nombre, ~Z Nombre (en poder de: Quién | donde: Dónde), +Z PO, -W PO] — OBLIGATORIO siempre que el protagonista gane, compre, reciba de un PNJ, encuentre, invoque, gaste, pierda, consuma o LE QUITEN objetos o dinero durante la escena. **«+» entra o RECUPERA · «-» se acabó (consumido, gastado, entregado para siempre) · «~» SE LO HAN QUITADO pero sigue siendo suyo.** ⛔ El signo «~» es obligatorio cuando la requisan, la detienen, la registran, la roban o deja algo en prenda: esas cosas NO se borran de su ficha, cambian de manos, y hay que apuntar quién las tiene. ⚡ **REGLAS DE ORO DE REQUISAS Y CONFISCACIÓN TOTAL A PRISIONEROS (INVIOLABLES):** 1. *«¿Puede usarlo de arma, para golpear, envenenar, forzar cerraduras o escaparse? ---> SÍ ---> SE LE QUITA TODO. ¡TODO PUEDE SER UN ARMA, HASTA UN ALFILER!»* (Escudos, trampas de caza, armas, ganzúas, herramientas, sogas, pociones). 2. *«¿Puede servirnos para obtener información o inteligencia sobre el preso (saber si es un espía, descubrir sus secretos, contactos, misión o lealtades)? ---> SÍ ---> SE LE QUITA TODO Y SE INTENTA LEER/EXAMINAR.»* (Diarios, libros, almanaques, cartas, notas, mapas, pergaminos, relicarios, sellos). Los captores o líderes (ej. Jarlaxle) intentan activamente leer los escritos para indagar quién es y qué oculta; se evalúa orgánicamente si logran descifrarlo o si topan con barreras de idioma, sellos mágicos o cifrados. Jamás dejes a un prisionero un escudo (arma contundente), una trampa de caza o cepo (arma letal), armas, ganzúas, herramientas, diarios, libros, pociones, sogas ni dinero. A un prisionero SOLO se le deja su ropa básica modesta puesta (sin armaduras). En cuanto sea apresada o reducida, emite obligatoriamente [INVENTARIO: ~Objeto1 (...), ~Objeto2 (...)] para TODO su equipo confiscado. Ejemplos: si invoca 10 Buenas Bayas: [INVENTARIO: +10 Buenas Bayas (duran 24h)]; si come 3: [INVENTARIO: -3 Buenas Bayas]; si gasta 15 de oro: [INVENTARIO: +Disfraz noble, -15 PO]; **si le requisan el equipaje al capturarla: [INVENTARIO: ~1 Violín (en poder de: la tripulación | donde: la bodega), ~1 Diario ilustrado (en poder de: Jarlaxle | donde: camarote de Jarlaxle), ~1 Escudo (en poder de: la tripulación | donde: la bodega), ~1 Trampa de caza (en poder de: la tripulación | donde: la bodega)]**; ⭐ **Y CUANDO SE LO DEVUELVEN O LO RECUPERA**: es IMPRESCINDIBLE emitir [INVENTARIO: +1 Violín, +1 Diario ilustrado] (o con «(equipado)» si lo empuña/viste). Al registrar la entrada con «+», la aplicación ELIMINA automáticamente el objeto de la lista de requisados y lo devuelve a su inventario activo (en sus manos / portado / equipado). Si en este turno NO ha habido alteración de inventario ni monedas, OMITE totalmente esta línea.
-`}   - [APRENDE: +Nombre (tipo, detalle opcional), +Otro (tipo)] — OBLIGATORIO en el turno en que el protagonista GANA una capacidad nueva: al subir de nivel, al aprender un conjuro, al recibir adiestramiento, al desbloquear un rasgo o al ganar una competencia o un idioma. **Este registro es el único sitio donde queda constancia**: su ficha se subió una vez y está congelada en el nivel que tuviera aquel día, así que lo que no se apunte aquí se pierde y dentro de tres niveles nadie sabrá que lo tiene. El tipo va dentro del paréntesis y es uno de: conjuro, rasgo, competencia, mejora. Ejemplos: [APRENDE: +Rayo de escarcha (conjuro, truco de evocación)]; [APRENDE: +Sentido salvaje (rasgo), +Competencia en Supervivencia (competencia)]; [APRENDE: +2 a Sabiduría (mejora, al subir a nivel 4)]; [APRENDE: +Infracomún (competencia, se lo enseña un compañero)]. ⛔ Y no lo uses para objetos —eso es [INVENTARIO:]— ni para apuntar lo que YA figura en su ficha: solo lo nuevo. Si en este turno no ha aprendido nada, OMITE la línea.
-${docsVivos ? '' : `    - [BAMBALINAS: Quién | hizo: qué | donde: dónde | con: con quién | resultado: qué saca | hilo: de qué trama cuelga] — TU CUADERNO, que ella NO lee. Se emite cuando ha pasado tiempo (un descanso largo, un salto, un viaje) y alguien con algo entre manos se ha movido **aunque no aparezca en escena**. Uno por cada quien se mueva. ⚡ **PROHIBIDAS NOTAS VAGAS:** Registra siempre el POR QUÉ estratégico (motivo real) y las ÓRDENES CONCRETAS dadas a subalternos (a quién y qué ordenó). Ejemplo: [BAMBALINAS: Jarlaxle | hizo: repasa cartas náuticas para bordear bajíos evitando patrullas de Luskan, y ordena a Braelin apostar centinela en el pasillo con orden estricta de no tocar el violín confiscado | donde: camarote principal | con: Braelin | resultado: ruta segura trazada y custodia garantizada | hilo: la travesía a Luskan]. ⛔ Esto NO se narra ni se insinúa a la jugadora: es memoria causal viva del mundo.
-`}${docsVivos ? '' : `    - [RELOJ: Nombre único del plan | van: 3/6 | al llenarse: qué ocurre | de: quién lo mueve] — la cuenta atrás de lo que corre por detrás. «van: 3/6» fija los dos números; sobre un reloj que ya existe basta «van: +1» para avanzarlo, o «van: 4» para fijarlo. ⚡ **TÍTULOS UNÍVOCOS:** Cada reloj debe tener un nombre específico que distinga al objetivo investigado (ej: [RELOJ: Jarlaxle investiga el origen de Auron | van: 2/6] vs [RELOJ: Bregan D'aerthe ata cabos sobre Aryendell | van: 1/6]), evitando duplicar nombres idénticos o genéricos. Ejemplo: [RELOJ: Bregan D'aerthe ata cabos sobre ella | van: +1 | al llenarse: mandan a alguien a buscarla en persona | de: Bregan D'aerthe]. Úsalo para las amenazas, las búsquedas, las investigaciones ajenas y los plazos. ⛔ Tampoco se narra. ⭐ **Y TAMBIÉN PARA LAS PERSONAS, que es lo que casi nadie hace:** añade \`sobre: Nombre\` y el reloj pasa a ser de ese vínculo. Ejemplo: [RELOJ: Decide qué es ella para él | van: 1/4 | al llenarse: le pide algo que ella no puede dar sin elegir bando | de: Jarlaxle | sobre: Jarlaxle]. Una relación sin reloj es un registro: dice cómo están las cosas y no promete nada. Con reloj **va a pasar algo**, y pasa aunque ella no lo empuje, igual que una amenaza. ✅ Abre uno cuando un vínculo llegue al punto en que su dueño **ya tendría que hacer algo al respecto**: quien la desea acabará moviendo pieza, quien le debe algo acabará cobrándoselo o pagándolo, quien la está evaluando acabará decidiendo. Y que al llenarse **cueste algo**: una elección, una lealtad, una puerta que se cierra. Un reloj cuyo final es «se hacen más amigos» no es un reloj.
-`}${docsVivos ? '' : `   - [FACCIÓN: Nombre | es: qué es | quiere: su objetivo ahora | tiene: con qué cuenta | cabeza: quién manda | con ella: aliada/neutral/recelosa/enemiga/no la conoce | contra: Otra facción (rival); Tercera (guerra) | oculto: lo que ella no sabe | conocida: no] — la ficha de un bando. Emítela la primera vez que un grupo con intereses propios aparece o se menciona, y cuando su objetivo o su postura CAMBIEN. Una facción no es la suma de su gente: su objetivo sigue vivo aunque muera quien lo llevaba. ⛔ No la uses para grupos de paso ni para una pareja de matones: solo para lo que va a estar ahí toda la campaña.
-`}${docsVivos ? '' : `   - [PLAN: premisa: ... | destino: ...] — **corrige el rumbo de la campaña** cuando lo jugado lo haya desviado de verdad: ella ha ignorado el gancho principal, ha cerrado por su cuenta la vía que llevaba al final previsto, o ha convertido un hilo secundario en el importante. ⛔ No lo toques por una escena suelta ni cada vez que algo se tuerza un poco: esto es el mapa, y reescribirlo cada turno es no tener mapa. Solo un campo si solo cambia uno.
-   - [MISIÓN: Título | objetivo: ... | progreso: ... | origen: quién lo encargó | estado: activa/completada/fallada | tipo: principal/secundaria/personal] — **abre, mueve o cierra una trama.** Emítela cuando alguien le encargue algo de verdad, cuando la escena haga avanzar un encargo abierto, y **sobre todo cuando lo complete**: una misión cumplida que sigue marcada como activa te la vas a encontrar en el dosier de cada turno como si estuviera pendiente. Por el título exacto, y lo que no pongas se conserva. ⛔ No abras una trama por cada conversación: solo lo que de verdad es un encargo o un hilo que ella persigue.
-`}
-${docsVivos ? '' : `   - [PREPARADO: Título | tipo: escena/encuentro/complicacion/revelacion/pnj | detalle: qué pasa | cuando: en qué momento encaja | hilo: de qué cuelga | si nadie va: qué pasa en el mundo si esto no se usa nunca] — guarda algo listo para usar más adelante, que es lo que hace un director antes de sentarse. Emítelo cuando se te ocurra algo bueno que AHORA no toca: así no se pierde y no acabas improvisándolo en caliente. Y cuando lo uses, ciérralo con [PREPARADO: el mismo título | usada: sí]. ⛔ Nada de esto se narra: es tu material. ⭐ **Rellena siempre «si nadie va»**, que es lo que separa una trampa de una promesa: si preparas una emboscada en el faro y ella no va al faro, el farero sigue muerto, la señal sigue apagada y algún barco encalla. No ir también es una decisión, y una decisión sin consecuencia es que daba igual.
-`}${docsVivos ? '' : `     ⭐ **Y marca los encargos.** Si lo que entra es una tarea con forma de objeto —una carta que entregar, un pergamino que traducir, algo que ha tenido que robar—, dilo dentro del paréntesis con \`encargo:\` (qué hay que hacer con él) y \`de:\` (de quién salió), separados por \`|\`: \`[INVENTARIO: +1 Carta lacrada (encargo: entregarla en mano al destinatario, sin abrirla | de: quien se la dio)]\`. La aplicación los guarda aparte de sus cosas de uso, y al darlos de baja quedan como cerrados en vez de borrarse.
-`}    - [COMENTARIO_DM: comentario breve, simpático, sincero o ingenioso del DM fuera de personaje] — OPCIONAL (1-2 frases). Emítelo solo cuando ocurra algo genuinamente divertido, una pifia o éxito crítico épico, una jugarreta memorable del PJ a un PNJ (o viceversa), o un momento de rol memorable. Este comentario se envía automáticamente al chat OOC de la Mesa como un mensaje del DM, con tu personalidad entusiasta, cómica, sincera y rolera de colega de mesa. Si el turno es rutinario, formal o solemne, OMITE totalmente esta etiqueta.
+   - [APRENDE: +Nombre (tipo, detalle opcional), +Otro (tipo)] — OBLIGATORIO en el turno en que el protagonista GANA una capacidad nueva: al subir de nivel, al aprender un conjuro, al recibir adiestramiento, al desbloquear un rasgo o al ganar una competencia o un idioma. **Este registro es el único sitio donde queda constancia**: su ficha se subió una vez y está congelada en el nivel que tuviera aquel día, así que lo que no se apunte aquí se pierde y dentro de tres niveles nadie sabrá que lo tiene. El tipo va dentro del paréntesis y es uno de: conjuro, rasgo, competencia, mejora. Ejemplos: [APRENDE: +Rayo de escarcha (conjuro, truco de evocación)]; [APRENDE: +Sentido salvaje (rasgo), +Competencia en Supervivencia (competencia)]; [APRENDE: +2 a Sabiduría (mejora, al subir a nivel 4)]; [APRENDE: +Infracomún (competencia, se lo enseña un compañero)]. ⛔ Y no lo uses para objetos —esos van en la Ficha viva— ni para apuntar lo que YA figura en su ficha: solo lo nuevo. Si en este turno no ha aprendido nada, OMITE la línea.
+   - [COMENTARIO_DM: comentario breve, simpático, sincero o ingenioso del DM fuera de personaje] — OPCIONAL (1-2 frases). Emítelo solo cuando ocurra algo genuinamente divertido, una pifia o éxito crítico épico, una jugarreta memorable del PJ a un PNJ (o viceversa), o un momento de rol memorable. Este comentario se envía automáticamente al chat OOC de la Mesa como un mensaje del DM, con tu personalidad entusiasta, cómica, sincera y rolera de colega de mesa. Si el turno es rutinario, formal o solemne, OMITE totalmente esta etiqueta.
 ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | agotamiento: 0-10 | condiciones: lista separada por comas, o "ninguna"]
    - [GRUPO: Nombre | entra | supervisa] cuando alguien se suma a la cuadrilla y viaja con ella, y [GRUPO: Nombre | sale] cuando se separa. Mientras no lo marques, para la aplicación esa persona NO va con ella y tú te olvidarás de meterla en escena dentro de dos turnos. El rango dice quién está por encima de quién, y no es cosmético: «manda» (decide por la cuadrilla), «supervisa» (está por encima de ella: la vigila, la instruye y la evalúa), «iguales», o «acompaña» (ella tiene más antigüedad — esto SE GANA jugando y NO significa que le obedezcan). ⚠️ Si no lo pones, se da por supuesto «supervisa»: quien entra en una organización entra por abajo. Y en ningún caso son secuaces: el rango dice quién decide la operación, no quién manda sobre quién.
    - [DOLENCIA: nombre | cd: 12 | exitos: 0-2] para abrir o llevar una enfermedad, y [DOLENCIA: nombre | curada] para cerrarla. Dos éxitos SEGUIDOS la curan; un fallo la agrava o suma un nivel de agotamiento. Si la enfermedad no se anota aquí, no existe pasado este turno.
@@ -7347,6 +7327,50 @@ export interface ConsultaDeMesa {
  * cuesta una fracción de un turno de partida, y una afirmación así hay que
  * poder comprobarla, no repetirla.
  */
+/*
+ * 📚 LA MESA CON DOCUMENTOS VIVOS.
+ *
+ * Con documentos vivos, la mochila, los relojes, lo de fuera de cámara, las
+ * facciones, las tramas, los lugares y el estado viven en el Cuaderno y la
+ * Ficha viva. Las etiquetas viejas que corregían aquellas listas ya no llegan
+ * a ningún sitio: el Director decía «hecho» y no cambiaba nada. Aquí se quitan
+ * de su lista y se le da la que sí escribe en los documentos: [DOC: …].
+ */
+const ETIQUETAS_MUERTAS_EN_MESA = /^- \\?`\[(INVENTARIO|BAMBALINAS|RELOJ|FACCI[OÓ]N|PREPARADO|PLAN|MISI[OÓ]N|LUGAR|SITUACI[OÓ]N):/;
+
+const INSTRUCCION_DOC_EN_MESA = `- \`[DOC: ficha | Sección | + línea nueva]\` · \`[DOC: cuaderno | Sección | - texto de la línea a quitar]\` · \`[DOC: ficha | Sección | ~ texto de la línea => línea nueva entera]\` — **✏️ CORRIGE LOS DOCUMENTOS VIVOS**, que es donde vive TODO el estado de esta campaña: en la 🎒 Ficha viva, el inventario por dónde está («Lo que lleva encima», «Mochila y contenedores», «Guardado en otro sitio», «Requisado o en manos ajenas», «Encargos»), el dinero, los PG, las heridas y los recursos; en el 🕯️ Cuaderno, el estado general, las tramas, los actores, los relojes y lo de fuera de cámara, los lugares, los vínculos (ATR/VÍN/CON), los secretos, los hilos, las consecuencias y la reputación. La sección se nombra como en el documento. «+» añade una línea; «-» quita las líneas que contengan ese texto; «~» cambia la línea que contenga el texto por la línea nueva entera. Se aplica al momento, sin IA, y ella puede deshacerlo.
+  - Ejemplos: \`[DOC: ficha | Lo que lleva encima | + Violín de las Moonshae, con su arco]\` · \`[DOC: ficha | Requisado o en manos ajenas | - Diario de viaje]\` · \`[DOC: cuaderno | Vínculos | ~ **Braelin** => **Braelin** — ATR 2 · VÍN 4 · CON 3 — la respeta desde el tejado]\` · \`[DOC: cuaderno | Estado general | ~ Ahora: => Ahora: en alta mar, rumbo a Luskan, sin tierra a la vista]\`
+  - ⭐ Para los ejes de un PNJ (ATR, VÍN, CON), para dónde están, para la mochila, para un reloj o una trama: esto, y no otra etiqueta. Las que había antes para eso ya no se leen.
+`;
+
+function promptDeMesaConDocumentos(prompt: string): string {
+  const fuera: string[] = [];
+  let saltando = false;
+  let puesta = false;
+  for (const linea of prompt.split('\n')) {
+    if (ETIQUETAS_MUERTAS_EN_MESA.test(linea)) {
+      saltando = true;
+      continue;
+    }
+    // Las sub-viñetas de una etiqueta quitada se van con ella.
+    if (saltando && /^\s{2,}\S/.test(linea)) continue;
+    saltando = false;
+    if (!puesta && /^- \\?`\[OLVIDA:/.test(linea)) {
+      fuera.push(INSTRUCCION_DOC_EN_MESA.trimEnd());
+      puesta = true;
+    }
+    fuera.push(linea);
+  }
+  return fuera
+    .join('\n')
+    .replace(
+      /incluidas \\?`\[NIVEL:\]\\?`, [^.]*?y \\?`\[FICHA:\]\\?`\./,
+      'incluidas `[DOC:]`, `[NIVEL:]`, `[ESTAMOS:]`, `[VIAJE:]`, `[PUENTE:]`, `[APRENDE:]`, `[DOLENCIA:]`, `[GRUPO:]` y `[FICHA:]`.'
+    )
+    .replace(/2\. Compara el equipo y pertenencias de la ficha con lo que figura en «Inventario actual registrado en panel»\./, '2. Compara el equipo de la ficha con lo que figura en la 🎒 Ficha viva.')
+    .replace(/3\. Emite de inmediato la orden \\?`\[INVENTARIO: [^\n]*/, '3. Emite de inmediato `[DOC: ficha | Lo que lleva encima | + Objeto]` (una por objeto, en la sección que toque) para corregirla.');
+}
+
 export function construirPromptOOC({
   project,
   chats,
@@ -7361,6 +7385,8 @@ export function construirPromptOOC({
   const pc = project.memory?.player_character;
   const cal = project.calendar;
   const fecha = project.currentDate;
+  // 📚 Con documentos vivos, el Director de la Mesa ve y corrige los documentos, no las listas viejas.
+  const docsDeMesa = hayDocumentosVivos(project.memory) ? project.memory!.documentos_vivos! : null;
 
   // Solo la cola de la escena, para que sepa a qué se refiere «esto».
   const capitulo = chats.find(c => c.id === currentChatId) || chats[chats.length - 1];
@@ -7488,10 +7514,17 @@ export function construirPromptOOC({
         typeof pc.hitosActuales === 'number' && pc.hitosParaSubir
           ? `- Hitos hacia el siguiente nivel: ${pc.hitosActuales}/${pc.hitosParaSubir}`
           : '',
-        `- Dinero actual en panel: ${monedasActuales}`,
-        `- Inventario actual registrado en panel — es lo que puedes corregir con [INVENTARIO: ...]:\n${inventarioActual}`,
+        ...(docsDeMesa
+          ? [
+              `\n--- 🎒 FICHA VIVA (la ve ella; inventario, dinero, heridas y recursos) — la corriges con [DOC: ficha | …] ---\n${docsDeMesa.ficha.trim()}`,
+              `\n--- 🕯️ CUADERNO DEL GM (ella no lo lee) — lo corriges con [DOC: cuaderno | …] ---\n${docsDeMesa.cuaderno.trim()}`
+            ]
+          : [
+              `- Dinero actual en panel: ${monedasActuales}`,
+              `- Inventario actual registrado en panel — es lo que puedes corregir con [INVENTARIO: ...]:\n${inventarioActual}`
+            ]),
         `- Lo que ha aprendido jugando y su ficha NO recoge — lo corriges con [APRENDE: ...]:\n${aprendidoActual}`,
-        `\n--- TU CUADERNO (lo que ella no sabe) — lo corriges con [BAMBALINAS: ...] y [RELOJ: ...] ---\n${cuadernoActual}`,
+        docsDeMesa ? '' : `\n--- TU CUADERNO (lo que ella no sabe) — lo corriges con [BAMBALINAS: ...] y [RELOJ: ...] ---\n${cuadernoActual}`,
         pc.sheetText ? `\n--- FICHA BASE (TEXTO REGISTRADO EN MEMORIA) ---\n${pc.sheetText}` : ''
       ]
         .filter(Boolean)
@@ -7853,7 +7886,7 @@ ${conversacion ? `CONVERSACIÓN DE MESA HASTA AHORA:\n${conversacion}\n` : ''}
 Jugadora: ${pregunta}
 Director:`;
 
-  return prompt;
+  return docsDeMesa ? promptDeMesaConDocumentos(prompt) : prompt;
 }
 
 const MEMORIA_MESA_RE = /\[\s*MEMORIA\s*:\s*([^\]]+)\]/gi;
@@ -7928,6 +7961,8 @@ export interface RespuestaDeMesa {
   corregirCronica?: string | null;
   /** Indicación para volver a generar con IA el último turno de la Crónica. */
   rehacerUltimoTurno?: string | null;
+  /** ✏️ Correcciones directas a los documentos vivos ([DOC: …]). */
+  documentos?: CambioDeDocumento[];
   /**
    * Lo que costó de verdad la pregunta, en fichas de entrada.
    *
@@ -8136,6 +8171,7 @@ export async function preguntarAlDirectorOOC(
   const puentes = leerPuentes(bruto);
   const corregirCronica = leerCorregirCronica(bruto);
   const rehacerUltimoTurno = leerRehacerUltimoTurno(bruto);
+  const documentosDeMesa = leerCambiosDeDocumento(bruto);
   // El mismo lector que usa la narración: `[NIVEL: 5]` y `[Avance: 2/3]`.
   const nivelDeMesa = leerAvanceDeNivel(bruto);
   const misionesDeMesa = leerMisiones(bruto);
@@ -8154,7 +8190,7 @@ export async function preguntarAlDirectorOOC(
   const lugaresDeMesa = leerLugares(bruto);
 
   // Las etiquetas se quitan del texto que se lee: aquí no se registra nada más.
-  const texto = stripStateTag(limpiarEtiquetasDeTiempo(limpiarEtiquetasDePnj(bruto)))
+  const texto = stripStateTag(limpiarEtiquetasDeTiempo(limpiarEtiquetasDePnj(limpiarEtiquetasDeDocumento(bruto))))
     .replace(MEMORIA_MESA_RE, '')
     .replace(/\[\s*OLVIDA\s*:[^\]]*\]/gi, '')
     .replace(/\[\s*INVENTARIO\s*:[^\]]*\]/gi, '')
@@ -8216,6 +8252,7 @@ export async function preguntarAlDirectorOOC(
     plan: planDeMesa,
     corregirCronica,
     rehacerUltimoTurno,
+    documentos: documentosDeMesa,
     fichasDeEntrada: respuesta?.usageMetadata?.promptTokenCount
   };
 }

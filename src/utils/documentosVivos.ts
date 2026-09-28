@@ -1005,3 +1005,106 @@ export function sembrarSeccionesVacias(cuaderno: string, sembrado: string): { cu
   }
   return { cuaderno: fuera, llenadas };
 }
+
+// ---------------------------------------------------------------- correcciones desde la Mesa
+
+/*
+ * ✏️ [DOC: …] — el Director de la Mesa escribe en los documentos vivos.
+ *
+ * Con documentos vivos, las correcciones de la Mesa por etiquetas viejas
+ * ([INVENTARIO], [RELOJ], [BAMBALINAS]…) ya no llegaban a ningún sitio: el
+ * Director decía «hecho» y no cambiaba nada. Ahora corrige la fuente:
+ *
+ *   [DOC: ficha | Lo que lleva encima | + Violín de las Moonshae]
+ *   [DOC: cuaderno | Vínculos | - Braelin]
+ *   [DOC: cuaderno | Estado general | ~ Ahora: => Ahora: en alta mar, rumbo a Luskan]
+ *
+ * «+» añade una línea, «-» quita las líneas que contengan el texto, y «~»
+ * cambia la línea que contenga el texto por la línea nueva entera. Sin IA, y con versión
+ * anterior para deshacer.
+ */
+export interface CambioDeDocumento {
+  cual: 'cuaderno' | 'ficha';
+  seccion: string;
+  op: '+' | '-' | '~';
+  texto: string;
+  por?: string;
+}
+
+const DOC_RE = /\[\s*DOC\s*:\s*([^|\]]+)\|([^|\]]+)\|\s*([+\-~])\s*([^\]]*)\]/gi;
+
+export function leerCambiosDeDocumento(texto: string): CambioDeDocumento[] {
+  if (!texto || !/\[\s*DOC\s*:/i.test(texto)) return [];
+  DOC_RE.lastIndex = 0;
+  const fuera: CambioDeDocumento[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = DOC_RE.exec(texto)) !== null) {
+    const doc = plegar(m[1]);
+    const cual = /cuaderno|gm/.test(doc) ? 'cuaderno' : /ficha/.test(doc) ? 'ficha' : null;
+    if (!cual) continue;
+    const op = m[3] as '+' | '-' | '~';
+    const cuerpo = m[4].trim();
+    if (!cuerpo) continue;
+    if (op === '~') {
+      const [viejo, nuevo] = cuerpo.split(/\s*=>\s*/);
+      if (!viejo || nuevo === undefined) continue;
+      fuera.push({ cual, seccion: m[2].trim(), op, texto: viejo.trim(), por: nuevo.trim() });
+    } else {
+      fuera.push({ cual, seccion: m[2].trim(), op, texto: cuerpo });
+    }
+  }
+  return fuera;
+}
+
+export const limpiarEtiquetasDeDocumento = (texto: string) => (texto || '').replace(DOC_RE, '');
+
+/**
+ * Aplica los cambios a un documento. Devuelve el texto nuevo y, por cada
+ * cambio, si ha entrado o por qué no (sección que no existe, texto que no está).
+ */
+export function aplicarCambiosDeDocumento(
+  doc: string,
+  cambios: CambioDeDocumento[]
+): { doc: string; hechos: string[]; fallidos: string[] } {
+  let fuera = doc;
+  const hechos: string[] = [];
+  const fallidos: string[] = [];
+  const norma = (t: string) => plegar(t.replace(/^\d+[.)]\s*/, ''));
+  for (const c of cambios) {
+    const { secciones } = partirEnSecciones(fuera);
+    let i = secciones.findIndex(s => norma(s.titulo) === norma(c.seccion));
+    if (i < 0) i = secciones.findIndex(s => norma(s.titulo).includes(norma(c.seccion)) || norma(c.seccion).includes(norma(s.titulo)));
+    if (i < 0) {
+      fallidos.push(`no hay sección «${c.seccion}»`);
+      continue;
+    }
+    const lineas = secciones[i].bloque.split('\n');
+    const [cabecera, ...cuerpo] = lineas;
+    const contiene = (l: string) => plegar(l).includes(plegar(c.texto));
+    let nuevo = cuerpo;
+    if (c.op === '+') {
+      const linea = /^\s*[-*]\s/.test(c.texto) ? c.texto : `- ${c.texto}`;
+      nuevo = [...cuerpo.filter(l => !/^\s*[-*]\s+\(vac[ií]o\)\s*$/i.test(l)), linea];
+      hechos.push(`➕ ${secciones[i].titulo}: ${c.texto}`);
+    } else if (c.op === '-') {
+      nuevo = cuerpo.filter(l => !(l.trim() && contiene(l)));
+      if (nuevo.length === cuerpo.length) {
+        fallidos.push(`«${c.texto}» no está en ${secciones[i].titulo}`);
+        continue;
+      }
+      if (!nuevo.some(l => /^\s*[-*]\s/.test(l))) nuevo = [...nuevo.filter(l => l.trim()), '- (vacío)'];
+      hechos.push(`➖ ${secciones[i].titulo}: ${c.texto}`);
+    } else {
+      const j = cuerpo.findIndex(contiene);
+      if (j < 0) {
+        fallidos.push(`«${c.texto}» no está en ${secciones[i].titulo}`);
+        continue;
+      }
+      const linea = /^\s*[-*]\s/.test(c.por || '') ? c.por! : `- ${c.por}`;
+      nuevo = cuerpo.map((l, k) => (k === j ? linea : l));
+      hechos.push(`✏️ ${secciones[i].titulo}: ${c.texto} → ${c.por}`);
+    }
+    fuera = reemplazarSeccion(fuera, i, [cabecera, ...nuevo].join('\n'));
+  }
+  return { doc: fuera, hechos, fallidos };
+}

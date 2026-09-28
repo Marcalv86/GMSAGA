@@ -146,6 +146,8 @@ import {
   sincronizarFichasConDocumentos,
   reflejarSecretosEnCuaderno,
   entradaAnteriorA,
+  aplicarCambiosDeDocumento,
+  type CambioDeDocumento,
   sembrarSeccionesVacias,
   totalDeEntradas
 } from './utils/documentosVivos';
@@ -2102,6 +2104,7 @@ export default function App() {
     plan?: PlanLeido | null;
     corregirCronica?: string | null;
     rehacerUltimoTurno?: string | null;
+    documentos?: CambioDeDocumento[];
   }): Promise<string[]> => {
     /*
      * Las etiquetas de búsqueda viven en los archivos, no en el proyecto, así
@@ -2164,6 +2167,47 @@ export default function App() {
      * que arrastra siempre: la cuenta de hitos vuelve a cero al subir y el
      * progreso se recalcula.
      */
+    /*
+     * ✏️ LOS DOCUMENTOS VIVOS, CORREGIDOS DESDE LA MESA. Sin IA y con versión
+     * anterior para deshacer; lo que no casa se dice, no se calla.
+     */
+    if (orden.documentos?.length) {
+      const aplicar = (docs: NonNullable<NonNullable<Project['memory']>['documentos_vivos']>) => {
+        const cambios: Partial<Record<'cuaderno' | 'ficha', string>> = {};
+        const hechos: string[] = [];
+        const fallidos: string[] = [];
+        for (const cual of ['cuaderno', 'ficha'] as const) {
+          const suyos = orden.documentos!.filter(c => c.cual === cual);
+          if (!suyos.length) continue;
+          const r = aplicarCambiosDeDocumento(docs[cual], suyos);
+          hechos.push(...r.hechos.map(h => `${cual === 'ficha' ? '🎒' : '🕯️'} ${h}`));
+          fallidos.push(...r.fallidos);
+          if (r.doc !== docs[cual]) cambios[cual] = r.doc;
+        }
+        return { cambios, hechos, fallidos };
+      };
+      const actuales = projectsRef.current.find(pr => pr.id === currentPIdRef.current)?.memory?.documentos_vivos;
+      if (!actuales) {
+        aplicado.push('⚠️ No entró: esta campaña todavía no tiene documentos vivos');
+      } else {
+        const { hechos, fallidos } = aplicar(actuales);
+        await handleUpdateProjectField(prev => {
+          const docs = prev.memory?.documentos_vivos;
+          if (!docs) return {};
+          const { cambios } = aplicar(docs);
+          if (!Object.keys(cambios).length) return {};
+          return {
+            memory: sincronizarFichasConDocumentos({
+              ...(prev.memory as any),
+              documentos_vivos: reescribirDocumentos(docs, cambios, 'Corrección desde la Mesa')
+            })
+          };
+        });
+        aplicado.push(...hechos);
+        if (fallidos.length) aplicado.push(`⚠️ No entró: ${fallidos.join(' · ')}`);
+      }
+    }
+
     if (orden.nivel && (orden.nivel.nivelAlcanzado || orden.nivel.hitos !== undefined)) {
       await handleUpdateProjectField(prev => ({ memory: conAvanceDeNivel(prev.memory, orden.nivel!) }));
       aplicado.push(
@@ -2265,7 +2309,8 @@ export default function App() {
       Boolean(orden.puentes?.length) ||
       Boolean(orden.viaje) ||
       Boolean(orden.corregirCronica) ||
-      Boolean(orden.rehacerUltimoTurno);
+      Boolean(orden.rehacerUltimoTurno) ||
+      Boolean(orden.documentos?.length);
     if (!hayAlgo) return aplicado;
 
     await handleUpdateProjectField(p => {
