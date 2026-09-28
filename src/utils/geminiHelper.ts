@@ -21,7 +21,7 @@ import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, Inventor
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { quitarEtiquetasInternas } from './etiquetasInternas';
 import { ampliarConPuentes, buscar, construirIndice } from './localSearch';
-import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './defaultDirectives';
+import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE, protocolosSegunMemoria } from './defaultDirectives';
 import {
   apuntarPeticion,
   cupoDiarioAgotado,
@@ -3862,7 +3862,7 @@ ${diseaseConfig.customRules ? `\n- **Reglas de Enfermedad, Contagio y Estrés:**
 - El motivo de esta mesa es que los dados se vean. Resolver por tu cuenta, aunque el resultado sea justo, rompe justamente lo que se quería arreglar.
 ` : '';
 
-  const bloqueEstable = `${CORE_INTERFACE_PROTOCOLS}
+  const bloqueEstable = `${protocolosSegunMemoria(Boolean(docsVivos))}
 
 ### INSTRUCCIONES DE CAMPAÑA (IDENTIDAD Y DIRECTIVAS MAESTRAS DEL NARRADOR)
 ${activeInstructions}
@@ -6890,6 +6890,7 @@ REGLAS PARA «cuaderno» y «ficha» (los dos se REESCRIBEN ENTEROS):
 2. Parte del documento actual y aplica solo lo que lo jugado cambia. Lo que no se ha tocado se copia tal cual: **no se pierde nada por el camino**.
 3. ⛔ Cero invención. Solo entra lo que lo jugado narra o lo que ya estaba escrito. Una captura, una requisa, una herida o una pérdida solo existen si hay una escena que las cuente de forma explícita: palabras sueltas como «presa» o «atada» no son una captura.
 4. Las etiquetas entre corchetes que aparezcan en lo jugado ([INVENTARIO: …], [RELOJ: …], [VÍNCULO: …], [BAMBALINAS: …], etc.) son datos válidos: aplícalas.
+   ⭐ Las notas «[CUADERNO: …]» son lo que el Director decidió en secreto durante la partida (planes de salida, desenlaces de encargos, qué hace alguien fuera de cámara, hitos). Mandan: pásalas a la sección que les toque, sin perder nada.
 5. El cuaderno guarda ESTADO, no crónica: lo que se ha cerrado se borra (su historia queda en la bitácora). Si deja una consecuencia que sigue pesando (una deuda, una promesa, un enemigo), queda en UNA línea en «Consecuencias vivas».
 
 CUADERNO — además (si una sección tiene otro nombre en el documento actual, aplícalo a su equivalente):

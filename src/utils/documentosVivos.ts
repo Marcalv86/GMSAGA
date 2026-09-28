@@ -406,6 +406,7 @@ export function bloqueDocumentosParaNarrador(docs: DocumentosVivos): string {
 ### 📚 DOCUMENTOS VIVOS DE LA CAMPAÑA — mandan sobre tu memoria
 Son el estado de la partida **al último volcado**. Lo que se haya jugado después está en este chat, y **lo del chat manda** si se contradicen: el documento se pone al día al cerrar el capítulo.
 - ⛔ Estos documentos NO los actualizas tú desde el chat: **no emitas** \`[INVENTARIO:]\`, \`[VÍNCULO:]\`, \`[MISIÓN:]\`, \`[PLAN:]\`, \`[BAMBALINAS:]\`, \`[RELOJ:]\`, \`[FACCIÓN:]\` ni \`[PREPARADO:]\`. Lleva lo que cambie en la cabeza; se vuelca de una sentada al cerrar el capítulo, y de ahí salen también las fichas de PNJs, lugares y tramas.
+- 🕯️ Lo que decidas en secreto y deba sobrevivir al cierre (el plan de salida de un PNJ, el desenlace de un encargo, qué hace alguien fuera de cámara, un hito) déjalo en una nota \`[CUADERNO: …]\` al final del turno: ella no la ve y el volcado la coloca en su sección. Lo que no esté escrito en el chat, se pierde al cerrar.
 - ✅ Consúltalos antes de afirmar un dato concreto: si no está aquí, ni en su ficha, ni en los documentos del proyecto, ni en este chat, no lo inventes.
 
 #### 🕯️ CUADERNO DEL GM (⛔ ella NO lo lee: no lo narres, no lo insinúes, no lo cuentes sin una vía jugada)

@@ -298,3 +298,75 @@ export const GRIMDARK_SURVIVAL_DISEASE_RULES = `Supervivencia Grimdark / Realist
 - Las heridas abiertas no vendadas o caídas a <25% PG pueden infectarse si no se tratan con antisépticos o magia (Salvación Con CD 13).
 - Las enfermedades reducen la regeneración de PG en descansos y provocan temblores, náuseas o fiebre (desventaja en características específicas).
 - El clima extremo, hipotermia o inanición provocan fatiga acumulativa severa cada jornada.`;
+
+// ============================================================================
+// 3. PROTOCOLOS CON DOCUMENTOS VIVOS
+// ============================================================================
+
+/*
+ * 📚 Con documentos vivos, la mochila, los vínculos, los hilos, los lugares y el
+ * avance ya no se apuntan con etiquetas turno a turno: los escribe el volcado
+ * al cerrar capítulo. Pedirle al Narrador que emita esas etiquetas en cada
+ * turno era contradecirle y gastar texto en balde, así que aquí se sustituyen
+ * esos apartados por lo que de verdad vale ahora: la nota [CUADERNO: …].
+ */
+const reemplazarEntre = (texto: string, desde: string, hasta: string, nuevo: string): string => {
+  const a = texto.indexOf(desde);
+  // Sin marcador de fin, se sustituye hasta el final del texto.
+  const b = a < 0 ? -1 : hasta ? texto.indexOf(hasta, a + desde.length) : texto.length;
+  return a >= 0 && b > a ? texto.slice(0, a) + nuevo + texto.slice(b) : texto;
+};
+
+const NOTA_CUADERNO =
+  '- **Notas del Cuaderno**: `[CUADERNO: lo que decidiste, en una o dos frases]` al final del turno. Es lo único que el volcado de cierre sabe de lo que decides en secreto: planes de salida de PNJs, desenlaces de encargos, qué hace alguien fuera de cámara, órdenes dadas, hitos que cuentan para el avance, idiomas o datos nuevos de un PNJ o un lugar. La jugadora no la ve. Úsala para decisiones de verdad, no para resumir la escena.\n';
+
+export const CORE_INTERFACE_PROTOCOLS_DOCUMENTOS = (() => {
+  let t = CORE_INTERFACE_PROTOCOLS;
+  t = reemplazarEntre(
+    t,
+    '#### D. Sistema de Afinidad',
+    '#### E.',
+    '#### D. Afinidad de PNJs (ATR / VÍN / CON)\n' +
+      '- Los ejes de cada PNJ (de 0 a 10) están en «Vínculos» del Cuaderno del GM, que recibes en cada turno, y de ahí salen las barras de su ficha. **No emitas `[VÍNCULO: …]`**: si una relación cambia de verdad, que se vea en la escena; el volcado de cierre lo anota. Si el cambio no se ve en la prosa (lo que un PNJ piensa y calla), déjalo en una nota `[CUADERNO: …]`.\n\n'
+  );
+  t = reemplazarEntre(
+    t,
+    '#### E. Inventario y Dinero',
+    '#### F.',
+    '#### E. Inventario y Dinero\n' +
+      '- Lo que lleva, dónde está cada cosa, lo requisado y el dinero están en la **Ficha viva**, que recibes en cada turno. **No emitas `[INVENTARIO: …]`**: narra con claridad qué gana, gasta, pierde o le quitan, quién se lo queda y dónde acaba; el volcado de cierre lo pasa a la Ficha viva. Sin escena que lo cuente, no hay cambio.\n\n'
+  );
+  t = reemplazarEntre(
+    t,
+    '#### H. Hilos, Lugares y Registros Ocultos',
+    '#### I.',
+    '#### H. Hilos, Lugares y Registros Ocultos\n' +
+      NOTA_CUADERNO +
+      '- **Secretos y Giros**: `[SECRETO: título | la verdad | se descubre: ...]` para plantar un giro con candado que aún no ha pasado.\n' +
+      '- **Revelaciones**: `[REVELADO: Nombre del secreto — cómo se ha sabido]` (cuando el secreto sale a la luz en la escena).\n\n'
+  );
+  t = reemplazarEntre(
+    t,
+    '#### I. Progreso y Nivel',
+    '#### J.',
+    '#### I. Progreso y Nivel\n' +
+      '- El avance (`[Avance: X/Y]`) y el nivel los escribe la Bitácora y la Ficha viva al cerrar capítulo. Cuando ocurra un hito, déjalo en `[CUADERNO: hito — …]`; si sube de nivel, anúncialo en la escena y en `[CUADERNO: sube a nivel N]`.\n\n'
+  );
+  t = reemplazarEntre(
+    t,
+    '16. **Rigor Causal del Cuaderno Secreto del GM',
+    '',
+    '16. **Rigor Causal del Cuaderno Secreto del GM (Órdenes Concretas y Continuidad)**:\n' +
+      '    - **Lo que pasa fuera de cámara vive en el Cuaderno** («Relojes y fuera de cámara»). Úsalo: los PNJs actúan en cumplimiento de las órdenes que constan ahí (los centinelas impiden el paso, los correos salen, las pesquisas avanzan) y se nota por fuera, no en explicaciones.\n' +
+      '    - **Lo que decidas tú fuera de cámara durante la partida** —quién hace qué, por qué y con qué órdenes a quién— va en una nota `[CUADERNO: …]` con sustancia concreta, nada de «sigue investigando». No emitas `[BAMBALINAS:]`, `[RELOJ:]`, `[FACCIÓN:]` ni `[PREPARADO:]`: el volcado de cierre pone el Cuaderno al día.\n'
+  );
+  t = t.replace(
+    '(`[VÍNCULO: ...]`, `[ESTADO: ...]`, `[INVENTARIO: ...]`, etc.)',
+    '(`[ESTADO: ...]`, `[TIEMPO: ...]`, `[CUADERNO: ...]`, etc.)'
+  );
+  return t;
+})();
+
+/** Los protocolos que viajan en cada turno, según haya documentos vivos o no. */
+export const protocolosSegunMemoria = (conDocumentos: boolean): string =>
+  conDocumentos ? CORE_INTERFACE_PROTOCOLS_DOCUMENTOS : CORE_INTERFACE_PROTOCOLS;
