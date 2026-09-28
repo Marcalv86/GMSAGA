@@ -459,94 +459,6 @@ export function detectarDevolucionesEnTexto(
 }
 
 /**
- * Detecta si el texto de la narración describe la requisa, desarme, captura o confinamiento
- * de pertenencias del personaje (ej. apresamiento por corsarios, guardias, piratas, etc.).
- *
- * REGLAS INVIOLABLES DE CONFISCACIÓN A PRISIONEROS:
- * 1. «¿Puede usarlo de arma, para golpear, forzar cerraduras o escapar? -> SÍ -> SE LE QUITA.»
- *    ¡TODO PUEDE SER UN ARMA, HASTA UN ALFILER! (Escudos, trampas de caza, armas, sogas, ganzúas, herramientas).
- * 2. «¿Puede servirnos para obtener información sobre el preso, saber si es un espía, descubrir sus secretos o contactos? -> SÍ -> SE LE QUITA.»
- *    (Diarios, cuadernos, cartas, notas, mapas, pergaminos, libros, sellos, reliquias).
- *
- * Ningún captor deja estos objetos a un preso. SOLO se le deja puesta su ropa básica modesta/común para no desnudarla.
- */
-export function detectarRequisasEnTexto(
-  texto: string,
-  candidatos: InventoryItem[]
-): { nombre: string; cantidad: number; enPoderDe?: string; dondeEsta?: string }[] {
-  if (!texto || candidatos.length === 0) return [];
-  const incautadas: { nombre: string; cantidad: number; enPoderDe?: string; dondeEsta?: string }[] = [];
-
-  // Detección de captor en el texto
-  let captor = 'Bregan D\'aerthe';
-  if (/\b(?:jarlaxle)\b/i.test(texto)) captor = 'Jarlaxle';
-  else if (/\b(?:dab'nay|dabnay)\b/i.test(texto)) captor = "Dab'nay";
-  else if (/\b(?:braelin)\b/i.test(texto)) captor = 'Braelin';
-  else if (/\b(?:valas)\b/i.test(texto)) captor = 'Valas';
-  else if (/\b(?:kimmuriel)\b/i.test(texto)) captor = 'Kimmuriel';
-  else if (/\b(?:corsarios?|tripulaci[oó]n|drows?)\b/i.test(texto)) captor = 'Tripulación corsaria';
-  else if (/\b(?:guardias?|soldados?|carceleros?|alguacil)\b/i.test(texto)) captor = 'Guardia';
-
-  let ubicacion = 'pañol del navío';
-  if (/\b(?:camarote)\b/i.test(texto)) ubicacion = 'camarote de Jarlaxle';
-  else if (/\b(?:bodega|sentina)\b/i.test(texto)) ubicacion = 'bodega del navío';
-  else if (/\b(?:calabozo|celda|prisi[oó]n)\b/i.test(texto)) ubicacion = 'pañol de requisas';
-
-  // Patrón amplio de captura, apresamiento, desarme, retención, despojo o confinamiento
-  const patronRequisaGlobal =
-    /(?:te\s+(?:requisan|confiscan|despojan|quitan|retiran|desarman|registran)|desarmad[ao]|cautiv[ao]|prisioner[ao]|pres[ao]|apresad[ao]|capturad[ao]|detenid[ao]|encerrad[ao]|confinad[ao]|maniatad[ao]|encadenad[ao]|atad[ao]|arrojad[ao]\s+a\s+la\s+sentina|confinad[ao]\s+en\s+el\s+calabozo|grilletes|esposas|registran\s+tu\s+(?:equipaje|mochila|petate|ropaje)|privad[ao]\s+de\s+(?:su|tu)\s+equipo|bajo\s+custodia\s+de\s+(?:los\s+corsarios|bregan|d'aerthe|jarlaxle|la\s+guardia|los\s+drows)|en\s+calidad\s+de\s+(?:presa|preso|cautiva|cautivo|prisionera|prisionero))/i;
-
-  if (patronRequisaGlobal.test(texto)) {
-    // En requisa global o captura, confiscan TODO lo que pueda ser un arma, servir para escapar,
-    // golpear, forzar cerraduras, contener venenos o tener valor.
-    // Solo se permite conservar ropa básica inofensiva (no armaduras, no cueros endurecidos).
-    for (const c of candidatos) {
-      if (esRequisado(c)) continue;
-      const nom = (c.name || '').toLowerCase();
-      
-      // Ropa básica inocua: ropas sencillas / comunes / de viaje sin blindaje ni armas
-      const esRopaBasicaInocua =
-        /^(?:ropa\s+(?:com[uú]n|de\s+viaje|modesta|sencilla|humilde)|ropajes?\s+comunes?|vestid[oa]\s+(?:sencill[oa]|modest[oa]|com[uú]n)|t[uú]nica\s+(?:sencilla|modesta|com[uú]n|de\s+lino)|harapos|camisa|pantal[oó]n|calzas|falda)$/i.test(nom.trim()) &&
-        !/(?:armadura|cuero|malla|placas|metal|ocult|arma|pu[ñn]al|daga|acero|reforzad)/i.test(nom);
-
-      if (!esRopaBasicaInocua) {
-        const esEscrito = /\b(?:diario|almanaque|cuaderno|libro|tomo|bit[aá]cora|pergamino|mapa|escrito)\b/i.test(nom);
-        incautadas.push({
-          nombre: c.name,
-          cantidad: c.quantity || 1,
-          enPoderDe: esEscrito ? (captor === 'Guardia' ? 'Guardia' : 'Jarlaxle') : captor,
-          dondeEsta: esEscrito ? (captor === 'Guardia' ? 'sala de guardia' : 'camarote de Jarlaxle') : ubicacion
-        });
-      }
-    }
-  }
-
-  // Detección por mención específica de retención o requisa en la escena
-  for (const c of candidatos) {
-    if (esRequisado(c) || incautadas.some(inc => sonElMismoObjeto(inc.nombre, c.name))) continue;
-    const palabras = normalizarNombreObjeto(c.name).split(' ').filter(w => w.length >= 4);
-    if (palabras.length === 0) continue;
-    const palabraClave = palabras[0];
-    const regexIncautado = new RegExp(
-      `(?:(?:confisc|requisa|arrebata|retiene|custodia|apoder|arrebatad|incautad|retirad)[\\wáéíóúñ]*\\s+(?:el|la|los|las|tu|tus)?\\s*(?:[\\wáéíóúñ]+\\s+){0,3}${palabraClave}|${palabraClave}\\s+(?:requirad[oa]|confiscad[oa]|incautad[oa]|retenid[oa]|en\\s+(?:su|el)\\s+camarote|en\\s+manos\\s+de|sobre\\s+el\\s+escritorio))`,
-      'i'
-    );
-    if (regexIncautado.test(texto)) {
-      const nom = (c.name || '').toLowerCase();
-      const esEscrito = /\b(?:diario|almanaque|cuaderno|libro|tomo|bit[aá]cora|pergamino|mapa|escrito)\b/i.test(nom);
-      incautadas.push({
-        nombre: c.name,
-        cantidad: c.quantity || 1,
-        enPoderDe: esEscrito ? (captor === 'Guardia' ? 'Guardia' : 'Jarlaxle') : captor,
-        dondeEsta: esEscrito ? (captor === 'Guardia' ? 'sala de guardia' : 'camarote de Jarlaxle') : ubicacion
-      });
-    }
-  }
-
-  return incautadas;
-}
-
-/**
  * Aplica un cambio leído sobre la mochila que ya había.
  *
  * Sumar y restar, sin sorpresas: lo que ya estaba conserva todo lo suyo —si era
@@ -778,22 +690,6 @@ export function reconstruirInventario(
             cantidad: d.cantidad || 1,
             equipped: d.equipped,
             detalles: d.detalles
-          });
-        }
-      }
-    }
-
-    // Detección de requisa, desarme o confiscación en el texto narrativo
-    const candidatosRequisa = [...inventario, ...aMano].filter(i => !i.enPoderDe && !i.eliminado);
-    if (candidatosRequisa.length > 0) {
-      const incautadasNarrativas = detectarRequisasEnTexto(m.content, candidatosRequisa);
-      for (const inc of incautadasNarrativas) {
-        if (!cambio.incautadas.some(ci => sonElMismoObjeto(ci.nombre, inc.nombre))) {
-          cambio.incautadas.push({
-            nombre: inc.nombre,
-            cantidad: inc.cantidad,
-            enPoderDe: inc.enPoderDe,
-            dondeEsta: inc.dondeEsta
           });
         }
       }

@@ -101,8 +101,8 @@ export function quitarEtiquetasInternas(texto: string): string {
   for (const re of EXPRESIONES) limpio = limpio.replace(re, '');
   // Limpieza adicional de directivas o etiquetas auxiliares con corchetes
   limpio = limpio
-    .replace(/(?:\*\*|__|_|\*|\x60)?\[\s*ESTO SE JUEGA[^\\]]*\](?:\*\*|__|_|\*|\x60)?/gi, '')
-    .replace(/(?:\*\*|__|_|\*|\x60)?\[\s*DURACI[OÓ]N EXACTA[^\\]]*\](?:\*\*|__|_|\*|\x60)?/gi, '')
-    .replace(/(?:\*\*|__|_|\*|\x60)?\[\s*TRANSICI[OÓ]N[^\\]]*\](?:\*\*|__|_|\*|\x60)?/gi, '');
+    .replace(/(?:\*\*|__|_|\*|\x60)?\[\s*ESTO SE JUEGA[^\]]*\](?:\*\*|__|_|\*|\x60)?/gi, '')
+    .replace(/(?:\*\*|__|_|\*|\x60)?\[\s*DURACI[OÓ]N EXACTA[^\]]*\](?:\*\*|__|_|\*|\x60)?/gi, '')
+    .replace(/(?:\*\*|__|_|\*|\x60)?\[\s*TRANSICI[OÓ]N[^\]]*\](?:\*\*|__|_|\*|\x60)?/gi, '');
   return limpio;
 }

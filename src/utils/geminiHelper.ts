@@ -6869,6 +6869,7 @@ PO: ${currentCurrencies.gp || 0}, PP: ${currentCurrencies.pp || 0}, PA: ${curren
 
 INSTRUCCIONES DE AUDITORÍA CRUCIALES:
 1. SI LA PROTAGONISTA FUE CAPTURADA, APRESADA, DESARMADA O ENCERRADA (ej: corsarios drows de Bregan D'aerthe, Jarlaxle, guardias, piratas):
+   - ⛔ SOLO si el historial NARRA esa captura de forma explícita. No la des por hecha por el trasfondo, el arranque previsto ni por palabras sueltas («presa», «atada»): sin escena de captura, nada se marca como requisado.
    - ¡REGLAS INVIOLABLES DE CONFISCACIÓN A PRISIONEROS:
      1. «¿Puede usarlo de arma, para golpear, envenenar, forzar cerraduras o escaparse? -> SÍ -> SE LE QUITA TODO» (¡Todo puede ser un arma, hasta un alfiler! Escudos, trampas de caza, armas, ganzúas, sogas, pociones).
      2. «¿Puede servirnos para obtener información sobre el preso, saber si es un espía, etc.? -> SÍ -> SE LE QUITA TODO Y SE INTENTA LEER/EXAMINAR» (Diarios íntimos, libros, cartas, notas, mapas, pergaminos, sellos, relicarios). Los captores intentan activamente leerlos para indagar quién es; se evalúa orgánicamente si lo logran o si topan con idiomas desconocidos, sellos mágicos o cifrados.
@@ -6877,7 +6878,6 @@ INSTRUCCIONES DE AUDITORÍA CRUCIALES:
      * "enPoderDe": quién lo tiene (ej: "Jarlaxle", "Bregan D'aerthe", "la tripulación", "la guardia", etc.)
      * "dondeEsta": dónde está (ej: "camarote de Jarlaxle", "pañol del navío", "bodega", etc.)
      * "equipped": false
-   - El diario personal de viaje/almanaque de peregrina, instrumentos musicales, armas, escudos, trampas de caza, ganzúas, herramientas y morrales fueron confiscados durante el apresamiento.
    - Solo queda en sus manos (sin "enPoderDe") su ropa básica modesta puesta (sin armaduras metálicas) o lo que haya conseguido ocultar o recuperar después.
 2. DEVOLUCIONES Y RECUPERACIÓN:
    - Si en el texto se describe que un PNJ le devuelve algo o que ella lo roba o recupera de vuelta, elimina "enPoderDe" y "dondeEsta" para que vuelva a estar en sus manos.
