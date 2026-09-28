@@ -2490,7 +2490,9 @@ ${project.memory.memory_edits.map((e, idx) => `${idx + 1}. ${e.text}`).join('\n'
    * initialization» en cuanto se ejecuta, y `tsc` no lo ve. Ya ha pasado dos
    * veces en este archivo. No cuesta nada leerlo otra vez.
    */
-  const relojesDePersona = relojesEnMarcha(project.memory?.gm_relojes).filter(r => r.sobre);
+  // Con documentos vivos los relojes viven en el Cuaderno: la lista vieja ya no se
+  // actualiza y colgar sus relojes de las fichas sería dar datos caducados.
+  const relojesDePersona = docsVivos ? [] : relojesEnMarcha(project.memory?.gm_relojes).filter(r => r.sobre);
   // Se lee del almacén del propio proyecto: el modo es de esta campaña.
   const coNarrativa = getStoredCoNarrativa(project.id);
   /*
@@ -3246,7 +3248,7 @@ ${lista
 ${marcoTemporalBlock}
 ${rawProjectMemBlock}
 ${userDirectivesBlock}
-${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones ? `${dosierMisiones}\n` : ''}${docsVivos ? `${bloqueDocumentosParaNarrador(docsVivos)}\n` : `${bloqueMochila ? `${bloqueMochila}\n` : ''}`}${bloqueAprendido ? `${bloqueAprendido}\n` : ''}${!docsVivos && bloqueCuaderno ? `${bloqueCuaderno}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueCoNarrativa ? `${bloqueCoNarrativa}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
+${dosierPnjs ? `${dosierPnjs}\n` : ''}${dosierLugares ? `${dosierLugares}\n` : ''}${dosierMisiones && !docsVivos ? `${dosierMisiones}\n` : ''}${docsVivos ? `${bloqueDocumentosParaNarrador(docsVivos)}\n` : `${bloqueMochila ? `${bloqueMochila}\n` : ''}`}${bloqueAprendido ? `${bloqueAprendido}\n` : ''}${!docsVivos && bloqueCuaderno ? `${bloqueCuaderno}\n` : ''}${bloqueMesa ? `${bloqueMesa}\n` : ''}${bloqueViaje ? `${bloqueViaje}\n` : ''}${bloqueCoNarrativa ? `${bloqueCoNarrativa}\n` : ''}${bloqueSecretos ? `${bloqueSecretos}\n` : ''}
 ${
   allPreviousHistory.length > 0
     ? `### 📖 EL PASADO DE ESTA AVENTURA (capítulos ya cerrados)

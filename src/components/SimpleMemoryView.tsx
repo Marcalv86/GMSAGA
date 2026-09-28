@@ -174,6 +174,17 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
 
     const updatedEdits = [...(memory.memory_edits || []), newEdit];
     setDirectiveInput('');
+    /*
+     * Con documentos vivos la memoria general ya no la lee el Narrador: la
+     * directiva se guarda (esa sí viaja en cada turno) y no se gasta una
+     * llamada en reescribir un texto que nadie usa.
+     */
+    if (conDocumentos) {
+      await onUpdateMemory(prev => ({ ...prev, memory_edits: updatedEdits }));
+      setIsSavedRecently(true);
+      setTimeout(() => setIsSavedRecently(false), 2000);
+      return;
+    }
     setIsLocalUpdating(true);
 
     try {
@@ -693,6 +704,13 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                   </div>
                 </div>
 
+                {conDocumentos && (
+                  <div className="mx-3 sm:mx-6 mt-3 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 text-[11px] sm:text-xs text-[var(--text-secondary)] leading-relaxed">
+                    📚 <strong className="text-[var(--accent)] font-cinzel">Con documentos vivos, este texto ya no lo lee el Narrador.</strong>{' '}
+                    Su contenido pasó al «Estado general» del Cuaderno, que se pone al día al cerrar capítulo. Las{' '}
+                    <strong className="text-[var(--text-primary)]">Directivas</strong> sí siguen viajando en cada turno.
+                  </div>
+                )}
                 {/* Scrollable Document or Empty State */}
                 {isMemoryEmpty ? (
                   <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col items-center justify-center text-center space-y-4">

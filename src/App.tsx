@@ -2534,7 +2534,18 @@ export default function App() {
     }
 
     try {
-      let resumen: string | undefined = options?.resumen?.trim() || undefined;
+      /*
+       * Con documentos vivos, el resumen del capítulo ya está escrito: son sus
+       * entradas de la Bitácora. No hace falta pedir otro a la IA.
+       */
+      const conDocs = hayDocumentosVivos(currentProject.memory);
+      const deLaBitacora = conDocs
+        ? (currentProject.memory?.documentos_vivos?.bitacora || [])
+            .filter(b => b.chatId === chat.id)
+            .map(b => (b.parte ? `### Parte ${b.parte}\n\n${b.texto}` : b.texto))
+            .join('\n\n')
+        : '';
+      let resumen: string | undefined = options?.resumen?.trim() || deLaBitacora.trim() || undefined;
       if (!resumen && !options?.sinIA && hasConfiguredApiKey() && mensajesValidos.length >= 2) {
         try {
           resumen = await consolidarCronicaAlCerrarCapitulo({
@@ -2568,7 +2579,7 @@ export default function App() {
       saveLocalChats(currentPId, updatedChats);
 
       // Cierre de capítulo como hito narrativo clave: actualización de memoria persistente en segundo plano
-      if (!options?.sinIA && getStoredAutoBackgroundTasks() && currentProject && hasConfiguredApiKey()) {
+      if (!options?.sinIA && !conDocs && getStoredAutoBackgroundTasks() && currentProject && hasConfiguredApiKey()) {
         setTimeout(async () => {
           try {
             const rawMem = await generateClaudeProjectMemory({
@@ -3101,6 +3112,8 @@ export default function App() {
     options?: { forzar?: boolean }
   ): Promise<{ facciones: number; preparado: number; relojes: number } | null> => {
     if (!proyecto) return null;
+    // Con documentos vivos, el tablero (facciones, relojes, cartas) es el Cuaderno: nada que montar.
+    if (hayDocumentosVivos(proyecto.memory)) return null;
     if (!options?.forzar && !getStoredAutoBackgroundTasks()) return null;
 
     const esTexto = (f: ProjectFile) => !f.isImage && !f.isAudio && f.category !== 'style_sample';
@@ -3720,10 +3733,17 @@ export default function App() {
           currentFiles.some(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 200) ||
           effectiveChats.some(c => (c.messages || []).length >= 1);
 
-        if (
-          getStoredAutoBackgroundTasks() &&
-          (needsInitialSync || needsDailySync || needsMilestoneSync)
-        ) {
+        /*
+         * 📚 Con documentos vivos, esto se hace UNA vez al empezar: el estudio
+         * de arranque (calendario, fecha y lugar de inicio) solo rellena lo que
+         * falte, y la memoria general ya no la lee nadie. Después, el estado lo
+         * llevan los documentos al cerrar capítulo.
+         */
+        const conDocsVivos = hayDocumentosVivos(currentProject.memory);
+        const tocaRepaso = conDocsVivos
+          ? !currentProject.lastMemoryUpdate
+          : needsInitialSync || needsDailySync || needsMilestoneSync;
+        if (getStoredAutoBackgroundTasks() && tocaRepaso) {
           setTimeout(async () => {
             try {
               // 1. Estudio ágil de documentos, contexto y arranque de campaña:
@@ -3757,7 +3777,11 @@ export default function App() {
                 });
               }
 
-              // 2. Síntesis narrativa de memoria general
+              // 2. Síntesis narrativa de memoria general (no con documentos vivos)
+              if (conDocsVivos) {
+                await handleUpdateProjectField(() => ({ lastMemoryUpdate: Date.now(), lastMemoryMessageCount: totalMensajes }));
+                return;
+              }
               const newRawMem = await generateClaudeProjectMemory({
                 project: currentProject,
                 chats: effectiveChats,
@@ -3823,7 +3847,8 @@ export default function App() {
                * y el día cero no hay nada en marcha.
                */
               let tablero: { facciones: any[]; preparado: any[] } = { facciones: [], preparado: [] };
-              if (!(currentProject.memory?.gm_facciones || []).length) {
+              // Con documentos vivos, facciones y cartas viven en el Cuaderno: no se leen aparte.
+              if (!(currentProject.memory?.gm_facciones || []).length && !hayDocumentosVivos(currentProject.memory)) {
                 try {
                   tablero = await leerElTableroDeDocumentos({ project: currentProject, files: currentFiles });
                 } catch (err) {
