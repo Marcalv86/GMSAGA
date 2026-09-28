@@ -743,3 +743,42 @@ export function sincronizarFichasConDocumentos(mem: Memory): Memory {
 
   return { ...mem, npcs, locations, quests, player_character };
 }
+
+// ---------------------------------------------------------------- pestañas por sección
+
+export interface BloqueDeSeccion {
+  /** El título tal como está, sin el número de delante. */
+  titulo: string;
+  /** El bloque entero, desde su «## …» hasta justo antes del siguiente. */
+  bloque: string;
+  /** Cuántas entradas tiene (sin contar los «(vacío)»). */
+  entradas: number;
+}
+
+/** Parte un documento en lo que va antes del primer «## » y un bloque por sección. */
+export function partirEnSecciones(doc: string): { preambulo: string; secciones: BloqueDeSeccion[] } {
+  const lineas = (doc || '').split('\n');
+  const preambulo: string[] = [];
+  const secciones: { titulo: string; lineas: string[] }[] = [];
+  for (const l of lineas) {
+    const h = l.match(/^##\s+(.+?)\s*$/);
+    if (h) secciones.push({ titulo: h[1].replace(/^\d+[.)]\s*/, '').trim(), lineas: [l] });
+    else if (secciones.length) secciones[secciones.length - 1].lineas.push(l);
+    else preambulo.push(l);
+  }
+  return {
+    preambulo: preambulo.join('\n'),
+    secciones: secciones.map(s => {
+      const bloque = s.lineas.join('\n').replace(/\s+$/, '');
+      return { titulo: s.titulo, bloque, entradas: Object.values(contarEntradas(bloque))[0] || 0 };
+    })
+  };
+}
+
+/** Sustituye el bloque de la sección `i` y devuelve el documento entero. */
+export function reemplazarSeccion(doc: string, i: number, bloqueNuevo: string): string {
+  const { preambulo, secciones } = partirEnSecciones(doc);
+  if (i < 0 || i >= secciones.length) return doc;
+  const bloques = secciones.map((s, j) => (j === i ? bloqueNuevo.replace(/\s+$/, '') : s.bloque));
+  return [preambulo.replace(/\s+$/, ''), ...bloques].filter(Boolean).join('\n\n') + '\n';
+}

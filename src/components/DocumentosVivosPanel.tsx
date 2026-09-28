@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChevronDown, ChevronRight, Pencil, Save, Undo2, X } from 'lucide-react';
 import type { DocumentosVivos } from '../types';
+import { partirEnSecciones, reemplazarSeccion } from '../utils/documentosVivos';
 
 /*
  * 📚 La vista de los documentos vivos.
@@ -25,10 +26,22 @@ const Documento: React.FC<{
   const [editando, setEditando] = useState(false);
   const [borrador, setBorrador] = useState(texto);
   const [confirmarDeshacer, setConfirmarDeshacer] = useState(false);
+  /*
+   * Una pestaña por sección («## …»), más «Todo». Se lee y se edita la
+   * sección elegida; al guardar se vuelve a coser en el documento entero.
+   */
+  const { secciones } = partirEnSecciones(texto);
+  const [pestana, setPestana] = useState<number>(-1);
+  const elegida = pestana >= 0 && pestana < secciones.length ? pestana : -1;
+  const visible = elegida >= 0 ? secciones[elegida].bloque : texto;
 
   const empezar = () => {
-    setBorrador(texto);
+    setBorrador(visible);
     setEditando(true);
+  };
+  const guardar = async () => {
+    await onGuardar(elegida >= 0 ? reemplazarSeccion(texto, elegida, borrador) : borrador);
+    setEditando(false);
   };
 
   return (
@@ -70,10 +83,7 @@ const Documento: React.FC<{
           {editando ? (
             <>
               <button
-                onClick={async () => {
-                  await onGuardar(borrador);
-                  setEditando(false);
-                }}
+                onClick={guardar}
                 className="min-h-[36px] px-2.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-cinzel font-bold flex items-center gap-1 cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
@@ -97,6 +107,35 @@ const Documento: React.FC<{
           )}
         </div>
       </header>
+      {secciones.length > 1 && (
+        <nav
+          className="flex gap-1.5 px-3 sm:px-4 py-2 overflow-x-auto no-scrollbar border-b border-[var(--glass-border)] bg-[var(--surface)]"
+          aria-label="Secciones"
+        >
+          {[{ titulo: 'Todo', entradas: -1 }, ...secciones].map((sec, i) => {
+            const idx = i - 1;
+            const activa = idx === elegida;
+            return (
+              <button
+                key={`${idx}-${sec.titulo}`}
+                onClick={() => {
+                  if (editando) return;
+                  setPestana(idx);
+                }}
+                disabled={editando && !activa}
+                className={`shrink-0 min-h-[32px] px-2.5 rounded-md text-[11px] font-cinzel font-bold whitespace-nowrap transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                  activa
+                    ? 'bg-[var(--accent)] text-[var(--on-accent)]'
+                    : 'text-[var(--text-secondary)] border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)]'
+                }`}
+              >
+                {sec.titulo}
+                {sec.entradas > 0 && <span className="ml-1 opacity-70">({sec.entradas})</span>}
+              </button>
+            );
+          })}
+        </nav>
+      )}
       {editando ? (
         <textarea
           value={borrador}
@@ -106,7 +145,7 @@ const Documento: React.FC<{
         />
       ) : (
         <div className="px-3 sm:px-5 py-3 markdown-body text-[var(--text-primary)] text-xs sm:text-sm leading-relaxed font-lora break-words">
-          <ReactMarkdown>{texto}</ReactMarkdown>
+          <ReactMarkdown>{visible}</ReactMarkdown>
         </div>
       )}
     </section>
@@ -186,7 +225,7 @@ export const DocumentosVivosPanel: React.FC<{
         )}
       </div>
       <Documento
-        key={`${cual}-${docs.actualizadoEl || 0}`}
+        key={cual}
         titulo={cual === 'ficha' ? '🎒 Ficha viva' : '🕯️ Cuaderno del GM'}
         texto={docs[cual]}
         versiones={versiones.length}
