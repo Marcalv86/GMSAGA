@@ -167,9 +167,22 @@ const Documento: React.FC<{
   );
 };
 
+/*
+ * 🏕️ Las entradas se agrupan en temporadas de diez capítulos: la última abierta
+ * y las anteriores plegadas, para que la Bitácora no se vuelva un pergamino
+ * interminable. Sin IA: es solo orden.
+ */
+const POR_TEMPORADA = 10;
+
 const Bitacora: React.FC<{ docs: DocumentosVivos }> = ({ docs }) => {
+  // Capítulos en orden de aparición (varias partes de un capítulo cuentan como uno).
+  const capitulos: string[] = [];
+  for (const e of docs.bitacora) if (!capitulos.includes(e.chatId)) capitulos.push(e.chatId);
+  const temporadaDe = (chatId: string) => Math.floor(capitulos.indexOf(chatId) / POR_TEMPORADA) + 1;
+  const ultimaTemporada = Math.max(1, temporadaDe(capitulos[capitulos.length - 1] || ''));
   const entradas = [...docs.bitacora].reverse();
   const [abierta, setAbierta] = useState<string | null>(entradas[0]?.id || null);
+  const [temporadas, setTemporadas] = useState<Set<number>>(new Set([ultimaTemporada]));
   if (!entradas.length) {
     return (
       <section className="rounded-xl border border-dashed border-[var(--glass-border)] px-4 py-3 text-xs text-[var(--text-secondary)]">
@@ -178,34 +191,77 @@ const Bitacora: React.FC<{ docs: DocumentosVivos }> = ({ docs }) => {
       </section>
     );
   }
+  const grupos: { n: number; entradas: typeof entradas }[] = [];
+  for (const e of entradas) {
+    const n = temporadaDe(e.chatId);
+    const g = grupos.find(x => x.n === n);
+    if (g) g.entradas.push(e);
+    else grupos.push({ n, entradas: [e] });
+  }
+  const conTemporadas = grupos.length > 1;
+  const alternar = (n: number) =>
+    setTemporadas(prev => {
+      const s = new Set(prev);
+      if (s.has(n)) s.delete(n);
+      else s.add(n);
+      return s;
+    });
+
+  const lista = (es: typeof entradas) => (
+    <ul className="m-0 p-0 list-none divide-y divide-[var(--glass-border)]">
+      {es.map(e => {
+        const abiertaEsta = abierta === e.id;
+        return (
+          <li key={e.id}>
+            <button
+              onClick={() => setAbierta(abiertaEsta ? null : e.id)}
+              className="w-full min-h-[44px] px-3 sm:px-4 py-2 flex items-center gap-2 text-left cursor-pointer hover:bg-[var(--glass)]"
+            >
+              {abiertaEsta ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
+              <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate">
+                {e.capitulo}
+                {e.parte ? ` · parte ${e.parte}` : ''}
+              </span>
+              <span className="ml-auto text-[10px] text-[var(--text-secondary)] shrink-0">{fechaCorta(e.fecha)}</span>
+            </button>
+            {abiertaEsta && <TarjetasDeBitacora texto={e.texto} />}
+          </li>
+        );
+      })}
+    </ul>
+  );
+
   return (
     <section className="rounded-xl border border-[var(--glass-border)] bg-[var(--surface)] shadow-xs overflow-hidden">
       <header className="px-3 sm:px-4 py-2 border-b border-[var(--glass-border)] bg-[var(--surface-soft)]">
         <h3 className="font-cinzel font-bold text-sm text-[var(--accent)] m-0">📖 Bitácora</h3>
       </header>
-      <ul className="m-0 p-0 list-none divide-y divide-[var(--glass-border)]">
-        {entradas.map(e => {
-          const abiertaEsta = abierta === e.id;
-          return (
-            <li key={e.id}>
-              <button
-                onClick={() => setAbierta(abiertaEsta ? null : e.id)}
-                className="w-full min-h-[44px] px-3 sm:px-4 py-2 flex items-center gap-2 text-left cursor-pointer hover:bg-[var(--glass)]"
-              >
-                {abiertaEsta ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
-                <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate">
-                  {e.capitulo}
-                  {e.parte ? ` · parte ${e.parte}` : ''}
-                </span>
-                <span className="ml-auto text-[10px] text-[var(--text-secondary)] shrink-0">{fechaCorta(e.fecha)}</span>
-              </button>
-              {abiertaEsta && (
-                <TarjetasDeBitacora texto={e.texto} />
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {conTemporadas
+        ? grupos.map(g => {
+            const desde = (g.n - 1) * POR_TEMPORADA + 1;
+            const hasta = Math.min(g.n * POR_TEMPORADA, capitulos.length);
+            const abiertaT = temporadas.has(g.n);
+            return (
+              <div key={g.n} className="border-b last:border-b-0 border-[var(--glass-border)]">
+                <button
+                  onClick={() => alternar(g.n)}
+                  aria-expanded={abiertaT}
+                  className="w-full min-h-[40px] px-3 sm:px-4 py-1.5 flex items-center gap-2 text-left cursor-pointer bg-[var(--surface-soft)]/60 hover:bg-[var(--glass)]"
+                >
+                  <span aria-hidden>🏕️</span>
+                  <span className="font-cinzel font-bold text-[11px] sm:text-xs text-[var(--accent)]">Temporada {g.n}</span>
+                  <span className="text-[10px] text-[var(--text-secondary)]">
+                    · capítulos {desde}–{hasta}
+                  </span>
+                  <span className="ml-auto shrink-0 text-[var(--text-secondary)]">
+                    {abiertaT ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </span>
+                </button>
+                {abiertaT && lista(g.entradas)}
+              </div>
+            );
+          })
+        : lista(entradas)}
     </section>
   );
 };
