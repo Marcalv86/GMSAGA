@@ -835,6 +835,18 @@ export interface Memory {
    * Sin esto, «de las Moonshae a Luskan hay 8-12 días» era una frase en las
    * directivas que nadie comprobaba: la travesía entera cabía en una noche.
    */
+  /**
+   * 🎬 Frentes paralelos: cuando el grupo está partido (Jarlaxle en la costa,
+   * Auron y Aryendell en el camino), dónde está la cámara y qué frentes
+   * esperan su turno. `desdeMensaje` es cuántos mensajes tenía el capítulo
+   * cuando la cámara llegó al frente activo: con eso se cuenta cuánto lleva ahí.
+   */
+  frentes?: {
+    activo: string;
+    otros: string[];
+    chatId: string;
+    desdeMensaje: number;
+  };
   viaje?: {
     destino: string;
     /** Jornadas que cuesta el trayecto entero. */

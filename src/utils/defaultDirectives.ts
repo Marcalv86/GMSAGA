@@ -55,6 +55,7 @@ Todas las etiquetas deben ir al final del mensaje o en su lugar correspondiente.
 
 #### C. Presentes y Elenco
 - \`[PRESENTES: nombre1, nombre2]\` — Lista de PNJs con nombre propio presentes en escena.
+- \`[FRENTES: activo: quién y dónde | otros: frente 2; frente 3]\` — Solo con el grupo partido en frentes paralelos: emítela cuando la cámara cambie de frente (o al partirse el grupo). \`[FRENTES: fin]\` cuando vuelvan a estar juntos. La aplicación enseña el frente activo y te avisa si llevas demasiado sin volver a los otros.
   - ⛔ **NUNCA incluyas al personaje protagonista principal** en esta lista. Tampoco a extras genéricos ("los guardias").
 
 #### D. Sistema de Afinidad de PNJs en Tres Ejes

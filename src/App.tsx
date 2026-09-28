@@ -215,6 +215,7 @@ export default function App() {
   const currentPIdRef = useRef(currentPId);
   const currentChatsRef = useRef(currentChats);
   const currentFilesRef = useRef(currentFiles);
+  const currentChatIdRef = useRef(currentChatId);
 
   useEffect(() => {
     projectsRef.current = projects;
@@ -228,6 +229,9 @@ export default function App() {
   useEffect(() => {
     currentFilesRef.current = currentFiles;
   }, [currentFiles]);
+  useEffect(() => {
+    currentChatIdRef.current = currentChatId;
+  }, [currentChatId]);
 
   const [activeTab, setActiveTab] = useState<
     'chat' | 'files' | 'memory' | 'instructions' | 'novel' | 'mesa'
@@ -918,6 +922,36 @@ export default function App() {
       ? { ...reportado, vinculos: [], lugares: [], misiones: [], plan: null, avanceDeNivel: undefined }
       : reportado;
     reporteActual.current = t;
+
+    /*
+     * 🎬 Frentes paralelos: dónde está la cámara. Se guarda cuántos turnos
+     * del Narrador llevaba el capítulo al llegar, para contar cuánto lleva ahí.
+     */
+    if (t.frentes && currentPIdRef.current) {
+      const chatId = currentChatIdRef.current || '';
+      const chat = currentChatsRef.current.find(c => c.id === chatId);
+      const turnos = (chat?.messages || []).filter(m => m.role === 'model').length;
+      const f = t.frentes;
+      await handleUpdateProjectField(p => {
+        const mem = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
+        if (f.fin) return { memory: { ...mem, frentes: undefined } };
+        const previo = mem.frentes;
+        // Si la cámara sigue en el mismo frente, la cuenta no se reinicia.
+        const mismo = previo && previo.chatId === chatId && previo.activo.toLowerCase() === (f.activo || '').toLowerCase();
+        return {
+          memory: {
+            ...mem,
+            frentes: {
+              activo: f.activo || '',
+              otros: f.otros?.length ? f.otros : previo?.otros || [],
+              chatId,
+              desdeMensaje: mismo ? previo!.desdeMensaje : turnos
+            }
+          }
+        };
+      });
+    }
+
     if (t.comentariosDM && t.comentariosDM.length > 0 && currentPId) {
       const msgsPrevios = leerMesa(currentPId);
       const nuevosMsgs: MensajeDeMesa[] = t.comentariosDM.map(com => ({

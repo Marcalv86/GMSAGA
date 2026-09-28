@@ -33,6 +33,7 @@ export const ETIQUETAS_INTERNAS = [
   'AGENDA',
   'HILO',
   'PRESENTES',
+  'FRENTES?',
   'V[IÍ]NCULO',
   'AFINIDAD',
   'CHAPTER',

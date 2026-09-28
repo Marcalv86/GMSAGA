@@ -65,6 +65,8 @@ import {
   limpiarEtiquetasDeTiempo,
   limpiarEtiquetasDePnj,
   leerPresentes,
+  leerFrentes,
+  type FrentesLeidos,
   leerVinculos,
   leerRevelaciones,
   leerSecretos,
@@ -4070,8 +4072,27 @@ ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | agotamiento: 0
 ⚠️ La fecha va DESPUÉS del guion largo y es obligatoria: sin ella la aplicación no puede contar la jornada. Y el lugar tiene que ser dónde se está AHORA —si se sigue a bordo, se dice el barco y el mar, no el puerto al que se va—.`
       : '';
 
+  /*
+   * 🎬 FRENTES PARALELOS. Con el grupo partido, cuánto lleva la cámara en el
+   * frente activo; a los tres turnos se le recuerda que toca corte (§8.1).
+   */
+  const frentes = project.memory?.frentes;
+  const turnosEnFrente =
+    frentes && frentes.chatId === currentChat.id ? Math.max(0, turnosJugados - frentes.desdeMensaje) : -1;
+  const bloqueFrentes =
+    frentes && turnosEnFrente >= 0 && frentes.otros.length
+      ? `
+### 🎬 FRENTES PARALELOS
+La cámara está en **${frentes.activo}** desde hace ${turnosEnFrente} ${turnosEnFrente === 1 ? 'turno' : 'turnos'}. Esperan su turno: ${frentes.otros.map(o => `**${o}**`).join(' · ')}.
+${
+  turnosEnFrente >= 3
+    ? `⚠️ **Toca corte de cámara.** Cierra este latido y pasa a otro frente (\`[Corte de cámara: …]\`), con su propio estímulo vivo: el tiempo también ha corrido allí. Emite \`[FRENTES: activo: … | otros: …]\` con el cambio.`
+    : 'Cuando cambies de frente, emite `[FRENTES: activo: … | otros: …]`. Si el grupo se reúne, `[FRENTES: fin]`.'
+}`
+      : '';
+
   const bloqueVivo = `
-${fragmentosConsultaText ? `${fragmentosConsultaText}\n\n` : ''}${pjSection}
+${fragmentosConsultaText ? `${fragmentosConsultaText}\n\n` : ''}${pjSection}${bloqueFrentes ? `\n${bloqueFrentes}\n` : ''}
 ${grupoSection ? `\n${grupoSection}\n` : ''}${companionSection ? `\n${companionSection}\n` : ''}
 
 ### CONOCIMIENTO DE LA CAMPAÑA (MEMORIA VIVA)
@@ -5193,6 +5214,8 @@ export interface TiempoReportado {
   preparado?: CartaPreparada[];
   /** Comentarios OOC espontáneos del DM generados en la escena. */
   comentariosDM?: string[];
+  /** 🎬 Dónde está la cámara si el grupo está partido. */
+  frentes?: FrentesLeidos | null;
 }
 
 async function saveStreamedMessage(
@@ -5235,6 +5258,7 @@ async function saveStreamedMessage(
   const agenda = leerAgenda(cleanedText);
   const hilos = leerHilos(cleanedText);
   const presentes = leerPresentes(cleanedText);
+  const frentes = leerFrentes(cleanedText);
   const vinculos = leerVinculos(cleanedText);
   const revelaciones = leerRevelaciones(cleanedText);
   const secretos = leerSecretos(cleanedText);
@@ -5277,6 +5301,7 @@ async function saveStreamedMessage(
       agenda.length ||
       hilos.length ||
       presentes.length ||
+      frentes ||
       vinculos.length ||
       revelaciones.length ||
       secretos.length ||
@@ -5298,6 +5323,7 @@ async function saveStreamedMessage(
         hilos,
         inventario,
         presentes,
+        frentes,
         vinculos,
         revelaciones,
         secretos,

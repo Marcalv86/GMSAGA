@@ -1635,6 +1635,44 @@ export function leerPresentes(texto: string): string[] {
   return out;
 }
 
+const FRENTES_RE = /\[\s*FRENTES?\s*:\s*([^\]]+)\]/gi;
+
+export interface FrentesLeidos {
+  /** El grupo ya no está partido. */
+  fin?: boolean;
+  activo?: string;
+  otros?: string[];
+}
+
+/**
+ * 🎬 [FRENTES: activo: Jarlaxle en la costa | otros: Auron y Aryendell en el camino]
+ * o [FRENTES: fin] cuando el grupo vuelve a estar junto. Manda la última del turno.
+ */
+export function leerFrentes(texto: string): FrentesLeidos | null {
+  if (!texto || !/FRENTES?\s*:/i.test(texto)) return null;
+  FRENTES_RE.lastIndex = 0;
+  let ultimo: FrentesLeidos | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = FRENTES_RE.exec(texto)) !== null) {
+    const cuerpo = m[1].trim();
+    if (/^(fin|juntos|reunidos|ninguno)\b/i.test(cuerpo)) {
+      ultimo = { fin: true };
+      continue;
+    }
+    const campo = (k: string) => {
+      const r = cuerpo.match(new RegExp(`${k}\\s*:\\s*([^|]+)`, 'i'));
+      return r ? r[1].trim() : '';
+    };
+    const activo = campo('activo') || cuerpo.split('|')[0].trim();
+    const otros = campo('otros')
+      .split(/;/)
+      .map(x => x.trim())
+      .filter(Boolean);
+    if (activo) ultimo = { activo: activo.slice(0, 80), otros: otros.map(o => o.slice(0, 80)) };
+  }
+  return ultimo;
+}
+
 const SECRETO_RE = /\[\s*SECRETO\s*:\s*([^\]]+)\]/gi;
 
 export interface SecretoLeido {
@@ -1969,6 +2007,7 @@ export function limpiarEtiquetasDePnj(texto: string): string {
   if (!texto) return texto;
   return texto
     .replace(PRESENTES_RE, '')
+    .replace(FRENTES_RE, '')
     .replace(VINCULO_RE, '')
     .replace(AFINIDAD_TAG_RE, '')
     .replace(AFINIDAD_INLINE_RE, '')

@@ -1504,6 +1504,47 @@ export const ChatView: React.FC<{
             );
           })()}
 
+          {/* 🎬 Frentes paralelos: dónde está la cámara y cuánto lleva ahí. */}
+          {(() => {
+            const f = project?.memory?.frentes;
+            if (!f || !chat || f.chatId !== chat.id) return null;
+            const turnos = Math.max(0, (chat.messages || []).filter(m => m.role === 'model').length - f.desdeMensaje);
+            const toca = turnos >= 3 && f.otros.length > 0;
+            return (
+              <>
+                <span className="border-r border-[var(--glass-border)] h-4 inline shrink-0" />
+                <span
+                  className={`inline-flex items-center gap-1 min-h-[28px] pl-2 pr-1 rounded-full border text-[11px] font-cinzel font-bold shrink-0 whitespace-nowrap ${
+                    toca
+                      ? 'border-amber-500/60 bg-amber-500/10 text-amber-800 dark:text-amber-300'
+                      : 'border-[var(--glass-border)] text-[var(--text-secondary)]'
+                  }`}
+                  title={`Cámara en: ${f.activo} (${turnos} ${turnos === 1 ? 'turno' : 'turnos'})${
+                    f.otros.length ? `\nEsperan: ${f.otros.join(' · ')}` : ''
+                  }${toca ? '\nToca corte de cámara: el Narrador ya lo sabe.' : ''}`}
+                >
+                  <span aria-hidden>🎬</span>
+                  <span className="hidden sm:inline truncate max-w-[180px]">{f.activo}</span>
+                  <span className="tabular-nums opacity-80">· {turnos}</span>
+                  {toca && <span aria-hidden>⏳</span>}
+                  {onUpdateProject && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdateProject(p => ({ memory: { ...(p.memory as any), frentes: undefined } }))
+                      }
+                      aria-label="El grupo vuelve a estar junto"
+                      title="El grupo vuelve a estar junto (quitar frentes)"
+                      className="hidden sm:flex min-w-[24px] min-h-[24px] rounded-full items-center justify-center hover:bg-[var(--glass)] cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </span>
+              </>
+            );
+          })()}
+
           <span className="border-r border-[var(--glass-border)] h-4 hidden sm:inline shrink-0" />
 
           <h3
