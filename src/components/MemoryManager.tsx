@@ -26,6 +26,8 @@ import { NpcDossierModal } from './NpcDossierModal';
 import { LocationDossierModal } from './LocationDossierModal';
 import { DailyAgendaDiary } from './DailyAgendaDiary';
 import { StatusView } from './StatusView';
+import { DocumentosVivosPanel } from './DocumentosVivosPanel';
+import { deshacerDocumento, reescribirDocumentos } from '../utils/documentosVivos';
 
 import {
   BookOpen,
@@ -50,6 +52,7 @@ import {
   X,
   User,
   Backpack,
+  NotebookPen,
   Coins,
   PackageCheck,
   PackageX,
@@ -155,7 +158,9 @@ export type SeccionMemoria =
   | 'bambalinas'
   | 'relojes'
   | 'facciones'
-  | 'preparado';
+  | 'preparado'
+  | 'ficha_viva'
+  | 'cuaderno';
 
 export const MemoryManager: React.FC<{
   project: Project;
@@ -173,6 +178,8 @@ export const MemoryManager: React.FC<{
   secciones?: SeccionMemoria[];
   /** Banner opcional fijo arriba al hacer scroll */
   topBanner?: React.ReactNode;
+  /** Pone al día los documentos vivos con el capítulo actual. */
+  onVolcarAhora?: () => void;
 }> = ({
   project,
   files,
@@ -186,7 +193,8 @@ export const MemoryManager: React.FC<{
   hasChats = false,
   chats,
   secciones,
-  topBanner
+  topBanner,
+  onVolcarAhora
 }) => {
   /**
    * Qué secciones se muestran. Sirve para partir esta vista en dos: las fichas
@@ -1035,6 +1043,20 @@ export const MemoryManager: React.FC<{
               count: memory.player_character?.name ? `(${memory.player_character.name})` : ''
             },
             {
+              id: 'ficha_viva',
+              label: 'Ficha viva',
+              shortLabel: 'Ficha viva',
+              icon: Backpack,
+              count: memory.documentos_vivos?.bitacora?.length ? `(${memory.documentos_vivos.bitacora.length})` : ''
+            },
+            {
+              id: 'cuaderno',
+              label: 'Cuaderno',
+              shortLabel: 'Cuaderno',
+              icon: NotebookPen,
+              count: ''
+            },
+            {
               id: 'inventario',
               label: 'Inventario',
               shortLabel: 'Mochila',
@@ -1158,6 +1180,28 @@ export const MemoryManager: React.FC<{
           </button>
         </div>
       </div>
+
+      {/* 📚 Documentos vivos: la Ficha viva (con la Bitácora) y el Cuaderno del GM */}
+      {(activeTab === 'ficha_viva' || activeTab === 'cuaderno') && memory.documentos_vivos && (
+        <DocumentosVivosPanel
+          docs={memory.documentos_vivos}
+          cual={activeTab === 'ficha_viva' ? 'ficha' : 'cuaderno'}
+          onVolcarAhora={onVolcarAhora}
+          onGuardar={(cual, texto) =>
+            onUpdateMemory(mem =>
+              mem?.documentos_vivos
+                ? { ...mem, documentos_vivos: reescribirDocumentos(mem.documentos_vivos, { [cual]: texto }, 'Edición a mano') }
+                : mem
+            )
+          }
+          onDeshacer={cual =>
+            onUpdateMemory(mem => {
+              const d = mem?.documentos_vivos ? deshacerDocumento(mem.documentos_vivos, cual) : null;
+              return d ? { ...mem!, documentos_vivos: d } : mem;
+            })
+          }
+        />
+      )}
 
       {/* Tab: Protagonist (OC) */}
       {activeTab === 'character' && (() => {
