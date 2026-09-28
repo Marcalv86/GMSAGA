@@ -975,3 +975,33 @@ export function entradaAnteriorA(
   const candidatas = docs.bitacora.filter(e => antes.has(e.chatId));
   return candidatas[candidatas.length - 1];
 }
+
+// ---------------------------------------------------------------- sembrar desde los compendios
+
+/** Cuántas entradas tiene el documento entero (sin contar «(vacío)»). */
+export const totalDeEntradas = (doc: string): number =>
+  Object.values(contarEntradas(doc)).reduce((a, n) => a + n, 0);
+
+/**
+ * 🌱 Mete lo sembrado en las secciones que están VACÍAS, y en ninguna más: lo
+ * que ya esté escrito salió jugando o lo puso ella, y eso manda. Las secciones
+ * se emparejan por nombre (sin el número de delante). Devuelve el Cuaderno
+ * nuevo y qué secciones se han llenado.
+ */
+export function sembrarSeccionesVacias(cuaderno: string, sembrado: string): { cuaderno: string; llenadas: string[] } {
+  const norma = (t: string) => plegar(t.replace(/^\d+[.)]\s*/, ''));
+  const propuestas = partirEnSecciones(sembrado).secciones.filter(s => s.entradas > 0);
+  let fuera = cuaderno;
+  const llenadas: string[] = [];
+  for (const prop of propuestas) {
+    const { secciones } = partirEnSecciones(fuera);
+    const i = secciones.findIndex(s => norma(s.titulo) === norma(prop.titulo));
+    if (i < 0 || secciones[i].entradas > 0) continue;
+    // Se conserva el encabezado propio (con su número, si lo lleva) y se pone el cuerpo sembrado.
+    const cabecera = secciones[i].bloque.split('\n')[0];
+    const cuerpo = prop.bloque.split('\n').slice(1).join('\n').trim();
+    fuera = reemplazarSeccion(fuera, i, `${cabecera}\n${cuerpo}`);
+    llenadas.push(secciones[i].titulo);
+  }
+  return { cuaderno: fuera, llenadas };
+}

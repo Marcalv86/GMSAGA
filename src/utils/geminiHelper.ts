@@ -74,7 +74,7 @@ import {
   HiloLeido
 } from './campaignCalendar';
 import { cambioVacio, leerInventario, sonElMismoObjeto, deduplicarInventario } from './inventoryTag';
-import { bloqueDocumentosParaNarrador, hayDocumentosVivos } from './documentosVivos';
+import { bloqueDocumentosParaNarrador, hayDocumentosVivos, SECCIONES_CUADERNO } from './documentosVivos';
 import { leerAprendizajes, nadaAprendido } from './aprendizajeTag';
 import { cuadernoQuieto, leerBambalinas, leerFacciones, leerPreparado, leerRelojes, preparadoEnPie, relojesEnMarcha, sinNovedadDeMesa, mismoNombre } from './cuadernoOculto';
 import { leerEstado, leerEtiquetados, leerOlvidos, OrdenDeEtiquetado } from './ordenesDeMesa';
@@ -9580,6 +9580,72 @@ export interface EstudioInicialCampanaResult {
  * sincronizar la fecha real del mundo, detectar travesías en curso (mar, bosque, ruinas, mazmorra)
  * y registrar el viaje en memoria si arranca en mitad de un trayecto.
  */
+/**
+ * 🌱 SEMBRAR EL CUADERNO DESDE LOS COMPENDIOS.
+ *
+ * Una campaña nueva arranca con el Cuaderno vacío aunque tenga compendios de
+ * mundo, de PNJs y de facciones. Esta llamada los lee y propone lo que un
+ * Director apuntaría antes de la primera sesión: quién mueve qué, los sitios
+ * que importan, el tono y los límites, los vínculos que ya existen por
+ * trasfondo. Devuelve un Cuaderno entero; quien llama mete solo lo que caiga
+ * en secciones vacías.
+ */
+export async function sembrarCuadernoDesdeCompendios({
+  project,
+  files = []
+}: {
+  project: Project;
+  files?: ProjectFile[];
+}): Promise<string> {
+  const docFiles = files.filter(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 20);
+  if (!docFiles.length) return '';
+  const documentos = docFiles
+    .map(f => `=== DOCUMENTO: ${f.name}${f.category ? ` [${f.category}]` : ''} ===\n${(f.content || '').trim().slice(0, 40000)}`)
+    .join('\n\n')
+    .slice(0, 300000);
+  const pc = project.memory?.player_character;
+  const pj = pc?.name || 'la protagonista';
+  const secciones = SECCIONES_CUADERNO.map(x => `## ${x}`).join('\n');
+
+  const prompt = `Eres el Director de Juego de una partida de rol en solitario, preparando tu cuaderno ANTES de la primera sesión. Nada de narrar.
+
+PROTAGONISTA: ${pj}${pc?.race ? ` · ${pc.race}` : ''}${pc?.class ? ` · ${pc.class}` : ''}${pc?.background ? `\nTRASFONDO: ${pc.background}` : ''}
+
+DIRECTIVAS DE LA CAMPAÑA (resumen de tono y reglas):
+${(project.instructions || '').slice(0, 20000) || '(sin directivas)'}
+
+${documentos}
+
+=== QUÉ TIENES QUE DEVOLVER ===
+El Cuaderno del GM en Markdown, con la primera línea «# Cuaderno del GM — ${pj}» y EXACTAMENTE estos encabezados, en este orden:
+${secciones}
+
+Rellena SOLO lo que los documentos sostengan. ⛔ Cero invención: lo que no esté en los documentos no se escribe. Una sección sin material lleva «- (vacío)». Cada entrada es una viñeta «- » de una o dos líneas.
+- «Estado general»: dónde y cuándo arranca la campaña, si los documentos lo dicen.
+- «La verdad oculta (tramas)»: solo si algún documento describe una trama de arranque: «### TRAMA: Nombre — principal/secundaria», con **Lo que parece** · **La verdad** · **Resolución**.
+- «Actores»: por PNJ o facción con agenda, «**Nombre** — quiere: … · sabe: … · no sabe: …».
+- «Lugares clave»: «**Lugar** — qué es y por qué importa».
+- «Tono y límites»: lo que las directivas fijan de tono, contenido y líneas rojas.
+- «PNJs menores»: «**Nombre** — quién es, idiomas si constan».
+- «Vínculos»: solo relaciones que YA existan por trasfondo con ${pj}: «**Nombre** — ATR n · VÍN n · CON n — qué es para ella», con números de 0 a 10. Un desconocido no va aquí.
+- «Secretos vigentes»: «[SECRETO: título | la verdad | se descubre: cómo]», solo los que los documentos marquen como ocultos para ella.
+- Lo que depende de jugar (relojes, hilos, consecuencias, reputación, arranques, canon de mesa, semillas) queda «- (vacío)» salvo que un documento lo fije ya.
+- En español. Sobrio. Devuelve SOLO el Markdown, sin \`\`\`.`;
+
+  const bgModel = getBackgroundTaskModel();
+  const response = await generateContentWithFailover({
+    proposito: 'Sembrar el Cuaderno desde los compendios',
+    primaryModel: bgModel,
+    contents: prompt,
+    config: {
+      temperature: 0.2,
+      maxOutputTokens: 16000,
+      ...(esModeloAbierto(bgModel) ? {} : { safetySettings: buildSafetySettings(getStoredSafetyLevel()) })
+    }
+  });
+  return (response.text || '').trim().replace(/^```(?:markdown|md)?\s*/i, '').replace(/\s*```$/, '');
+}
+
 export async function estudiarContextoInicialDeCampana({
   project,
   files = [],

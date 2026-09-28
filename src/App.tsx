@@ -129,6 +129,7 @@ import {
   anclarHistorialPorHud,
   consolidarCronicaAlCerrarCapitulo,
   volcarDocumentosVivos,
+  sembrarCuadernoDesdeCompendios,
   ordenarChatsCronologicamente
 } from './utils/geminiHelper';
 import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo, desarchivarCapitulo } from './utils/chapterArchiver';
@@ -144,7 +145,9 @@ import {
   seccionesMermadas,
   sincronizarFichasConDocumentos,
   reflejarSecretosEnCuaderno,
-  entradaAnteriorA
+  entradaAnteriorA,
+  sembrarSeccionesVacias,
+  totalDeEntradas
 } from './utils/documentosVivos';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
@@ -2866,6 +2869,70 @@ export default function App() {
     }
   };
 
+  /*
+   * 🌱 SEMBRAR EL CUADERNO DESDE LOS COMPENDIOS.
+   *
+   * Solo llena secciones vacías: lo escrito jugando o a mano no se toca. Se
+   * lanza sola una vez en una campaña que empieza con el Cuaderno casi vacío,
+   * y a mano desde el Cuaderno cuando ella quiera.
+   */
+  const sembrandoCuaderno = useRef(false);
+  const sembrarCuaderno = async (motivo: 'auto' | 'manual') => {
+    const pid = currentPIdRef.current;
+    const proyecto = projectsRef.current.find(pr => pr.id === pid);
+    const docs = proyecto?.memory?.documentos_vivos;
+    const archivos = currentFilesRef.current || [];
+    if (!pid || !proyecto || !docs || sembrandoCuaderno.current) return;
+    const hayCompendios = archivos.some(f => !f.isImage && !f.isAudio && (f.content || '').trim().length > 20);
+    if (!hayCompendios || !hasConfiguredApiKey()) {
+      if (motivo === 'manual') {
+        setAlertConfig({
+          isOpen: true,
+          title: '🌱 Nada que sembrar',
+          message: hayCompendios ? 'Hace falta una clave de API configurada.' : 'La campaña no tiene compendios ni documentos de texto de los que leer.'
+        });
+      }
+      return;
+    }
+    sembrandoCuaderno.current = true;
+    setTopProgress({ active: true, label: '🌱 Sembrando el Cuaderno desde los compendios...', type: 'sync' });
+    try {
+      const sembrado = await sembrarCuadernoDesdeCompendios({ project: proyecto, files: archivos });
+      let llenadas: string[] = [];
+      await handleUpdateProjectField(p => {
+        const actuales = p.memory?.documentos_vivos;
+        if (!actuales || !sembrado) return {};
+        const r = sembrarSeccionesVacias(actuales.cuaderno, sembrado);
+        llenadas = r.llenadas;
+        if (!llenadas.length) return {};
+        return {
+          memory: sincronizarFichasConDocumentos({
+            ...(p.memory as any),
+            documentos_vivos: reescribirDocumentos(actuales, { cuaderno: r.cuaderno }, 'Sembrado desde compendios')
+          })
+        };
+      });
+      logInfo('memory_sync', 'Cuaderno sembrado', llenadas.length ? llenadas.join(' · ') : 'Nada nuevo que meter');
+      if (motivo === 'manual' || llenadas.length) {
+        setAlertConfig({
+          isOpen: true,
+          title: '🌱 Cuaderno sembrado',
+          message: llenadas.length
+            ? `Se han llenado ${llenadas.length} secciones vacías con lo que dicen tus compendios:\n\n${llenadas.map(t => `• ${t}`).join('\n')}\n\nLo que ya estaba escrito no se ha tocado. Si algo no te cuadra, en Memoria → Cuaderno puedes deshacer.`
+            : 'Las secciones con material ya estaban escritas, así que no se ha tocado nada.'
+        });
+      }
+    } catch (err) {
+      logWarn('memory_sync', 'No se pudo sembrar el Cuaderno', describeApiError(err));
+      if (motivo === 'manual') {
+        setAlertConfig({ isOpen: true, title: 'No se pudo sembrar', message: describeApiError(err) });
+      }
+    } finally {
+      sembrandoCuaderno.current = false;
+      setTopProgress({ active: false, label: '', type: 'sync' });
+    }
+  };
+
   const handleCreateChat = () => {
     if (!currentPId || !currentProject) return;
 
@@ -3826,6 +3893,11 @@ export default function App() {
                   }
                   return updates;
                 });
+              }
+
+              // 1b. 🌱 Campaña que empieza con el Cuaderno casi vacío: sembrarlo desde los compendios.
+              if (conDocsVivos && totalDeEntradas(currentProject.memory?.documentos_vivos?.cuaderno || '') <= 5) {
+                await sembrarCuaderno('auto');
               }
 
               // 2. La memoria del proyecto. Con documentos vivos, solo si aún no la hay:
@@ -7052,6 +7124,7 @@ export default function App() {
               onCompletarFichaDesdeDocumento={() => completarFichaDesdeDocumento(currentFiles, true)}
               isGenerating={isSyncingMemory}
               onVolcarAhora={currentChat ? () => void volcarDocumentos(currentChat, 'manual') : undefined}
+              onSembrarCuaderno={() => void sembrarCuaderno('manual')}
             />
           )}
 

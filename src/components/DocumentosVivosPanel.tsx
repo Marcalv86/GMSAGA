@@ -216,7 +216,9 @@ export const DocumentosVivosPanel: React.FC<{
   onGuardar: (cual: 'ficha' | 'cuaderno', texto: string) => Promise<void> | void;
   onDeshacer: (cual: 'ficha' | 'cuaderno') => Promise<void> | void;
   onVolcarAhora?: () => void;
-}> = ({ docs, cual, onGuardar, onDeshacer, onVolcarAhora }) => {
+  onSembrarCuaderno?: () => void;
+}> = ({ docs, cual, onGuardar, onDeshacer, onVolcarAhora, onSembrarCuaderno }) => {
+  const [confirmarSembrar, setConfirmarSembrar] = useState(false);
   const versiones = docs.versiones?.[cual] || [];
   const ultima = versiones[versiones.length - 1];
   return (
@@ -225,6 +227,31 @@ export const DocumentosVivosPanel: React.FC<{
         <span title="Se pone al día sola al cerrar capítulo.">
           🕰️ {docs.actualizadoEl ? fechaCorta(docs.actualizadoEl) : 'Sin actualizar todavía'}
         </span>
+        <span className="flex items-center gap-1.5 shrink-0">
+        {cual === 'cuaderno' && onSembrarCuaderno && (
+          confirmarSembrar ? (
+            <button
+              onClick={() => {
+                setConfirmarSembrar(false);
+                onSembrarCuaderno();
+              }}
+              onBlur={() => setConfirmarSembrar(false)}
+              className="min-h-[36px] px-2.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-cinzel font-bold flex items-center gap-1 cursor-pointer"
+              title="Lee tus compendios y llena SOLO las secciones vacías. Lo escrito no se toca."
+            >
+              🌱 ¿Sembrar?
+            </button>
+          ) : (
+            <button
+              onClick={() => setConfirmarSembrar(true)}
+              aria-label="Sembrar desde los compendios"
+              title="Sembrar desde los compendios: llena las secciones vacías con lo que dicen tus documentos (una llamada a la IA)."
+              className="min-h-[36px] min-w-[36px] px-2 rounded-lg border border-[var(--glass-border)] hover:border-[var(--accent)] flex items-center justify-center cursor-pointer text-base leading-none"
+            >
+              🌱
+            </button>
+          )
+        )}
         {onVolcarAhora && (
           <button
             onClick={onVolcarAhora}
@@ -236,6 +263,7 @@ export const DocumentosVivosPanel: React.FC<{
             Volcar
           </button>
         )}
+        </span>
       </div>
       <Documento
         key={cual}

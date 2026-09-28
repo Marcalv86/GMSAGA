@@ -180,6 +180,7 @@ export const MemoryManager: React.FC<{
   topBanner?: React.ReactNode;
   /** Pone al día los documentos vivos con el capítulo actual. */
   onVolcarAhora?: () => void;
+  onSembrarCuaderno?: () => void;
 }> = ({
   project,
   files,
@@ -194,7 +195,8 @@ export const MemoryManager: React.FC<{
   chats,
   secciones,
   topBanner,
-  onVolcarAhora
+  onVolcarAhora,
+  onSembrarCuaderno
 }) => {
   /**
    * Qué secciones se muestran. Sirve para partir esta vista en dos: las fichas
@@ -1191,6 +1193,7 @@ export const MemoryManager: React.FC<{
           docs={memory.documentos_vivos}
           cual={activeTab === 'ficha_viva' ? 'ficha' : 'cuaderno'}
           onVolcarAhora={onVolcarAhora}
+          onSembrarCuaderno={onSembrarCuaderno}
           onGuardar={(cual, texto) =>
             onUpdateMemory(mem =>
               mem?.documentos_vivos

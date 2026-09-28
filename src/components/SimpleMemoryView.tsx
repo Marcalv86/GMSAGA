@@ -34,6 +34,7 @@ interface SimpleMemoryViewProps {
   isGenerating?: boolean;
   /** Pone al día los documentos vivos con el capítulo actual. */
   onVolcarAhora?: () => void;
+  onSembrarCuaderno?: () => void;
 }
 
 export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
@@ -45,7 +46,8 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   onTriggerAIUpdate,
   onCompletarFichaDesdeDocumento,
   isGenerating = false,
-  onVolcarAhora
+  onVolcarAhora,
+  onSembrarCuaderno
 }) => {
   const memory: Memory = project.memory || {
     story: '',
@@ -414,6 +416,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             hasChats={chats.length > 0}
             secciones={conDocumentos ? ['cuaderno', 'giros'] : ['giros', 'bambalinas', 'relojes', 'facciones', 'preparado']}
             onVolcarAhora={onVolcarAhora}
+            onSembrarCuaderno={onSembrarCuaderno}
             topBanner={
               <div className="flex flex-col gap-2 pt-2">
                 <div className="flex justify-end">
@@ -454,6 +457,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             hasChats={chats.length > 0}
             secciones={conDocumentos ? ['character', 'ficha_viva', 'diary', 'npcs', 'locs', 'quests', 'story', 'status'] : undefined}
             onVolcarAhora={onVolcarAhora}
+            onSembrarCuaderno={onSembrarCuaderno}
             topBanner={
               <div className="pt-2">
                 <div className="rounded-lg border border-[var(--user-border)] bg-[var(--surface-soft)] px-3 py-2 flex items-start gap-2 shadow-xs">
