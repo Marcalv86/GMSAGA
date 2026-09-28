@@ -6741,6 +6741,8 @@ export async function syncMemoryFromChats(project: Project, chats: Chat[], files
  * (resumen, memoria general, sincronización completa y repaso del Director),
  * que escribían sobre lo mismo y se pisaban.
  */
+type ParteDelVolcado = 'cuaderno' | 'ficha' | 'bitacora';
+
 export async function volcarDocumentosVivos({
   project,
   chat,
@@ -6752,7 +6754,7 @@ export async function volcarDocumentosVivos({
   /** Índice del primer mensaje del capítulo que aún no se ha volcado. */
   desde: number;
   motivo: 'cierre' | 'manual';
-}): Promise<{ cuaderno: string; ficha: string; bitacora: string; leidos: number }> {
+}): Promise<{ cuaderno: string; ficha: string; bitacora: string; leidos: number; porPartes?: boolean }> {
   const docs = project.memory?.documentos_vivos;
   if (!docs) throw new Error('El proyecto todavía no tiene documentos vivos.');
 
@@ -6777,7 +6779,7 @@ export async function volcarDocumentosVivos({
   const ultima = docs.bitacora[docs.bitacora.length - 1];
   const canonDeMesa = (project.memory?.memory_edits || []).map(e => `- ${e.text}`).join('\n');
 
-  const prompt = `Eres el Director de Juego de una partida de rol en solitario, sentado después de jugar para poner al día tus documentos. Nada de narrar: solo actualizar.
+  const contexto = `Eres el Director de Juego de una partida de rol en solitario, sentado después de jugar para poner al día tus documentos. Nada de narrar: solo actualizar.
 
 PROTAGONISTA: ${pj}
 ${hoy ? `FECHA DE CAMPAÑA AHORA: ${hoy}\n` : ''}MOTIVO: ${motivo === 'cierre' ? `cierre del capítulo «${chat.name}»` : `volcado a mitad del capítulo «${chat.name}»`}
@@ -6789,20 +6791,22 @@ ${docs.cuaderno}
 ${docs.ficha}
 
 ${ultima ? `=== 📖 ÚLTIMA ENTRADA DE LA BITÁCORA (${ultima.capitulo}${ultima.parte ? `, parte ${ultima.parte}` : ''}) ===\n${ultima.texto}\n\n` : ''}${canonDeMesa ? `=== 📌 CANON Y REGLAS DE MESA ACORDADAS (respétalas) ===\n${canonDeMesa}\n\n` : ''}=== LO JUGADO DESDE EL ÚLTIMO VOLCADO${recortada ? ' (muy largo: llega solo el final)' : ''} ===
-${cronica}
+${cronica}`;
 
-=== QUÉ TIENES QUE DEVOLVER ===
-Tres textos en Markdown dentro de un JSON: «cuaderno», «ficha» y «bitacora».
-
-REGLAS PARA «cuaderno» y «ficha» (los dos se REESCRIBEN ENTEROS):
+  /*
+   * Las reglas van por documento para poder pedir solo una parte: si un
+   * capítulo es tan largo que los tres documentos no caben en una respuesta,
+   * el JSON llega cortado, y entonces se reintenta por partes.
+   */
+  const REGLAS_COMUNES = `REGLAS PARA «cuaderno» y «ficha» (se REESCRIBEN ENTEROS):
 1. Conserva EXACTAMENTE los mismos encabezados «## …», en el mismo orden, y la primera línea «# …». Cada entrada va en su sección, como viñeta «- ». Una sección sin nada lleva «- (vacío)».
 2. Parte del documento actual y aplica solo lo que lo jugado cambia. Lo que no se ha tocado se copia tal cual: **no se pierde nada por el camino**.
 3. ⛔ Cero invención. Solo entra lo que lo jugado narra o lo que ya estaba escrito. Una captura, una requisa, una herida o una pérdida solo existen si hay una escena que las cuente de forma explícita: palabras sueltas como «presa» o «atada» no son una captura.
 4. Las etiquetas entre corchetes que aparezcan en lo jugado ([INVENTARIO: …], [RELOJ: …], [VÍNCULO: …], [BAMBALINAS: …], etc.) son datos válidos: aplícalas.
    ⭐ Las notas «[CUADERNO: …]» son lo que el Director decidió en secreto durante la partida (planes de salida, desenlaces de encargos, qué hace alguien fuera de cámara, hitos). Mandan: pásalas a la sección que les toque, sin perder nada.
-5. El cuaderno guarda ESTADO, no crónica: lo que se ha cerrado se borra (su historia queda en la bitácora). Si deja una consecuencia que sigue pesando (una deuda, una promesa, un enemigo), queda en UNA línea en «Consecuencias vivas».
-
-CUADERNO — además (si una sección tiene otro nombre en el documento actual, aplícalo a su equivalente):
+5. El cuaderno guarda ESTADO, no crónica: lo que se ha cerrado se borra (su historia queda en la bitácora). Si deja una consecuencia que sigue pesando (una deuda, una promesa, un enemigo), queda en UNA línea en «Consecuencias vivas».`;
+  const REGLAS: Record<ParteDelVolcado, string> = {
+    cuaderno: `CUADERNO — además (si una sección tiene otro nombre en el documento actual, aplícalo a su equivalente):
 - «Estado general»: CORTO, como mucho 10 líneas. Calendario, fechas clave y «Ahora»: dónde está ella, con quién, cómo y qué está a punto de pasar. ⛔ Nada de crónica escena a escena aquí: ese detalle va a la bitácora.
 - «La verdad oculta (tramas)»: una subsección por trama abierta, «### TRAMA: Nombre — encargo/secundaria/principal», con tres líneas: **Lo que parece** · **La verdad** (lo que ella aún no sabe) · **Resolución** (cómo acaba bien y cómo mal). Lo cerrado sale de aquí.
 - «Actores»: por PNJ o facción con agenda, «**Nombre** — quiere: … · sabe: … · no sabe: …».
@@ -6813,56 +6817,103 @@ CUADERNO — además (si una sección tiene otro nombre en el documento actual, 
 - «Hilos con vencimiento»: «[HILO: título | vence: cuándo | qué ocurrirá si nadie lo toca]».
 - «Canon de mesa»: reglas o cambios de canon que la jugadora haya acordado en el chat y no estén en su ficha.
 - «Reputación y rumores»: qué se dice de ella y dónde.
-- «Arranques y cortes»: cómo se cerró este tramo y cómo arranca el siguiente (lugar, momento, presentes y qué conviene tirar al empezar).
-
-FICHA VIVA — además:
+- «Arranques y cortes»: cómo se cerró este tramo y cómo arranca el siguiente (lugar, momento, presentes y qué conviene tirar al empezar).`,
+    ficha: `FICHA VIVA — además:
 - «Nivel, PG y recursos»: nivel, PG al cierre, ranuras o usos gastados que no se han recuperado, agotamiento, heridas, secuelas y dolencias que DUREN.
 - Inventario exacto y por dónde está: «Lo que lleva encima», «Mochila y contenedores» (indica el contenedor), «Guardado en otro sitio» (dónde), «Requisado o en manos ajenas» (quién lo tiene y dónde), «Encargos» (qué hay que hacer y para quién).
 - Lo gastado, consumido o entregado desaparece. Lo devuelto vuelve a su sitio.
 - «Dinero»: saldo final tras lo cobrado, gastado o perdido.
-- «Lista de compras»: lo que ella haya dicho que quiere comprar o reponer.
-
-REGLAS PARA «bitacora» (una entrada nueva; la jugadora la LEE):
+- «Lista de compras»: lo que ella haya dicho que quiere comprar o reponer.`,
+    bitacora: `REGLAS PARA «bitacora» (una entrada nueva; la jugadora la LEE):
 - ⛔ Nada del cuaderno que ella no sepa: ni verdades ocultas, ni fuera de cámara, ni relojes.
 - Con estos encabezados «### …», en este orden: **Hechos y decisiones** (viñetas, en orden, con los momentos clave y las frases que importan) · **Salud, recursos y secuelas** · **Relaciones** (qué ha cambiado con cada cual) · **Hilos abiertos** · **Progresión** (una línea «[Avance: X/Y hacia Nivel N]» y el hito anotado; un hito no es solo combate: investigación, logro social, avance espiritual, travesía dura, vínculo que cruza un umbral o peligro superado sin pelear) · **Arranque siguiente** (lugar, momento y quién está presente) · **Cambios de canon** (solo si los hubo).
-- En español, sobria y concreta. Sin florituras.
-
-RESPONDE SOLO CON ESTE JSON:
-{"cuaderno": "…", "ficha": "…", "bitacora": "…"}`;
+- En español, sobria y concreta. Sin florituras.`
+  };
+  const NOMBRE: Record<ParteDelVolcado, string> = { cuaderno: '«cuaderno»', ficha: '«ficha»', bitacora: '«bitacora»' };
 
   const activeModel = getBackgroundTaskModel();
   const safetySetting = getStoredSafetyLevel();
-  const response = await generateContentWithFailover({
-    proposito: motivo === 'cierre' ? 'Volcado de documentos al cerrar capítulo' : 'Volcado de documentos a mitad de capítulo',
-    primaryModel: activeModel,
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.2,
-      // Tres documentos enteros: sin margen de salida, el JSON llega cortado.
-      maxOutputTokens: 32000,
-      ...(esModeloAbierto(activeModel) ? {} : { safetySettings: buildSafetySettings(safetySetting) })
-    }
-  });
 
-  const texto = (response.text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const a = texto.indexOf('{');
-  const b = texto.lastIndexOf('}');
-  let parsed: any = null;
-  if (a !== -1 && b > a) {
-    try {
-      parsed = JSON.parse(texto.slice(a, b + 1));
-    } catch {
-      parsed = null;
+  const pedir = async (partes: ParteDelVolcado[]): Promise<Partial<Record<ParteDelVolcado, string>>> => {
+    const reescritas = partes.filter(x => x !== 'bitacora');
+    const peticion = `${contexto}
+
+=== QUÉ TIENES QUE DEVOLVER ===
+${partes.length === 1 ? 'Un texto' : `${partes.length} textos`} en Markdown dentro de un JSON: ${partes.map(x => NOMBRE[x]).join(', ')}.${
+      partes.length < 3 ? ' (Los demás documentos se ponen al día aparte: no los devuelvas.)' : ''
     }
+
+${reescritas.length ? `${REGLAS_COMUNES}\n\n` : ''}${partes.map(x => REGLAS[x]).join('\n\n')}
+
+RESPONDE SOLO CON ESTE JSON:
+{${partes.map(x => `"${x}": "…"`).join(', ')}}`;
+
+    const response = await generateContentWithFailover({
+      proposito:
+        (motivo === 'cierre' ? 'Volcado de documentos al cerrar capítulo' : 'Volcado de documentos a mitad de capítulo') +
+        (partes.length < 3 ? ` (${partes.join(' + ')})` : ''),
+      primaryModel: activeModel,
+      contents: peticion,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+        // Documentos enteros: sin margen de salida, el JSON llega cortado.
+        maxOutputTokens: 32000,
+        ...(esModeloAbierto(activeModel) ? {} : { safetySettings: buildSafetySettings(safetySetting) })
+      }
+    });
+
+    const texto = (response.text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    const a = texto.indexOf('{');
+    const b = texto.lastIndexOf('}');
+    let parsed: any = null;
+    if (a !== -1 && b > a) {
+      try {
+        parsed = JSON.parse(texto.slice(a, b + 1));
+      } catch {
+        parsed = null;
+      }
+    }
+    const fuera: Partial<Record<ParteDelVolcado, string>> = {};
+    for (const x of partes) {
+      if (typeof parsed?.[x] === 'string' && parsed[x].trim()) fuera[x] = parsed[x].trim();
+    }
+    return fuera;
+  };
+
+  // 1) De una sentada. 2) Lo que falte, por partes y a la vez.
+  let errorDeLlamada: unknown = null;
+  const intentar = (partes: ParteDelVolcado[]) =>
+    pedir(partes).catch(err => {
+      errorDeLlamada = errorDeLlamada || err;
+      return {} as Partial<Record<ParteDelVolcado, string>>;
+    });
+  let res = await intentar(['cuaderno', 'ficha', 'bitacora']);
+  const faltan = (['cuaderno', 'ficha', 'bitacora'] as ParteDelVolcado[]).filter(x => !res[x]);
+  let porPartes = false;
+  if (faltan.length) {
+    porPartes = true;
+    const tandas: ParteDelVolcado[][] = [];
+    if (faltan.includes('cuaderno')) tandas.push(['cuaderno']);
+    const resto = faltan.filter(x => x !== 'cuaderno');
+    if (resto.length) tandas.push(resto);
+    const extra = await Promise.all(tandas.map(intentar));
+    res = Object.assign({}, res, ...extra);
   }
-  const cuaderno = typeof parsed?.cuaderno === 'string' ? parsed.cuaderno.trim() : '';
-  const ficha = typeof parsed?.ficha === 'string' ? parsed.ficha.trim() : '';
-  const bitacora = typeof parsed?.bitacora === 'string' ? parsed.bitacora.trim() : '';
+
+  const cuaderno = res.cuaderno || '';
+  const ficha = res.ficha || '';
+  const bitacora = res.bitacora || '';
   if (!cuaderno || !ficha) {
-    throw new Error('El volcado ha vuelto incompleto o ilegible. No se ha tocado nada: vuelve a intentarlo.');
+    // Si ni siquiera hubo respuesta (sin conexión, sin cuota…), ese es el error que importa.
+    if (errorDeLlamada && !res.cuaderno && !res.ficha) throw errorDeLlamada;
+    throw new Error(
+      `El volcado ha vuelto incompleto${porPartes ? ' incluso por partes' : ''} (falta ${[!cuaderno && 'el Cuaderno', !ficha && 'la Ficha viva']
+        .filter(Boolean)
+        .join(' y ')}). No se ha tocado nada: vuelve a intentarlo.`
+    );
   }
-  return { cuaderno, ficha, bitacora, leidos: mensajes.length };
+  return { cuaderno, ficha, bitacora, leidos: mensajes.length, porPartes };
 }
 
 /**

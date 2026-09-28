@@ -1775,7 +1775,7 @@ export const Modals: React.FC<{
             <p className="text-[var(--text-primary)] mb-6 font-lora text-xs sm:text-sm whitespace-pre-wrap leading-relaxed max-h-[60vh] overflow-y-auto">
               {confirmConfig.message}
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <button
                 onClick={() => {
                   confirmConfig.onCancel?.();

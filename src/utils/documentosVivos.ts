@@ -366,12 +366,21 @@ export function contarEntradas(doc: string): Record<string, number> {
  * que nada desaparezca sin que nadie lo vea.
  */
 export function seccionesMermadas(antes: string, despues: string): string[] {
-  const a = contarEntradas(antes);
-  const d = contarEntradas(despues);
+  // Sin el número de delante: que el volcado renumere no es perder una sección.
+  const sinNumero = (r: Record<string, number>) =>
+    Object.fromEntries(Object.entries(r).map(([k, v]) => [k.replace(/^\d+[.)]\s*/, '').trim(), v]));
+  const a = sinNumero(contarEntradas(antes));
+  const d = sinNumero(contarEntradas(despues));
   const fuera: string[] = [];
   for (const [sec, n] of Object.entries(a)) {
     if (!(sec in d)) fuera.push(`«${sec}» ha desaparecido`);
     else if (n >= 3 && d[sec] < n / 2) fuera.push(`«${sec}» baja de ${n} a ${d[sec]} entradas`);
+  }
+  // Y el tamaño total: un documento que pierde casi la mitad de golpe suele ser un corte, no una poda.
+  const largoAntes = (antes || '').trim().length;
+  const largoDespues = (despues || '').trim().length;
+  if (largoAntes > 1500 && largoDespues < largoAntes * 0.6) {
+    fuera.push(`el documento entero baja de ${largoAntes} a ${largoDespues} caracteres`);
   }
   return fuera;
 }
@@ -782,4 +791,187 @@ export function reemplazarSeccion(doc: string, i: number, bloqueNuevo: string): 
   if (i < 0 || i >= secciones.length) return doc;
   const bloques = secciones.map((s, j) => (j === i ? bloqueNuevo.replace(/\s+$/, '') : s.bloque));
   return [preambulo.replace(/\s+$/, ''), ...bloques].filter(Boolean).join('\n\n') + '\n';
+}
+
+// ---------------------------------------------------------------- giros (secretos)
+
+/*
+ * 🔒 LOS GIROS VIVEN EN EL CUADERNO.
+ *
+ * Antes había dos sitios para lo mismo: la pestaña de Giros (que se llenaba
+ * con [SECRETO:] turno a turno) y los [SECRETO: …] del Cuaderno (que escribe
+ * el volcado). Tarde o temprano se contradecían. Ahora el Cuaderno manda: la
+ * pestaña se lee de él, y lo que se planta o se destapa en mitad de la partida
+ * se escribe en él al momento, sin llamar a la IA.
+ */
+export interface SecretoDelCuaderno {
+  titulo: string;
+  secreto: string;
+  comoSeDescubre?: string;
+  /** Si ella ya lo sabe, cómo lo supo (o '' si no consta). */
+  yaLoSabe?: string;
+}
+
+const RE_SECRETO = /\[SECRETO:\s*([^|\]]+?)\s*(?:\|\s*([^|\]]*?)\s*)?(?:\|\s*([^\]]*?)\s*)?\]/i;
+const RE_YA_LO_SABE = /\((?:ya lo sabe|lo supo|descubierto)\s*(?::\s*([^)]*))?\)/i;
+
+/** Todos los [SECRETO: …] del Cuaderno, estén en la sección que estén. */
+export function leerSecretosDelCuaderno(cuaderno: string): SecretoDelCuaderno[] {
+  const vistos = new Set<string>();
+  const out: SecretoDelCuaderno[] = [];
+  for (const linea of (cuaderno || '').split('\n')) {
+    const m = linea.match(RE_SECRETO);
+    if (!m) continue;
+    const titulo = m[1].trim();
+    const clave = plegar(titulo);
+    if (!titulo || vistos.has(clave)) continue;
+    vistos.add(clave);
+    const resto = linea.slice((m.index || 0) + m[0].length);
+    const sabe = resto.match(RE_YA_LO_SABE) || (m[3] || '').match(RE_YA_LO_SABE);
+    out.push({
+      titulo,
+      secreto: (m[2] || '').trim(),
+      comoSeDescubre: (m[3] || '').replace(RE_YA_LO_SABE, '').replace(/^\s*se\s+(descubre|extiende|sabe)\s*:\s*/i, '').trim() || undefined,
+      ...(sabe ? { yaLoSabe: (sabe[1] || '').trim() } : {})
+    });
+  }
+  return out;
+}
+
+const esLineaDelSecreto = (linea: string, titulo: string) => {
+  const m = linea.match(RE_SECRETO);
+  return Boolean(m && plegar(m[1]) === plegar(titulo));
+};
+
+/** Añade giros nuevos a «Secretos vigentes» (la crea si no existe). Los que ya están, no se tocan. */
+export function anotarSecretosEnCuaderno(
+  cuaderno: string,
+  nuevos: { titulo: string; secreto: string; comoSeDescubre?: string }[]
+): string {
+  const lineas = (cuaderno || '').split('\n');
+  const faltan = nuevos.filter(n => n.titulo && !lineas.some(l => esLineaDelSecreto(l, n.titulo)));
+  if (!faltan.length) return cuaderno;
+  const limpio = (v?: string) => (v || '').replace(/[|\]\n]+/g, ' ').trim();
+  const nuevasLineas = faltan.map(
+    n => `- [SECRETO: ${limpio(n.titulo)} | ${limpio(n.secreto)}${n.comoSeDescubre ? ` | se descubre: ${limpio(n.comoSeDescubre)}` : ''}]`
+  );
+  const { secciones } = partirEnSecciones(cuaderno);
+  const i = secciones.findIndex(s => /secreto/i.test(s.titulo));
+  if (i < 0) return `${(cuaderno || '').replace(/\s+$/, '')}\n\n## Secretos vigentes\n${nuevasLineas.join('\n')}\n`;
+  const cuerpo = secciones[i].bloque
+    .split('\n')
+    .filter(l => !/^\s*-\s*\(vac[ií]o\)\s*$/i.test(l))
+    .join('\n');
+  return reemplazarSeccion(cuaderno, i, `${cuerpo}\n${nuevasLineas.join('\n')}`);
+}
+
+/** Marca un giro como descubierto: «(ya lo sabe: cómo)» al final de su línea. */
+export function marcarSecretoSabidoEnCuaderno(cuaderno: string, titulo: string, como?: string): string {
+  let cambiado = false;
+  const lineas = (cuaderno || '').split('\n').map(l => {
+    if (cambiado || !esLineaDelSecreto(l, titulo) || RE_YA_LO_SABE.test(l)) return l;
+    cambiado = true;
+    return `${l.replace(/\s+$/, '')} (ya lo sabe${como ? `: ${como.replace(/[()\n]+/g, ' ').trim()}` : ''})`;
+  });
+  return cambiado ? lineas.join('\n') : cuaderno;
+}
+
+/** Quita un giro del Cuaderno. */
+export function quitarSecretoDelCuaderno(cuaderno: string, titulo: string): string {
+  const lineas = (cuaderno || '').split('\n');
+  const quedan = lineas.filter(l => !esLineaDelSecreto(l, titulo));
+  return quedan.length === lineas.length ? cuaderno : quedan.join('\n');
+}
+
+/**
+ * Pone de acuerdo la lista de giros y el Cuaderno tras un cambio, y devuelve
+ * la lista leída del Cuaderno. Dos reglas:
+ *
+ * - Si el Cuaderno ha cambiado (volcado o edición a mano), manda el Cuaderno:
+ *   lo que quitó, quitado se queda. Solo se le añade lo que la lista tenía y
+ *   el Cuaderno no había visto nunca (lo plantado en mitad de la partida).
+ * - Si solo ha cambiado la lista (una etiqueta, la mesa, la pestaña), se
+ *   escribe en el Cuaderno: lo plantado se anota, lo destapado se marca y lo
+ *   borrado se quita.
+ *
+ * Es idempotente: aplicarlo dos veces da lo mismo.
+ */
+export function reflejarSecretosEnCuaderno(antes: Memory | undefined, despues: Memory): Memory {
+  const docs = despues.documentos_vivos;
+  if (!docs) return despues;
+  const previos = antes?.gm_secrets || [];
+  const ahora = despues.gm_secrets || [];
+  const cuadernoAntes = antes?.documentos_vivos?.cuaderno ?? docs.cuaderno;
+  const cuadernoCambio = docs.cuaderno !== cuadernoAntes;
+  const clave = (s: { titulo: string }) => plegar(s.titulo);
+  const estabaEnElCuaderno = new Set(leerSecretosDelCuaderno(cuadernoAntes).map(clave));
+
+  let cuaderno = anotarSecretosEnCuaderno(
+    docs.cuaderno,
+    ahora.filter(s => !estabaEnElCuaderno.has(clave(s)))
+  );
+  for (const s of ahora) {
+    if (!s.revelado) continue;
+    const p = previos.find(x => clave(x) === clave(s));
+    if (!cuadernoCambio || !p?.revelado) cuaderno = marcarSecretoSabidoEnCuaderno(cuaderno, s.titulo, s.revelado.como);
+  }
+  if (!cuadernoCambio) {
+    for (const p of previos) {
+      if (!ahora.some(s => clave(s) === clave(p))) cuaderno = quitarSecretoDelCuaderno(cuaderno, p.titulo);
+    }
+  }
+  const conCuaderno = cuaderno === docs.cuaderno ? despues : { ...despues, documentos_vivos: { ...docs, cuaderno } };
+  return { ...conCuaderno, gm_secrets: secretosDesdeElCuaderno(conCuaderno) };
+}
+
+/** La lista de giros de la pestaña, leída del Cuaderno y con los datos extra que ya tuviera. */
+export function secretosDesdeElCuaderno(mem: Memory): NonNullable<Memory['gm_secrets']> {
+  const previos = mem.gm_secrets || [];
+  return leerSecretosDelCuaderno(mem.documentos_vivos?.cuaderno || '').map(s => {
+    const p = previos.find(x => plegar(x.titulo) === plegar(s.titulo));
+    const revelado =
+      s.yaLoSabe !== undefined ? { ...(p?.revelado || {}), como: s.yaLoSabe || p?.revelado?.como } : p?.revelado;
+    return {
+      ...(p || {}),
+      id: p?.id || `sec_doc_${slug(s.titulo)}`,
+      titulo: s.titulo,
+      secreto: s.secreto || p?.secreto || '',
+      comoSeDescubre: s.comoSeDescubre || p?.comoSeDescubre,
+      ...(revelado ? { revelado } : { revelado: undefined })
+    };
+  });
+}
+
+// ---------------------------------------------------------------- «anteriormente en…»
+
+/** Los apartados «### …» de una entrada de la Bitácora, con sus líneas. */
+export function leerApartadosDeBitacora(texto: string): { titulo: string; lineas: string[] }[] {
+  const fuera: { titulo: string; lineas: string[] }[] = [];
+  for (const l of (texto || '').split('\n')) {
+    const h = l.match(/^#{2,4}\s+(.+?)\s*$/);
+    if (h) {
+      fuera.push({ titulo: h[1].replace(/[*_]/g, '').trim(), lineas: [] });
+      continue;
+    }
+    const limpia = l.replace(/^\s*[-*]\s+/, '').trim();
+    if (!limpia || /^\(vac[ií]o\)$/i.test(limpia)) continue;
+    if (!fuera.length) fuera.push({ titulo: '', lineas: [] });
+    fuera[fuera.length - 1].lineas.push(limpia);
+  }
+  return fuera;
+}
+
+/**
+ * La última entrada de la Bitácora de los capítulos ANTERIORES a este, según
+ * el orden de la lista de capítulos (no por fecha: la del cierre se escribe
+ * cuando el capítulo nuevo ya está abierto).
+ */
+export function entradaAnteriorA(
+  docs: DocumentosVivos | undefined,
+  idsDeCapitulosAnteriores: string[]
+): EntradaDeBitacora | undefined {
+  if (!docs?.bitacora?.length || !idsDeCapitulosAnteriores.length) return undefined;
+  const antes = new Set(idsDeCapitulosAnteriores);
+  const candidatas = docs.bitacora.filter(e => antes.has(e.chatId));
+  return candidatas[candidatas.length - 1];
 }

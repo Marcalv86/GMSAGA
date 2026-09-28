@@ -1,6 +1,7 @@
+import { AnteriormenteEn } from './AnteriormenteEn';
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Chat, PlayerCharacter, Project, ProjectFile, RecuerdoEpisodicoNPC, NPC } from '../types';
+import { Chat, PlayerCharacter, Project, ProjectFile, RecuerdoEpisodicoNPC, NPC, EntradaDeBitacora } from '../types';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
 import { CreativeStudioModal } from './CreativeStudioModal';
@@ -775,8 +776,11 @@ export const ChatView: React.FC<{
   tieneNovedadMesa?: boolean;
   /** Si este capítulo ya está cerrado, es decir, si hay otro después. */
   estaCerrado?: boolean;
+  /** 📜 La entrada de la Bitácora del capítulo anterior, para el «Anteriormente en…». */
+  anteriormente?: EntradaDeBitacora;
 }> = ({
   chat,
+  anteriormente,
   chapterIndex,
   isGenerating,
   isStreaming,
@@ -1598,6 +1602,13 @@ export const ChatView: React.FC<{
             intervención de la jugadora, que es donde de verdad empieza algo.
           */}
           <div className="flex flex-col gap-2.5 md:gap-3 pb-4">
+            {anteriormente && (
+              <AnteriormenteEn
+                key={anteriormente.id}
+                entrada={anteriormente}
+                empezado={(chat?.messages || []).some(m => m.role === 'model')}
+              />
+            )}
             {!chat?.messages || chat.messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center py-6 sm:py-10 px-4 max-w-md mx-auto">
                 <div className="w-12 h-12 rounded-full border border-[var(--accent)]/30 bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] flex items-center justify-center mb-3 shadow-2xs">

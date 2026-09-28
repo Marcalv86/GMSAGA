@@ -142,7 +142,9 @@ import {
   migrarADocumentosVivos,
   reescribirDocumentos,
   seccionesMermadas,
-  sincronizarFichasConDocumentos
+  sincronizarFichasConDocumentos,
+  reflejarSecretosEnCuaderno,
+  entradaAnteriorA
 } from './utils/documentosVivos';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
@@ -1910,9 +1912,25 @@ export default function App() {
   ) => {
     if (!currentPId) return;
     setProjects(prev => {
-      const updated = prev.map(p =>
-        p.id === currentPId ? { ...p, ...(typeof fields === 'function' ? fields(p) : fields) } : p
-      );
+      const updated = prev.map(p => {
+        if (p.id !== currentPId) return p;
+        const next = { ...p, ...(typeof fields === 'function' ? fields(p) : fields) };
+        /*
+         * 🔒 Los giros viven en el Cuaderno. Da igual por dónde entren (una
+         * etiqueta, la mesa, la pestaña o el volcado): aquí se ponen de acuerdo
+         * la lista y el Cuaderno, para que nunca digan cosas distintas.
+         */
+        const m = next.memory;
+        if (
+          m &&
+          hayDocumentosVivos(m) &&
+          (m.gm_secrets !== p.memory?.gm_secrets ||
+            m.documentos_vivos?.cuaderno !== p.memory?.documentos_vivos?.cuaderno)
+        ) {
+          next.memory = reflejarSecretosEnCuaderno(p.memory, m);
+        }
+        return next;
+      });
       saveLocalProjects(updated);
       return updated;
     });
@@ -2742,11 +2760,26 @@ export default function App() {
         motivo
       });
       const etiqueta = motivo === 'cierre' ? `Cierre de ${chat.name}` : `Volcado en ${chat.name}`;
+      const mermaCuaderno = seccionesMermadas(docs.cuaderno, res.cuaderno);
+      const mermaFicha = seccionesMermadas(docs.ficha, res.ficha);
+      const { quitadas, nuevas } = diferenciasPorLinea(docs.ficha, res.ficha);
 
-      // 1. Cuaderno, Bitácora y marca de lo leído: directos.
+      const guardarDocumento = (cual: 'cuaderno' | 'ficha', texto: string) =>
+        handleUpdateProjectField(p => {
+          const actuales = p.memory?.documentos_vivos;
+          if (!actuales) return {};
+          return {
+            memory: sincronizarFichasConDocumentos({
+              ...(p.memory as any),
+              documentos_vivos: reescribirDocumentos(actuales, { [cual]: texto }, etiqueta)
+            })
+          };
+        });
+
+      // 1. La Bitácora y la marca de lo leído, siempre. El Cuaderno también, salvo que haya podado mucho.
       await handleUpdateProjectField(p => {
         const actuales = p.memory?.documentos_vivos || docs;
-        let d = reescribirDocumentos(actuales, { cuaderno: res.cuaderno }, etiqueta);
+        let d = mermaCuaderno.length ? actuales : reescribirDocumentos(actuales, { cuaderno: res.cuaderno }, etiqueta);
         if (res.bitacora) d = anotarEnBitacora(d, { chatId: chat.id, capitulo: chat.name, texto: res.bitacora });
         d = { ...d, volcadoHasta: { ...(d.volcadoHasta || {}), [chat.id]: total } };
         const base = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
@@ -2754,18 +2787,31 @@ export default function App() {
         return { memory: sincronizarFichasConDocumentos({ ...base, documentos_vivos: d }) };
       });
 
-      const podaFuerte = seccionesMermadas(docs.cuaderno, res.cuaderno).length;
-      const mermaFicha = seccionesMermadas(docs.ficha, res.ficha);
-      const { quitadas, nuevas } = diferenciasPorLinea(docs.ficha, res.ficha);
       logInfo(
         'memory_sync',
         `Documentos volcados (${etiqueta})`,
-        `${res.leidos} mensajes leídos · ficha: ${nuevas.length} líneas nuevas, ${quitadas.length} quitadas${podaFuerte ? ` · el cuaderno ha podado mucho en ${podaFuerte} sección(es)` : ''}`
+        `${res.leidos} mensajes leídos${res.porPartes ? ' · en dos llamadas' : ''} · ficha: ${nuevas.length} líneas nuevas, ${quitadas.length} quitadas${
+          mermaCuaderno.length ? ` · el cuaderno poda mucho: ${mermaCuaderno.join('; ')}` : ''
+        }`
       );
 
-      // 2. La Ficha viva, solo con su visto bueno.
-      if (quitadas.length || nuevas.length) {
-        const muestra = (l: string[]) => l.slice(0, 25).join('\n') + (l.length > 25 ? `\n… y ${l.length - 25} más` : '');
+      /*
+       * 2. Lo delicado, con su visto bueno y de uno en uno: primero el Cuaderno
+       * si ha encogido mucho (ella no lo revisa cada vez, así que un corte ahí
+       * pasaría desapercibido) y después los cambios de la Ficha viva.
+       */
+      const muestra = (l: string[]) => l.slice(0, 25).join('\n') + (l.length > 25 ? `\n… y ${l.length - 25} más` : '');
+      const preguntarFicha = () => {
+        if (!quitadas.length && !nuevas.length) {
+          if (motivo === 'manual') {
+            setAlertConfig({
+              isOpen: true,
+              title: '📚 Documentos al día',
+              message: `Se han volcado ${res.leidos} mensajes de «${chat.name}». La Ficha viva no cambia.`
+            });
+          }
+          return;
+        }
         setConfirmConfig({
           isOpen: true,
           message:
@@ -2773,32 +2819,35 @@ export default function App() {
             (nuevas.length ? `➕ Entra o cambia:\n${muestra(nuevas)}\n\n` : '') +
             (quitadas.length ? `➖ Sale:\n${muestra(quitadas)}\n\n` : '') +
             (mermaFicha.length ? `⚠️ ${mermaFicha.join(' · ')}\n\n` : '') +
-            (podaFuerte ? `🕯️ El Cuaderno ha podado bastante; si echas algo en falta, en Memoria → Documentos puedes deshacer.\n\n` : '') +
             '¿Guardar estos cambios? Si no, la ficha se queda como estaba y puedes corregirla a mano.',
-          confirmLabel: 'Guardar cambios',
-          cancelLabel: 'Dejarla como estaba',
+          confirmLabel: '✅ Guardar',
+          cancelLabel: '✋ Dejarla como estaba',
+          danger: false,
+          onConfirm: () => void guardarDocumento('ficha', res.ficha)
+        });
+      };
+      // El diálogo se cierra después de su botón; el siguiente se abre en el tic de después.
+      const despues = (fn: () => void) => () => setTimeout(fn, 0);
+
+      if (mermaCuaderno.length) {
+        setConfirmConfig({
+          isOpen: true,
+          message:
+            `🕯️ El volcado de «${chat.name}» quiere podar mucho el Cuaderno del GM:\n\n` +
+            mermaCuaderno.map(m => `✂️ ${m}`).join('\n') +
+            '\n\nA veces es una poda buena (tramas cerradas), y a veces es que la respuesta llegó cortada. ' +
+            'Si lo guardas y echas algo en falta, en Memoria → Cuaderno puedes deshacer.',
+          confirmLabel: '✅ Guardar el Cuaderno nuevo',
+          cancelLabel: '✋ Quedarme con el de antes',
           danger: false,
           onConfirm: () => {
-            void handleUpdateProjectField(p => {
-              const actuales = p.memory?.documentos_vivos;
-              if (!actuales) return {};
-              return {
-                memory: sincronizarFichasConDocumentos({
-                  ...(p.memory as any),
-                  documentos_vivos: reescribirDocumentos(actuales, { ficha: res.ficha }, etiqueta)
-                })
-              };
-            });
-          }
+            void guardarDocumento('cuaderno', res.cuaderno);
+            despues(preguntarFicha)();
+          },
+          onCancel: despues(preguntarFicha)
         });
-      } else if (motivo === 'manual') {
-        setAlertConfig({
-          isOpen: true,
-          title: '📚 Documentos al día',
-          message:
-            `Se han volcado ${res.leidos} mensajes de «${chat.name}». La Ficha viva no cambia.` +
-            (podaFuerte ? '\n\n🕯️ El Cuaderno ha podado bastante; si echas algo en falta, en Memoria → Documentos puedes deshacer.' : '')
-        });
+      } else {
+        preguntarFicha();
       }
       return res.bitacora || null;
     } catch (err) {
@@ -6901,6 +6950,14 @@ export default function App() {
           {activeTab === 'chat' && (
             <ChatView
               chat={currentChat}
+              anteriormente={
+                hayDocumentosVivos(currentProject?.memory) && currentChapterIndex > 0
+                  ? entradaAnteriorA(
+                      currentProject?.memory?.documentos_vivos,
+                      currentChats.slice(0, currentChapterIndex).map(c => c.id)
+                    )
+                  : undefined
+              }
               chapterIndex={currentChapterIndex >= 0 ? currentChapterIndex : 0}
               isGenerating={isGenerating}
               isStreaming={isStreamingTurn}
