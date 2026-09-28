@@ -1521,22 +1521,22 @@ export const ChatView: React.FC<{
           {onOpenNovelReader && (
             <button
               onClick={onOpenNovelReader}
-              className="text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[var(--glass)] px-2 sm:px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+              className="text-xs font-cinzel text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] hover:bg-[var(--glass)] min-h-[32px] min-w-[32px] justify-center px-2 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
               title="Leer la crónica en formato novela maquetada"
               aria-label="Modo novela"
             >
-              <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
+              <BookOpen className="w-4 h-4" />
             </button>
           )}
 
           <button
             onClick={onExportPDF}
             disabled={isGenerating || !chat?.messages?.length}
-            className="text-xs font-cinzel font-bold text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-2 sm:px-2.5 py-1 rounded-lg cursor-pointer disabled:opacity-30 transition-all flex items-center gap-1.5 shadow-2xs"
+            className="text-xs font-cinzel font-bold text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] min-h-[32px] min-w-[32px] justify-center px-2 py-1 rounded-lg cursor-pointer disabled:opacity-30 transition-all flex items-center gap-1.5 shadow-2xs"
             title="Exportar este capítulo como libro ilustrado en PDF"
             aria-label="Exportar PDF"
           >
-            <Scroll className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Exportar Tomo (PDF)</span>
+            <Scroll className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -2124,18 +2124,17 @@ export const ChatView: React.FC<{
             <div className="flex flex-wrap items-center gap-2 min-w-0">
             <button
               onClick={handleOpenTransitionModal}
-              className="shrink-0 min-h-[32px] text-xs font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              className="shrink-0 min-h-[36px] min-w-[36px] justify-center text-xs font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
               aria-label="Salto de tiempo o de escena"
               title="Avanzar el reloj (descanso largo/corto, horas, días) o cambiar de escenario"
             >
               <FastForward className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Salto de Tiempo / Escena</span>
             </button>
             <button
               onClick={alternarCoNarrativa}
               aria-pressed={coNarrativa}
               aria-label="Co-narrativa: llevar también a los PNJs"
-              className={`shrink-0 min-h-[32px] text-xs font-cinzel font-bold px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border ${
+              className={`shrink-0 min-h-[36px] min-w-[36px] justify-center text-xs font-cinzel font-bold px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border ${
                 coNarrativa
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)]'
                   : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)]'
@@ -2147,19 +2146,15 @@ export const ChatView: React.FC<{
               }
             >
               <Drama className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">
-                {coNarrativa ? 'Co-narrativa activada' : 'Co-narrativa'}
-              </span>
             </button>
             {hayMensajes && !isLastMessageIncomplete && (
               <button
                 onClick={() => onContinueNarrative()}
-                className="shrink-0 min-h-[32px] text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--on-accent)] hover:bg-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="shrink-0 min-h-[36px] min-w-[36px] justify-center text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--on-accent)] hover:bg-[var(--accent)] border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 rounded-full shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                 aria-label="Continuar la narración"
                 title="Pide al Narrador que continúe narrando la escena actual sin escribir un nuevo mensaje"
               >
                 <Play className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Continuar Narración</span>
               </button>
             )}
             </div>

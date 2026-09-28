@@ -114,16 +114,51 @@ function Marcadores({ texto }: { texto: string }) {
   ].filter(e => e.m);
   const reloj = texto.match(/(?:^|\s)(\d{1,2})\s*\/\s*(\d{1,2})(?:\s|$|·)/);
   if (!ejes.length && !reloj) return null;
+  const EJE: Record<string, { emoji: string; nombre: string; barra: string }> = {
+    ATR: { emoji: '🔥', nombre: 'Atracción', barra: 'bg-rose-500 dark:bg-rose-400' },
+    VÍN: { emoji: '🤝', nombre: 'Vínculo', barra: 'bg-amber-500 dark:bg-amber-400' },
+    CON: { emoji: '🛡️', nombre: 'Confianza', barra: 'bg-emerald-600 dark:bg-emerald-400' }
+  };
   return (
-    <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-      {ejes.map(e => (
-        <span
-          key={e.k}
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[10px] font-cinzel font-bold text-[var(--accent)]"
-        >
-          {e.k} {e.m![1]}
-        </span>
-      ))}
+    <div className="flex flex-col gap-1.5 mb-2">
+      {ejes.length > 0 && (
+        <div className="grid gap-1">
+          {ejes.map(e => {
+            const v = e.m![1];
+            const n = Number(v);
+            const eje = EJE[e.k];
+            // Sin número (ATR «desea» / «interés»): una chapita en lugar de la barra.
+            if (!Number.isFinite(n)) {
+              return (
+                <div key={e.k} className="flex items-center gap-1.5 text-[10px] font-cinzel font-bold text-[var(--text-secondary)]">
+                  <span aria-hidden>{eje.emoji}</span>
+                  <span className="w-[62px] shrink-0">{eje.nombre}</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                    {/desea/i.test(v) ? '💘 la desea' : '💫 interés'}
+                  </span>
+                </div>
+              );
+            }
+            // La escala es de 0 a 10; si viene sobre 20 (fichas antiguas), se lleva a 10.
+            const sobre = n > 10 ? 20 : 10;
+            const pct = Math.max(0, Math.min(100, (n / sobre) * 100));
+            return (
+              <div
+                key={e.k}
+                className="flex items-center gap-1.5 text-[10px] font-cinzel font-bold text-[var(--text-secondary)]"
+                title={`${eje.nombre}: ${n} de ${sobre}`}
+              >
+                <span aria-hidden>{eje.emoji}</span>
+                <span className="w-[62px] shrink-0">{eje.nombre}</span>
+                <span className="flex-1 h-1.5 rounded-full bg-[var(--glass-border)] overflow-hidden">
+                  <span className={`block h-full rounded-full ${eje.barra}`} style={{ width: `${pct}%` }} />
+                </span>
+                <span className="w-5 text-right tabular-nums text-[var(--text-primary)]">{n}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {reloj && Number(reloj[2]) <= 12 && Number(reloj[1]) <= Number(reloj[2]) && (
         <span className="inline-flex items-center gap-0.5" title={`${reloj[1]} de ${reloj[2]}`}>
           {Array.from({ length: Number(reloj[2]) }).map((_, i) => (
@@ -141,6 +176,12 @@ function Marcadores({ texto }: { texto: string }) {
     </div>
   );
 }
+
+/** Quita del texto el «ATR n · VÍN n · CON n» que ya enseñan las barras. */
+const sinEjes = (t: string) =>
+  t
+    .replace(/^\s*(?:atr:\s*[+-]?\d+\s*→\s*)?ATR\s*[:=]?\s*(?:\d+|desea|inter[eé]s)\s*·\s*V[IÍ]N\s*[:=]?\s*\d+\s*·\s*CON\s*[:=]?\s*\d+\s*[—·.:-]?\s*/i, '')
+    .trim() || t;
 
 const Texto = ({ children }: { children: string }) => (
   <div className="markdown-body text-[var(--text-primary)] text-xs sm:text-[13px] leading-relaxed font-lora break-words [&_p]:m-0 [&_p+p]:mt-1.5">
@@ -195,7 +236,7 @@ function Bloques({ bloques, columnas }: { bloques: Bloque[]; columnas: boolean }
               </div>
             )}
             <Marcadores texto={`${b.nombre || ''} ${b.texto}`} />
-            {b.texto && <Texto>{b.texto}</Texto>}
+            {b.texto && <Texto>{sinEjes(b.texto)}</Texto>}
           </div>
         );
       })}

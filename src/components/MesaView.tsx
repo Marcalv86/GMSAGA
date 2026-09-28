@@ -540,7 +540,7 @@ export const MesaView: React.FC<{
               title="Leer la crónica en formato novela maquetada"
               aria-label="Modo novela"
             >
-              <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novela</span>
+              <BookOpen className="w-4 h-4" />
             </button>
           )}
           {mensajes.length > 0 && (
