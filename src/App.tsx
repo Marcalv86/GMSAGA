@@ -1937,9 +1937,9 @@ export default function App() {
     void handleUpdateProjectField(p => {
       if (p.memory?.documentos_vivos) return {};
       const base = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
-      logInfo('memory_sync', 'Documentos vivos creados', 'Se han montado el Cuaderno del GM y la Ficha viva con la memoria que ya había.');
       return { memory: { ...base, documentos_vivos: migrarADocumentosVivos(p.memory) } };
     });
+    logInfo('memory_sync', 'Documentos vivos creados', 'Se han montado el Cuaderno del GM y la Ficha viva con la memoria que ya había.');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPId, tieneDocumentosVivos]);
 
@@ -6923,6 +6923,7 @@ export default function App() {
               onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
               onCompletarFichaDesdeDocumento={() => completarFichaDesdeDocumento(currentFiles, true)}
               isGenerating={isSyncingMemory}
+              onVolcarAhora={currentChat ? () => void volcarDocumentos(currentChat, 'manual') : undefined}
             />
           )}
 
