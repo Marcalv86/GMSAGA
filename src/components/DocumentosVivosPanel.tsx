@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { emojiDeSeccion, TarjetasDeBitacora, TarjetasDeDocumento } from './TarjetasDeDocumento';
 import { ChevronDown, ChevronRight, Pencil, Save, Undo2, X } from 'lucide-react';
 import type { DocumentosVivos } from '../types';
 import { partirEnSecciones, reemplazarSeccion } from '../utils/documentosVivos';
@@ -129,6 +129,8 @@ const Documento: React.FC<{
                     : 'text-[var(--text-secondary)] border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)]'
                 }`}
               >
+                {i > 0 && <span className="mr-1">{emojiDeSeccion(sec.titulo)}</span>}
+                {i === 0 && <span className="mr-1">📖</span>}
                 {sec.titulo}
                 {sec.entradas > 0 && <span className="ml-1 opacity-70">({sec.entradas})</span>}
               </button>
@@ -144,9 +146,7 @@ const Documento: React.FC<{
           className="w-full min-h-[60vh] p-3 sm:p-4 bg-[var(--bg-color)] text-[var(--text-primary)] font-mono text-xs sm:text-sm leading-relaxed outline-none resize-y"
         />
       ) : (
-        <div className="px-3 sm:px-5 py-3 markdown-body text-[var(--text-primary)] text-xs sm:text-sm leading-relaxed font-lora break-words">
-          <ReactMarkdown>{visible}</ReactMarkdown>
-        </div>
+        <TarjetasDeDocumento texto={texto} seccion={elegida >= 0 ? elegida : undefined} />
       )}
     </section>
   );
@@ -185,9 +185,7 @@ const Bitacora: React.FC<{ docs: DocumentosVivos }> = ({ docs }) => {
                 <span className="ml-auto text-[10px] text-[var(--text-secondary)] shrink-0">{fechaCorta(e.fecha)}</span>
               </button>
               {abiertaEsta && (
-                <div className="markdown-body px-4 sm:px-6 pb-3 text-[var(--text-primary)] text-xs sm:text-sm leading-relaxed font-lora break-words">
-                  <ReactMarkdown>{e.texto}</ReactMarkdown>
-                </div>
+                <TarjetasDeBitacora texto={e.texto} />
               )}
             </li>
           );
