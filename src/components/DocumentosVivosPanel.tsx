@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { emojiDeSeccion, TarjetasDeBitacora, TarjetasDeDocumento } from './TarjetasDeDocumento';
-import { ChevronDown, ChevronRight, Pencil, Save, Undo2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Pencil, Save, Undo2, X } from 'lucide-react';
 import type { DocumentosVivos } from '../types';
 import { partirEnSecciones, reemplazarSeccion } from '../utils/documentosVivos';
 
@@ -59,7 +59,7 @@ const Documento: React.FC<{
                   }}
                   className="min-h-[36px] px-2.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-cinzel font-bold cursor-pointer"
                 >
-                  Sí, deshacer
+                  ↩️ ¿Seguro?
                 </button>
                 <button
                   onClick={() => setConfirmarDeshacer(false)}
@@ -72,11 +72,11 @@ const Documento: React.FC<{
             ) : (
               <button
                 onClick={() => setConfirmarDeshacer(true)}
+                aria-label="Deshacer"
                 title={`Vuelve a la versión anterior${ultimaVersion ? ` (${ultimaVersion})` : ''}. Quedan ${versiones} guardadas.`}
-                className="min-h-[36px] px-2.5 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold flex items-center gap-1 cursor-pointer"
+                className="min-h-[36px] min-w-[36px] px-2 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] flex items-center justify-center cursor-pointer"
               >
-                <Undo2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Deshacer</span>
+                <Undo2 className="w-4 h-4" />
               </button>
             )
           )}
@@ -84,25 +84,29 @@ const Documento: React.FC<{
             <>
               <button
                 onClick={guardar}
-                className="min-h-[36px] px-2.5 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-[11px] font-cinzel font-bold flex items-center gap-1 cursor-pointer"
+                aria-label="Guardar"
+                title="Guardar"
+                className="min-h-[36px] min-w-[36px] px-2 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] flex items-center justify-center cursor-pointer"
               >
-                <Save className="w-3.5 h-3.5" />
-                Guardar
+                <Check className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setEditando(false)}
-                className="min-h-[36px] px-2.5 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] text-[11px] font-cinzel font-bold cursor-pointer"
+                aria-label="Cancelar"
+                title="Cancelar"
+                className="min-h-[36px] min-w-[36px] px-2 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] flex items-center justify-center cursor-pointer"
               >
-                Cancelar
+                <X className="w-4 h-4" />
               </button>
             </>
           ) : (
             <button
               onClick={empezar}
-              className="min-h-[36px] px-2.5 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold flex items-center gap-1 cursor-pointer"
+              aria-label="Editar"
+              title={elegida >= 0 ? `Editar «${secciones[elegida].titulo}»` : 'Editar el documento entero'}
+              className="min-h-[36px] min-w-[36px] px-2 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] flex items-center justify-center cursor-pointer"
             >
-              <Pencil className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Editar</span>
+              <Pencil className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -118,21 +122,32 @@ const Documento: React.FC<{
             return (
               <button
                 key={`${idx}-${sec.titulo}`}
+                title={sec.titulo}
+                aria-label={sec.titulo}
                 onClick={() => {
                   if (editando) return;
                   setPestana(idx);
                 }}
                 disabled={editando && !activa}
-                className={`min-h-[32px] px-2.5 rounded-md text-[11px] font-cinzel font-bold whitespace-nowrap transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                className={`min-h-[36px] min-w-[36px] px-2 rounded-lg text-[11px] font-cinzel font-bold whitespace-nowrap flex items-center justify-center gap-1 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                   activa
                     ? 'bg-[var(--accent)] text-[var(--on-accent)]'
                     : 'text-[var(--text-secondary)] border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)]'
                 }`}
               >
-                {i > 0 && <span className="mr-1">{emojiDeSeccion(sec.titulo)}</span>}
-                {i === 0 && <span className="mr-1">📖</span>}
-                {sec.titulo}
-                {sec.entradas > 0 && <span className="ml-1 opacity-70">({sec.entradas})</span>}
+                <span className="text-base leading-none" aria-hidden>
+                  {i === 0 ? '📖' : emojiDeSeccion(sec.titulo)}
+                </span>
+                {activa && <span className="whitespace-normal text-left">{sec.titulo}</span>}
+                {sec.entradas > 0 && (
+                  <span
+                    className={`text-[9px] leading-none px-1 py-0.5 rounded-full ${
+                      activa ? 'bg-[var(--on-accent)]/20' : 'bg-[var(--glass)] opacity-80'
+                    }`}
+                  >
+                    {sec.entradas}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -207,18 +222,18 @@ export const DocumentosVivosPanel: React.FC<{
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--text-secondary)] px-1">
-        <span>
-          {docs.actualizadoEl ? `Última actualización: ${fechaCorta(docs.actualizadoEl)}` : 'Sin actualizar todavía'} ·
-          se pone al día al cerrar capítulo.
+        <span title="Se pone al día sola al cerrar capítulo.">
+          🕰️ {docs.actualizadoEl ? fechaCorta(docs.actualizadoEl) : 'Sin actualizar todavía'}
         </span>
         {onVolcarAhora && (
           <button
             onClick={onVolcarAhora}
             className="min-h-[36px] px-2.5 rounded-lg border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] text-[11px] font-cinzel font-bold flex items-center gap-1 cursor-pointer shrink-0"
-            title="Pone al día los documentos con lo jugado en el capítulo actual, sin cerrarlo."
+            title="Volcar ahora: pone al día los documentos con lo jugado en el capítulo actual, sin cerrarlo."
+            aria-label="Volcar ahora"
           >
-            <Save className="w-3.5 h-3.5" />
-            Volcar ahora
+            <Save className="w-4 h-4" />
+            Volcar
           </button>
         )}
       </div>

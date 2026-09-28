@@ -1011,7 +1011,8 @@ export const MemoryManager: React.FC<{
         </div>
       )}
 
-      {/* Banner de Memoria Viva Autónoma / Modo Supervisión */}
+      {/* Banner de Memoria Viva Autónoma: solo en el modo antiguo, sin documentos vivos */}
+      {!memory.documentos_vivos && (
       <div className="mb-4 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 p-3 sm:p-3.5 rounded-xl shadow-xs flex items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 shrink-0">
@@ -1030,34 +1031,35 @@ export const MemoryManager: React.FC<{
           ● En Vivo
         </span>
       </div>
+      )}
 
       {/* Top Nav & AI Action Button */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 md:mb-6 border-b border-[var(--glass-border)] pb-3 md:pb-4 gap-3 md:gap-4 w-full">
-        <div className="flex gap-1 sm:gap-2 md:gap-3 flex-wrap w-full lg:w-auto">
+      <div className="flex flex-row flex-wrap justify-between items-start mb-4 md:mb-6 border-b border-[var(--glass-border)] pb-3 md:pb-4 gap-2 md:gap-4 w-full">
+        <div className="flex gap-1.5 sm:gap-2 flex-wrap flex-1 min-w-0">
           {[
             {
-              id: 'character',
+              id: 'character', emoji: '🧝',
               label: 'Protagonista (OC)',
               shortLabel: 'Protagonista',
               icon: User,
-              count: memory.player_character?.name ? `(${memory.player_character.name})` : ''
+              count: ''
             },
             {
-              id: 'ficha_viva',
+              id: 'ficha_viva', emoji: '🎒',
               label: 'Ficha viva',
               shortLabel: 'Ficha viva',
               icon: Backpack,
-              count: memory.documentos_vivos?.bitacora?.length ? `(${memory.documentos_vivos.bitacora.length})` : ''
+              count: ''
             },
             {
-              id: 'cuaderno',
+              id: 'cuaderno', emoji: '🕯️',
               label: 'Cuaderno',
               shortLabel: 'Cuaderno',
               icon: NotebookPen,
               count: ''
             },
             {
-              id: 'inventario',
+              id: 'inventario', emoji: '🎒',
               label: 'Inventario',
               shortLabel: 'Mochila',
               icon: Backpack,
@@ -1067,7 +1069,7 @@ export const MemoryManager: React.FC<{
               })()
             },
             {
-              id: 'diary',
+              id: 'diary', emoji: '📅',
               label: 'Diario & Agenda',
               shortLabel: 'Diario',
               icon: CalendarClock,
@@ -1075,39 +1077,39 @@ export const MemoryManager: React.FC<{
                 ? `(${(project.threads || []).filter(t => t.status === 'pending').length})`
                 : ''
             },
-            { id: 'npcs', label: 'PNJs', shortLabel: 'PNJs', icon: Users, count: memory.npcs?.length ? `(${memory.npcs.length})` : '' },
+            { id: 'npcs', emoji: '👥', label: 'PNJs', shortLabel: 'PNJs', icon: Users, count: memory.npcs?.length ? `(${memory.npcs.length})` : '' },
             {
-              id: 'locs',
+              id: 'locs', emoji: '🗺️',
               label: 'Lugares',
               shortLabel: 'Lugares',
               icon: MapPin,
               count: memory.locations?.length ? `(${memory.locations.length})` : ''
             },
             {
-              id: 'quests',
+              id: 'quests', emoji: '📜',
               label: 'Tramas',
               shortLabel: 'Tramas',
               icon: Scroll,
               count: memory.quests?.length ? `(${memory.quests.length})` : ''
             },
-            { id: 'story', label: 'Resumen', shortLabel: 'Resumen', icon: BookOpen, count: memory.story ? '' : '' },
-            { id: 'status', label: 'Estado', shortLabel: 'Estado', icon: Compass, count: memory.current_status ? '' : '' },
+            { id: 'story', emoji: '📖', label: 'Resumen', shortLabel: 'Resumen', icon: BookOpen, count: memory.story ? '' : '' },
+            { id: 'status', emoji: '🧭', label: 'Estado', shortLabel: 'Estado', icon: Compass, count: memory.current_status ? '' : '' },
             {
-              id: 'giros',
+              id: 'giros', emoji: '🔒',
               label: 'Giros',
               shortLabel: 'Giros',
               icon: Lock,
               count: memory.gm_secrets?.length ? `(${memory.gm_secrets.filter(x => !x.revelado).length})` : ''
             },
             {
-              id: 'bambalinas',
+              id: 'bambalinas', emoji: '👣',
               label: 'Fuera de cámara',
               shortLabel: 'Bambalinas',
               icon: Footprints,
               count: memory.gm_bambalinas?.length ? `(${memory.gm_bambalinas.length})` : ''
             },
             {
-              id: 'relojes',
+              id: 'relojes', emoji: '⏳',
               label: 'Relojes',
               shortLabel: 'Relojes',
               icon: Timer,
@@ -1116,14 +1118,14 @@ export const MemoryManager: React.FC<{
                 : ''
             },
             {
-              id: 'facciones',
+              id: 'facciones', emoji: '🚩',
               label: 'Facciones',
               shortLabel: 'Facciones',
               icon: Flag,
               count: memory.gm_facciones?.length ? `(${memory.gm_facciones.length})` : ''
             },
             {
-              id: 'preparado',
+              id: 'preparado', emoji: '🗂️',
               label: 'Preparado',
               shortLabel: 'Preparado',
               icon: Layers,
@@ -1134,28 +1136,27 @@ export const MemoryManager: React.FC<{
           ]
             .filter(tab => seccionesVisibles.includes(tab.id as SeccionMemoria))
             .map(tab => {
-              const TabIcon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
                   title={tab.label}
                   aria-label={tab.label}
-                  className={`font-cinzel text-xs md:text-sm p-2 sm:px-3 sm:py-2 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 shrink-0 ${
+                  className={`font-cinzel text-xs md:text-sm min-h-[40px] min-w-[40px] px-2 sm:px-2.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
                     activeTab === tab.id
                       ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-sm'
                       : 'text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--surface)_40%,transparent)] hover:bg-[var(--glass)] hover:text-[var(--accent)] border border-[var(--glass-border)]'
                   }`}
                 >
-                  <TabIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                  {tab.count && <span className="text-[10px] opacity-80">{tab.count}</span>}
+                  <span className="text-base leading-none" aria-hidden>{tab.emoji}</span>
+                  {activeTab === tab.id && <span className="whitespace-nowrap">{tab.shortLabel}</span>}
+                  {tab.count && <span className="text-[10px] opacity-80">{tab.count.replace(/[()]/g, '')}</span>}
                 </button>
               );
             })}
         </div>
 
-        <div className="flex items-center gap-2 w-full lg:w-auto justify-end flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
           {onTriggerAIUpdate && (
             <button
               onClick={handleSyncWithAI}
@@ -1166,10 +1167,9 @@ export const MemoryManager: React.FC<{
                   : 'Analizar todas las sesiones y capítulos para sincronizar la memoria viva, PNJs, tramas y lugares con la IA'
               }
               aria-label={memory.documentos_vivos ? 'Repasar diario, ficha y giros' : 'Sincronizar con IA'}
-              className="text-xs text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] border border-[var(--accent)] p-2 sm:px-4 sm:py-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-sm disabled:opacity-50"
+              className="text-xs text-[var(--on-accent)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] border border-[var(--accent)] min-h-[40px] min-w-[40px] p-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-sm disabled:opacity-50"
             >
-              <Sparkles className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${isSyncingAI ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isSyncingAI ? 'Sincronizando...' : memory.documentos_vivos ? 'Repasar diario, ficha y giros' : 'Sincronizar con IA'}</span>
+              <Sparkles className={`w-4 h-4 ${isSyncingAI ? 'animate-spin' : ''}`} />
             </button>
           )}
 
@@ -1178,9 +1178,9 @@ export const MemoryManager: React.FC<{
             disabled={isGenerating}
             title="Vaciar y restablecer toda la memoria viva de la campaña en todas las pestañas"
             aria-label="Restablecer toda la memoria"
-            className="text-xs text-red-700 hover:text-red-900 border border-red-200 bg-red-50/70 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60 dark:hover:bg-red-900/50 p-2 sm:px-3 sm:py-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-xs disabled:opacity-50"
+            className="text-xs text-red-700 hover:text-red-900 border border-red-200 bg-red-50/70 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60 dark:hover:bg-red-900/50 min-h-[40px] min-w-[40px] p-2 rounded-lg font-cinzel transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-xs disabled:opacity-50"
           >
-            <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Restablecer Toda la Memoria</span>
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>

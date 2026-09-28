@@ -6636,20 +6636,23 @@ export default function App() {
             {currentChat && hayDocumentosVivos(currentProject?.memory) && (
               <button
                 onClick={() => void volcarDocumentos(currentChat, 'manual')}
-                className="hover:text-[var(--accent)] cursor-pointer text-[11px] flex items-center gap-0.5 ml-auto mr-2"
-                title="Pone al día el Cuaderno del GM, la Ficha viva y la Bitácora con lo jugado en este capítulo, sin cerrarlo."
+                className="min-h-[36px] min-w-[36px] rounded-lg border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)] cursor-pointer flex items-center justify-center ml-auto mr-1.5"
+                title="Volcar ahora: pone al día el Cuaderno del GM, la Ficha viva y la Bitácora con lo jugado en este capítulo, sin cerrarlo."
+                aria-label="Volcar ahora"
               >
-                <Save className="w-3 h-3" />
-                <span>Volcar ahora</span>
+                <Save className="w-4 h-4" />
               </button>
             )}
             <button
               onClick={handleCreateChat}
               disabled={!currentPId}
-              className="hover:text-[var(--accent)] disabled:opacity-40 cursor-pointer text-[11px] flex items-center gap-0.5"
+              title="Nuevo capítulo: cierra el actual y abre otro."
+              aria-label="Nuevo capítulo"
+              className={`min-h-[36px] min-w-[36px] rounded-lg border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)] disabled:opacity-40 cursor-pointer flex items-center justify-center ${
+                currentChat && hayDocumentosVivos(currentProject?.memory) ? '' : 'ml-auto'
+              }`}
             >
-              <Plus className="w-3 h-3" />
-              <span>Nuevo Capítulo</span>
+              <Plus className="w-4 h-4" />
             </button>
           </div>
 
