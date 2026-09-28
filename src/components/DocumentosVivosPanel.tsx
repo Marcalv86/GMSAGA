@@ -109,7 +109,7 @@ const Documento: React.FC<{
       </header>
       {secciones.length > 1 && (
         <nav
-          className="flex gap-1.5 px-3 sm:px-4 py-2 overflow-x-auto no-scrollbar border-b border-[var(--glass-border)] bg-[var(--surface)]"
+          className="flex flex-wrap gap-1.5 px-3 sm:px-4 py-2 border-b border-[var(--glass-border)] bg-[var(--surface)]"
           aria-label="Secciones"
         >
           {[{ titulo: 'Todo', entradas: -1 }, ...secciones].map((sec, i) => {
@@ -123,7 +123,7 @@ const Documento: React.FC<{
                   setPestana(idx);
                 }}
                 disabled={editando && !activa}
-                className={`shrink-0 min-h-[32px] px-2.5 rounded-md text-[11px] font-cinzel font-bold whitespace-nowrap transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                className={`min-h-[32px] px-2.5 rounded-md text-[11px] font-cinzel font-bold whitespace-nowrap transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                   activa
                     ? 'bg-[var(--accent)] text-[var(--on-accent)]'
                     : 'text-[var(--text-secondary)] border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)]'
