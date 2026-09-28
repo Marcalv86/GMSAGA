@@ -759,6 +759,47 @@ export interface SecretoDeCampana {
   };
 }
 
+/**
+ * 📚 LOS DOCUMENTOS VIVOS: el Cuaderno del GM, la Ficha viva y la Bitácora.
+ *
+ * El estado de la partida vivía repartido en listas (relojes, bambalinas,
+ * facciones, mochila…) que se rellenaban leyendo etiquetas turno a turno, y
+ * varias vías escribían a la vez sobre lo mismo. Aquí vive en documentos de
+ * texto que el Director reescribe de una sentada al cerrar el capítulo (o
+ * cuando la jugadora pulsa «Volcar ahora»), que se pueden leer y corregir a
+ * mano, y que guardan su versión anterior para poder deshacer.
+ */
+export interface VersionDeDocumento {
+  texto: string;
+  fecha: number;
+  motivo: string;
+}
+
+export interface EntradaDeBitacora {
+  id: string;
+  chatId: string;
+  capitulo: string;
+  /** Si el capítulo se volcó en varias veces, qué parte es esta. */
+  parte?: number;
+  texto: string;
+  fecha: number;
+}
+
+export interface DocumentosVivos {
+  /** 🕯️ Cuaderno del GM, en Markdown. Oculto para la jugadora. */
+  cuaderno: string;
+  /** 🎒 Ficha viva: estado, dinero, inventario y lista de compras. Visible y editable. */
+  ficha: string;
+  /** 📖 Bitácora: una entrada por capítulo (o por parte), que se añade y no se reescribe. */
+  bitacora: EntradaDeBitacora[];
+  /** Versiones anteriores de cada documento, la más reciente al final. */
+  versiones?: { cuaderno: VersionDeDocumento[]; ficha: VersionDeDocumento[] };
+  /** Hasta qué mensaje de cada capítulo se ha volcado ya, para no leerlo dos veces. */
+  volcadoHasta?: Record<string, number>;
+  creadoEl: number;
+  actualizadoEl?: number;
+}
+
 export interface Memory {
   story: string;
   quests: Quest[];
@@ -866,6 +907,11 @@ export interface Memory {
   puentes_de_busqueda?: { termino: string; relacionados: string[] }[];
   no_son_pnj?: string[];
   gm_secrets?: SecretoDeCampana[];
+  /**
+   * Los documentos vivos. Cuando existen, mandan sobre las listas de etiquetas
+   * (mochila, relojes, bambalinas, facciones, preparado), que dejan de leerse.
+   */
+  documentos_vivos?: DocumentosVivos;
   /** Lo que pasa fuera de cámara, día a día, aunque nadie lo vea. */
   gm_bambalinas?: MovimientoOculto[];
   /** Los planes que corren por detrás, con su cuenta atrás. */

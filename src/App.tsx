@@ -128,12 +128,21 @@ import {
   generarNoticiasSaltoTemporal,
   anclarHistorialPorHud,
   consolidarCronicaAlCerrarCapitulo,
+  volcarDocumentosVivos,
   ordenarChatsCronologicamente
 } from './utils/geminiHelper';
 import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo, desarchivarCapitulo } from './utils/chapterArchiver';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa, leerMesa, hayMensajesSinLeerEnMesa, marcarMesaLeida, MensajeDeMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario, sonElMismoObjeto, deduplicarInventario } from './utils/inventoryTag';
+import {
+  anotarEnBitacora,
+  diferenciasPorLinea,
+  hayDocumentosVivos,
+  migrarADocumentosVivos,
+  reescribirDocumentos,
+  seccionesMermadas
+} from './utils/documentosVivos';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
 import { aplicarOlvidos, fijarEstadoEnMemoria, nadaQueOlvidar, resumirOlvidos } from './utils/ordenesDeMesa';
@@ -1815,7 +1824,13 @@ export default function App() {
      * queda en el bolsillo.
      */
     const pcPrevio = mem.player_character;
-    const hayInventario = !cambioVacio(t.inventario);
+    /*
+     * Con documentos vivos, la mochila y el cuaderno ya no se tocan turno a
+     * turno: se reescriben de una sentada al cerrar capítulo. Así una
+     * respuesta rehecha no deja objetos ni relojes fantasma.
+     */
+    const conDocumentos = hayDocumentosVivos(mem);
+    const hayInventario = !conDocumentos && !cambioVacio(t.inventario);
     const loAprendido = t.aprendido || [];
     const player_character =
       !hayInventario && nadaAprendido(loAprendido)
@@ -1863,12 +1878,12 @@ export default function App() {
       npcs: npcsDeduplicados,
       locations: lugaresDeLaCampana,
       gm_secrets: secretosDeCampana,
-      gm_bambalinas: movimientos.length ? aplicarBambalinas(mem.gm_bambalinas, movimientos) : mem.gm_bambalinas,
-      gm_relojes: (t.relojes || []).length
+      gm_bambalinas: !conDocumentos && movimientos.length ? aplicarBambalinas(mem.gm_bambalinas, movimientos) : mem.gm_bambalinas,
+      gm_relojes: !conDocumentos && (t.relojes || []).length
         ? aplicarRelojes(mem.gm_relojes, t.relojes || [], diaActual)
         : mem.gm_relojes,
-      gm_facciones: (t.facciones || []).length ? aplicarFacciones(mem.gm_facciones, t.facciones || []) : mem.gm_facciones,
-      gm_preparado: (t.preparado || []).length
+      gm_facciones: !conDocumentos && (t.facciones || []).length ? aplicarFacciones(mem.gm_facciones, t.facciones || []) : mem.gm_facciones,
+      gm_preparado: !conDocumentos && (t.preparado || []).length
         ? aplicarPreparado(mem.gm_preparado, t.preparado || [], diaActual)
         : mem.gm_preparado,
       player_character,
@@ -1907,6 +1922,26 @@ export default function App() {
   };
 
 
+
+  /*
+   * 📚 PASO A DOCUMENTOS VIVOS.
+   *
+   * La primera vez que se abre un proyecto sin ellos, se montan con lo que ya
+   * hay guardado (mochila, relojes, fuera de cámara, facciones, preparado y
+   * memoria general). Sin IA y sin borrar nada: las listas viejas se quedan
+   * donde estaban, simplemente dejan de leerse.
+   */
+  const tieneDocumentosVivos = Boolean(currentProject?.memory?.documentos_vivos);
+  useEffect(() => {
+    if (!currentPId || !currentProject || tieneDocumentosVivos) return;
+    void handleUpdateProjectField(p => {
+      if (p.memory?.documentos_vivos) return {};
+      const base = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
+      return { memory: { ...base, documentos_vivos: migrarADocumentosVivos(p.memory) } };
+    });
+    logInfo('memory_sync', 'Documentos vivos creados', 'Se han montado el Cuaderno del GM y la Ficha viva con la memoria que ya había.');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPId, tieneDocumentosVivos]);
 
   /**
    * Guarda lo que el Director haya apuntado desde la mesa.
@@ -2449,7 +2484,14 @@ export default function App() {
   // Chapter / Chat Management
   const handleArchiveChatAsFile = async (
     targetChat?: Chat,
-    options?: { silent?: boolean; openFilesTab?: boolean }
+    options?: {
+      silent?: boolean;
+      openFilesTab?: boolean;
+      /** Resumen ya hecho (la entrada de bitácora del volcado): no se pide otro a la IA. */
+      resumen?: string;
+      /** Sin ninguna llamada a la IA: ni resumen ni memoria general. */
+      sinIA?: boolean;
+    }
   ) => {
     const chat = targetChat || currentChat;
     if (!currentPId || !currentProject || !chat) return;
@@ -2478,8 +2520,8 @@ export default function App() {
     }
 
     try {
-      let resumen: string | undefined = undefined;
-      if (hasConfiguredApiKey() && mensajesValidos.length >= 2) {
+      let resumen: string | undefined = options?.resumen?.trim() || undefined;
+      if (!resumen && !options?.sinIA && hasConfiguredApiKey() && mensajesValidos.length >= 2) {
         try {
           resumen = await consolidarCronicaAlCerrarCapitulo({
             project: currentProject,
@@ -2500,13 +2542,19 @@ export default function App() {
       setCurrentFiles(updatedFiles);
       await saveFilesToDB(currentPId, updatedFiles);
 
-      // Si estaba reabierto, al volver a archivarlo se marca como cerrado
-      const updatedChats = currentChats.map(c => (c.id === chat.id ? { ...c, reabierto: false } : c));
+      /*
+       * Si estaba reabierto, al volver a archivarlo se marca como cerrado.
+       *
+       * ⚠ Sobre la lista DE AHORA, no la de cuando se pulsó el botón: al
+       * cerrar capítulo esto corre después de abrir el nuevo, y con la lista
+       * vieja se guardaba sin él y el capítulo recién abierto desaparecía.
+       */
+      const updatedChats = currentChatsRef.current.map(c => (c.id === chat.id ? { ...c, reabierto: false } : c));
       setCurrentChats(updatedChats);
       saveLocalChats(currentPId, updatedChats);
 
       // Cierre de capítulo como hito narrativo clave: actualización de memoria persistente en segundo plano
-      if (getStoredAutoBackgroundTasks() && currentProject && hasConfiguredApiKey()) {
+      if (!options?.sinIA && getStoredAutoBackgroundTasks() && currentProject && hasConfiguredApiKey()) {
         setTimeout(async () => {
           try {
             const rawMem = await generateClaudeProjectMemory({
@@ -2620,6 +2668,124 @@ export default function App() {
     }
   };
 
+  /*
+   * 📚 EL VOLCADO DE LOS DOCUMENTOS VIVOS.
+   *
+   * Una sola llamada lee lo jugado desde el último volcado de ese capítulo y
+   * devuelve el Cuaderno y la Ficha viva reescritos, más la entrada de la
+   * Bitácora. El Cuaderno y la Bitácora se guardan directamente (con versión
+   * anterior para deshacer); los cambios de la Ficha viva se enseñan antes,
+   * porque es lo que ella ve y lo que más duele si sale mal.
+   *
+   * Devuelve el texto de la bitácora, que sirve también de resumen para
+   * archivar el capítulo sin gastar otra llamada.
+   */
+  const volcandoDocumentos = useRef(false);
+  const volcarDocumentos = async (chat: Chat, motivo: 'cierre' | 'manual'): Promise<string | null> => {
+    const pid = currentPIdRef.current;
+    const proyecto = projectsRef.current.find(pr => pr.id === pid);
+    if (!pid || !proyecto || !chat) return null;
+    if (!hasConfiguredApiKey()) {
+      if (motivo === 'manual') {
+        setAlertConfig({ isOpen: true, title: 'Falta la clave de la IA', message: 'Para volcar los documentos hace falta una clave de API configurada.' });
+      }
+      return null;
+    }
+    if (volcandoDocumentos.current) {
+      if (motivo === 'manual') {
+        setAlertConfig({ isOpen: true, title: 'Ya hay un volcado en marcha', message: 'Espera a que termine el que está en curso.' });
+      }
+      return null;
+    }
+    const docs = proyecto.memory?.documentos_vivos || migrarADocumentosVivos(proyecto.memory);
+    const desde = docs.volcadoHasta?.[chat.id] || 0;
+    const total = (chat.messages || []).length;
+    if (desde >= total) {
+      if (motivo === 'manual') {
+        setAlertConfig({ isOpen: true, title: 'Nada nuevo que volcar', message: `Todo lo jugado en «${chat.name}» ya está en los documentos.` });
+      }
+      return null;
+    }
+
+    volcandoDocumentos.current = true;
+    setTopProgress({ active: true, label: `📚 Poniendo al día el Cuaderno, la Ficha viva y la Bitácora (${chat.name})...`, type: 'sync' });
+    try {
+      const res = await volcarDocumentosVivos({
+        project: { ...proyecto, memory: { ...(proyecto.memory as any), documentos_vivos: docs } },
+        chat,
+        desde,
+        motivo
+      });
+      const etiqueta = motivo === 'cierre' ? `Cierre de ${chat.name}` : `Volcado en ${chat.name}`;
+
+      // 1. Cuaderno, Bitácora y marca de lo leído: directos.
+      await handleUpdateProjectField(p => {
+        const actuales = p.memory?.documentos_vivos || docs;
+        let d = reescribirDocumentos(actuales, { cuaderno: res.cuaderno }, etiqueta);
+        if (res.bitacora) d = anotarEnBitacora(d, { chatId: chat.id, capitulo: chat.name, texto: res.bitacora });
+        d = { ...d, volcadoHasta: { ...(d.volcadoHasta || {}), [chat.id]: total } };
+        const base = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
+        return { memory: { ...base, documentos_vivos: d } };
+      });
+
+      const podaFuerte = seccionesMermadas(docs.cuaderno, res.cuaderno).length;
+      const mermaFicha = seccionesMermadas(docs.ficha, res.ficha);
+      const { quitadas, nuevas } = diferenciasPorLinea(docs.ficha, res.ficha);
+      logInfo(
+        'memory_sync',
+        `Documentos volcados (${etiqueta})`,
+        `${res.leidos} mensajes leídos · ficha: ${nuevas.length} líneas nuevas, ${quitadas.length} quitadas${podaFuerte ? ` · el cuaderno ha podado mucho en ${podaFuerte} sección(es)` : ''}`
+      );
+
+      // 2. La Ficha viva, solo con su visto bueno.
+      if (quitadas.length || nuevas.length) {
+        const muestra = (l: string[]) => l.slice(0, 25).join('\n') + (l.length > 25 ? `\n… y ${l.length - 25} más` : '');
+        setConfirmConfig({
+          isOpen: true,
+          message:
+            `🎒 Cambios en la Ficha viva tras «${chat.name}»:\n\n` +
+            (nuevas.length ? `➕ Entra o cambia:\n${muestra(nuevas)}\n\n` : '') +
+            (quitadas.length ? `➖ Sale:\n${muestra(quitadas)}\n\n` : '') +
+            (mermaFicha.length ? `⚠️ ${mermaFicha.join(' · ')}\n\n` : '') +
+            (podaFuerte ? `🕯️ El Cuaderno ha podado bastante; si echas algo en falta, en Memoria → Documentos puedes deshacer.\n\n` : '') +
+            '¿Guardar estos cambios? Si no, la ficha se queda como estaba y puedes corregirla a mano.',
+          confirmLabel: 'Guardar cambios',
+          cancelLabel: 'Dejarla como estaba',
+          danger: false,
+          onConfirm: () => {
+            void handleUpdateProjectField(p => {
+              const actuales = p.memory?.documentos_vivos;
+              if (!actuales) return {};
+              return {
+                memory: { ...(p.memory as any), documentos_vivos: reescribirDocumentos(actuales, { ficha: res.ficha }, etiqueta) }
+              };
+            });
+          }
+        });
+      } else if (motivo === 'manual') {
+        setAlertConfig({
+          isOpen: true,
+          title: '📚 Documentos al día',
+          message:
+            `Se han volcado ${res.leidos} mensajes de «${chat.name}». La Ficha viva no cambia.` +
+            (podaFuerte ? '\n\n🕯️ El Cuaderno ha podado bastante; si echas algo en falta, en Memoria → Documentos puedes deshacer.' : '')
+        });
+      }
+      return res.bitacora || null;
+    } catch (err) {
+      logWarn('memory_sync', 'No se pudieron volcar los documentos', describeApiError(err));
+      setAlertConfig({
+        isOpen: true,
+        title: 'No se pudo volcar',
+        message: `Los documentos se quedan como estaban. Puedes reintentarlo con «Volcar ahora».\n\n${describeApiError(err)}`
+      });
+      return null;
+    } finally {
+      volcandoDocumentos.current = false;
+      setTopProgress({ active: false, label: '', type: 'sync' });
+    }
+  };
+
   const handleCreateChat = () => {
     if (!currentPId || !currentProject) return;
 
@@ -2638,6 +2804,20 @@ export default function App() {
     saveLocalChats(currentPId, updated);
     setCurrentChatId(newChatId);
     setActiveTab('chat');
+
+    /*
+     * Con documentos vivos, cerrar capítulo es UNA llamada: el volcado. Su
+     * entrada de bitácora sirve de resumen para archivar el capítulo, y ni la
+     * sincronización completa ni el repaso del Director corren en paralelo
+     * pisándose entre ellos.
+     */
+    if (tieneMensajes && hayDocumentosVivos(currentProject.memory)) {
+      void (async () => {
+        const bitacora = await volcarDocumentos(capituloCerrado, 'cierre');
+        await handleArchiveChatAsFile(capituloCerrado, { silent: true, resumen: bitacora || undefined, sinIA: true });
+      })();
+      return;
+    }
 
     // Al cerrar capítulo, se archiva automáticamente como documento de consulta On-Demand y se sincroniza la memoria.
     if (tieneMensajes) {
@@ -5238,6 +5418,7 @@ export default function App() {
          * entera jugada antes de que nada de esto existiera. Manda la etiqueta
          * donde la hay, y lo leído rellena lo que falta.
          */
+        const conDocumentos = hayDocumentosVivos(p.memory);
         const porEtiquetas = mochila.inventario;
         const inventarioIA = memoriaSincronizada.player_character?.inventory || [];
 
@@ -5304,10 +5485,15 @@ export default function App() {
               );
             })(),
             retratos_guardados: p.memory?.retratos_guardados,
-            gm_bambalinas: cuaderno.movimientos.length ? cuaderno.movimientos : memoriaSincronizada.gm_bambalinas,
-            gm_relojes: cuaderno.relojes.length ? cuaderno.relojes : memoriaSincronizada.gm_relojes,
-            gm_facciones: mesa.facciones.length ? mesa.facciones : memoriaSincronizada.gm_facciones,
-            gm_preparado: mesa.preparado.length ? mesa.preparado : memoriaSincronizada.gm_preparado,
+            /*
+             * Con documentos vivos, mochila y cuaderno los lleva el volcado de
+             * cierre de capítulo: la sincronización no los rehace ni los pisa.
+             */
+            gm_bambalinas: conDocumentos ? p.memory?.gm_bambalinas : cuaderno.movimientos.length ? cuaderno.movimientos : memoriaSincronizada.gm_bambalinas,
+            gm_relojes: conDocumentos ? p.memory?.gm_relojes : cuaderno.relojes.length ? cuaderno.relojes : memoriaSincronizada.gm_relojes,
+            gm_facciones: conDocumentos ? p.memory?.gm_facciones : mesa.facciones.length ? mesa.facciones : memoriaSincronizada.gm_facciones,
+            gm_preparado: conDocumentos ? p.memory?.gm_preparado : mesa.preparado.length ? mesa.preparado : memoriaSincronizada.gm_preparado,
+            documentos_vivos: p.memory?.documentos_vivos,
             player_character: (() => {
               const base = memoriaSincronizada.player_character || { name: '' };
               /*
@@ -5341,7 +5527,12 @@ export default function App() {
                 ...(fichaLeida?.currencies && !Object.values(base.currencies || {}).some(v => v)
                   ? { currencies: fichaLeida.currencies }
                   : {}),
-                inventory: delDocumento.length ? [...inventory, ...delDocumento] : inventory,
+                ...(conDocumentos
+                  ? {
+                      inventory: p.memory?.player_character?.inventory || [],
+                      currencies: p.memory?.player_character?.currencies
+                    }
+                  : { inventory: delDocumento.length ? [...inventory, ...delDocumento] : inventory }),
                 /*
                  * Lo aprendido se FUNDE con lo que la IA haya leído de la prosa:
                  * la etiqueta es exacta pero solo existe si se escribió, y la
@@ -6379,6 +6570,16 @@ export default function App() {
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5">
           <div className="flex justify-between items-center text-xs font-cinzel font-bold text-[var(--text-secondary)] px-1 mb-1">
             <span>CAPÍTULOS ({currentChats.length})</span>
+            {currentChat && hayDocumentosVivos(currentProject?.memory) && (
+              <button
+                onClick={() => void volcarDocumentos(currentChat, 'manual')}
+                className="hover:text-[var(--accent)] cursor-pointer text-[11px] flex items-center gap-0.5 ml-auto mr-2"
+                title="Pone al día el Cuaderno del GM, la Ficha viva y la Bitácora con lo jugado en este capítulo, sin cerrarlo."
+              >
+                <Save className="w-3 h-3" />
+                <span>Volcar ahora</span>
+              </button>
+            )}
             <button
               onClick={handleCreateChat}
               disabled={!currentPId}
@@ -6722,6 +6923,7 @@ export default function App() {
               onTriggerAIUpdate={handleTriggerMemorySyncWithAI}
               onCompletarFichaDesdeDocumento={() => completarFichaDesdeDocumento(currentFiles, true)}
               isGenerating={isSyncingMemory}
+              onVolcarAhora={currentChat ? () => void volcarDocumentos(currentChat, 'manual') : undefined}
             />
           )}
 

@@ -1772,7 +1772,7 @@ export const Modals: React.FC<{
         >
           <div className="bg-[var(--bg-color)] p-6 rounded-xl shadow-2xl border border-[var(--glass-border)] w-96 max-w-full">
             <h3 className="font-cinzel text-xl text-[var(--accent)] mb-3">Confirmar acción</h3>
-            <p className="text-[var(--text-primary)] mb-6 font-lora text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">
+            <p className="text-[var(--text-primary)] mb-6 font-lora text-xs sm:text-sm whitespace-pre-wrap leading-relaxed max-h-[60vh] overflow-y-auto">
               {confirmConfig.message}
             </p>
             <div className="flex justify-end gap-2">

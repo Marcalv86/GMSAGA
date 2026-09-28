@@ -18,6 +18,8 @@ import {
   Lock as LockIcon
 } from 'lucide-react';
 import { MemoryManager } from './MemoryManager';
+import { DocumentosVivosPanel } from './DocumentosVivosPanel';
+import { deshacerDocumento, reescribirDocumentos } from '../utils/documentosVivos';
 import {
   generateClaudeProjectMemory,
   extractAiDirectives
@@ -32,6 +34,8 @@ interface SimpleMemoryViewProps {
   onTriggerAIUpdate?: () => void;
   onCompletarFichaDesdeDocumento?: () => Promise<void>;
   isGenerating?: boolean;
+  /** Pone al día los documentos vivos con el capítulo actual. */
+  onVolcarAhora?: () => void;
 }
 
 export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
@@ -42,7 +46,8 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   onUpdateProject,
   onTriggerAIUpdate,
   onCompletarFichaDesdeDocumento,
-  isGenerating = false
+  isGenerating = false,
+  onVolcarAhora
 }) => {
   const memory: Memory = project.memory || {
     story: '',
@@ -79,8 +84,40 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
    */
   const [cuadernoAbierto, setCuadernoAbierto] = useState(false);
 
+  /*
+   * 📚 Con documentos vivos, las pestañas enseñan los documentos. Las fichas
+   * antiguas (PNJs, lugares, misiones, giros…) siguen a un clic mientras se
+   * decide qué hacer con ellas.
+   */
+  const docsVivos = memory.documentos_vivos && (memory.documentos_vivos.cuaderno || memory.documentos_vivos.ficha)
+    ? memory.documentos_vivos
+    : null;
+  const [vistaAntigua, setVistaAntigua] = useState(false);
+  const guardarDocumento = (cual: 'ficha' | 'cuaderno', texto: string) =>
+    onUpdateMemory(mem =>
+      mem.documentos_vivos
+        ? { ...mem, documentos_vivos: reescribirDocumentos(mem.documentos_vivos, { [cual]: texto }, 'Edición a mano') }
+        : mem
+    );
+  const deshacer = (cual: 'ficha' | 'cuaderno') =>
+    onUpdateMemory(mem => {
+      const d = mem.documentos_vivos ? deshacerDocumento(mem.documentos_vivos, cual) : null;
+      return d ? { ...mem, documentos_vivos: d } : mem;
+    });
+  const botonVolverADocumentos = docsVivos ? (
+    <div className="px-3 sm:px-6 pt-2 shrink-0">
+      <button
+        onClick={() => setVistaAntigua(false)}
+        className="min-h-[36px] px-3 rounded-lg border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] text-[11px] font-cinzel font-bold cursor-pointer"
+      >
+        ← Volver a los documentos
+      </button>
+    </div>
+  ) : null;
+
   const handleSwitchMode = (mode: 'character' | 'gm' | 'project') => {
     if (mode !== 'gm') setCuadernoAbierto(false);
+    setVistaAntigua(false);
     setMemoryMode(mode);
     try {
       localStorage.setItem('preferred_memory_view_mode', mode);
@@ -371,8 +408,38 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             Abrirlo de todas formas
           </button>
         </div>
+      ) : memoryMode === 'gm' && docsVivos && !vistaAntigua ? (
+        <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-3">
+          <div className="max-w-[900px] mx-auto flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                onClick={() => setVistaAntigua(true)}
+                className="min-h-[36px] px-3 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold cursor-pointer"
+                title="Los giros con candado siguen siendo un sistema aparte; aquí también están las listas antiguas del cuaderno."
+              >
+                Giros con candado y listas antiguas →
+              </button>
+              <button
+                onClick={() => setCuadernoAbierto(false)}
+                className="min-h-[36px] p-2 sm:px-3 rounded-lg border border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-[var(--surface)] shadow-xs"
+                aria-label="Cerrar el cuaderno"
+              >
+                <LockIcon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Cerrar el cuaderno</span>
+              </button>
+            </div>
+            <DocumentosVivosPanel
+              docs={docsVivos}
+              cual="cuaderno"
+              onGuardar={guardarDocumento}
+              onDeshacer={deshacer}
+              onVolcarAhora={onVolcarAhora}
+            />
+          </div>
+        </div>
       ) : memoryMode === 'gm' ? (
         <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+          {botonVolverADocumentos}
           <MemoryManager
             project={project}
             files={files}
@@ -410,8 +477,29 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             }
           />
         </div>
+      ) : memoryMode === 'character' && docsVivos && !vistaAntigua ? (
+        <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-3">
+          <div className="max-w-[900px] mx-auto flex flex-col gap-3">
+            <div className="flex justify-end">
+              <button
+                onClick={() => setVistaAntigua(true)}
+                className="min-h-[36px] px-3 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] text-[11px] font-cinzel font-bold cursor-pointer"
+              >
+                Fichas antiguas (PNJs, lugares, misiones…) →
+              </button>
+            </div>
+            <DocumentosVivosPanel
+              docs={docsVivos}
+              cual="ficha"
+              onGuardar={guardarDocumento}
+              onDeshacer={deshacer}
+              onVolcarAhora={onVolcarAhora}
+            />
+          </div>
+        </div>
       ) : memoryMode === 'character' ? (
         <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+          {botonVolverADocumentos}
           <MemoryManager
             project={project}
             files={files}
