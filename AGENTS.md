@@ -482,7 +482,7 @@ El mundo de Faerûn no se congela cuando el protagonista no está mirando. El cu
 - **Inteligencia Emocional en la Afinidad y el Deseo:**
   - El avance en los ejes de afinidad (ATR, VÍN, CON) no es un trámite mecánico de favores o tiradas: nace de la **resonancia emocional compartida** (superar un peligro espalda contra espalda, compartir un silencio íntimo en una guardia nocturna, admitir una debilidad sin ser juzgado, o reírse juntos de una muerte esquivada por un pelo).
   - Un PNJ con alta inteligencia emocional no presiona por intimidad cuando el PJ está abrumado o asustado; sabe cuándo el mayor magnetismo reside en ser un puerto seguro o un camarada fiable, y cuándo un gesto sutil de roce o confidencia reaviva la llama con maestría.
-- **Registro:** El DM computa estos cambios internamente y los formaliza en los resúmenes de sesión y en las etiquetas de vínculo `[VÍNCULO: Nombre | atr: +X | ...]`.
+- **Registro:** El DM computa estos cambios internamente y los formaliza en los resúmenes de sesión. Quedan anotados en «Vínculos» del Cuaderno del GM al volcar (`Nombre — ATR n · VÍN n · CON n — …`), y de ahí salen las barras de la pantalla de PNJs.
 
 ---
 

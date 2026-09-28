@@ -3,8 +3,10 @@ import type {
   EntradaDeBitacora,
   InventoryItem,
   Memory,
+  NPC,
   VersionDeDocumento
 } from '../types';
+import { coincidenNombresNpc } from './npcMatcher';
 
 /*
  * 📚 LOS DOCUMENTOS VIVOS.
@@ -155,8 +157,9 @@ export function migrarADocumentosVivos(mem: Memory | undefined, ahora = Date.now
     .map(n => {
       const ejes = [
         n.atraccion ? `ATR ${n.atraccion}` : '',
-        typeof n.vin === 'number' ? `VÍN ${n.vin}` : '',
-        typeof n.con === 'number' ? `CON ${n.con}` : ''
+        typeof n.atr === 'number' && !n.atraccion ? `ATR ${Math.round(n.atr / 2)}` : '',
+        typeof n.vin === 'number' ? `VÍN ${Math.round(n.vin / 2)}` : '',
+        typeof n.con === 'number' ? `CON ${Math.round(n.con / 2)}` : ''
       ].filter(Boolean);
       const extra = [
         n.aparenta ? `aparenta: ${linea(n.aparenta)}` : '',
@@ -402,7 +405,7 @@ export function bloqueDocumentosParaNarrador(docs: DocumentosVivos): string {
   return `
 ### 📚 DOCUMENTOS VIVOS DE LA CAMPAÑA — mandan sobre tu memoria
 Son el estado de la partida **al último volcado**. Lo que se haya jugado después está en este chat, y **lo del chat manda** si se contradicen: el documento se pone al día al cerrar el capítulo.
-- ⛔ Estos documentos NO los actualizas tú desde el chat: **no emitas** \`[INVENTARIO:]\`, \`[BAMBALINAS:]\`, \`[RELOJ:]\`, \`[FACCIÓN:]\` ni \`[PREPARADO:]\`. Lleva lo que cambie en la cabeza; se vuelca de una sentada al cerrar el capítulo.
+- ⛔ Estos documentos NO los actualizas tú desde el chat: **no emitas** \`[INVENTARIO:]\`, \`[VÍNCULO:]\`, \`[MISIÓN:]\`, \`[PLAN:]\`, \`[BAMBALINAS:]\`, \`[RELOJ:]\`, \`[FACCIÓN:]\` ni \`[PREPARADO:]\`. Lleva lo que cambie en la cabeza; se vuelca de una sentada al cerrar el capítulo, y de ahí salen también las fichas de PNJs, lugares y tramas.
 - ✅ Consúltalos antes de afirmar un dato concreto: si no está aquí, ni en su ficha, ni en los documentos del proyecto, ni en este chat, no lo inventes.
 
 #### 🕯️ CUADERNO DEL GM (⛔ ella NO lo lee: no lo narres, no lo insinúes, no lo cuentes sin una vía jugada)
@@ -418,4 +421,325 @@ ${ultima.texto.trim()}`
     : ''
 }
 `.trim();
+}
+
+// ---------------------------------------------------------------- las pantallas leen de los documentos
+
+/*
+ * 📚 LAS FICHAS SALEN DE LOS DOCUMENTOS, NO DE LAS ETIQUETAS.
+ *
+ * Las pantallas de PNJs, Lugares, Tramas y Protagonista eran bonitas pero se
+ * alimentaban de etiquetas turno a turno y se desincronizaban. Con documentos
+ * vivos, cada vez que el Cuaderno o la Ficha viva cambian (volcado, edición a
+ * mano o deshacer) se leen aquí y se ponen al día solo los campos que dicen
+ * los documentos. Retratos, apariencia, idiomas y lo que vino de los
+ * compendios no se tocan.
+ *
+ * Escala: en el Cuaderno ATR, VÍN y CON van de 0 a 10, como en las
+ * instrucciones de la mesa; las barras de la app van de 0 a 20.
+ */
+
+const plegar = (t: string) =>
+  (t || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+
+/** Las secciones «## …» de un documento (sin el número de delante), con sus líneas. */
+export function leerSecciones(doc: string): { titulo: string; clave: string; lineas: string[] }[] {
+  const fuera: { titulo: string; clave: string; lineas: string[] }[] = [];
+  for (const l of (doc || '').split('\n')) {
+    const h = l.match(/^##\s+(.+?)\s*$/);
+    if (h) {
+      const titulo = h[1].replace(/^\d+[.)]\s*/, '').trim();
+      fuera.push({ titulo, clave: plegar(titulo), lineas: [] });
+    } else if (fuera.length) {
+      fuera[fuera.length - 1].lineas.push(l);
+    }
+  }
+  return fuera;
+}
+
+const seccionQue = (doc: string, ...claves: string[]) =>
+  leerSecciones(doc).find(s => claves.some(c => s.clave.includes(c)));
+
+/** Quita viñeta y negritas y deja la línea limpia; vacía si es un «(vacío)». */
+const limpiarLinea = (l: string) => {
+  const t = l.replace(/^\s*[-*]\s+/, '').replace(/\*\*/g, '').trim();
+  return /^\(vac[ií]o\)$/i.test(t) ? '' : t;
+};
+
+/** El nombre al principio de una entrada: antes de « — », « (», «:» o «. ». */
+const nombreDeEntrada = (t: string) =>
+  t
+    .replace(/\s*\[[^\]]*\]/g, '')
+    .split(/\s+—\s+|\s+\(|:\s|\.\s/)[0]
+    .replace(/[.,;:]+$/, '')
+    .trim();
+
+/** Palabras que abren una línea pero no son el nombre de nadie ni de ningún sitio. */
+const NO_ES_NOMBRE = /^(otros?|otras?|varios|varias|resto|dem[aá]s|nota|ahora|general)$/i;
+
+const aVeinte = (n: number) => Math.max(0, Math.min(20, Math.round(n * 2)));
+
+export interface VinculoDelCuaderno {
+  nombre: string;
+  atr?: number;
+  atraccion?: 'desea' | 'interes' | 'ninguna';
+  vin?: number;
+  con?: number;
+  aparenta?: string;
+  oculta?: string;
+  impresion?: string;
+  promesas?: string[];
+  confidencias?: string[];
+}
+
+/** Los vínculos del Cuaderno. Si un PNJ sale varias veces, manda la última línea. */
+export function leerVinculosDelCuaderno(cuaderno: string): VinculoDelCuaderno[] {
+  const sec = seccionQue(cuaderno, 'vinculo');
+  if (!sec) return [];
+  const porNombre = new Map<string, VinculoDelCuaderno>();
+  for (const bruto of sec.lineas) {
+    let t = limpiarLinea(bruto);
+    if (!t) continue;
+    let nombre: string;
+    const etiqueta = t.match(/^\[\s*V[IÍ]NCULO\s*:\s*([^|\]]+)\|(.*)\]?$/i);
+    if (etiqueta) {
+      nombre = etiqueta[1].trim();
+      // En las líneas de historial, los valores buenos van tras la flecha.
+      const tras = etiqueta[2].split('→');
+      t = tras.length > 1 ? tras.slice(1).join('→') : etiqueta[2];
+    } else {
+      nombre = nombreDeEntrada(t);
+    }
+    if (!nombre || nombre.length > 60) continue;
+    const previo = porNombre.get(plegar(nombre)) || { nombre };
+    const v: VinculoDelCuaderno = { ...previo, nombre: previo.nombre || nombre };
+    const num = (re: RegExp) => {
+      const m = t.match(re);
+      return m ? Number(m[1]) : undefined;
+    };
+    const atrTexto = t.match(/\bATR\s*[:=]?\s*(desea|inter[eé]s)/i);
+    if (atrTexto) v.atraccion = /desea/i.test(atrTexto[1]) ? 'desea' : 'interes';
+    const atr = num(/\bATR\s*[:=]?\s*(\d+(?:[.,]\d+)?)/i);
+    const vin = num(/\bV[IÍ]N\s*[:=]?\s*(\d+(?:[.,]\d+)?)/i);
+    const con = num(/\bCON\s*[:=]?\s*(\d+(?:[.,]\d+)?)/i);
+    if (atr !== undefined && !isNaN(atr)) {
+      v.atr = aVeinte(atr);
+      // La tarjeta enseña la atracción como «la desea» o «interés», no como barra.
+      if (!atrTexto) v.atraccion = atr >= 6 ? 'desea' : atr >= 3 ? 'interes' : 'ninguna';
+    }
+    if (vin !== undefined && !isNaN(vin)) v.vin = aVeinte(vin);
+    if (con !== undefined && !isNaN(con)) v.con = aVeinte(con);
+    const campo = (...nombres: string[]) => {
+      for (const n of nombres) {
+        const m = t.match(new RegExp(`${n}\\s*:\\s*([^·|]+)`, 'i'));
+        if (m && m[1].trim()) return m[1].trim().replace(/[.;]$/, '');
+      }
+      return undefined;
+    };
+    v.aparenta = campo('aparenta') ?? v.aparenta;
+    v.oculta = campo('oculta') ?? v.oculta;
+    v.impresion = campo('piensa de ella', 'impresi[oó]n') ?? v.impresion;
+    const promesas = campo('promesas?');
+    if (promesas) v.promesas = promesas.split(/;\s*/).filter(Boolean);
+    const confidencias = campo('confidencias?');
+    if (confidencias) v.confidencias = confidencias.split(/;\s*/).filter(Boolean);
+    porNombre.set(plegar(nombre), v);
+  }
+  return [...porNombre.values()];
+}
+
+/** Entradas «Nombre — lo que sea» de una sección (PNJs menores, lugares…). */
+function leerEntradas(doc: string, ...claves: string[]): { nombre: string; texto: string }[] {
+  const sec = seccionQue(doc, ...claves);
+  if (!sec) return [];
+  const fuera: { nombre: string; texto: string }[] = [];
+  for (const bruto of sec.lineas) {
+    if (/^\s*#/.test(bruto)) continue;
+    const t = limpiarLinea(bruto);
+    if (!t || t.startsWith('[') || t.startsWith('>')) continue;
+    const nombre = nombreDeEntrada(t);
+    if (!nombre || NO_ES_NOMBRE.test(nombre) || nombre.length > 60 || nombre.split(' ').length > 7) continue;
+    const texto = t
+      .replace(/\s*\[[^\]]*\]/g, '')
+      .slice(nombre.length)
+      .replace(/^\s*(—|:|\.)\s*/, '')
+      .trim();
+    const ya = fuera.find(e => plegar(e.nombre) === plegar(nombre));
+    if (ya) ya.texto = [ya.texto, texto].filter(Boolean).join(' ');
+    else fuera.push({ nombre, texto });
+  }
+  return fuera;
+}
+
+export interface TramaDelCuaderno {
+  titulo: string;
+  escala?: string;
+  loQueParece?: string;
+}
+
+/** Las tramas abiertas. «La verdad» NO se lee: la pantalla de Tramas la ve ella. */
+export function leerTramasDelCuaderno(cuaderno: string): TramaDelCuaderno[] {
+  const sec = seccionQue(cuaderno, 'verdad oculta', 'tramas');
+  if (!sec) return [];
+  const fuera: TramaDelCuaderno[] = [];
+  for (const bruto of sec.lineas) {
+    const h = bruto.match(/^#{3,}\s*(?:TRAMA\s*:\s*)?(.+?)\s*$/i);
+    if (h) {
+      const [titulo, escala] = h[1].split(/\s+—\s+/);
+      fuera.push({ titulo: titulo.replace(/\*\*/g, '').trim(), escala: escala?.trim().toLowerCase() });
+      continue;
+    }
+    const t = limpiarLinea(bruto);
+    if (!t) continue;
+    const parece = t.match(/^lo que parece\s*:\s*(.+)$/i);
+    if (parece && fuera.length) {
+      fuera[fuera.length - 1].loQueParece = parece[1].trim();
+      continue;
+    }
+    // Formato corto de una línea: «Nombre [escala] — objetivo: …»
+    const corta = bruto.match(/^\s*[-*]\s+\*\*(.+?)\*\*\s*(?:\[([^\]]+)\])?\s*(?:—\s*(.*))?$/);
+    if (corta && !/^(premisa|hacia d[oó]nde)/i.test(corta[1])) {
+      const objetivo = (corta[3] || '').match(/objetivo\s*:\s*([^·]+)/i)?.[1]?.trim();
+      fuera.push({ titulo: corta[1].trim(), escala: corta[2]?.trim().toLowerCase(), loQueParece: objetivo });
+    }
+  }
+  return fuera.filter(t => t.titulo);
+}
+
+/** Nivel y PG máximos de la Ficha viva, y el avance de la última entrada de bitácora. */
+export function leerProgresion(docs: DocumentosVivos): {
+  nivel?: string;
+  maxHp?: number;
+  hitos?: number;
+  hitosParaSubir?: number;
+} {
+  const sec = seccionQue(docs.ficha, 'nivel', 'estado');
+  const texto = sec ? sec.lineas.join('\n') : '';
+  const nivel = texto.match(/\bNivel\s+(\d+)/i)?.[1];
+  const pg = texto.match(/\bPG\s*(?:[:=]\s*)?\d+\s*\/\s*(\d+)/i)?.[1];
+  const ultima = docs.bitacora[docs.bitacora.length - 1]?.texto || '';
+  const avance = ultima.match(/\[\s*Avance\s*:\s*(\d+)\s*\/\s*(\d+)/i);
+  return {
+    nivel,
+    maxHp: pg ? Number(pg) : undefined,
+    hitos: avance ? Number(avance[1]) : undefined,
+    hitosParaSubir: avance ? Number(avance[2]) : undefined
+  };
+}
+
+const idNuevo = (pre: string) => `${pre}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+const slug = (t: string) => plegar(t).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40);
+
+/**
+ * Pone al día PNJs, lugares, tramas y progresión con lo que dicen los
+ * documentos. Se llama cada vez que cambian, y es idempotente: aplicarlo dos
+ * veces da lo mismo.
+ */
+export function sincronizarFichasConDocumentos(mem: Memory): Memory {
+  const docs = mem.documentos_vivos;
+  if (!docs || !(docs.cuaderno || docs.ficha)) return mem;
+
+  // ---- PNJs: vínculos y PNJs menores
+  let npcs = [...(mem.npcs || [])];
+  const buscar = (nombre: string) =>
+    npcs.findIndex(n => coincidenNombresNpc(nombre, n.name, undefined, { alias: n.alias, trueIdentity: n.trueIdentity }));
+  const esElla = (nombre: string) => {
+    const pj = mem.player_character?.name;
+    return Boolean(pj && coincidenNombresNpc(nombre, pj));
+  };
+  const nuevoNpc = (nombre: string, notas: string): NPC => ({
+    id: idNuevo('npc_doc'),
+    name: nombre,
+    relation: '',
+    status: '',
+    notes: notas
+  });
+
+  for (const v of leerVinculosDelCuaderno(docs.cuaderno)) {
+    if (esElla(v.nombre)) continue;
+    let i = buscar(v.nombre);
+    if (i < 0) {
+      npcs.push(nuevoNpc(v.nombre, v.aparenta || ''));
+      i = npcs.length - 1;
+    }
+    const n = npcs[i];
+    npcs[i] = {
+      ...n,
+      ...(v.atr !== undefined ? { atr: v.atr } : {}),
+      ...(v.atraccion ? { atraccion: v.atraccion === 'ninguna' ? undefined : v.atraccion } : {}),
+      ...(v.vin !== undefined ? { vin: v.vin } : {}),
+      ...(v.con !== undefined ? { con: v.con } : {}),
+      ...(v.aparenta ? { aparenta: v.aparenta } : {}),
+      ...(v.oculta ? { oculta: v.oculta } : {}),
+      ...(v.impresion ? { impresionActual: v.impresion } : {}),
+      ...(v.promesas ? { promesas: v.promesas } : {}),
+      ...(v.confidencias ? { confidencias: v.confidencias } : {})
+    };
+  }
+  for (const e of leerEntradas(docs.cuaderno, 'pnjs menores', 'pnj menores', 'secundarios')) {
+    if (esElla(e.nombre) || buscar(e.nombre) >= 0) continue;
+    npcs.push(nuevoNpc(e.nombre, e.texto));
+  }
+
+  // ---- Lugares
+  let locations = [...(mem.locations || [])];
+  for (const e of leerEntradas(docs.cuaderno, 'lugares')) {
+    const i = locations.findIndex(l => plegar(l.name) === plegar(e.nombre));
+    if (i < 0) {
+      locations.push({ id: idNuevo('loc_doc'), name: e.nombre, desc: e.texto, notes: '' });
+    } else if (!(locations[i].desc || '').trim() && e.texto) {
+      locations[i] = { ...locations[i], desc: e.texto };
+    }
+  }
+
+  // ---- Tramas: las del Cuaderno abiertas; las que salieron de él y ya no están, cerradas
+  const tramas = leerTramasDelCuaderno(docs.cuaderno);
+  const quests = (mem.quests || []).map(q => {
+    const t = tramas.find(x => plegar(x.titulo) === plegar(q.title));
+    if (t) {
+      return {
+        ...q,
+        status: 'Activa',
+        ...(t.escala ? { type: t.escala } : {}),
+        ...(t.loQueParece && !q.objective ? { objective: t.loQueParece } : {})
+      };
+    }
+    return q.id.startsWith('q_doc_') && q.status === 'Activa' ? { ...q, status: 'Completada' } : q;
+  });
+  for (const t of tramas) {
+    if (quests.some(q => plegar(q.title) === plegar(t.titulo))) continue;
+    quests.push({
+      id: `q_doc_${slug(t.titulo)}`,
+      title: t.titulo,
+      origin: '',
+      objective: t.loQueParece || '',
+      progress: '',
+      status: 'Activa',
+      type: t.escala || 'secundaria'
+    });
+  }
+
+  // ---- Protagonista: nivel, PG máximos y avance
+  const prog = leerProgresion(docs);
+  const pc = mem.player_character;
+  const player_character = pc
+    ? {
+        ...pc,
+        ...(prog.nivel ? { level: prog.nivel } : {}),
+        ...(prog.maxHp ? { maxHp: prog.maxHp } : {}),
+        ...(prog.hitos !== undefined && prog.hitosParaSubir
+          ? {
+              hitosActuales: prog.hitos,
+              hitosParaSubir: prog.hitosParaSubir,
+              levelProgress: Math.max(0, Math.min(100, Math.round((prog.hitos / prog.hitosParaSubir) * 100)))
+            }
+          : {})
+      }
+    : pc;
+
+  return { ...mem, npcs, locations, quests, player_character };
 }

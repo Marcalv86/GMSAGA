@@ -27,7 +27,7 @@ import { LocationDossierModal } from './LocationDossierModal';
 import { DailyAgendaDiary } from './DailyAgendaDiary';
 import { StatusView } from './StatusView';
 import { DocumentosVivosPanel } from './DocumentosVivosPanel';
-import { deshacerDocumento, reescribirDocumentos } from '../utils/documentosVivos';
+import { deshacerDocumento, reescribirDocumentos, sincronizarFichasConDocumentos } from '../utils/documentosVivos';
 
 import {
   BookOpen,
@@ -1190,14 +1190,17 @@ export const MemoryManager: React.FC<{
           onGuardar={(cual, texto) =>
             onUpdateMemory(mem =>
               mem?.documentos_vivos
-                ? { ...mem, documentos_vivos: reescribirDocumentos(mem.documentos_vivos, { [cual]: texto }, 'Edición a mano') }
+                ? sincronizarFichasConDocumentos({
+                    ...mem,
+                    documentos_vivos: reescribirDocumentos(mem.documentos_vivos, { [cual]: texto }, 'Edición a mano')
+                  })
                 : mem
             )
           }
           onDeshacer={cual =>
             onUpdateMemory(mem => {
               const d = mem?.documentos_vivos ? deshacerDocumento(mem.documentos_vivos, cual) : null;
-              return d ? { ...mem!, documentos_vivos: d } : mem;
+              return d ? sincronizarFichasConDocumentos({ ...mem!, documentos_vivos: d }) : mem;
             })
           }
         />

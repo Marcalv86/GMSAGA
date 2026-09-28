@@ -141,7 +141,8 @@ import {
   hayDocumentosVivos,
   migrarADocumentosVivos,
   reescribirDocumentos,
-  seccionesMermadas
+  seccionesMermadas,
+  sincronizarFichasConDocumentos
 } from './utils/documentosVivos';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
@@ -897,7 +898,20 @@ export default function App() {
   // por parámetro a través de dos capas.
   const reporteActual = useRef<TiempoReportado | null>(null);
 
-  const handleTimeReported = async (t: TiempoReportado, msgInfo?: { msgId?: string; msgIndex?: number }) => {
+  const handleTimeReported = async (reportado: TiempoReportado, msgInfo?: { msgId?: string; msgIndex?: number }) => {
+    /*
+     * 📚 Con documentos vivos, las fichas (vínculos, lugares, tramas, plan y
+     * avance de nivel) salen del Cuaderno y la Ficha viva al volcar, no de las
+     * etiquetas de cada turno: así solo hay una vía escribiendo sobre ellas y
+     * una respuesta rehecha no deja restos. Quién está presente sí se sigue
+     * apuntando: es lo que ficha a los que aparecen por primera vez.
+     */
+    const conDocumentosVivos = hayDocumentosVivos(
+      projectsRef.current.find(pr => pr.id === currentPIdRef.current)?.memory
+    );
+    const t: TiempoReportado = conDocumentosVivos
+      ? { ...reportado, vinculos: [], lugares: [], misiones: [], plan: null, avanceDeNivel: undefined }
+      : reportado;
     reporteActual.current = t;
     if (t.comentariosDM && t.comentariosDM.length > 0 && currentPId) {
       const msgsPrevios = leerMesa(currentPId);
@@ -2725,7 +2739,8 @@ export default function App() {
         if (res.bitacora) d = anotarEnBitacora(d, { chatId: chat.id, capitulo: chat.name, texto: res.bitacora });
         d = { ...d, volcadoHasta: { ...(d.volcadoHasta || {}), [chat.id]: total } };
         const base = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
-        return { memory: { ...base, documentos_vivos: d } };
+        // Y las pantallas (PNJs, lugares, tramas, nivel) se ponen al día con lo volcado.
+        return { memory: sincronizarFichasConDocumentos({ ...base, documentos_vivos: d }) };
       });
 
       const podaFuerte = seccionesMermadas(docs.cuaderno, res.cuaderno).length;
@@ -2757,7 +2772,10 @@ export default function App() {
               const actuales = p.memory?.documentos_vivos;
               if (!actuales) return {};
               return {
-                memory: { ...(p.memory as any), documentos_vivos: reescribirDocumentos(actuales, { ficha: res.ficha }, etiqueta) }
+                memory: sincronizarFichasConDocumentos({
+                  ...(p.memory as any),
+                  documentos_vivos: reescribirDocumentos(actuales, { ficha: res.ficha }, etiqueta)
+                })
               };
             });
           }
@@ -5444,8 +5462,10 @@ export default function App() {
         );
 
         const inventory = deduplicarInventario([...reconciliado, ...nuevosDeIA]);
+        // Con documentos vivos, lo que dicen los documentos manda sobre lo que la IA haya releído.
+        const conLoDeLosDocumentos = (m: NonNullable<Project['memory']>): NonNullable<Project['memory']> => (conDocumentos ? sincronizarFichasConDocumentos(m) : m);
         return {
-          memory: {
+          memory: conLoDeLosDocumentos({
             ...memoriaSincronizada,
             /*
              * La afinidad NO la decide la sincronización.
@@ -5544,7 +5564,7 @@ export default function App() {
                 )
               };
             })()
-          },
+          }),
           timeline: fusionarTimeline(p.timeline || [], syncResult.timeline || []).timeline,
           currentDate: syncResult.currentDate || p.currentDate,
           threads: syncResult.threads || p.threads,
