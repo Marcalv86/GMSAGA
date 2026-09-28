@@ -6888,23 +6888,29 @@ REGLAS PARA «cuaderno» y «ficha» (los dos se REESCRIBEN ENTEROS):
 4. Las etiquetas entre corchetes que aparezcan en lo jugado ([INVENTARIO: …], [RELOJ: …], [VÍNCULO: …], [BAMBALINAS: …], etc.) son datos válidos: aplícalas.
 5. El cuaderno guarda ESTADO, no crónica: lo que se ha cerrado se borra (su historia queda en la bitácora). Si deja una consecuencia que sigue pesando (una deuda, una promesa, un enemigo), queda en UNA línea en «Consecuencias vivas».
 
-CUADERNO — además:
-- «Fuera de cámara»: si ha pasado tiempo de juego (una noche, días de viaje), decide qué han hecho los PNJs y facciones que tienen algo entre manos y no estaban en escena. Concreto: quién, qué, por qué, a quién dio órdenes y qué sacó. Nada de «sigue investigando». Máximo tres por jornada; conserva solo lo que siga importando.
-- «Relojes»: formato «**Nombre único** — X/Y · lo mueve Z · al llenarse: …». Avanza los que algo haya empujado; si uno se llena, pasa lo que dice y se quita (con su consecuencia en «Consecuencias vivas» o «Estado general»).
-- «Vínculos»: por PNJ, «**Nombre** (ATR desea/interés · VÍN 0-20 · CON 0-20) — qué aparenta · qué oculta · qué piensa de ella ahora · promesas · confidencias». Sube o baja solo por lo jugado.
-- «Tramas y su verdad oculta»: cada trama abierta con su escala (encargo/secundaria/principal), dónde está y la verdad que ella aún no sabe.
-- «Secretos descubiertos»: lo que ella ha averiguado de verdad jugando, y cómo.
+CUADERNO — además (si una sección tiene otro nombre en el documento actual, aplícalo a su equivalente):
+- «Estado general»: CORTO, como mucho 10 líneas. Calendario, fechas clave y «Ahora»: dónde está ella, con quién, cómo y qué está a punto de pasar. ⛔ Nada de crónica escena a escena aquí: ese detalle va a la bitácora.
+- «La verdad oculta (tramas)»: una subsección por trama abierta, «### TRAMA: Nombre — encargo/secundaria/principal», con tres líneas: **Lo que parece** · **La verdad** (lo que ella aún no sabe) · **Resolución** (cómo acaba bien y cómo mal). Lo cerrado sale de aquí.
+- «Actores»: por PNJ o facción con agenda, «**Nombre** — quiere: … · sabe: … · no sabe: …».
+- «Relojes y fuera de cámara»: relojes como «**Nombre único** — X/Y · lo mueve Z · al llenarse: …». Si ha pasado tiempo de juego (una noche, días de viaje), decide qué han hecho los PNJs y facciones con algo entre manos que no estaban en escena: quién, qué, por qué, a quién dio órdenes y qué sacó. Nada de «sigue investigando». Máximo tres por jornada; conserva solo lo que siga importando. Si un reloj se llena, pasa lo que dice y se quita (su consecuencia va a «Consecuencias vivas» o «Estado general»).
+- «Vínculos»: por PNJ, «**Nombre** — ATR n · VÍN n · CON n — qué aparenta · qué oculta · qué piensa de ella ahora · promesas · confidencias». ATR, VÍN y CON solo cambian por lo jugado.
+- «PNJs menores»: una línea por PNJ secundario con lo que importa (idiomas, qué le enseñó o le debe, cómo la trata).
+- «Secretos vigentes»: «[SECRETO: título | la verdad | se descubre: cómo]». Lo que ella ya ha descubierto se marca «(ya lo sabe: cómo)».
+- «Hilos con vencimiento»: «[HILO: título | vence: cuándo | qué ocurrirá si nadie lo toca]».
+- «Canon de mesa»: reglas o cambios de canon que la jugadora haya acordado en el chat y no estén en su ficha.
+- «Reputación y rumores»: qué se dice de ella y dónde.
+- «Arranques y cortes»: cómo se cerró este tramo y cómo arranca el siguiente (lugar, momento, presentes y qué conviene tirar al empezar).
 
 FICHA VIVA — además:
+- «Nivel, PG y recursos»: nivel, PG al cierre, ranuras o usos gastados que no se han recuperado, agotamiento, heridas, secuelas y dolencias que DUREN.
 - Inventario exacto y por dónde está: «Lo que lleva encima», «Mochila y contenedores» (indica el contenedor), «Guardado en otro sitio» (dónde), «Requisado o en manos ajenas» (quién lo tiene y dónde), «Encargos» (qué hay que hacer y para quién).
 - Lo gastado, consumido o entregado desaparece. Lo devuelto vuelve a su sitio.
 - «Dinero»: saldo final tras lo cobrado, gastado o perdido.
-- «Estado»: solo heridas, secuelas, dolencias o agotamiento que DUREN más allá de la escena. Los PG del momento no.
 - «Lista de compras»: lo que ella haya dicho que quiere comprar o reponer.
 
 REGLAS PARA «bitacora» (una entrada nueva; la jugadora la LEE):
 - ⛔ Nada del cuaderno que ella no sepa: ni verdades ocultas, ni fuera de cámara, ni relojes.
-- Secciones breves: **Hechos y decisiones** · **Salud, recursos y secuelas** · **Relaciones** (cómo han cambiado) · **Hilos abiertos** · una línea «[Avance: X/Y hacia Nivel N]» con el hito anotado (un hito no es solo combate: investigación, logro social, avance espiritual, travesía dura, vínculo que cruza un umbral o peligro superado sin pelear) · **Arranque siguiente** (lugar, momento y quién está presente).
+- Con estos encabezados «### …», en este orden: **Hechos y decisiones** (viñetas, en orden, con los momentos clave y las frases que importan) · **Salud, recursos y secuelas** · **Relaciones** (qué ha cambiado con cada cual) · **Hilos abiertos** · **Progresión** (una línea «[Avance: X/Y hacia Nivel N]» y el hito anotado; un hito no es solo combate: investigación, logro social, avance espiritual, travesía dura, vínculo que cruza un umbral o peligro superado sin pelear) · **Arranque siguiente** (lugar, momento y quién está presente) · **Cambios de canon** (solo si los hubo).
 - En español, sobria y concreta. Sin florituras.
 
 RESPONDE SOLO CON ESTE JSON:

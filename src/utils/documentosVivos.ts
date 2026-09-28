@@ -23,24 +23,32 @@ import type {
 /** Cuántas versiones anteriores de cada documento se guardan para deshacer. */
 export const VERSIONES_GUARDADAS = 10;
 
+/*
+ * La estructura sale del «Códice de campaña» que ya funcionaba jugando con
+ * Claude: el estado del mundo corto arriba, la verdad oculta de cada trama,
+ * quién quiere qué, relojes, vínculos, secretos e hilos con fecha, y abajo lo
+ * cerrado que sigue pesando y cómo se arranca la próxima vez.
+ */
 export const SECCIONES_CUADERNO = [
   'Estado general',
-  'Tramas y su verdad oculta',
-  'Actores y facciones',
-  'Relojes',
-  'Fuera de cámara',
-  'Lugares',
-  'Vida cotidiana',
+  'La verdad oculta (tramas)',
+  'Actores',
+  'Relojes y fuera de cámara',
+  'Lugares clave',
+  'Tono y límites',
+  'PNJs menores',
   'Vínculos',
-  'Secretos descubiertos',
-  'Hilos y plazos',
-  'Semillas y cartas preparadas',
-  'Rumores',
-  'Consecuencias vivas'
+  'Secretos vigentes',
+  'Hilos con vencimiento',
+  'Canon de mesa',
+  'Semillas',
+  'Consecuencias vivas',
+  'Reputación y rumores',
+  'Arranques y cortes'
 ] as const;
 
 export const SECCIONES_FICHA = [
-  'Estado',
+  'Nivel, PG y recursos',
   'Dinero',
   'Lo que lleva encima',
   'Mochila y contenedores',
@@ -185,18 +193,20 @@ export function migrarADocumentosVivos(mem: Memory | undefined, ahora = Date.now
   const cuaderno = [
     `# Cuaderno del GM${pj ? ` — ${pj}` : ''}`,
     seccion('Estado general', estado),
-    seccion('Tramas y su verdad oculta', tramas),
-    seccion('Actores y facciones', actores),
-    seccion('Relojes', relojes),
-    seccion('Fuera de cámara', fuera),
-    seccion('Lugares', lugares),
-    seccion('Vida cotidiana', []),
+    seccion('La verdad oculta (tramas)', tramas),
+    seccion('Actores', actores),
+    seccion('Relojes y fuera de cámara', [...relojes, ...fuera]),
+    seccion('Lugares clave', lugares),
+    seccion('Tono y límites', []),
+    seccion('PNJs menores', []),
     seccion('Vínculos', vinculos),
-    seccion('Secretos descubiertos', descubiertos),
-    seccion('Hilos y plazos', []),
-    seccion('Semillas y cartas preparadas', semillas),
-    seccion('Rumores', []),
-    seccion('Consecuencias vivas', [])
+    seccion('Secretos vigentes', descubiertos),
+    seccion('Hilos con vencimiento', []),
+    seccion('Canon de mesa', []),
+    seccion('Semillas', semillas),
+    seccion('Consecuencias vivas', []),
+    seccion('Reputación y rumores', []),
+    seccion('Arranques y cortes', [])
   ].join('\n\n');
 
   // ---- Ficha viva
@@ -222,6 +232,8 @@ export function migrarADocumentosVivos(mem: Memory | undefined, ahora = Date.now
     : [];
 
   const estadoPj = [
+    ...(pc?.level ? [`Nivel ${linea(String(pc.level))}`] : []),
+    ...(typeof pc?.maxHp === 'number' ? [`PG ${typeof pc.hp === 'number' ? pc.hp : pc.maxHp}/${pc.maxHp}`] : []),
     ...(pc?.conditions || []).map(c => `Condición: ${linea(c)}`),
     ...(typeof pc?.agotamiento === 'number' && pc.agotamiento > 0 ? [`Agotamiento: nivel ${pc.agotamiento}`] : []),
     ...(pc?.dolencias || []).map(d => `Dolencia: ${linea(d.nombre)}`)
@@ -229,8 +241,8 @@ export function migrarADocumentosVivos(mem: Memory | undefined, ahora = Date.now
 
   const ficha = [
     `# Ficha viva${pj ? ` — ${pj}` : ''}`,
-    `> Los PG, la CA y las condiciones del momento los lleva el HUD con cada turno. Aquí va lo que dura: heridas y secuelas, dinero y pertenencias.`,
-    seccion('Estado', estadoPj),
+    `> Los PG del momento los lleva el HUD turno a turno; aquí queda cómo está al último volcado.`,
+    seccion('Nivel, PG y recursos', estadoPj),
     seccion('Dinero', dinero.length ? [dinero.join(' · ')] : []),
     seccion('Lo que lleva encima', encima.map(lineaDeObjeto)),
     seccion('Mochila y contenedores', mochila.map(lineaDeObjeto)),
