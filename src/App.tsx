@@ -134,6 +134,7 @@ import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo, desarchivarCa
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
 import { guardarMesa, leerMesa, hayMensajesSinLeerEnMesa, marcarMesaLeida, MensajeDeMesa } from './utils/mesaStorage';
 import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario, sonElMismoObjeto, deduplicarInventario } from './utils/inventoryTag';
+import { hayDocumentosVivos, migrarADocumentosVivos } from './utils/documentosVivos';
 import { aplicarAprendizajes, nadaAprendido, reconstruirAprendido } from './utils/aprendizajeTag';
 import { aplicarBambalinas, aplicarFacciones, aplicarPreparado, aplicarRelojes, cuadernoQuieto, reconstruirCuaderno, reconstruirMesa, sinNovedadDeMesa } from './utils/cuadernoOculto';
 import { aplicarOlvidos, fijarEstadoEnMemoria, nadaQueOlvidar, resumirOlvidos } from './utils/ordenesDeMesa';
@@ -1815,7 +1816,13 @@ export default function App() {
      * queda en el bolsillo.
      */
     const pcPrevio = mem.player_character;
-    const hayInventario = !cambioVacio(t.inventario);
+    /*
+     * Con documentos vivos, la mochila y el cuaderno ya no se tocan turno a
+     * turno: se reescriben de una sentada al cerrar capítulo. Así una
+     * respuesta rehecha no deja objetos ni relojes fantasma.
+     */
+    const conDocumentos = hayDocumentosVivos(mem);
+    const hayInventario = !conDocumentos && !cambioVacio(t.inventario);
     const loAprendido = t.aprendido || [];
     const player_character =
       !hayInventario && nadaAprendido(loAprendido)
@@ -1863,12 +1870,12 @@ export default function App() {
       npcs: npcsDeduplicados,
       locations: lugaresDeLaCampana,
       gm_secrets: secretosDeCampana,
-      gm_bambalinas: movimientos.length ? aplicarBambalinas(mem.gm_bambalinas, movimientos) : mem.gm_bambalinas,
-      gm_relojes: (t.relojes || []).length
+      gm_bambalinas: !conDocumentos && movimientos.length ? aplicarBambalinas(mem.gm_bambalinas, movimientos) : mem.gm_bambalinas,
+      gm_relojes: !conDocumentos && (t.relojes || []).length
         ? aplicarRelojes(mem.gm_relojes, t.relojes || [], diaActual)
         : mem.gm_relojes,
-      gm_facciones: (t.facciones || []).length ? aplicarFacciones(mem.gm_facciones, t.facciones || []) : mem.gm_facciones,
-      gm_preparado: (t.preparado || []).length
+      gm_facciones: !conDocumentos && (t.facciones || []).length ? aplicarFacciones(mem.gm_facciones, t.facciones || []) : mem.gm_facciones,
+      gm_preparado: !conDocumentos && (t.preparado || []).length
         ? aplicarPreparado(mem.gm_preparado, t.preparado || [], diaActual)
         : mem.gm_preparado,
       player_character,
@@ -1907,6 +1914,26 @@ export default function App() {
   };
 
 
+
+  /*
+   * 📚 PASO A DOCUMENTOS VIVOS.
+   *
+   * La primera vez que se abre un proyecto sin ellos, se montan con lo que ya
+   * hay guardado (mochila, relojes, fuera de cámara, facciones, preparado y
+   * memoria general). Sin IA y sin borrar nada: las listas viejas se quedan
+   * donde estaban, simplemente dejan de leerse.
+   */
+  const tieneDocumentosVivos = Boolean(currentProject?.memory?.documentos_vivos);
+  useEffect(() => {
+    if (!currentPId || !currentProject || tieneDocumentosVivos) return;
+    void handleUpdateProjectField(p => {
+      if (p.memory?.documentos_vivos) return {};
+      const base = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
+      logInfo('memory_sync', 'Documentos vivos creados', 'Se han montado el Cuaderno del GM y la Ficha viva con la memoria que ya había.');
+      return { memory: { ...base, documentos_vivos: migrarADocumentosVivos(p.memory) } };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPId, tieneDocumentosVivos]);
 
   /**
    * Guarda lo que el Director haya apuntado desde la mesa.
@@ -5238,6 +5265,7 @@ export default function App() {
          * entera jugada antes de que nada de esto existiera. Manda la etiqueta
          * donde la hay, y lo leído rellena lo que falta.
          */
+        const conDocumentos = hayDocumentosVivos(p.memory);
         const porEtiquetas = mochila.inventario;
         const inventarioIA = memoriaSincronizada.player_character?.inventory || [];
 
@@ -5304,10 +5332,15 @@ export default function App() {
               );
             })(),
             retratos_guardados: p.memory?.retratos_guardados,
-            gm_bambalinas: cuaderno.movimientos.length ? cuaderno.movimientos : memoriaSincronizada.gm_bambalinas,
-            gm_relojes: cuaderno.relojes.length ? cuaderno.relojes : memoriaSincronizada.gm_relojes,
-            gm_facciones: mesa.facciones.length ? mesa.facciones : memoriaSincronizada.gm_facciones,
-            gm_preparado: mesa.preparado.length ? mesa.preparado : memoriaSincronizada.gm_preparado,
+            /*
+             * Con documentos vivos, mochila y cuaderno los lleva el volcado de
+             * cierre de capítulo: la sincronización no los rehace ni los pisa.
+             */
+            gm_bambalinas: conDocumentos ? p.memory?.gm_bambalinas : cuaderno.movimientos.length ? cuaderno.movimientos : memoriaSincronizada.gm_bambalinas,
+            gm_relojes: conDocumentos ? p.memory?.gm_relojes : cuaderno.relojes.length ? cuaderno.relojes : memoriaSincronizada.gm_relojes,
+            gm_facciones: conDocumentos ? p.memory?.gm_facciones : mesa.facciones.length ? mesa.facciones : memoriaSincronizada.gm_facciones,
+            gm_preparado: conDocumentos ? p.memory?.gm_preparado : mesa.preparado.length ? mesa.preparado : memoriaSincronizada.gm_preparado,
+            documentos_vivos: p.memory?.documentos_vivos,
             player_character: (() => {
               const base = memoriaSincronizada.player_character || { name: '' };
               /*
@@ -5341,7 +5374,12 @@ export default function App() {
                 ...(fichaLeida?.currencies && !Object.values(base.currencies || {}).some(v => v)
                   ? { currencies: fichaLeida.currencies }
                   : {}),
-                inventory: delDocumento.length ? [...inventory, ...delDocumento] : inventory,
+                ...(conDocumentos
+                  ? {
+                      inventory: p.memory?.player_character?.inventory || [],
+                      currencies: p.memory?.player_character?.currencies
+                    }
+                  : { inventory: delDocumento.length ? [...inventory, ...delDocumento] : inventory }),
                 /*
                  * Lo aprendido se FUNDE con lo que la IA haya leído de la prosa:
                  * la etiqueta es exacta pero solo existe si se escribió, y la
