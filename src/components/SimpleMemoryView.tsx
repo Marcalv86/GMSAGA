@@ -706,9 +706,10 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
 
                 {conDocumentos && (
                   <div className="mx-3 sm:mx-6 mt-3 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 text-[11px] sm:text-xs text-[var(--text-secondary)] leading-relaxed">
-                    📚 <strong className="text-[var(--accent)] font-cinzel">Con documentos vivos, este texto ya no lo lee el Narrador.</strong>{' '}
-                    Su contenido pasó al «Estado general» del Cuaderno, que se pone al día al cerrar capítulo. Las{' '}
-                    <strong className="text-[var(--text-primary)]">Directivas</strong> sí siguen viajando en cada turno.
+                    🧭 <strong className="text-[var(--accent)] font-cinzel">La memoria del proyecto: quién, qué y cómo se juega.</strong>{' '}
+                    Viaja al Narrador en cada turno, igual que las <strong className="text-[var(--text-primary)]">Directivas</strong>.
+                    Su «Current state» no, porque el estado de la partida lo lleva el Cuaderno. Se repasa sola al cerrar
+                    capítulo, solo si ha cambiado algo de fondo.
                   </div>
                 )}
                 {/* Scrollable Document or Empty State */}

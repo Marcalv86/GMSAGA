@@ -2461,11 +2461,20 @@ ${currentChat.esFlashback ? '⛔ **ADVERTENCIA DE ANALLEPSIS / FLASHBACK**: Este
    */
   const docsVivos = hayDocumentosVivos(project.memory) ? project.memory!.documentos_vivos! : null;
 
+  /*
+   * 🧭 La memoria del proyecto es el «quién, qué y cómo se juega», como la
+   * memoria de proyecto de Claude, y viaja siempre. Con documentos vivos, su
+   * «Current state» se queda fuera: el estado lo lleva el Cuaderno, y dos
+   * versiones del «ahora» acaban contradiciéndose.
+   */
   let rawProjectMemBlock = '';
-  if (project.memory?.raw_project_memory && !docsVivos) {
+  const memoriaDelProyecto = docsVivos
+    ? memoriaSinEstadoActual(project.memory?.raw_project_memory || '')
+    : (project.memory?.raw_project_memory || '').trim();
+  if (memoriaDelProyecto) {
     rawProjectMemBlock = `
 === MEMORIA GENERAL DEL PROYECTO (PROJECT MEMORY) ===
-${project.memory.raw_project_memory.trim()}
+${memoriaDelProyecto}
 `;
   }
 
@@ -6741,7 +6750,7 @@ export async function syncMemoryFromChats(project: Project, chats: Chat[], files
  * (resumen, memoria general, sincronización completa y repaso del Director),
  * que escribían sobre lo mismo y se pisaban.
  */
-type ParteDelVolcado = 'cuaderno' | 'ficha' | 'bitacora';
+type ParteDelVolcado = 'cuaderno' | 'ficha' | 'bitacora' | 'memoria';
 
 export async function volcarDocumentosVivos({
   project,
@@ -6754,7 +6763,7 @@ export async function volcarDocumentosVivos({
   /** Índice del primer mensaje del capítulo que aún no se ha volcado. */
   desde: number;
   motivo: 'cierre' | 'manual';
-}): Promise<{ cuaderno: string; ficha: string; bitacora: string; leidos: number; porPartes?: boolean }> {
+}): Promise<{ cuaderno: string; ficha: string; bitacora: string; memoria?: string; leidos: number; porPartes?: boolean }> {
   const docs = project.memory?.documentos_vivos;
   if (!docs) throw new Error('El proyecto todavía no tiene documentos vivos.');
 
@@ -6778,6 +6787,7 @@ export async function volcarDocumentosVivos({
     calendarioValido(project.calendar) && project.currentDate ? fechaLegible(project.calendar!, project.currentDate) : '';
   const ultima = docs.bitacora[docs.bitacora.length - 1];
   const canonDeMesa = (project.memory?.memory_edits || []).map(e => `- ${e.text}`).join('\n');
+  const memoriaActual = memoriaSinEstadoActual(project.memory?.raw_project_memory || '');
 
   const contexto = `Eres el Director de Juego de una partida de rol en solitario, sentado después de jugar para poner al día tus documentos. Nada de narrar: solo actualizar.
 
@@ -6790,7 +6800,7 @@ ${docs.cuaderno}
 === 🎒 FICHA VIVA ACTUAL (visible y editable por la jugadora) ===
 ${docs.ficha}
 
-${ultima ? `=== 📖 ÚLTIMA ENTRADA DE LA BITÁCORA (${ultima.capitulo}${ultima.parte ? `, parte ${ultima.parte}` : ''}) ===\n${ultima.texto}\n\n` : ''}${canonDeMesa ? `=== 📌 CANON Y REGLAS DE MESA ACORDADAS (respétalas) ===\n${canonDeMesa}\n\n` : ''}=== LO JUGADO DESDE EL ÚLTIMO VOLCADO${recortada ? ' (muy largo: llega solo el final)' : ''} ===
+${memoriaActual && motivo === 'cierre' ? `=== 🧭 MEMORIA DEL PROYECTO ACTUAL (quién, qué y cómo se juega) ===\n${memoriaActual}\n\n` : ''}${ultima ? `=== 📖 ÚLTIMA ENTRADA DE LA BITÁCORA (${ultima.capitulo}${ultima.parte ? `, parte ${ultima.parte}` : ''}) ===\n${ultima.texto}\n\n` : ''}${canonDeMesa ? `=== 📌 CANON Y REGLAS DE MESA ACORDADAS (respétalas) ===\n${canonDeMesa}\n\n` : ''}=== LO JUGADO DESDE EL ÚLTIMO VOLCADO${recortada ? ' (muy largo: llega solo el final)' : ''} ===
 ${cronica}`;
 
   /*
@@ -6824,23 +6834,33 @@ ${cronica}`;
 - Lo gastado, consumido o entregado desaparece. Lo devuelto vuelve a su sitio.
 - «Dinero»: saldo final tras lo cobrado, gastado o perdido.
 - «Lista de compras»: lo que ella haya dicho que quiere comprar o reponer.`,
+    memoria: `REGLAS PARA «memoria» (la memoria del proyecto: quién, qué y cómo se juega; viaja al Narrador en cada turno):
+- ⭐ Casi nunca cambia. Devuelve «memoria» como texto VACÍO ("") salvo que lo jugado haya cambiado algo DE FONDO: un acompañante que pasa a ser habitual o deja de serlo, un cambio de premisa o de objetivo del personaje, reglas de ambientación o de tono acordadas en la mesa, una preferencia de juego que la jugadora haya dejado clara.
+- Si cambia, devuélvela ENTERA en Markdown con «### Purpose & context» (con su «Key worldbuilding parameters established:») y «### Tools & resources», copiando tal cual lo que no cambie. ⛔ Sin «Current state»: el estado de la partida vive en el Cuaderno.
+- Como mucho ${TOPE_MEMORIA_PROYECTO_CARACTERES} caracteres. Nada de crónica ni de secretos del Cuaderno: aquí va lo estable.`,
     bitacora: `REGLAS PARA «bitacora» (una entrada nueva; la jugadora la LEE):
 - ⛔ Nada del cuaderno que ella no sepa: ni verdades ocultas, ni fuera de cámara, ni relojes.
 - Con estos encabezados «### …», en este orden: **Hechos y decisiones** (viñetas, en orden, con los momentos clave y las frases que importan) · **Salud, recursos y secuelas** · **Relaciones** (qué ha cambiado con cada cual) · **Hilos abiertos** · **Progresión** (una línea «[Avance: X/Y hacia Nivel N]» y el hito anotado; un hito no es solo combate: investigación, logro social, avance espiritual, travesía dura, vínculo que cruza un umbral o peligro superado sin pelear) · **Arranque siguiente** (lugar, momento y quién está presente) · **Cambios de canon** (solo si los hubo).
 - En español, sobria y concreta. Sin florituras.`
   };
-  const NOMBRE: Record<ParteDelVolcado, string> = { cuaderno: '«cuaderno»', ficha: '«ficha»', bitacora: '«bitacora»' };
+  const NOMBRE: Record<ParteDelVolcado, string> = {
+    cuaderno: '«cuaderno»',
+    ficha: '«ficha»',
+    bitacora: '«bitacora»',
+    memoria: '«memoria»'
+  };
 
   const activeModel = getBackgroundTaskModel();
   const safetySetting = getStoredSafetyLevel();
 
   const pedir = async (partes: ParteDelVolcado[]): Promise<Partial<Record<ParteDelVolcado, string>>> => {
-    const reescritas = partes.filter(x => x !== 'bitacora');
+    const reescritas = partes.filter(x => x === 'cuaderno' || x === 'ficha');
+    const completa = partes.includes('cuaderno') && partes.includes('ficha');
     const peticion = `${contexto}
 
 === QUÉ TIENES QUE DEVOLVER ===
 ${partes.length === 1 ? 'Un texto' : `${partes.length} textos`} en Markdown dentro de un JSON: ${partes.map(x => NOMBRE[x]).join(', ')}.${
-      partes.length < 3 ? ' (Los demás documentos se ponen al día aparte: no los devuelvas.)' : ''
+      completa ? '' : ' (Los demás documentos se ponen al día aparte: no los devuelvas.)'
     }
 
 ${reescritas.length ? `${REGLAS_COMUNES}\n\n` : ''}${partes.map(x => REGLAS[x]).join('\n\n')}
@@ -6851,7 +6871,7 @@ RESPONDE SOLO CON ESTE JSON:
     const response = await generateContentWithFailover({
       proposito:
         (motivo === 'cierre' ? 'Volcado de documentos al cerrar capítulo' : 'Volcado de documentos a mitad de capítulo') +
-        (partes.length < 3 ? ` (${partes.join(' + ')})` : ''),
+        (completa ? '' : ` (${partes.join(' + ')})`),
       primaryModel: activeModel,
       contents: peticion,
       config: {
@@ -6888,7 +6908,7 @@ RESPONDE SOLO CON ESTE JSON:
       errorDeLlamada = errorDeLlamada || err;
       return {} as Partial<Record<ParteDelVolcado, string>>;
     });
-  let res = await intentar(['cuaderno', 'ficha', 'bitacora']);
+  let res = await intentar(motivo === 'cierre' ? ['cuaderno', 'ficha', 'bitacora', 'memoria'] : ['cuaderno', 'ficha', 'bitacora']);
   const faltan = (['cuaderno', 'ficha', 'bitacora'] as ParteDelVolcado[]).filter(x => !res[x]);
   let porPartes = false;
   if (faltan.length) {
@@ -6913,7 +6933,8 @@ RESPONDE SOLO CON ESTE JSON:
         .join(' y ')}). No se ha tocado nada: vuelve a intentarlo.`
     );
   }
-  return { cuaderno, ficha, bitacora, leidos: mensajes.length, porPartes };
+  const memoria = memoriaSinEstadoActual(res.memoria || '');
+  return { cuaderno, ficha, bitacora, ...(memoria ? { memoria } : {}), leidos: mensajes.length, porPartes };
 }
 
 /**
@@ -7201,6 +7222,13 @@ ${relato}`;
  * un turno de cada tres.
  */
 export const TOPE_MEMORIA_PROYECTO_CARACTERES = 8000;
+
+/** La memoria del proyecto sin su apartado «Current state» (el estado lo lleva el Cuaderno). */
+export const memoriaSinEstadoActual = (texto: string): string =>
+  (texto || '')
+    .replace(/(^|\n)#{2,4}\s*(current state|estado actual)[^\n]*\n[\s\S]*?(?=\n#{2,4}\s|$)/i, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
 /** Quita vallas de código y preámbulos del tipo «Aquí tienes la memoria:». */
 function limpiarTextoGenerado(texto: string): string {

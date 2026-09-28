@@ -2782,7 +2782,9 @@ export default function App() {
         let d = mermaCuaderno.length ? actuales : reescribirDocumentos(actuales, { cuaderno: res.cuaderno }, etiqueta);
         if (res.bitacora) d = anotarEnBitacora(d, { chatId: chat.id, capitulo: chat.name, texto: res.bitacora });
         d = { ...d, volcadoHasta: { ...(d.volcadoHasta || {}), [chat.id]: total } };
-        const base = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
+        const previa = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
+        // 🧭 La memoria del proyecto solo llega si ha cambiado algo de fondo.
+        const base = res.memoria ? { ...previa, raw_project_memory: res.memoria } : previa;
         // Y las pantallas (PNJs, lugares, tramas, nivel) se ponen al día con lo volcado.
         return { memory: sincronizarFichasConDocumentos({ ...base, documentos_vivos: d }) };
       });
@@ -2790,7 +2792,7 @@ export default function App() {
       logInfo(
         'memory_sync',
         `Documentos volcados (${etiqueta})`,
-        `${res.leidos} mensajes leídos${res.porPartes ? ' · en dos llamadas' : ''} · ficha: ${nuevas.length} líneas nuevas, ${quitadas.length} quitadas${
+        `${res.leidos} mensajes leídos${res.porPartes ? ' · en dos llamadas' : ''}${res.memoria ? ' · memoria del proyecto repasada' : ''} · ficha: ${nuevas.length} líneas nuevas, ${quitadas.length} quitadas${
           mermaCuaderno.length ? ` · el cuaderno poda mucho: ${mermaCuaderno.join('; ')}` : ''
         }`
       );
@@ -3826,8 +3828,9 @@ export default function App() {
                 });
               }
 
-              // 2. Síntesis narrativa de memoria general (no con documentos vivos)
-              if (conDocsVivos) {
+              // 2. La memoria del proyecto. Con documentos vivos, solo si aún no la hay:
+              //    después la repasa el volcado al cerrar capítulo.
+              if (conDocsVivos && (currentProject.memory?.raw_project_memory || '').trim()) {
                 await handleUpdateProjectField(() => ({ lastMemoryUpdate: Date.now(), lastMemoryMessageCount: totalMensajes }));
                 return;
               }
