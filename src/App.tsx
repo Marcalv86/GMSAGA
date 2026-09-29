@@ -7107,7 +7107,7 @@ export default function App() {
             <ChatView
               chat={currentChat}
               anteriormente={
-                hayDocumentosVivos(currentProject?.memory) && currentChapterIndex > 0
+                hayDocumentosVivos(currentProject?.memory) && currentChapterIndex >= 0
                   ? entradaAnteriorA(
                       currentProject?.memory?.documentos_vivos,
                       currentChats.slice(0, currentChapterIndex).map(c => c.id)

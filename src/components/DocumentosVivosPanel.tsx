@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { emojiDeSeccion, TarjetasDeBitacora, TarjetasDeDocumento } from './TarjetasDeDocumento';
 import { Check, ChevronDown, ChevronRight, Pencil, Save, Undo2, X } from 'lucide-react';
 import type { DocumentosVivos } from '../types';
-import { partirEnSecciones, reemplazarSeccion } from '../utils/documentosVivos';
+import { importarDesdeClaude, partirEnSecciones, reemplazarSeccion } from '../utils/documentosVivos';
 
 /*
  * 📚 La vista de los documentos vivos.
@@ -266,6 +266,114 @@ const Bitacora: React.FC<{ docs: DocumentosVivos }> = ({ docs }) => {
   );
 };
 
+/*
+ * 📥 IMPORTAR DESDE CLAUDE. Dos cajas, el Cuaderno y la Bitácora del proyecto
+ * de Claude, y un avance de lo que va a pasar antes de hacerlo. Sin IA.
+ */
+const ImportarDesdeClaude: React.FC<{
+  docs: DocumentosVivos;
+  onImportar: (pegado: { cuaderno: string; bitacora: string }) => Promise<string[]> | string[];
+  onCerrar: () => void;
+}> = ({ docs, onImportar, onCerrar }) => {
+  const [cuaderno, setCuaderno] = useState('');
+  const [bitacora, setBitacora] = useState('');
+  const [hecho, setHecho] = useState<string[] | null>(null);
+  const [trabajando, setTrabajando] = useState(false);
+  const avance = cuaderno.trim() || bitacora.trim() ? importarDesdeClaude(docs, { cuaderno, bitacora }).resumen : [];
+  const caja =
+    'w-full min-h-[120px] p-2.5 rounded-lg border border-[var(--glass-border)] bg-[var(--bg-color)] text-[var(--text-primary)] font-mono text-[11px] sm:text-xs leading-relaxed outline-none focus:border-[var(--accent)] resize-y';
+
+  if (hecho) {
+    return (
+      <section className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3 sm:p-4 flex flex-col gap-2">
+        <h3 className="m-0 font-cinzel font-bold text-sm text-emerald-700 dark:text-emerald-300">✅ Importado</h3>
+        <ul className="m-0 pl-4 text-xs sm:text-sm text-[var(--text-primary)] flex flex-col gap-0.5">
+          {hecho.map(h => (
+            <li key={h}>{h}</li>
+          ))}
+        </ul>
+        <p className="m-0 text-[11px] text-[var(--text-secondary)]">
+          PNJs, tramas, lugares y giros ya se han puesto al día. Si algo no te cuadra, «Deshacer» en el Cuaderno o la Ficha
+          vuelve atrás.
+        </p>
+        <button
+          onClick={onCerrar}
+          className="self-end min-h-[36px] px-3 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold cursor-pointer"
+        >
+          👍 Listo
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-[var(--accent)]/40 bg-[var(--surface)] shadow-xs p-3 sm:p-4 flex flex-col gap-3">
+      <header className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="m-0 font-cinzel font-bold text-sm text-[var(--accent)]">📥 Importar desde Claude</h3>
+          <p className="m-0 mt-1 text-[11px] sm:text-xs text-[var(--text-secondary)] leading-relaxed">
+            Pega tus documentos del proyecto de Claude. Mejor en Markdown (en el documento, exportar o descargar como .md);
+            si pegas el texto tal cual, la app reconoce los títulos igualmente. El inventario y el estado del PJ del Cuaderno
+            pasan solos a la Ficha viva, y la Bitácora se trocea en una entrada por sesión.
+          </p>
+        </div>
+        <button
+          onClick={onCerrar}
+          aria-label="Cerrar"
+          title="Cerrar"
+          className="shrink-0 min-h-[32px] min-w-[32px] rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </header>
+      <label className="flex flex-col gap-1">
+        <span className="font-cinzel font-bold text-xs text-[var(--text-primary)]">🕯️ Cuaderno del GM</span>
+        <textarea value={cuaderno} onChange={e => setCuaderno(e.target.value)} spellCheck={false} className={caja} placeholder="# Cuaderno GM…" />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="font-cinzel font-bold text-xs text-[var(--text-primary)]">📖 Bitácora</span>
+        <textarea value={bitacora} onChange={e => setBitacora(e.target.value)} spellCheck={false} className={caja} placeholder="# Bitácora…" />
+      </label>
+      {avance.length > 0 && (
+        <div className="rounded-lg bg-[var(--surface-soft)] border border-[var(--glass-border)] px-3 py-2 text-[11px] sm:text-xs text-[var(--text-primary)]">
+          <div className="font-cinzel font-bold text-[var(--accent)] mb-1">👀 Esto es lo que va a entrar</div>
+          <ul className="m-0 pl-4 flex flex-col gap-0.5">
+            {avance.map(a => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+          <p className="m-0 mt-1.5 text-[var(--text-secondary)]">
+            {cuaderno.trim() ? 'El Cuaderno actual se sustituye (con deshacer). ' : ''}
+            {bitacora.trim() ? 'Las entradas que ya haya escrito la app se conservan.' : ''}
+          </p>
+        </div>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={onCerrar}
+          className="min-h-[36px] px-3 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] text-xs font-cinzel font-bold cursor-pointer"
+        >
+          ✋ Cancelar
+        </button>
+        <button
+          disabled={!avance.length || trabajando}
+          onClick={async () => {
+            setTrabajando(true);
+            try {
+              setHecho(await onImportar({ cuaderno, bitacora }));
+            } finally {
+              setTrabajando(false);
+            }
+          }}
+          className="min-h-[36px] px-3 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] text-xs font-cinzel font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          📥 Importar
+        </button>
+      </div>
+    </section>
+  );
+};
+
 export const DocumentosVivosPanel: React.FC<{
   docs: DocumentosVivos;
   cual: 'ficha' | 'cuaderno';
@@ -273,8 +381,10 @@ export const DocumentosVivosPanel: React.FC<{
   onDeshacer: (cual: 'ficha' | 'cuaderno') => Promise<void> | void;
   onVolcarAhora?: () => void;
   onSembrarCuaderno?: () => void;
-}> = ({ docs, cual, onGuardar, onDeshacer, onVolcarAhora, onSembrarCuaderno }) => {
+  onImportarDesdeClaude?: (pegado: { cuaderno: string; bitacora: string }) => Promise<string[]> | string[];
+}> = ({ docs, cual, onGuardar, onDeshacer, onVolcarAhora, onSembrarCuaderno, onImportarDesdeClaude }) => {
   const [confirmarSembrar, setConfirmarSembrar] = useState(false);
+  const [importando, setImportando] = useState(false);
   const versiones = docs.versiones?.[cual] || [];
   const ultima = versiones[versiones.length - 1];
   return (
@@ -284,6 +394,19 @@ export const DocumentosVivosPanel: React.FC<{
           🕰️ {docs.actualizadoEl ? fechaCorta(docs.actualizadoEl) : 'Sin actualizar todavía'}
         </span>
         <span className="flex items-center gap-1.5 shrink-0">
+        {onImportarDesdeClaude && (
+          <button
+            onClick={() => setImportando(v => !v)}
+            aria-label="Importar desde Claude"
+            aria-pressed={importando}
+            title="Importar desde Claude: pega el Cuaderno y la Bitácora de tu proyecto de Claude (sin IA)."
+            className={`min-h-[36px] min-w-[36px] px-2 rounded-lg border flex items-center justify-center cursor-pointer text-base leading-none ${
+              importando ? 'border-[var(--accent)] bg-[var(--accent)]/10' : 'border-[var(--glass-border)] hover:border-[var(--accent)]'
+            }`}
+          >
+            📥
+          </button>
+        )}
         {cual === 'cuaderno' && onSembrarCuaderno && (
           confirmarSembrar ? (
             <button
@@ -321,6 +444,9 @@ export const DocumentosVivosPanel: React.FC<{
         )}
         </span>
       </div>
+      {importando && onImportarDesdeClaude && (
+        <ImportarDesdeClaude docs={docs} onImportar={onImportarDesdeClaude} onCerrar={() => setImportando(false)} />
+      )}
       <Documento
         key={cual}
         titulo={cual === 'ficha' ? '🎒 Ficha viva' : '🕯️ Cuaderno del GM'}

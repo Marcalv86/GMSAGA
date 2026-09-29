@@ -970,9 +970,10 @@ export function entradaAnteriorA(
   docs: DocumentosVivos | undefined,
   idsDeCapitulosAnteriores: string[]
 ): EntradaDeBitacora | undefined {
-  if (!docs?.bitacora?.length || !idsDeCapitulosAnteriores.length) return undefined;
+  if (!docs?.bitacora?.length) return undefined;
   const antes = new Set(idsDeCapitulosAnteriores);
-  const candidatas = docs.bitacora.filter(e => antes.has(e.chatId));
+  // Las importadas de Claude van antes que cualquier capítulo de la app.
+  const candidatas = docs.bitacora.filter(e => antes.has(e.chatId) || e.chatId.startsWith('importada_'));
   return candidatas[candidatas.length - 1];
 }
 
@@ -1107,4 +1108,183 @@ export function aplicarCambiosDeDocumento(
     fuera = reemplazarSeccion(fuera, i, [cabecera, ...nuevo].join('\n'));
   }
   return { doc: fuera, hechos, fallidos };
+}
+
+// ---------------------------------------------------------------- importar desde Claude
+
+/*
+ * 📥 IMPORTAR UNA PARTIDA JUGADA EN CLAUDE.
+ *
+ * El proyecto de Claude lleva el mismo Cuaderno y la misma Bitácora, con dos
+ * diferencias: su Cuaderno guarda dentro el inventario y el estado del PJ (que
+ * aquí viven en la Ficha viva), y su Bitácora es un documento entero en vez de
+ * entradas sueltas. Esto lo reparte sin IA: el Cuaderno entra tal cual menos
+ * esas secciones, que pasan a la Ficha viva, y la Bitácora se trocea en una
+ * entrada por sesión. Con versión anterior para deshacer.
+ */
+
+const APARTADO_DE_BITACORA =
+  /^(hechos( y decisiones)?|salud|relaciones|hilos( abiertos)?|progresi[oó]n|arranque|cambios de canon|estado al corte|parte \d+)/i;
+
+/**
+ * Lo pegado, en Markdown. Si viene de copiar la vista del documento (texto
+ * plano, sin «#» ni viñetas), se reconocen los títulos y cada línea suelta pasa
+ * a ser una viñeta.
+ */
+export function aMarkdownDeClaude(texto: string, tipo: 'cuaderno' | 'bitacora'): string {
+  const limpio = (texto || '').replace(/\r\n?/g, '\n').replace(/ /g, ' ').trim();
+  if (!limpio || /^#{1,3}\s/m.test(limpio)) return limpio;
+  let primera = true;
+  return limpio
+    .split('\n')
+    .map(bruta => {
+      const l = bruta.trim();
+      if (!l) return '';
+      if (primera) {
+        primera = false;
+        if (/^(cuaderno|bit[aá]cora)\b/i.test(l)) return `# ${l}`;
+      }
+      if (tipo === 'bitacora') {
+        if (/^(sesi[oó]n|cap[ií]tulo)\s*\d+/i.test(l)) return `## ${l}`;
+        if (APARTADO_DE_BITACORA.test(l) && l.length < 80 && !/[.;]$/.test(l)) return `### ${l}`;
+      } else {
+        if (/^\d{1,2}[.)]\s+\S/.test(l) && l.length < 70 && !/[.;:]$/.test(l)) return `## ${l}`;
+        if (/^TRAMA\s*:/i.test(l)) return `### ${l}`;
+      }
+      return /^[-*]\s/.test(l) ? l : `- ${l}`;
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+export interface SesionImportada {
+  capitulo: string;
+  texto: string;
+}
+
+/** Trocea la Bitácora entera en una entrada por sesión («## Sesión N …»). */
+export function trocearBitacora(texto: string): SesionImportada[] {
+  const md = aMarkdownDeClaude(texto, 'bitacora');
+  if (!md) return [];
+  const lineas = md.split('\n');
+  // Se parte por el nivel de título más alto que se repita: «##» si lo hay, si no «#».
+  const cuantos = (n: number) => lineas.filter(l => new RegExp(`^#{${n}}\\s`).test(l)).length;
+  const nivel = cuantos(2) > 0 ? 2 : cuantos(1) > 1 ? 1 : 0;
+  if (!nivel) return [{ capitulo: 'Bitácora importada', texto: md }];
+  const re = new RegExp(`^#{${nivel}}\\s+(.+?)\\s*$`);
+  const fuera: SesionImportada[] = [];
+  for (const l of lineas) {
+    const h = l.match(re);
+    if (h) {
+      fuera.push({ capitulo: h[1].replace(/[*_]/g, '').trim(), texto: '' });
+      continue;
+    }
+    // Lo de antes de la primera sesión (el título del documento) no es una entrada.
+    if (!fuera.length || (nivel === 2 && /^#\s/.test(l))) continue;
+    fuera[fuera.length - 1].texto += `${l}\n`;
+  }
+  return fuera.map(e => ({ ...e, texto: e.texto.trim() })).filter(e => e.texto);
+}
+
+/** Secciones del Cuaderno de Claude que aquí son de la Ficha viva, y adónde va cada línea. */
+const ES_INVENTARIO = /inventario|mochila|equipo|pertenencias|lo que lleva/i;
+const ES_ESTADO_DEL_PJ = /estado del pj|estado de la protagonista|ficha del pj|salud y recursos|nivel, pg/i;
+const DESTINO_EN_FICHA: [RegExp, string][] = [
+  [/^inventario\s*:/i, 'Lo que lleva encima'],
+  [/^(dinero|monedas|saldo)\b/i, 'Dinero'],
+  [/^(lista de compras|compras|por comprar)\b/i, 'Lista de compras'],
+  [/^encarg/i, 'Encargos'],
+  [/requisad|confiscad|en manos (de|ajenas)|se lo (han )?quitado/i, 'Requisado o en manos ajenas'],
+  [/^(mochila|bolsa|zurr[oó]n|alforja|petate|morral|contenedor)/i, 'Mochila y contenedores'],
+  [/^(en (la|su) habitaci[oó]n|guardad|en el camarote|en el barco|en casa|a mano, no suyo|dep[oó]sito)/i, 'Guardado en otro sitio']
+];
+
+const destinoDeLinea = (linea: string, porDefecto: string) => {
+  const t = limpiarLinea(linea);
+  for (const [re, sec] of DESTINO_EN_FICHA) if (re.test(t)) return sec;
+  return porDefecto;
+};
+
+/** Mete líneas en secciones de la Ficha. Lo importado manda: la sección que recibe líneas se sustituye entera. */
+function repartirEnFicha(ficha: string, porSeccion: Map<string, string[]>): string {
+  let fuera = ficha;
+  const norma = (t: string) => plegar(t.replace(/^\d+[.)]\s*/, ''));
+  for (const [seccion, lineas] of porSeccion) {
+    if (!lineas.length) continue;
+    const { secciones } = partirEnSecciones(fuera);
+    const i = secciones.findIndex(s => norma(s.titulo) === norma(seccion));
+    const nuevas = lineas.map(l => (/^\s*[-*]\s/.test(l) ? l.trim() : `- ${l.trim()}`));
+    if (i < 0) {
+      fuera = `${fuera.replace(/\s+$/, '')}\n\n## ${seccion}\n${nuevas.join('\n')}\n`;
+      continue;
+    }
+    const cabecera = secciones[i].bloque.split('\n')[0];
+    fuera = reemplazarSeccion(fuera, i, [cabecera, ...nuevas].join('\n'));
+  }
+  return fuera;
+}
+
+export interface ResultadoDeImportacion {
+  docs: DocumentosVivos;
+  resumen: string[];
+}
+
+export function importarDesdeClaude(
+  docs: DocumentosVivos,
+  pegado: { cuaderno?: string; bitacora?: string },
+  ahora = Date.now()
+): ResultadoDeImportacion {
+  const resumen: string[] = [];
+  let fuera = docs;
+
+  // ---- Cuaderno (y lo que de él va a la Ficha viva)
+  const md = aMarkdownDeClaude(pegado.cuaderno || '', 'cuaderno');
+  if (md) {
+    const { preambulo, secciones } = partirEnSecciones(md);
+    const aLaFicha = new Map<string, string[]>();
+    const quedan: string[] = [];
+    const movidas: string[] = [];
+    for (const s of secciones) {
+      const inventario = ES_INVENTARIO.test(s.titulo);
+      const estado = !inventario && ES_ESTADO_DEL_PJ.test(s.titulo);
+      if (!inventario && !estado) {
+        quedan.push(s.bloque);
+        continue;
+      }
+      movidas.push(s.titulo);
+      const porDefecto = inventario ? 'Lo que lleva encima' : 'Nivel, PG y recursos';
+      for (const l of s.bloque.split('\n').slice(1)) {
+        const t = limpiarLinea(l);
+        // Las notas de funcionamiento del proyecto de Claude no son equipo.
+        if (!t || /pregunta de mesa|vive en el cuaderno/i.test(t)) continue;
+        const destino = destinoDeLinea(l, porDefecto);
+        aLaFicha.set(destino, [...(aLaFicha.get(destino) || []), l]);
+      }
+    }
+    const cuaderno = [preambulo.trim(), ...quedan].filter(Boolean).join('\n\n') + '\n';
+    const ficha = aLaFicha.size ? repartirEnFicha(docs.ficha, aLaFicha) : docs.ficha;
+    fuera = reescribirDocumentos(fuera, { cuaderno, ficha }, 'Importado desde Claude', ahora);
+    resumen.push(`🕯️ Cuaderno: ${quedan.length} secciones`);
+    if (movidas.length) {
+      const lineas = [...aLaFicha.values()].reduce((n, l) => n + l.length, 0);
+      resumen.push(`🎒 Ficha viva: ${lineas} líneas desde «${movidas.join('» y «')}»`);
+    }
+  }
+
+  // ---- Bitácora: una entrada por sesión, delante de las que ya haya escrito la app
+  const sesiones = trocearBitacora(pegado.bitacora || '');
+  if (sesiones.length) {
+    const propias = fuera.bitacora.filter(e => !e.chatId.startsWith('importada_'));
+    const importadas: EntradaDeBitacora[] = sesiones.map((s, i) => ({
+      id: `bit_imp_${ahora}_${i}`,
+      chatId: `importada_${i}`,
+      capitulo: s.capitulo,
+      texto: s.texto,
+      // En orden, y todas antes de lo jugado en la app.
+      fecha: Math.min(ahora, ...propias.map(e => e.fecha)) - (sesiones.length - i) * 1000
+    }));
+    fuera = { ...fuera, bitacora: [...importadas, ...propias] };
+    resumen.push(`📖 Bitácora: ${sesiones.length} ${sesiones.length === 1 ? 'entrada' : 'entradas'}`);
+  }
+  return { docs: fuera, resumen };
 }

@@ -27,7 +27,7 @@ import { LocationDossierModal } from './LocationDossierModal';
 import { DailyAgendaDiary } from './DailyAgendaDiary';
 import { StatusView } from './StatusView';
 import { DocumentosVivosPanel } from './DocumentosVivosPanel';
-import { deshacerDocumento, reescribirDocumentos, sincronizarFichasConDocumentos } from '../utils/documentosVivos';
+import { deshacerDocumento, importarDesdeClaude, reescribirDocumentos, sincronizarFichasConDocumentos } from '../utils/documentosVivos';
 
 import {
   BookOpen,
@@ -1194,6 +1194,20 @@ export const MemoryManager: React.FC<{
           cual={activeTab === 'ficha_viva' ? 'ficha' : 'cuaderno'}
           onVolcarAhora={onVolcarAhora}
           onSembrarCuaderno={onSembrarCuaderno}
+          onImportarDesdeClaude={async pegado => {
+            const actuales = memory.documentos_vivos;
+            if (!actuales) return [];
+            const { resumen } = importarDesdeClaude(actuales, pegado);
+            await onUpdateMemory(mem =>
+              mem?.documentos_vivos
+                ? sincronizarFichasConDocumentos({
+                    ...mem,
+                    documentos_vivos: importarDesdeClaude(mem.documentos_vivos, pegado).docs
+                  })
+                : mem
+            );
+            return resumen;
+          }}
           onGuardar={(cual, texto) =>
             onUpdateMemory(mem =>
               mem?.documentos_vivos

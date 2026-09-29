@@ -112,7 +112,9 @@ function Marcadores({ texto }: { texto: string }) {
     { k: 'VÍN', m: texto.match(/\bV[IÍ]N\s*[:=]?\s*(\d+)/i) },
     { k: 'CON', m: texto.match(/\bCON\s*[:=]?\s*(\d+)/i) }
   ].filter(e => e.m);
-  const reloj = texto.match(/(?:^|\s)(\d{1,2})\s*\/\s*(\d{1,2})(?:\s|$|·)/);
+  // Bolitas solo para relojes de verdad («reloj» o «Nombre — 3/6»), no para «PG 27/27» o «ranuras 4/4».
+  const esReloj = /\breloj/i.test(texto) || /—\s*\d{1,2}\s*\/\s*\d{1,2}(?:\s|$|·)/.test(texto);
+  const reloj = esReloj ? texto.match(/(?:^|\s)(\d{1,2})\s*\/\s*(\d{1,2})(?:\s|$|·)/) : null;
   if (!ejes.length && !reloj) return null;
   const EJE: Record<string, { emoji: string; nombre: string; barra: string }> = {
     ATR: { emoji: '🔥', nombre: 'Atracción', barra: 'bg-rose-500 dark:bg-rose-400' },
