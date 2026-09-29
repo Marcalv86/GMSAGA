@@ -270,11 +270,13 @@ const Bitacora: React.FC<{ docs: DocumentosVivos }> = ({ docs }) => {
  * 📥 IMPORTAR DESDE CLAUDE. Dos cajas, el Cuaderno y la Bitácora del proyecto
  * de Claude, y un avance de lo que va a pasar antes de hacerlo. Sin IA.
  */
-const ImportarDesdeClaude: React.FC<{
+export const ImportarDesdeClaude: React.FC<{
   docs: DocumentosVivos;
   onImportar: (pegado: { cuaderno: string; bitacora: string; memoria: string }) => Promise<string[]> | string[];
   onCerrar: () => void;
-}> = ({ docs, onImportar, onCerrar }) => {
+  /** Dentro de otra ventana que ya lleva título. */
+  sinTitulo?: boolean;
+}> = ({ docs, onImportar, onCerrar, sinTitulo }) => {
   const [cuaderno, setCuaderno] = useState('');
   const [bitacora, setBitacora] = useState('');
   const [memoria, setMemoria] = useState('');
@@ -311,16 +313,19 @@ const ImportarDesdeClaude: React.FC<{
   }
 
   return (
-    <section className="rounded-xl border border-[var(--accent)]/40 bg-[var(--surface)] shadow-xs p-3 sm:p-4 flex flex-col gap-3">
+    <section
+      className={`flex flex-col gap-3 ${sinTitulo ? '' : 'rounded-xl border border-[var(--accent)]/40 bg-[var(--surface)] shadow-xs p-3 sm:p-4'}`}
+    >
       <header className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="m-0 font-cinzel font-bold text-sm text-[var(--accent)]">📥 Importar desde Claude</h3>
+          {!sinTitulo && <h3 className="m-0 font-cinzel font-bold text-sm text-[var(--accent)]">📥 Importar desde Claude</h3>}
           <p className="m-0 mt-1 text-[11px] sm:text-xs text-[var(--text-secondary)] leading-relaxed">
             Pega tus documentos y la memoria del proyecto de Claude (rellena solo lo que quieras). Mejor en Markdown (en el documento, exportar o descargar como .md);
             si pegas el texto tal cual, la app reconoce los títulos igualmente. El inventario y el estado del PJ del Cuaderno
             pasan solos a la Ficha viva, y la Bitácora se trocea en una entrada por sesión.
           </p>
         </div>
+        {!sinTitulo && (
         <button
           onClick={onCerrar}
           aria-label="Cerrar"
@@ -329,6 +334,7 @@ const ImportarDesdeClaude: React.FC<{
         >
           <X className="w-4 h-4" />
         </button>
+        )}
       </header>
       <label className="flex flex-col gap-1">
         <span className="font-cinzel font-bold text-xs text-[var(--text-primary)]">🕯️ Cuaderno del GM</span>

@@ -778,9 +778,12 @@ export const ChatView: React.FC<{
   estaCerrado?: boolean;
   /** 📜 La entrada de la Bitácora del capítulo anterior, para el «Anteriormente en…». */
   anteriormente?: EntradaDeBitacora;
+  /** En una campaña sin jugar todavía: abrir «Traer de Claude». */
+  onTraerDeClaude?: () => void;
 }> = ({
   chat,
   anteriormente,
+  onTraerDeClaude,
   chapterIndex,
   isGenerating,
   isStreaming,
@@ -1661,6 +1664,20 @@ export const ChatView: React.FC<{
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)] italic font-lora leading-relaxed">
                   Escribe la primera acción de tu personaje o espera a que el Narrador inicie el relato automáticamente.
                 </p>
+                {onTraerDeClaude && (
+                  <button
+                    onClick={onTraerDeClaude}
+                    className="mt-5 w-full rounded-xl border border-[var(--accent)]/40 bg-[color-mix(in_srgb,var(--accent)_7%,var(--surface))] hover:border-[var(--accent)] px-4 py-3 flex items-center gap-3 text-left cursor-pointer transition-all shadow-xs"
+                  >
+                    <span className="text-2xl leading-none" aria-hidden>📥</span>
+                    <span className="flex flex-col">
+                      <span className="font-cinzel font-bold text-sm text-[var(--accent)]">¿Vienes de Claude? Trae tu partida</span>
+                      <span className="text-[11px] text-[var(--text-secondary)] not-italic">
+                        Cuaderno, Bitácora, memoria del proyecto y tus sesiones como capítulos.
+                      </span>
+                    </span>
+                  </button>
+                )}
               </div>
             ) : (
               <ChatMessagesList

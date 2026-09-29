@@ -31,7 +31,9 @@ export const ImportarSesionesModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onImportar: (sesiones: SesionDeChat[]) => Promise<void> | void;
-}> = ({ isOpen, onClose, onImportar }) => {
+  /** Sin ventana propia: para ir dentro de otra (la de «Traer de Claude»). */
+  incrustado?: boolean;
+}> = ({ isOpen, onClose, onImportar, incrustado }) => {
   const [lista, setLista] = useState<Pendiente[]>([]);
   const [avisos, setAvisos] = useState<string[]>([]);
   const [pegado, setPegado] = useState('');
@@ -111,24 +113,8 @@ export const ImportarSesionesModal: React.FC<{
   const boton =
     'min-h-[32px] min-w-[32px] rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer disabled:opacity-30';
 
-  return (
-    <div
-      className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4"
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div className="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-xl border border-[var(--accent)]/50 bg-[var(--surface)] shadow-2xl overflow-hidden">
-        <header className="flex items-start justify-between gap-2 px-4 py-3 border-b border-[var(--glass-border)] bg-[var(--surface-soft)]">
-          <div>
-            <h2 className="m-0 font-cinzel font-bold text-base text-[var(--accent)]">📥 Importar sesiones</h2>
-            <p className="m-0 mt-0.5 text-[11px] sm:text-xs text-[var(--text-secondary)] leading-relaxed">
-              Cada sesión entra como un capítulo cerrado, delante de los que ya tengas, lista para releer en 📖 novela.
-            </p>
-          </div>
-          <button onClick={onClose} aria-label="Cerrar" title="Cerrar" className={boton}>
-            <X className="w-4 h-4" />
-          </button>
-        </header>
-
+  const cuerpo = (
+    <>
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 flex flex-col gap-3">
           <button
             onClick={() => entrada.current?.click()}
@@ -277,6 +263,30 @@ export const ImportarSesionesModal: React.FC<{
             📥 Importar {elegidas.length || ''} {elegidas.length === 1 ? 'capítulo' : 'capítulos'}
           </button>
         </footer>
+    </>
+  );
+
+  if (incrustado) return <div className="flex flex-col min-h-0">{cuerpo}</div>;
+
+  return (
+    <div
+      className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4"
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-xl border border-[var(--accent)]/50 bg-[var(--surface)] shadow-2xl overflow-hidden">
+        <header className="flex items-start justify-between gap-2 px-4 py-3 border-b border-[var(--glass-border)] bg-[var(--surface-soft)]">
+          <div>
+            <h2 className="m-0 font-cinzel font-bold text-base text-[var(--accent)]">📥 Importar sesiones</h2>
+            <p className="m-0 mt-0.5 text-[11px] sm:text-xs text-[var(--text-secondary)] leading-relaxed">
+              Cada sesión entra como un capítulo cerrado, delante de los que ya tengas, lista para releer en 📖 novela.
+            </p>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" title="Cerrar" className={boton}>
+            <X className="w-4 h-4" />
+          </button>
+        </header>
+
+        {cuerpo}
       </div>
     </div>
   );

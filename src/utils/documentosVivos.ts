@@ -1347,3 +1347,26 @@ export function aMarkdownDeMemoria(texto: string): string {
     .map(l => (TITULO.test(l.trim()) ? `### ${l.trim()}` : l.replace(/^(\s*)[•◦▪‣]\s*/, '$1- ')))
     .join('\n');
 }
+
+/**
+ * 📥 Todo lo pegado desde Claude, aplicado a la memoria: el Cuaderno y la
+ * Bitácora (con lo que va a la Ficha viva) y la memoria del proyecto. Devuelve
+ * la memoria nueva y el resumen para enseñar.
+ */
+export function aplicarImportacionDeClaude(
+  mem: Memory,
+  pegado: { cuaderno?: string; bitacora?: string; memoria?: string }
+): { memoria: Memory; resumen: string[] } {
+  const docs = mem.documentos_vivos || migrarADocumentosVivos(mem);
+  const hayDocs = Boolean((pegado.cuaderno || '').trim() || (pegado.bitacora || '').trim());
+  const memoriaNueva = aMarkdownDeMemoria(pegado.memoria || '');
+  const importado = hayDocs ? importarDesdeClaude(docs, pegado) : null;
+  const conDocs = importado ? sincronizarFichasConDocumentos({ ...mem, documentos_vivos: importado.docs }) : mem;
+  return {
+    memoria: memoriaNueva ? { ...conDocs, raw_project_memory: memoriaNueva } : conDocs,
+    resumen: [
+      ...(importado?.resumen || []),
+      ...(memoriaNueva ? [`🧭 Memoria del proyecto: ${memoriaNueva.length.toLocaleString('es-ES')} caracteres`] : [])
+    ]
+  };
+}

@@ -1,3 +1,4 @@
+import { TraerDeClaudeModal } from './components/TraerDeClaudeModal';
 import { ImportarSesionesModal } from './components/ImportarSesionesModal';
 import type { SesionDeChat } from './utils/importarSesiones';
 import { useState, useEffect, useRef, Suspense } from 'react';
@@ -148,6 +149,7 @@ import {
   sincronizarFichasConDocumentos,
   reflejarSecretosEnCuaderno,
   entradaAnteriorA,
+  aplicarImportacionDeClaude,
   aplicarCambiosDeDocumento,
   type CambioDeDocumento,
   sembrarSeccionesVacias,
@@ -342,6 +344,7 @@ export default function App() {
   // por su cuenta cuando anda justo de espacio.
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const [importandoSesiones, setImportandoSesiones] = useState(false);
+  const [traerDeClaude, setTraerDeClaude] = useState(false);
   const [isManuallySaved, setIsManuallySaved] = useState(false);
 
   const handleManualSaveCampaign = async () => {
@@ -3022,6 +3025,16 @@ export default function App() {
    * marcan como ya volcadas: su estado llega por el Cuaderno y la Bitácora
    * importados, y volcarlas otra vez duplicaría la historia.
    */
+  /** 📥 Cuaderno, Bitácora y memoria del proyecto pegados desde Claude. */
+  const importarDocumentosDeClaude = async (pegado: { cuaderno: string; bitacora: string; memoria: string }) => {
+    const actual = projectsRef.current.find(pr => pr.id === currentPIdRef.current)?.memory;
+    if (!actual) return [];
+    const { resumen } = aplicarImportacionDeClaude(actual, pegado);
+    await handleUpdateMemory(mem => (mem ? aplicarImportacionDeClaude(mem, pegado).memoria : mem));
+    logInfo('memory_sync', 'Importado desde Claude', resumen.join(' · '));
+    return resumen;
+  };
+
   const importarSesiones = async (sesiones: SesionDeChat[]) => {
     const pid = currentPIdRef.current;
     if (!pid || !sesiones.length) return;
@@ -6815,7 +6828,7 @@ export default function App() {
               <span>Campaña</span>
               <span className="text-[9px] opacity-70">Ajustes & Recursos</span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-4 gap-1.5">
               <button
                 onClick={() => {
                   setActiveTab('instructions');
@@ -6871,6 +6884,21 @@ export default function App() {
                       : 'bg-red-500'
                   }`}
                 />
+              </button>
+
+              <button
+                onClick={() => {
+                  setTraerDeClaude(true);
+                  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                    setIsSidebarOpen(false);
+                  }
+                }}
+                disabled={!currentPId}
+                className="flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-[11px] font-cinzel transition-all duration-200 cursor-pointer border bg-[var(--glass)] border-[var(--user-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] active:scale-95 disabled:opacity-40"
+                title="Traer tu partida de Claude: Cuaderno, Bitácora, memoria del proyecto y sesiones"
+              >
+                <span className="text-sm leading-none" aria-hidden>📥</span>
+                <span className="truncate text-[10px]">De Claude</span>
               </button>
             </div>
           </div>
@@ -7063,6 +7091,13 @@ export default function App() {
           dados: no se podía ni teclear hasta cerrarlo. Ahora va en el flujo,
           debajo de la barra: empuja la escena hacia abajo en vez de taparla.
         */}
+        <TraerDeClaudeModal
+          isOpen={traerDeClaude}
+          onClose={() => setTraerDeClaude(false)}
+          docs={currentProject?.memory?.documentos_vivos}
+          onImportarDocumentos={importarDocumentosDeClaude}
+          onImportarSesiones={importarSesiones}
+        />
         <ImportarSesionesModal
           isOpen={importandoSesiones}
           onClose={() => setImportandoSesiones(false)}
@@ -7161,6 +7196,9 @@ export default function App() {
           {activeTab === 'chat' && (
             <ChatView
               chat={currentChat}
+              onTraerDeClaude={
+                currentChats.every(c => !(c.messages || []).length) ? () => setTraerDeClaude(true) : undefined
+              }
               anteriormente={
                 hayDocumentosVivos(currentProject?.memory) && currentChapterIndex >= 0
                   ? entradaAnteriorA(

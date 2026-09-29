@@ -27,7 +27,7 @@ import { LocationDossierModal } from './LocationDossierModal';
 import { DailyAgendaDiary } from './DailyAgendaDiary';
 import { StatusView } from './StatusView';
 import { DocumentosVivosPanel } from './DocumentosVivosPanel';
-import { aMarkdownDeMemoria, deshacerDocumento, importarDesdeClaude, reescribirDocumentos, sincronizarFichasConDocumentos } from '../utils/documentosVivos';
+import { aplicarImportacionDeClaude, deshacerDocumento, reescribirDocumentos, sincronizarFichasConDocumentos } from '../utils/documentosVivos';
 
 import {
   BookOpen,
@@ -1195,21 +1195,8 @@ export const MemoryManager: React.FC<{
           onVolcarAhora={onVolcarAhora}
           onSembrarCuaderno={onSembrarCuaderno}
           onImportarDesdeClaude={async pegado => {
-            const actuales = memory.documentos_vivos;
-            if (!actuales) return [];
-            const hayDocs = Boolean(pegado.cuaderno.trim() || pegado.bitacora.trim());
-            const memoriaNueva = aMarkdownDeMemoria(pegado.memoria);
-            const resumen = [
-              ...(hayDocs ? importarDesdeClaude(actuales, pegado).resumen : []),
-              ...(memoriaNueva ? [`🧭 Memoria del proyecto: ${memoriaNueva.length.toLocaleString('es-ES')} caracteres`] : [])
-            ];
-            await onUpdateMemory(mem => {
-              if (!mem?.documentos_vivos) return mem;
-              const conDocs = hayDocs
-                ? sincronizarFichasConDocumentos({ ...mem, documentos_vivos: importarDesdeClaude(mem.documentos_vivos, pegado).docs })
-                : mem;
-              return memoriaNueva ? { ...conDocs, raw_project_memory: memoriaNueva } : conDocs;
-            });
+            const { resumen } = aplicarImportacionDeClaude(memory, pegado);
+            await onUpdateMemory(mem => (mem ? aplicarImportacionDeClaude(mem, pegado).memoria : mem));
             return resumen;
           }}
           onGuardar={(cual, texto) =>
