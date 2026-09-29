@@ -476,9 +476,16 @@ const seccionQue = (doc: string, ...claves: string[]) =>
 
 /** Quita viñeta y negritas y deja la línea limpia; vacía si es un «(vacío)». */
 const limpiarLinea = (l: string) => {
-  const t = l.replace(/^\s*[-*]\s+/, '').replace(/\*\*/g, '').trim();
+  const t = l.replace(/^\s*[-*]\s+/, '').replace(/^\s*[•◦▪‣]\s*/, '').replace(/\*\*/g, '').trim();
   return /^\(vac[ií]o\)$/i.test(t) ? '' : t;
 };
+
+/** Parte «[VÍNCULO: A | …] · [VÍNCULO: B | …]» en una línea por etiqueta. */
+export const partirEtiquetasSeguidas = (t: string): string[] =>
+  t
+    .split(/(?<=\])\s*[·;,]?\s*(?=\[\s*[A-ZÁÉÍÓÚÑ]+\s*:)/)
+    .map(x => x.trim())
+    .filter(Boolean);
 
 /** El nombre al principio de una entrada: antes de « — », « (», «:» o «. ». */
 const nombreDeEntrada = (t: string) =>
@@ -511,7 +518,9 @@ export function leerVinculosDelCuaderno(cuaderno: string): VinculoDelCuaderno[] 
   const sec = seccionQue(cuaderno, 'vinculo');
   if (!sec) return [];
   const porNombre = new Map<string, VinculoDelCuaderno>();
-  for (const bruto of sec.lineas) {
+  // «[VÍNCULO: A | …] · [VÍNCULO: B | …]» en una sola línea son dos entradas.
+  const lineas = sec.lineas.flatMap(l => partirEtiquetasSeguidas(limpiarLinea(l)));
+  for (const bruto of lineas) {
     let t = limpiarLinea(bruto);
     if (!t) continue;
     let nombre: string;
@@ -1132,7 +1141,12 @@ const APARTADO_DE_BITACORA =
  * a ser una viñeta.
  */
 export function aMarkdownDeClaude(texto: string, tipo: 'cuaderno' | 'bitacora'): string {
-  const limpio = (texto || '').replace(/\r\n?/g, '\n').replace(/ /g, ' ').trim();
+  const limpio = (texto || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    // Viñetas «•» (y «- •», que es lo que queda al copiar una lista ya con guion) → «- ».
+    .replace(/^([ \t]*)(?:[-*][ \t]+)?[•◦▪‣][ \t]*/gm, '$1- ')
+    .trim();
   if (!limpio || /^#{1,3}\s/m.test(limpio)) return limpio;
   let primera = true;
   return limpio
@@ -1150,8 +1164,11 @@ export function aMarkdownDeClaude(texto: string, tipo: 'cuaderno' | 'bitacora'):
       } else {
         if (/^\d{1,2}[.)]\s+\S/.test(l) && l.length < 70 && !/[.;:]$/.test(l)) return `## ${l}`;
         if (/^TRAMA\s*:/i.test(l)) return `### ${l}`;
+        const trama = l.match(/^\[\s*Trama\s*:\s*([^\]]+)\]\s*(.+)$/i);
+        if (trama) return `### TRAMA: ${trama[2].trim()} — ${trama[1].trim()}`;
       }
-      return /^[-*]\s/.test(l) ? l : `- ${l}`;
+      if (/^[•◦▪‣]\s*/.test(l)) return `- ${l.replace(/^[•◦▪‣]\s*/, '')}`;
+      return /^[-*]\s/.test(l) ? l.replace(/^\*\s+/, '- ') : `- ${l}`;
     })
     .join('\n')
     .replace(/\n{3,}/g, '\n\n');
@@ -1213,7 +1230,7 @@ function repartirEnFicha(ficha: string, porSeccion: Map<string, string[]>): stri
     if (!lineas.length) continue;
     const { secciones } = partirEnSecciones(fuera);
     const i = secciones.findIndex(s => norma(s.titulo) === norma(seccion));
-    const nuevas = lineas.map(l => (/^\s*[-*]\s/.test(l) ? l.trim() : `- ${l.trim()}`));
+    const nuevas = lineas.map(l => `- ${l.trim().replace(/^[-*]\s+/, '')}`);
     if (i < 0) {
       fuera = `${fuera.replace(/\s+$/, '')}\n\n## ${seccion}\n${nuevas.join('\n')}\n`;
       continue;
@@ -1261,10 +1278,36 @@ export function importarDesdeClaude(
         aLaFicha.set(destino, [...(aLaFicha.get(destino) || []), l]);
       }
     }
-    const cuaderno = [preambulo.trim(), ...quedan].filter(Boolean).join('\n\n') + '\n';
+    /*
+     * Las etiquetas que el Cuaderno de Claude va dejando en «Estado general»
+     * («[VÍNCULO: …]», «[SECRETO: …]», «[HILO: …]») se llevan a su sección, en
+     * el orden en que están: así las barras de los PNJs salen con el último valor.
+     */
+    const DESTINO_DE_ETIQUETA: [RegExp, RegExp][] = [
+      [/^\[\s*V[IÍ]NCULO\s*:/i, /v[ií]nculo/i],
+      [/^\[\s*SECRETO\s*:/i, /secreto/i],
+      [/^\[\s*HILO\s*:/i, /hilo/i]
+    ];
+    const titulos = quedan.map(b => (b.split('\n')[0] || '').replace(/^#+\s*/, ''));
+    const extra = new Map<number, string[]>();
+    const limpias = quedan.map((bloque, i) => {
+      const [cab, ...cuerpo] = bloque.split('\n');
+      const resto: string[] = [];
+      for (const l of cuerpo) {
+        const t = limpiarLinea(l);
+        const regla = DESTINO_DE_ETIQUETA.find(([re]) => re.test(t));
+        const j = regla ? titulos.findIndex(x => regla[1].test(x)) : -1;
+        if (regla && j >= 0 && j !== i) extra.set(j, [...(extra.get(j) || []), ...partirEtiquetasSeguidas(t).map(x => `- ${x}`)]);
+        else resto.push(l);
+      }
+      return [cab, ...resto].join('\n');
+    });
+    const movidasDeSitio = [...extra.values()].reduce((n, l) => n + l.length, 0);
+    const finales = limpias.map((b, i) => (extra.has(i) ? `${b.replace(/\s+$/, '')}\n${extra.get(i)!.join('\n')}` : b));
+    const cuaderno = [preambulo.trim(), ...finales].filter(Boolean).join('\n\n') + '\n';
     const ficha = aLaFicha.size ? repartirEnFicha(docs.ficha, aLaFicha) : docs.ficha;
     fuera = reescribirDocumentos(fuera, { cuaderno, ficha }, 'Importado desde Claude', ahora);
-    resumen.push(`🕯️ Cuaderno: ${quedan.length} secciones`);
+    resumen.push(`🕯️ Cuaderno: ${quedan.length} secciones${movidasDeSitio ? ` · ${movidasDeSitio} etiquetas llevadas a su sección` : ''}`);
     if (movidas.length) {
       const lineas = [...aLaFicha.values()].reduce((n, l) => n + l.length, 0);
       resumen.push(`🎒 Ficha viva: ${lineas} líneas desde «${movidas.join('» y «')}»`);

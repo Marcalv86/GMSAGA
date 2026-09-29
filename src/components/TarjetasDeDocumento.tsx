@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { partirEnSecciones } from '../utils/documentosVivos';
+import { partirEnSecciones, partirEtiquetasSeguidas } from '../utils/documentosVivos';
 
 /*
  * 🃏 Los documentos vivos, en tarjetas.
@@ -14,7 +14,8 @@ import { partirEnSecciones } from '../utils/documentosVivos';
 type Bloque =
   | { tipo: 'entrada'; nombre?: string; texto: string; clase?: string }
   | { tipo: 'grupo'; titulo: string; lineas: string[] }
-  | { tipo: 'parrafo'; texto: string };
+  | { tipo: 'parrafo'; texto: string }
+  | { tipo: 'pnj'; nombre: string; texto: string; ejes: string; historial: string[] };
 
 /*
  * 🎨 Un emoji por sección, por su nombre. Si el nombre no suena a ninguno,
@@ -91,18 +92,85 @@ function leerBloques(lineas: string[]): Bloque[] {
       continue;
     }
     if (grupo) {
-      grupo.lineas.push(l.replace(/^\s*[-*]\s+/, ''));
+      grupo.lineas.push(l.replace(/^\s*[-*]\s+/, '').replace(/^\s*[•◦▪‣]\s*/, ''));
       continue;
     }
-    const vineta = l.match(/^\s*[-*]\s+(.*)$/);
+    const vineta = l.match(/^\s*(?:[-*]\s+)?[•◦▪‣]\s*(.*)$/) || l.match(/^\s*[-*]\s+(.*)$/);
     if (vineta) {
       if (esVacio(vineta[1])) continue;
-      fuera.push({ tipo: 'entrada', ...partirEntrada(vineta[1]) });
+      for (const trozo of partirEtiquetasSeguidas(vineta[1])) fuera.push({ tipo: 'entrada', ...partirEntrada(trozo) });
     } else if (!l.startsWith('>')) {
       fuera.push({ tipo: 'parrafo', texto: l.trim() });
     }
   }
   return fuera;
+}
+
+/*
+ * 💞 Vínculos: una tarjeta por PNJ. Las líneas de historial
+ * («[VÍNCULO: Jarlaxle | vín +1 → ATR 7 · VÍN 6 · CON 3 | …]») no son tarjetas
+ * sueltas: van dentro de la del PNJ, plegadas, y sus barras enseñan el último
+ * valor, igual que la pantalla de PNJs.
+ */
+const plegarNombre = (t: string) =>
+  t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[*_•]/g, '').trim();
+
+type Ejes = { atr?: string; vin?: string; con?: string };
+
+const ejesDe = (t: string): Ejes => {
+  const tras = t.includes('→') ? t.slice(t.lastIndexOf('→')) : t;
+  const uno = (re: RegExp) => tras.match(re)?.[1];
+  return {
+    atr: uno(/\bATR\s*[:=]?\s*(\d+|desea|inter[eé]s)/i),
+    vin: uno(/\bV[IÍ]N\s*[:=]?\s*(\d+)/i),
+    con: uno(/\bCON\s*[:=]?\s*(\d+)/i)
+  };
+};
+
+function agruparVinculos(bloques: Bloque[]): Bloque[] {
+  type Tarjeta = Extract<Bloque, { tipo: 'pnj' }>;
+  const fuera: Bloque[] = [];
+  const porNombre = new Map<string, { tarjeta: Tarjeta; v: Ejes }>();
+  for (const b of bloques) {
+    if (b.tipo !== 'entrada' || !b.nombre) {
+      fuera.push(b);
+      continue;
+    }
+    const clave = plegarNombre(b.nombre);
+    let item = porNombre.get(clave);
+    if (!item) {
+      const tarjeta: Tarjeta = { tipo: 'pnj', nombre: b.nombre.replace(/^[•\s]+/, ''), texto: '', ejes: '', historial: [] };
+      item = { tarjeta, v: {} };
+      porNombre.set(clave, item);
+      fuera.push(tarjeta);
+    }
+    // El último valor manda, en el orden en que están escritas las líneas.
+    const e = ejesDe(b.texto);
+    item.v = { atr: e.atr ?? item.v.atr, vin: e.vin ?? item.v.vin, con: e.con ?? item.v.con };
+    if (b.clase) item.tarjeta.historial.push(b.texto);
+    else item.tarjeta.texto = [item.tarjeta.texto, b.texto].filter(Boolean).join(' ');
+  }
+  for (const { tarjeta, v } of porNombre.values()) {
+    tarjeta.ejes = [v.atr && `ATR ${v.atr}`, v.vin && `VÍN ${v.vin}`, v.con && `CON ${v.con}`].filter(Boolean).join(' · ');
+  }
+  return fuera;
+}
+
+/** Una línea de historial: el cambio («vín +1 → ATR 7 · VÍN 6 · CON 3») aparte del relato. */
+function LineaDeHistorial({ texto }: { texto: string }) {
+  const m = texto.match(/^(.*?→\s*(?:ATR[^·]*·\s*)?(?:V[IÍ]N[^·]*·\s*)?CON\s*\d+)\s*·?\s*(.*)$/s);
+  const cambio = m ? m[1].trim() : '';
+  const relato = (m ? m[2] : texto).replace(/\]\s*$/, '').trim();
+  return (
+    <li className="flex flex-col gap-0.5">
+      {cambio && (
+        <span className="self-start text-[10px] font-cinzel font-bold px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)]">
+          {cambio}
+        </span>
+      )}
+      {relato && <Texto>{relato}</Texto>}
+    </li>
+  );
 }
 
 /** ATR/VÍN/CON y relojes «n/m» en chapitas, si la entrada los lleva. */
@@ -205,6 +273,29 @@ function Bloques({ bloques, columnas }: { bloques: Bloque[]; columnas: boolean }
             </div>
           );
         }
+        if (b.tipo === 'pnj') {
+          return (
+            <div key={i} className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)] p-3 shadow-xs">
+              <div className="font-cinzel font-bold text-[13px] text-[var(--accent)] mb-1">
+                <ReactMarkdown components={{ p: ({ children }) => <>{children}</> }}>{b.nombre}</ReactMarkdown>
+              </div>
+              {b.ejes && <Marcadores texto={b.ejes} />}
+              {b.texto && <Texto>{sinEjes(b.texto)}</Texto>}
+              {b.historial.length > 0 && (
+                <details className="mt-2 group">
+                  <summary className="cursor-pointer list-none text-[11px] font-cinzel font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] min-h-[28px] flex items-center gap-1">
+                    <span className="inline-block transition-transform group-open:rotate-90">▸</span> 🕰️ Cómo ha ido ({b.historial.length})
+                  </summary>
+                  <ul className="m-0 mt-1.5 pl-3 border-l-2 border-[var(--accent)]/25 list-none flex flex-col gap-2">
+                    {b.historial.map((h, j) => (
+                      <LineaDeHistorial key={j} texto={h} />
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          );
+        }
         if (b.tipo === 'grupo') {
           return (
             <div key={i} className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface-soft)] p-3 shadow-xs">
@@ -293,7 +384,10 @@ export const TarjetasDeDocumento: React.FC<{ texto: string; seccion?: number }> 
                 )}
               </header>
               <div className="p-3">
-                <Bloques bloques={leerBloques(lineas)} columnas={unaSola} />
+                <Bloques
+                  bloques={/v[ií]nculo/i.test(sec.titulo) ? agruparVinculos(leerBloques(lineas)) : leerBloques(lineas)}
+                  columnas={unaSola}
+                />
               </div>
             </section>
           );
