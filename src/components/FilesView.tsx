@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Project, ProjectFile, FileCategory, viajaSiemprePorCategoria } from '../types';
+import { Project, ProjectFile, FileCategory, viajaSiemprePorCategoria, vaDeConsultaPorDefecto } from '../types';
 import { classifyFileAuto } from '../utils/geminiHelper';
 import { leerPuentesDelMapa, recuperar } from '../utils/localSearch';
 
@@ -50,6 +50,8 @@ export const FilesView: React.FC<{
   onUpdateFileCategory?: (fileId: string, category: FileCategory) => Promise<void>;
   onToggleOnDemand?: (fileId: string, onDemand: boolean) => Promise<void>;
   onToggleAllOnDemand?: (onDemand: boolean) => Promise<void>;
+  /** Manda a la biblioteca varios archivos de una vez. */
+  onPasarAConsulta?: (ids: string[]) => Promise<void>;
   /** Deja de una hoja de oráculo solo las tablas y las reglas. */
   onDistillOracle?: (file: ProjectFile) => Promise<void>;
   onExtractMechanics?: (file: ProjectFile) => Promise<void>;
@@ -76,6 +78,7 @@ export const FilesView: React.FC<{
   onUpdateFileCategory,
   onToggleOnDemand,
   onToggleAllOnDemand,
+  onPasarAConsulta,
   onDistillOracle,
   onExtractMechanics,
   onGenerarEtiquetas,
@@ -166,6 +169,10 @@ export const FilesView: React.FC<{
   const textChars = files.reduce((acc, f) => acc + (countsAsContext(f) ? f.length || 0 : 0), 0);
   const budgetShare = (textChars / CONTEXT_BUDGET_CHARS) * 100;
   const budgetLevel = budgetShare < 25 ? 'holgado' : budgetShare < 50 ? 'ajustado' : 'excesivo';
+
+  const pesadosSiemprePresentes = files.filter(
+    f => !f.onDemand && vaDeConsultaPorDefecto({ ...f, category: getFileCategory(f) })
+  );
 
   // La búsqueda corre entera en el navegador, así que probarla no cuesta nada:
   // ni una petición a Google ni esperar a nadie.
@@ -543,6 +550,27 @@ export const FilesView: React.FC<{
           )}
         </div>
       </div>
+
+      {/* 📚 Compendios grandes que viajan enteros en cada turno */}
+      {onPasarAConsulta && pesadosSiemprePresentes.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5 text-xs text-amber-950 dark:text-amber-100">
+          <span className="text-lg" aria-hidden>📚</span>
+          <span className="flex-1 min-w-[12rem] leading-snug">
+            <b>{pesadosSiemprePresentes.length}</b>{' '}
+            {pesadosSiemprePresentes.length === 1 ? 'compendio grande viaja entero' : 'compendios grandes viajan enteros'} en cada turno
+            {' '}(≈{Math.round(pesadosSiemprePresentes.reduce((a, f) => a + (f.content?.length || f.length || 0), 0) / 3800).toLocaleString('es-ES')}k tokens).
+            De consulta, el Narrador recibe solo el trozo que pide la escena.
+          </span>
+          <button
+            onClick={() => onPasarAConsulta(pesadosSiemprePresentes.map(f => f.id))}
+            disabled={isGenerating || isRelacionando}
+            title={pesadosSiemprePresentes.map(f => f.name).join('\n')}
+            className="min-h-9 px-3 py-1.5 rounded-md bg-amber-600 text-white font-cinzel font-bold hover:bg-amber-700 disabled:opacity-50 cursor-pointer shrink-0"
+          >
+            📚 Pasar a consulta
+          </button>
+        </div>
+      )}
 
       {/* Files List */}
       {filteredFiles.length === 0 ? (

@@ -1328,6 +1328,25 @@ export const CATEGORIAS_QUE_VIAJAN_SIEMPRE = ['oracle', 'roster', 'index'] as co
 export const viajaSiemprePorCategoria = (categoria?: string): boolean =>
   (CATEGORIAS_QUE_VIAJAN_SIEMPRE as readonly string[]).includes(categoria || '');
 
+/*
+ * 📚 El material de fondo grande entra DE CONSULTA por defecto.
+ *
+ * Probado con una campaña real: diecisiete compendios siempre presentes eran
+ * 242.000 tokens por turno, y con ellos delante el Narrador perdía de vista
+ * sus propias reglas (movía a la protagonista por su cuenta, sentaba en la
+ * escena a quien no estaba). De consulta, la misma escena bajó a 115.000 y
+ * salió limpia. Lo corto sigue viajando entero: ahí buscar no ahorra nada.
+ */
+export const CATEGORIAS_DE_CONSULTA_POR_DEFECTO = ['compendio', 'cantera', 'lore'] as const;
+export const UMBRAL_DE_CONSULTA_POR_DEFECTO = 15000;
+
+/** ¿Este archivo debería ir de consulta si nadie ha dicho otra cosa? */
+export const vaDeConsultaPorDefecto = (f: { isImage?: boolean; isAudio?: boolean; category?: string; content?: string; length?: number }): boolean =>
+  !f.isImage &&
+  !f.isAudio &&
+  (CATEGORIAS_DE_CONSULTA_POR_DEFECTO as readonly string[]).includes(f.category || '') &&
+  (f.content?.length ?? f.length ?? 0) > UMBRAL_DE_CONSULTA_POR_DEFECTO;
+
 
 /**
  * Qué siente este personaje por ella.

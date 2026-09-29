@@ -37,7 +37,8 @@ import {
   NPC,
   PlayerCharacter,
   ScheduledThread,
-  TimelineEntry
+  TimelineEntry,
+  vaDeConsultaPorDefecto
 } from './types';
 import { ChatView } from './components/ChatView';
 import { ContextUsageWidget } from './components/ContextUsageWidget';
@@ -4611,6 +4612,8 @@ export default function App() {
 
         // Auto classify immediately using memory context
         newFile.category = classifyFileAuto(newFile, currentProject?.memory);
+        // Un compendio grande no viaja entero en cada turno: va a la biblioteca.
+        if (vaDeConsultaPorDefecto(newFile)) newFile.onDemand = true;
 
         newFilesList.push(newFile);
       }
@@ -5180,6 +5183,19 @@ export default function App() {
       setExtractingFileIds(prev => prev.filter(id => id !== fileId));
       setTopProgress({ active: false, label: '', type: 'general' });
     }
+  };
+
+  /** Manda a la biblioteca varios archivos de una vez y los etiqueta en un solo lote. */
+  const handlePasarAConsulta = async (ids: string[]) => {
+    const pid = currentPIdRef.current;
+    if (!pid || !ids.length) return;
+    const frescos = await loadFilesFromDB(pid);
+    const updated = frescos.map(f => (ids.includes(f.id) ? { ...f, onDemand: true } : f));
+    currentFilesRef.current = updated;
+    setCurrentFiles(updated);
+    setChatTokenLoads({});
+    await saveFilesToDB(pid, updated);
+    void etiquetarLosQueLleguenSinEtiquetas();
   };
 
   const handleToggleAllOnDemand = async (onDemand: boolean) => {
@@ -7369,6 +7385,7 @@ export default function App() {
               onUpdateFileCategory={handleUpdateFileCategory}
               onToggleOnDemand={handleToggleOnDemand}
               onToggleAllOnDemand={handleToggleAllOnDemand}
+              onPasarAConsulta={handlePasarAConsulta}
               onDistillOracle={handleDistillOracle}
               onExtractMechanics={handleExtractMechanics}
               onGenerarEtiquetas={handleGenerarEtiquetas}
