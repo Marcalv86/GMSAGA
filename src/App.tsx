@@ -3073,7 +3073,18 @@ export default function App() {
         .filter((h): h is NonNullable<ReturnType<typeof leerFechaDeHud>> => Boolean(h?.fechaTexto));
       const ultimo = huds[huds.length - 1];
       // El año puede faltar en la última («14 de Marpenoth»): se toma el último que se dijo.
-      const ano = [...huds].reverse().map(h => h.fechaTexto!.match(/\b(1\d{3})\b/)?.[1]).find(Boolean);
+      /*
+       * Y si ninguna cabecera lo dice, se busca en el propio capítulo y luego en
+       * la Bitácora y el Cuaderno («13 de Marpenoth de 1486 DR»). Antes caía al
+       * año por defecto del proyecto, y una partida en 1486 amanecía en 1492.
+       */
+      const docsVivos = proyecto?.memory?.documentos_vivos;
+      const anoEn = (t?: string) => (t || '').match(/\b(1\d{3})\s*(?:DR|CV)\b/)?.[1];
+      const ano =
+        [...huds].reverse().map(h => h.fechaTexto!.match(/\b(1\d{3})\b/)?.[1]).find(Boolean) ||
+        [...enCurso.messages].reverse().map(m => anoEn(m.content)).find(Boolean) ||
+        [...(docsVivos?.bitacora || [])].reverse().map(e => anoEn(`${e.capitulo} ${e.texto}`)).find(Boolean) ||
+        anoEn(docsVivos?.cuaderno);
       const fecha = ultimo ? parsearFechaTexto(cal, ultimo.fechaTexto!, ano ? Number(ano) : proyecto?.currentDate?.year || 1492) : null;
       if (fecha) {
         const minuto = extraerMinutoDeTexto(ultimo!.momento);
