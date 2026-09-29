@@ -272,14 +272,18 @@ const Bitacora: React.FC<{ docs: DocumentosVivos }> = ({ docs }) => {
  */
 const ImportarDesdeClaude: React.FC<{
   docs: DocumentosVivos;
-  onImportar: (pegado: { cuaderno: string; bitacora: string }) => Promise<string[]> | string[];
+  onImportar: (pegado: { cuaderno: string; bitacora: string; memoria: string }) => Promise<string[]> | string[];
   onCerrar: () => void;
 }> = ({ docs, onImportar, onCerrar }) => {
   const [cuaderno, setCuaderno] = useState('');
   const [bitacora, setBitacora] = useState('');
+  const [memoria, setMemoria] = useState('');
   const [hecho, setHecho] = useState<string[] | null>(null);
   const [trabajando, setTrabajando] = useState(false);
-  const avance = cuaderno.trim() || bitacora.trim() ? importarDesdeClaude(docs, { cuaderno, bitacora }).resumen : [];
+  const avance = [
+    ...(cuaderno.trim() || bitacora.trim() ? importarDesdeClaude(docs, { cuaderno, bitacora }).resumen : []),
+    ...(memoria.trim() ? [`🧭 Memoria del proyecto: ${memoria.trim().length.toLocaleString('es-ES')} caracteres`] : [])
+  ];
   const caja =
     'w-full min-h-[120px] p-2.5 rounded-lg border border-[var(--glass-border)] bg-[var(--bg-color)] text-[var(--text-primary)] font-mono text-[11px] sm:text-xs leading-relaxed outline-none focus:border-[var(--accent)] resize-y';
 
@@ -312,7 +316,7 @@ const ImportarDesdeClaude: React.FC<{
         <div>
           <h3 className="m-0 font-cinzel font-bold text-sm text-[var(--accent)]">📥 Importar desde Claude</h3>
           <p className="m-0 mt-1 text-[11px] sm:text-xs text-[var(--text-secondary)] leading-relaxed">
-            Pega tus documentos del proyecto de Claude. Mejor en Markdown (en el documento, exportar o descargar como .md);
+            Pega tus documentos y la memoria del proyecto de Claude (rellena solo lo que quieras). Mejor en Markdown (en el documento, exportar o descargar como .md);
             si pegas el texto tal cual, la app reconoce los títulos igualmente. El inventario y el estado del PJ del Cuaderno
             pasan solos a la Ficha viva, y la Bitácora se trocea en una entrada por sesión.
           </p>
@@ -334,6 +338,10 @@ const ImportarDesdeClaude: React.FC<{
         <span className="font-cinzel font-bold text-xs text-[var(--text-primary)]">📖 Bitácora</span>
         <textarea value={bitacora} onChange={e => setBitacora(e.target.value)} spellCheck={false} className={caja} placeholder="# Bitácora…" />
       </label>
+      <label className="flex flex-col gap-1">
+        <span className="font-cinzel font-bold text-xs text-[var(--text-primary)]">🧭 Memoria del proyecto</span>
+        <textarea value={memoria} onChange={e => setMemoria(e.target.value)} spellCheck={false} className={caja} placeholder="Purpose & context…" />
+      </label>
       {avance.length > 0 && (
         <div className="rounded-lg bg-[var(--surface-soft)] border border-[var(--glass-border)] px-3 py-2 text-[11px] sm:text-xs text-[var(--text-primary)]">
           <div className="font-cinzel font-bold text-[var(--accent)] mb-1">👀 Esto es lo que va a entrar</div>
@@ -344,7 +352,8 @@ const ImportarDesdeClaude: React.FC<{
           </ul>
           <p className="m-0 mt-1.5 text-[var(--text-secondary)]">
             {cuaderno.trim() ? 'El Cuaderno actual se sustituye (con deshacer). ' : ''}
-            {bitacora.trim() ? 'Las entradas que ya haya escrito la app se conservan.' : ''}
+            {bitacora.trim() ? 'Las entradas que ya haya escrito la app se conservan. ' : ''}
+            {memoria.trim() ? 'La memoria del proyecto se sustituye.' : ''}
           </p>
         </div>
       )}
@@ -360,7 +369,7 @@ const ImportarDesdeClaude: React.FC<{
           onClick={async () => {
             setTrabajando(true);
             try {
-              setHecho(await onImportar({ cuaderno, bitacora }));
+              setHecho(await onImportar({ cuaderno, bitacora, memoria }));
             } finally {
               setTrabajando(false);
             }
@@ -381,7 +390,7 @@ export const DocumentosVivosPanel: React.FC<{
   onDeshacer: (cual: 'ficha' | 'cuaderno') => Promise<void> | void;
   onVolcarAhora?: () => void;
   onSembrarCuaderno?: () => void;
-  onImportarDesdeClaude?: (pegado: { cuaderno: string; bitacora: string }) => Promise<string[]> | string[];
+  onImportarDesdeClaude?: (pegado: { cuaderno: string; bitacora: string; memoria: string }) => Promise<string[]> | string[];
 }> = ({ docs, cual, onGuardar, onDeshacer, onVolcarAhora, onSembrarCuaderno, onImportarDesdeClaude }) => {
   const [confirmarSembrar, setConfirmarSembrar] = useState(false);
   const [importando, setImportando] = useState(false);

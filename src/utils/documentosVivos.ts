@@ -1331,3 +1331,19 @@ export function importarDesdeClaude(
   }
   return { docs: fuera, resumen };
 }
+
+/**
+ * 🧭 La memoria de proyecto de Claude, pegada. Si viene en texto plano, sus
+ * títulos de siempre pasan a «### …», que es lo que la app sabe leer (y lo que
+ * permite dejar fuera el «Current state» al mandarla al Narrador).
+ */
+export function aMarkdownDeMemoria(texto: string): string {
+  const limpio = (texto || '').replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ').trim();
+  if (!limpio || /^#{1,4}\s/m.test(limpio)) return limpio;
+  const TITULO =
+    /^(purpose (&|and) context|current state|on the horizon|key learnings.*|approach (&|and) patterns|tools (&|and) resources|other instructions|prop[oó]sito y contexto|estado actual|en el horizonte|aprendizajes clave.*|enfoque y patrones|herramientas y recursos)\s*$/i;
+  return limpio
+    .split('\n')
+    .map(l => (TITULO.test(l.trim()) ? `### ${l.trim()}` : l.replace(/^(\s*)[•◦▪‣]\s*/, '$1- ')))
+    .join('\n');
+}

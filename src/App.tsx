@@ -1,3 +1,5 @@
+import { ImportarSesionesModal } from './components/ImportarSesionesModal';
+import type { SesionDeChat } from './utils/importarSesiones';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import {
   ArchiveRestore,
@@ -339,6 +341,7 @@ export default function App() {
   // Protección del almacenamiento: sin esto el navegador puede borrar la campaña
   // por su cuenta cuando anda justo de espacio.
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const [importandoSesiones, setImportandoSesiones] = useState(false);
   const [isManuallySaved, setIsManuallySaved] = useState(false);
 
   const handleManualSaveCampaign = async () => {
@@ -3010,6 +3013,46 @@ export default function App() {
       sembrandoCuaderno.current = false;
       setTopProgress({ active: false, label: '', type: 'sync' });
     }
+  };
+
+  /*
+   * 📥 SESIONES IMPORTADAS COMO CAPÍTULOS.
+   *
+   * Entran cerradas y delante de las que ya haya, en el orden elegido. Se
+   * marcan como ya volcadas: su estado llega por el Cuaderno y la Bitácora
+   * importados, y volcarlas otra vez duplicaría la historia.
+   */
+  const importarSesiones = async (sesiones: SesionDeChat[]) => {
+    const pid = currentPIdRef.current;
+    if (!pid || !sesiones.length) return;
+    const base = Date.now();
+    const nuevas: Chat[] = sesiones.map((s, i) => ({
+      id: `cap_imp_${base}_${i}`,
+      name: s.nombre,
+      autoTitled: true,
+      messages: s.mensajes
+    }));
+    const actuales = currentChatsRef.current;
+    // Un capítulo vacío recién creado (el de por defecto) no hace falta conservarlo delante.
+    const updated = [...nuevas, ...actuales];
+    setCurrentChats(updated);
+    saveLocalChats(pid, updated);
+    await handleUpdateProjectField(p => {
+      const docs = p.memory?.documentos_vivos;
+      if (!docs) return {};
+      const volcadoHasta = { ...(docs.volcadoHasta || {}) };
+      for (const c of nuevas) volcadoHasta[c.id] = c.messages.length;
+      return { memory: { ...(p.memory as any), documentos_vivos: { ...docs, volcadoHasta } } };
+    });
+    logInfo('memory_sync', 'Sesiones importadas', `${nuevas.length} capítulo(s): ${nuevas.map(c => c.name).join(' · ')}`);
+    setAlertConfig({
+      isOpen: true,
+      title: '📥 Sesiones importadas',
+      message:
+        `Han entrado ${nuevas.length} ${nuevas.length === 1 ? 'capítulo' : 'capítulos'}, delante de los que ya tenías:\n\n` +
+        nuevas.map(c => `📖 ${c.name} (${c.messages.length} mensajes)`).join('\n') +
+        '\n\nLos tienes en la barra lateral, listos para releer en formato novela. No se vuelcan a los documentos: su estado ya llega por el Cuaderno y la Bitácora.'
+    });
   };
 
   const handleCreateChat = () => {
@@ -6837,10 +6880,19 @@ export default function App() {
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5">
           <div className="flex justify-between items-center text-xs font-cinzel font-bold text-[var(--text-secondary)] px-1 mb-1">
             <span>CAPÍTULOS ({currentChats.length})</span>
+            <button
+              onClick={() => setImportandoSesiones(true)}
+              disabled={!currentPId}
+              title="Importar sesiones: tus chats de Claude en .md (o la exportación de datos) como capítulos."
+              aria-label="Importar sesiones"
+              className="min-h-[36px] min-w-[36px] rounded-lg border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)] disabled:opacity-40 cursor-pointer flex items-center justify-center ml-auto mr-1.5 text-base leading-none"
+            >
+              📥
+            </button>
             {currentChat && hayDocumentosVivos(currentProject?.memory) && (
               <button
                 onClick={() => void volcarDocumentos(currentChat, 'manual')}
-                className="min-h-[36px] min-w-[36px] rounded-lg border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)] cursor-pointer flex items-center justify-center ml-auto mr-1.5"
+                className="min-h-[36px] min-w-[36px] rounded-lg border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)] cursor-pointer flex items-center justify-center mr-1.5"
                 title="Volcar ahora: pone al día el Cuaderno del GM, la Ficha viva y la Bitácora con lo jugado en este capítulo, sin cerrarlo."
                 aria-label="Volcar ahora"
               >
@@ -6852,9 +6904,7 @@ export default function App() {
               disabled={!currentPId}
               title="Nuevo capítulo: cierra el actual y abre otro."
               aria-label="Nuevo capítulo"
-              className={`min-h-[36px] min-w-[36px] rounded-lg border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)] disabled:opacity-40 cursor-pointer flex items-center justify-center ${
-                currentChat && hayDocumentosVivos(currentProject?.memory) ? '' : 'ml-auto'
-              }`}
+              className="min-h-[36px] min-w-[36px] rounded-lg border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)] disabled:opacity-40 cursor-pointer flex items-center justify-center"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -7013,6 +7063,11 @@ export default function App() {
           dados: no se podía ni teclear hasta cerrarlo. Ahora va en el flujo,
           debajo de la barra: empuja la escena hacia abajo en vez de taparla.
         */}
+        <ImportarSesionesModal
+          isOpen={importandoSesiones}
+          onClose={() => setImportandoSesiones(false)}
+          onImportar={importarSesiones}
+        />
         {storageWarning && (
           <div className="shrink-0 border-b border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-100 px-3 py-2 flex items-start gap-2.5 text-xs font-lora">
             <TriangleAlert className="w-4 h-4 shrink-0 mt-0.5 text-amber-700 dark:text-amber-400" />
