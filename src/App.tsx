@@ -108,6 +108,7 @@ import {
   AVISO_TOKENS_POR_MINUTO,
   getStoredApiKeys,
   estimarCargaDelTurno,
+  CARACTERES_POR_TOKEN,
   generateClaudeProjectMemory,
   estudiarContextoInicialDeCampana,
   tramarLaCampana,
@@ -5198,8 +5199,32 @@ export default function App() {
     void etiquetarLosQueLleguenSinEtiquetas();
   };
 
-  const handleToggleAllOnDemand = async (onDemand: boolean) => {
+  const handleToggleAllOnDemand = async (onDemand: boolean, confirmado = false) => {
     if (!currentPId) return;
+    /*
+     * Mandarlo todo siempre es un clic que puede triplicar el coste de cada
+     * turno (en una campaña real, de 115.000 a 242.000 tokens) y enterrar las
+     * reglas del Narrador bajo los compendios. Se pregunta antes, con la cifra.
+     */
+    if (!onDemand && !confirmado) {
+      const frescosAntes = await loadFilesFromDB(currentPId);
+      const pasarian = frescosAntes.filter(f => !f.isImage && !f.isAudio && f.onDemand);
+      if (!pasarian.length) return;
+      const extra = Math.round(pasarian.reduce((a, f) => a + (f.content?.length || f.length || 0), 0) / CARACTERES_POR_TOKEN / 1000);
+      setConfirmConfig({
+        isOpen: true,
+        message:
+          `📌 ¿Enviar siempre los ${pasarian.length} documentos de consulta?\n\n` +
+          `Cada turno llevaría ≈${extra.toLocaleString('es-ES')}k tokens más. En la capa gratuita la cuota es de 250k por minuto, ` +
+          'y con tanto texto delante el Narrador tiende a olvidar sus propias reglas.\n\n' +
+          'Lo normal es dejar siempre presentes solo las fichas y pasar los compendios a consulta.',
+        confirmLabel: '📌 Enviar todo igualmente',
+        onConfirm: () => {
+          void handleToggleAllOnDemand(false, true);
+        }
+      });
+      return;
+    }
     const frescos = await loadFilesFromDB(currentPId);
     const updated = frescos.map(f => {
       if (f.isImage || f.isAudio) return f;

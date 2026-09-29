@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Project, ProjectFile, FileCategory, viajaSiemprePorCategoria, vaDeConsultaPorDefecto } from '../types';
-import { classifyFileAuto } from '../utils/geminiHelper';
+import { classifyFileAuto, CARACTERES_POR_TOKEN, TOPE_TOKENS_POR_MINUTO } from '../utils/geminiHelper';
 import { leerPuentesDelMapa, recuperar } from '../utils/localSearch';
 
 import {
@@ -168,7 +168,16 @@ export const FilesView: React.FC<{
     (!f.onDemand || viajaSiemprePorCategoria(f.category));
   const textChars = files.reduce((acc, f) => acc + (countsAsContext(f) ? f.length || 0 : 0), 0);
   const budgetShare = (textChars / CONTEXT_BUDGET_CHARS) * 100;
-  const budgetLevel = budgetShare < 25 ? 'holgado' : budgetShare < 50 ? 'ajustado' : 'excesivo';
+  /*
+   * Lo que frena de verdad no es la ventana de contexto (un millón de tokens
+   * da para casi todo), sino la cuota por MINUTO: cada turno manda estos
+   * documentos enteros, y 250.000 tokens por minuto se acaban con uno solo si
+   * la biblioteca pesa mucho. Esta franja decía «margen de sobra» mientras la
+   * barra lateral marcaba la cuota en rojo.
+   */
+  const tokensPorTurno = Math.round(textChars / CARACTERES_POR_TOKEN);
+  const cuotaShare = (tokensPorTurno / TOPE_TOKENS_POR_MINUTO) * 100;
+  const budgetLevel = cuotaShare < 20 ? 'holgado' : cuotaShare < 40 ? 'ajustado' : 'excesivo';
 
   const pesadosSiemprePresentes = files.filter(
     f => !f.onDemand && vaDeConsultaPorDefecto({ ...f, category: getFileCategory(f) })
@@ -392,22 +401,24 @@ export const FilesView: React.FC<{
         <div
           className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${
             budgetLevel === 'excesivo'
-              ? 'border-red-300 bg-red-50/70 text-red-900'
+              ? 'border-red-300 bg-red-50/70 text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100'
               : budgetLevel === 'ajustado'
-                ? 'border-amber-300 bg-amber-50/70 text-amber-900'
-                : 'border-emerald-300 bg-emerald-50/60 text-emerald-900'
+                ? 'border-amber-300 bg-amber-50/70 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100'
+                : 'border-emerald-300 bg-emerald-50/60 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100'
           }`}
+          title={`Además de esto, cada turno lleva las directivas, la memoria y el capítulo en curso. Ventana de contexto: ${budgetShare < 1 ? '<1' : Math.round(budgetShare)}%.`}
         >
           <span className="font-cinzel font-bold">
-            Los documentos ocupan el {budgetShare < 1 ? '<1' : Math.round(budgetShare)}% de la ventana de
-            contexto
+            {budgetLevel === 'excesivo' ? '🔴' : budgetLevel === 'ajustado' ? '🟡' : '🟢'} Lo que viaja siempre: ≈
+            {Math.round(tokensPorTurno / 1000).toLocaleString('es-ES')}k tokens por turno ·{' '}
+            {cuotaShare < 1 ? '<1' : Math.round(cuotaShare)}% de la cuota por minuto
           </span>
           <span className="italic">
             {budgetLevel === 'holgado'
-              ? 'Margen de sobra para que la crónica crezca.'
+              ? 'Ligero: queda sitio para directivas y capítulos.'
               : budgetLevel === 'ajustado'
-                ? 'Cabe, pero cada turno tarda más. Deja sitio para los capítulos.'
-                : 'Demasiado: la campaña se quedará sin espacio y las respuestas se volverán lentas.'}
+                ? 'Pesa: los turnos tardan más. Pasa a consulta lo que no haga falta siempre.'
+                : 'Demasiado: con esto se agota la cuota en uno o dos turnos. Pasa compendios a consulta.'}
           </span>
         </div>
       )}
