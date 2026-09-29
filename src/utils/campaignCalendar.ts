@@ -764,14 +764,21 @@ export function diasJugadosEnElCapitulo(textos: (string | undefined)[]): {
   for (const t of textos) {
     const hud = leerFechaDeHud(t);
     if (!hud?.fechaTexto) continue;
-    // «14 de Ches» y «14 De Ches,» son el mismo día: sin normalizar saldrían dos.
+    // «14 de Ches», «14 De Ches,» y «14 de Ches de 1492 DR» son el mismo día:
+    // sin normalizar (y sin quitar el año, que el Narrador pone unas veces sí
+    // y otras no) salían dos jornadas donde había una.
     const clave = hud.fechaTexto
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\(.*?\)/g, ' ')
+      .replace(/\b(de\s+)?(ano\s+)?\d{3,4}\s*(dr|cv)?\b/g, ' ')
       .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+de$/, '')
       .trim();
-    if (!clave || claves.has(clave)) continue;
+    // «fecha incierta» o «?» no es un día: solo cuenta lo que tiene número o es una fiesta.
+    const esDia = /\d/.test(clave) || /fest|fiesta|invierno|verdeflor|estival|banquete|escudo|midwinter|greengrass|midsummer|highharvest|shieldmeet|feast/.test(clave);
+    if (!clave || !esDia || claves.has(clave)) continue;
     claves.add(clave);
     vistas.push(hud.fechaTexto.trim());
   }
