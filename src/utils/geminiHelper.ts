@@ -10427,7 +10427,9 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
   // Palabras clave específicas de PNJ / monstruo / bestiario / enemigo
   const npcKeywords = [
     'pnj',
+    'pnjs',
     'npc',
+    'npcs',
     'boss',
     'jefe',
     'villano',
@@ -10500,6 +10502,27 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
 
   // 1. CLASIFICACIÓN DE DOCUMENTOS (PDF, TXT, MD, ETC.)
   if (!file.isImage) {
+    /*
+     * Lo que se llama a sí mismo compendio, cantera o resumen de novelas lo es,
+     * diga lo que diga el contenido. Estas reglas iban al final, detrás de las
+     * de ficha, y un compendio de PNJs con estadísticas dentro («puntos de
+     * golpe», «alineamiento», un familiar mencionado de pasada) acababa como
+     * ficha del protagonista o del compañero: y una ficha viaja entera en
+     * TODOS los turnos. Una campaña real llegó así a mandar medio millón de
+     * caracteres de compendios por turno.
+     */
+    // Las crónicas de capítulos archivados: las crea la app y son documento.
+    if (file.id.startsWith('file_archive_cap_') || /^cr[oó]nica\s+—\s/i.test(file.name)) return 'document';
+    if (palabraEnNombre(['cantera', 'canteras'])) return 'cantera';
+    if (palabraEnNombre(['compendio', 'compendios'])) return 'compendio';
+    if (palabraEnNombre(['red semantica', 'red semántica', 'mapa de relaciones', 'indice', 'índice'])) return 'index';
+    if (
+      palabraEnNombre(['novela', 'novelas', 'relatos']) &&
+      palabraEnNombre(['resumen', 'resumenes', 'resúmenes', 'resumido', 'resumidos', 'resumida', 'resumidas', 'canon'])
+    ) {
+      return 'compendio';
+    }
+
     const isCompanionDoc =
       matchesCompanionMemory ||
       palabraEnNombre(companionKeywords) ||
@@ -10568,7 +10591,7 @@ export function classifyFileAuto(file: ProjectFile, memory?: Memory): FileCatego
     // Si es claramente un PNJ o monstruo específico (por nombre de archivo o statblock explícito de monstruo)
     const esExplicitamenteNpc =
       matchesNpcMemory ||
-      palabraEnNombre(['pnj', 'npc', 'boss', 'villano', 'bestiario', 'monstruo', 'enemigo']) ||
+      palabraEnNombre(['pnj', 'pnjs', 'npc', 'npcs', 'boss', 'villano', 'bestiario', 'monstruo', 'enemigo']) ||
       normName.includes('bestiario') ||
       (normDoc.includes('statblock') && (normDoc.includes('desafio') || normDoc.includes('challenge rating') || normDoc.includes('vd')));
 
