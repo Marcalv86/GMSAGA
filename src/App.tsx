@@ -182,7 +182,8 @@ import {
   iconoDeHito,
   marcoDeLugar,
   obtenerInfoRelacion,
-  parsearFechaTexto
+  parsearFechaTexto,
+  leerFechaDeHud
 } from './utils/campaignCalendar';
 import { actualizarAfinidadNpc } from './utils/affinityProgression';
 import { coincidenNombresNpc, deduplicarListaNpcs } from './utils/npcMatcher';
@@ -3055,12 +3056,49 @@ export default function App() {
     const updated = ordenarChatsCronologicamente([...nuevas, ...actuales]);
     setCurrentChats(updated);
     saveLocalChats(pid, updated);
+    /*
+     * 📅 Y la fecha de la campaña, de la última cabecera 📍 del capítulo en
+     * curso. Sin esto, una partida importada seguía en el 1 de Martillo por
+     * defecto aunque el chat dijera «14 de Marpenoth de 1486»: calendario,
+     * diario y cabecera partían de una fecha que no era.
+     */
+    const enCurso = updated[updated.length - 1];
+    let fechaImportada: { fecha: NonNullable<Project['currentDate']>; lugar?: string; texto: string } | null = null;
+    if (enCurso && nuevas.some(c => c.id === enCurso.id)) {
+      const proyecto = projectsRef.current.find(pr => pr.id === pid);
+      const cal = calendarioValido(proyecto?.calendar) ? proyecto!.calendar! : CALENDARIO_HARPTOS;
+      const huds = enCurso.messages
+        .filter(m => m.role === 'model')
+        .map(m => leerFechaDeHud(m.content))
+        .filter((h): h is NonNullable<ReturnType<typeof leerFechaDeHud>> => Boolean(h?.fechaTexto));
+      const ultimo = huds[huds.length - 1];
+      // El año puede faltar en la última («14 de Marpenoth»): se toma el último que se dijo.
+      const ano = [...huds].reverse().map(h => h.fechaTexto!.match(/\b(1\d{3})\b/)?.[1]).find(Boolean);
+      const fecha = ultimo ? parsearFechaTexto(cal, ultimo.fechaTexto!, ano ? Number(ano) : proyecto?.currentDate?.year || 1492) : null;
+      if (fecha) {
+        const minuto = extraerMinutoDeTexto(ultimo!.momento);
+        fechaImportada = {
+          fecha: { ...fecha, ...(minuto !== null ? { minute: minuto } : {}) },
+          lugar: ultimo!.lugar,
+          texto: `${ultimo!.fechaTexto}${ultimo!.momento ? `, ${ultimo!.momento}` : ''}`
+        };
+      }
+    }
+
     await handleUpdateProjectField(p => {
       const docs = p.memory?.documentos_vivos;
-      if (!docs) return {};
-      const volcadoHasta = { ...(docs.volcadoHasta || {}) };
+      const volcadoHasta = { ...(docs?.volcadoHasta || {}) };
       for (const c of nuevas) volcadoHasta[c.id] = c.messages.length;
-      return { memory: { ...(p.memory as any), documentos_vivos: { ...docs, volcadoHasta } } };
+      return {
+        ...(fechaImportada
+          ? { currentDate: fechaImportada.fecha, ...(calendarioValido(p.calendar) ? {} : { calendar: CALENDARIO_HARPTOS }) }
+          : {}),
+        memory: {
+          ...(p.memory as any),
+          ...(docs ? { documentos_vivos: { ...docs, volcadoHasta } } : {}),
+          ...(fechaImportada?.lugar ? { current_status: fechaImportada.lugar } : {})
+        }
+      };
     });
     logInfo('memory_sync', 'Sesiones importadas', `${nuevas.length} capítulo(s): ${nuevas.map(c => c.name).join(' · ')}`);
     setAlertConfig({
@@ -3069,6 +3107,7 @@ export default function App() {
       message:
         `Han entrado ${nuevas.length} ${nuevas.length === 1 ? 'capítulo' : 'capítulos'}, delante de los que ya tenías:\n\n` +
         nuevas.map(c => `📖 ${c.name} (${c.messages.length} mensajes)`).join('\n') +
+        (fechaImportada ? `\n\n📅 La campaña se pone en ${fechaImportada.texto}${fechaImportada.lugar ? ` · 📍 ${fechaImportada.lugar}` : ''} (de la última cabecera de «${enCurso.name}»).` : '') +
         '\n\nLos tienes en la barra lateral, listos para releer en formato novela. No se vuelcan a los documentos: su estado ya llega por el Cuaderno y la Bitácora.'
     });
   };
