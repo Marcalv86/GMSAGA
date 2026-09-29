@@ -1,3 +1,4 @@
+import { extraerNumeroCapitulo } from '../utils/geminiHelper';
 import React, { useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Trash2, Upload, X } from 'lucide-react';
 import {
@@ -51,7 +52,11 @@ export const ImportarSesionesModal: React.FC<{
         .filter(n => !n.origen || !ya.has(n.origen))
         .map((n, i) => ({ ...n, elegida, clave: `${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}` }));
       const todas = [...prev, ...suma];
-      // Si todas tienen fecha, por fecha; si no, por nombre («Sesión 2» antes que «Sesión 10»).
+      // Por el número del nombre («Sesión 2» antes que «Sesión 10») si todas lo llevan;
+      // si no, por fecha si todas la tienen; y si no, por nombre.
+      if (todas.every(t => extraerNumeroCapitulo(t.nombre) !== null)) {
+        return todas.sort((a, b) => extraerNumeroCapitulo(a.nombre)! - extraerNumeroCapitulo(b.nombre)!);
+      }
       return todas.every(t => t.fecha) ? todas.sort((a, b) => a.fecha! - b.fecha!) : todas.sort((a, b) => ordenNatural(a.nombre, b.nombre));
     });
 

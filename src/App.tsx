@@ -3046,8 +3046,13 @@ export default function App() {
       messages: s.mensajes
     }));
     const actuales = currentChatsRef.current;
-    // Un capítulo vacío recién creado (el de por defecto) no hace falta conservarlo delante.
-    const updated = [...nuevas, ...actuales];
+    /*
+     * Toda la lista en orden, no solo delante: la app trata como capítulo en
+     * curso al ÚLTIMO, así que si las importadas quedan detrás del que se está
+     * jugando (o desordenadas entre sí), cree que la partida va por otro sitio.
+     * Manda el número del nombre («Sesión 3»), como al cargar la campaña.
+     */
+    const updated = ordenarChatsCronologicamente([...nuevas, ...actuales]);
     setCurrentChats(updated);
     saveLocalChats(pid, updated);
     await handleUpdateProjectField(p => {
