@@ -910,6 +910,25 @@ export default function App() {
   // por parámetro a través de dos capas.
   const reporteActual = useRef<TiempoReportado | null>(null);
 
+  const aplicarTiempo = async (t: TiempoReportado, msgInfo?: { msgId?: string; msgIndex?: number }) => {
+    reporteActual.current = t;
+
+    /*
+     * 🎬 Frentes paralelos: dónde está la cámara. Se guarda cuántos turnos
+     * lleva la acción en ese foco para recordar el cambio si pasa de tres.
+     */
+    if (t.frentes && currentChatId) {
+      const f = t.frentes;
+      const chatId = currentChatId;
+      const turnos = currentChat?.messages?.length || 0;
+      await handleUpdateProjectField(p => {
+        const mem = p.memory || {
+          story: '',
+          quests: [],
+          npcs: [],
+          locations: [],
+          current_status: ''
+        };
         if (f.fin) return { memory: { ...mem, frentes: undefined } };
         const previo = mem.frentes;
         // Si la cámara sigue en el mismo frente, la cuenta no se reinicia.
@@ -1139,24 +1158,7 @@ export default function App() {
         })
       ];
 
-      return {
-        memory: {
-          ...mem,
-          npcs: (mem.npcs || []).map(n =>
-            estrenanHoy.includes((n.name || '').trim().toLowerCase()) ? { ...n, diasVistos: [...(n.diasVistos || []), nuevoAbs] } : n
-          )
-        },
-        calendar: cal,
-        currentDate: nuevaFecha,
-        timeline: timelineCompleto,
-        threads
-      };
-    });
-  };
-
-  /*
-   * 🎬 Frentes paralelos: dónde está la cámara. Se guarda cuántos turnos
-   */
+      /*
        * El diario tenía un tope de 500 entradas aplicado con `.slice(-500)`: al
        * pasarlo, las más viejas se caían sin avisar. En una campaña larga eso es
        * perder el principio de la crónica, y desde que existen las notas podía
@@ -1186,7 +1188,18 @@ export default function App() {
       mem = conMisiones(mem, t.misiones);
       mem = conPlan(mem, t.plan, hoyAbs);
 
-      return { currentDate: nuevaFecha, threads, timeline, memory: mem };
+      return {
+        memory: {
+          ...mem,
+          npcs: (mem.npcs || []).map(n =>
+            estrenanHoy.includes((n.name || '').trim().toLowerCase()) ? { ...n, diasVistos: [...(n.diasVistos || []), nuevoAbs] } : n
+          )
+        },
+        calendar: cal,
+        currentDate: nuevaFecha,
+        timeline,
+        threads
+      };
     });
 
     // Y ahora sí, fuera del actualizador: a buscarles el canon sin prisa.
@@ -3833,7 +3846,9 @@ export default function App() {
             };
           });
         },
-        onTimeReported: () => {},
+        onTimeReported: t => {
+          void aplicarTiempo(t);
+        },
         // Refresco de pantalla en CADA fragmento: se vuelca inmediatamente cuando
         // está en segundo plano y a través de rAF cuando la ventana está activa.
         onChunk: (fullText: string) => {

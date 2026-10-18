@@ -30,21 +30,23 @@ const Documento: React.FC<{
   const [editando, setEditando] = useState(false);
   const [borrador, setBorrador] = useState(texto);
   const [confirmarDeshacer, setConfirmarDeshacer] = useState(false);
-  /*
-   * Una pestaña por sección («## …»), más «Todo». Se lee y se edita la
-   * sección elegida; al guardar se vuelve a coser en el documento entero.
-   */
   const { secciones } = partirEnSecciones(texto);
-  const [pestana, setPestana] = useState<number>(-1);
-  const elegida = pestana >= 0 && pestana < secciones.length ? pestana : -1;
-  const visible = elegida >= 0 ? secciones[elegida].bloque : texto;
+  const [abierta, setAbierta] = useState<number | null>(() => {
+    const primeraConEntradas = secciones.findIndex(s => s.entradas > 0);
+    return primeraConEntradas >= 0 ? primeraConEntradas : (secciones.length > 0 ? 0 : null);
+  });
 
-  const empezar = () => {
-    setBorrador(visible);
+  const seccionActiva = abierta !== null && abierta >= 0 && abierta < secciones.length ? abierta : null;
+
+  const empezar = (idx?: number) => {
+    const target = typeof idx === 'number' ? idx : seccionActiva;
+    if (typeof idx === 'number') setAbierta(idx);
+    setBorrador(target !== null && target >= 0 && target < secciones.length ? secciones[target].bloque : texto);
     setEditando(true);
   };
+
   const guardar = async () => {
-    await onGuardar(elegida >= 0 ? reemplazarSeccion(texto, elegida, borrador) : borrador);
+    await onGuardar(seccionActiva !== null ? reemplazarSeccion(texto, seccionActiva, borrador) : borrador);
     setEditando(false);
   };
 
@@ -105,9 +107,9 @@ const Documento: React.FC<{
             </>
           ) : (
             <button
-              onClick={empezar}
+              onClick={() => empezar()}
               aria-label="Editar"
-              title={elegida >= 0 ? `Editar «${secciones[elegida].titulo}»` : 'Editar el documento entero'}
+              title={seccionActiva !== null ? `Editar «${secciones[seccionActiva].titulo}»` : 'Editar el documento entero'}
               className="min-h-[36px] min-w-[36px] px-2 rounded-lg border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] flex items-center justify-center cursor-pointer"
             >
               <Pencil className="w-4 h-4" />
@@ -115,48 +117,7 @@ const Documento: React.FC<{
           )}
         </div>
       </header>
-      {secciones.length > 1 && (
-        <nav
-          className="flex flex-wrap gap-1.5 px-3 sm:px-4 py-2 border-b border-[var(--glass-border)] bg-[var(--surface)]"
-          aria-label="Secciones"
-        >
-          {[{ titulo: 'Todo', entradas: -1 }, ...secciones].map((sec, i) => {
-            const idx = i - 1;
-            const activa = idx === elegida;
-            return (
-              <button
-                key={`${idx}-${sec.titulo}`}
-                title={sec.titulo}
-                aria-label={sec.titulo}
-                onClick={() => {
-                  if (editando) return;
-                  setPestana(idx);
-                }}
-                disabled={editando && !activa}
-                className={`min-h-[36px] min-w-[36px] px-2 rounded-lg text-[11px] font-cinzel font-bold whitespace-nowrap flex items-center justify-center gap-1 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                  activa
-                    ? 'bg-[var(--accent)] text-[var(--on-accent)]'
-                    : 'text-[var(--text-secondary)] border border-[var(--glass-border)] hover:text-[var(--accent)] hover:border-[var(--accent)]'
-                }`}
-              >
-                <span className="text-base leading-none" aria-hidden>
-                  {i === 0 ? '📖' : emojiDeSeccion(sec.titulo)}
-                </span>
-                {activa && <span className="whitespace-normal text-left">{sec.titulo}</span>}
-                {sec.entradas > 0 && (
-                  <span
-                    className={`text-[9px] leading-none px-1 py-0.5 rounded-full ${
-                      activa ? 'bg-[var(--on-accent)]/20' : 'bg-[var(--glass)] opacity-80'
-                    }`}
-                  >
-                    {sec.entradas}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-      )}
+
       {editando ? (
         <textarea
           value={borrador}
@@ -164,8 +125,50 @@ const Documento: React.FC<{
           spellCheck={false}
           className="w-full min-h-[60vh] p-3 sm:p-4 bg-[var(--bg-color)] text-[var(--text-primary)] font-mono text-xs sm:text-sm leading-relaxed outline-none resize-y"
         />
+      ) : secciones.length === 0 ? (
+        <div className="p-4 text-xs text-[var(--text-secondary)] italic">Documento vacío.</div>
       ) : (
-        <TarjetasDeDocumento texto={texto} seccion={elegida >= 0 ? elegida : undefined} />
+        <ul className="m-0 p-0 list-none divide-y divide-[var(--glass-border)]">
+          {secciones.map((sec, idx) => {
+            const abiertaEsta = abierta === idx;
+            const tieneEntradas = sec.entradas > 0;
+            return (
+              <li key={`${idx}-${sec.titulo}`}>
+                <button
+                  type="button"
+                  onClick={() => setAbierta(abiertaEsta ? null : idx)}
+                  className="w-full min-h-[44px] px-3 sm:px-4 py-2.5 flex items-center gap-2 text-left cursor-pointer hover:bg-[var(--glass)] transition-colors"
+                >
+                  {abiertaEsta ? (
+                    <ChevronDown className="w-4 h-4 shrink-0 text-[var(--accent)]" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 shrink-0 text-[var(--text-secondary)]" />
+                  )}
+                  <span className="text-base shrink-0 leading-none" aria-hidden>
+                    {emojiDeSeccion(sec.titulo)}
+                  </span>
+                  <span className="font-cinzel font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate">
+                    {sec.titulo}
+                  </span>
+                  {tieneEntradas ? (
+                    <span className="ml-auto text-[10px] font-cinzel font-bold px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] shrink-0">
+                      {sec.entradas} {sec.entradas === 1 ? 'entrada' : 'entradas'}
+                    </span>
+                  ) : (
+                    <span className="ml-auto text-[10px] text-[var(--text-secondary)] italic opacity-60 shrink-0">
+                      (vacío)
+                    </span>
+                  )}
+                </button>
+                {abiertaEsta && (
+                  <div className="px-3 sm:px-4 pb-3 pt-1 bg-[var(--surface-soft)]/40 border-t border-[var(--glass-border)]/50">
+                    <TarjetasDeDocumento texto={texto} seccion={idx} />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
     </section>
   );

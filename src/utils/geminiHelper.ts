@@ -4033,10 +4033,15 @@ ${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | agotamiento: 0
     turnosJugados === 0
       ? `
 
-⭐ **ESTE ES EL PRIMER TURNO DEL CAPÍTULO, ASÍ QUE ABRE CON EL BLOQUE DE HUD.** No es opcional aquí aunque no haya cambiado nada desde el capítulo anterior: un capítulo que empieza sin decir dónde ni cuándo deja a la aplicación sin fecha que contar, al diario sin entrada de hoy y al lugar sin refrescar. Las dos primeras líneas, tal cual:
+⭐ **ESTE ES EL PRIMER TURNO DEL CAPÍTULO, ASÍ QUE ABRE CON EL BLOQUE DE HUD.** No es opcional aquí aunque no haya cambiado nada desde el capítulo anterior: un capítulo que empieza sin decir dónde ni cuándo deja a la aplicación sin fecha que contar, al diario sin entrada de hoy y al lugar sin refrescar. Encabezado cinemático con formato:
 \`\`\`
 📍 [Lugar exacto] · [contenedor] · [región] — [fecha del calendario], [momento del día]
-🌤 [Clima] · [luz] · 👥 [quién está en escena]
+🌤 [Clima / ambiente sensorial] · [luz] · 👥 [quién está en escena]
+\`\`\`
+Ejemplo canónico:
+\`\`\`
+📍 One-Eyed Jax · Salón reservado de la trastienda · Distrito Mirabar, Luskan — 22 de Ches, 1492 CV, noche cerrada
+🌤 Aguanieve azotando los ventanucos emplomados · Olor a turba encendida, cera y vino especiado · 👥 Jarlaxle Baenre, Kimmuriel Oblodra, Braelin Janquay, Dab'nay Tr'arach, Aryendell
 \`\`\`
 ⚠️ La fecha va DESPUÉS del guion largo y es obligatoria: sin ella la aplicación no puede contar la jornada. Y el lugar tiene que ser dónde se está AHORA —si se sigue a bordo, se dice el barco y el mar, no el puerto al que se va—.`
       : '';
@@ -5283,6 +5288,30 @@ async function saveStreamedMessage(
       !sinNovedadDeMesa(facciones, preparado) ||
       !cambioVacio(inventario))
   ) {
+    onTimeReported({
+      minutos: avance.minutos,
+      agenda,
+      hilos,
+      presentes,
+      frentes,
+      vinculos,
+      revelaciones,
+      secretos,
+      viaje,
+      lugares,
+      inventario,
+      aprendido,
+      bambalinas,
+      relojes,
+      facciones,
+      preparado,
+      fechaHud: hudDeEsteTurno?.fechaTexto,
+      momentoHud: hudDeEsteTurno?.momento,
+      climaHud: hudDeEsteTurno?.clima,
+      lugarHud: hudDeEsteTurno?.lugar,
+      avanceDeNivel,
+      comentariosDM
+    });
   }
 
 

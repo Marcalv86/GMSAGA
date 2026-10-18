@@ -421,12 +421,31 @@ export const TarjetasDeDocumento: React.FC<{ texto: string; seccion?: number }> 
   }
 
   const unaSola = typeof seccion === 'number' && seccion >= 0 && seccion < secciones.length;
-  const mostrar = unaSola ? [secciones[seccion!]] : secciones;
+
+  if (unaSola) {
+    const sec = secciones[seccion!];
+    const lineas = sec.bloque.split('\n').slice(1);
+    const bloques = /v[ií]nculo/i.test(sec.titulo) ? agruparVinculos(leerBloques(lineas)) : leerBloques(lineas);
+    if (!bloques.length || (bloques.length === 1 && bloques[0].tipo === 'parrafo' && esVacio(bloques[0].texto))) {
+      return (
+        <p className="m-0 text-xs text-[var(--text-secondary)] italic py-2">
+          Sin entradas todavía en esta sección.
+        </p>
+      );
+    }
+    return (
+      <div className="py-1">
+        <Bloques bloques={bloques} columnas />
+      </div>
+    );
+  }
+
+  const mostrar = secciones;
 
   return (
     <div className="p-3 sm:p-4 flex flex-col gap-3">
-      {!unaSola && nota && <p className="m-0 text-[11px] text-[var(--text-secondary)] italic">{nota}</p>}
-      <div className={`grid gap-3 ${unaSola ? '' : 'lg:grid-cols-2'}`}>
+      {nota && <p className="m-0 text-[11px] text-[var(--text-secondary)] italic">{nota}</p>}
+      <div className="grid gap-3 lg:grid-cols-2">
         {mostrar.map(sec => {
           const lineas = sec.bloque.split('\n').slice(1);
           return (
@@ -448,7 +467,7 @@ export const TarjetasDeDocumento: React.FC<{ texto: string; seccion?: number }> 
               <div className="p-3">
                 <Bloques
                   bloques={/v[ií]nculo/i.test(sec.titulo) ? agruparVinculos(leerBloques(lineas)) : leerBloques(lineas)}
-                  columnas={unaSola}
+                  columnas={false}
                 />
               </div>
             </section>
