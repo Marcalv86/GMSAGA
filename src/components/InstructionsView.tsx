@@ -10,8 +10,6 @@ import {
   GRIMDARK_SURVIVAL_DISEASE_RULES
 } from '../utils/defaultDirectives';
 import {
-  analyzeNarrativeStyleFromDocument,
-  describeApiError,
   getStoredSafetyLevel,
   setStoredSafetyLevel,
   SafetyThreshold
@@ -19,7 +17,6 @@ import {
 
 import {
   Activity,
-  AlertCircle,
   Check,
   ChevronDown,
   ChevronUp,
@@ -27,7 +24,6 @@ import {
   Dices,
   Flame,
   HeartPulse,
-  PenTool,
   RefreshCw,
   Save,
   Scroll,
@@ -35,9 +31,6 @@ import {
   Shield,
   ShieldAlert,
   Sliders,
-  Sparkles,
-  Swords,
-  Upload,
   X
 } from 'lucide-react';
 
@@ -47,8 +40,6 @@ export const InstructionsView: React.FC<{
   onRequestConfirm?: (message: string, onConfirm: () => void) => void;
 }> = ({ project, onUpdate, onRequestConfirm }) => {
   const [instructions, setInstructions] = useState(project.instructions || '');
-  const [system, setSystem] = useState(project.system || '');
-  const [style, setStyle] = useState(project.style || '');
   const [safetyLevel, setSafetyLevel] = useState<SafetyThreshold>(() => getStoredSafetyLevel());
   const [diseaseSystem, setDiseaseSystem] = useState<DiseaseRuleSystem>(
     project.diseaseConfig?.system || 'dnd5e_2024'
@@ -68,11 +59,7 @@ export const InstructionsView: React.FC<{
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [showDiseaseAdvanced, setShowDiseaseAdvanced] = useState(false);
 
-  const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
-  const [analyzingMessage, setAnalyzingMessage] = useState('');
   const [styleSuccessNotice, setStyleSuccessNotice] = useState<string | null>(null);
-  const [styleErrorNotice, setStyleErrorNotice] = useState<string | null>(null);
-  const styleFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<{
@@ -98,8 +85,6 @@ export const InstructionsView: React.FC<{
 
   useEffect(() => {
     setInstructions(project.instructions || '');
-    setSystem(project.system || '');
-    setStyle(project.style || '');
     setSafetyLevel(getStoredSafetyLevel());
     setDiseaseSystem(project.diseaseConfig?.system || 'dnd5e_2024');
     setAutoPenalties(
@@ -109,7 +94,7 @@ export const InstructionsView: React.FC<{
     setCustomDiseaseRules(project.diseaseConfig?.customRules || DEFAULT_DISEASE_CUSTOM_RULES);
     setManualDmRolls(Boolean(project.manualDmRolls));
     setSaveStatus('saved');
-  }, [project.id, project.instructions, project.system, project.style, project.manualDmRolls]);
+  }, [project.id, project.instructions, project.manualDmRolls]);
 
   const handleSafetyChange = (newLevel: SafetyThreshold) => {
     setSafetyLevel(newLevel);
@@ -130,8 +115,6 @@ export const InstructionsView: React.FC<{
 
   const saveChanges = async (
     newInst?: string,
-    newSys?: string,
-    newSty?: string,
     newDiseaseCfg?: Partial<DiseaseConfig>
   ) => {
     const activeDiseaseCfg: DiseaseConfig = {
@@ -143,8 +126,6 @@ export const InstructionsView: React.FC<{
 
     const payload: Partial<Project> = {
       instructions: newInst !== undefined ? newInst : instructions,
-      system: newSys !== undefined ? newSys : system,
-      style: newSty !== undefined ? newSty : style,
       diseaseConfig: activeDiseaseCfg,
       manualDmRolls: manualDmRolls
     };
@@ -162,8 +143,6 @@ export const InstructionsView: React.FC<{
 
   const scheduleDebouncedSave = (
     newInst?: string,
-    newSys?: string,
-    newSty?: string,
     newDiseaseCfg?: Partial<DiseaseConfig>
   ) => {
     setSaveStatus('unsaved');
@@ -176,15 +155,15 @@ export const InstructionsView: React.FC<{
 
     pendingRef.current = {
       instructions: newInst !== undefined ? newInst : instructions,
-      system: newSys !== undefined ? newSys : system,
-      style: newSty !== undefined ? newSty : style,
+      system: DEFAULT_SYSTEM,
+      style: DEFAULT_STYLE,
       diseaseConfig: activeDiseaseCfg,
     };
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = setTimeout(() => {
-      saveChanges(newInst, newSys, newSty, newDiseaseCfg);
+      saveChanges(newInst, newDiseaseCfg);
     }, 1500);
   };
 
@@ -194,7 +173,7 @@ export const InstructionsView: React.FC<{
       setDiseaseSystem('dnd5e_2024');
       setExhaustionRules(DND2024_EXHAUSTION_RULES);
       setCustomDiseaseRules(DEFAULT_DISEASE_CUSTOM_RULES);
-      await saveChanges(undefined, undefined, undefined, {
+      await saveChanges(undefined, {
         system: 'dnd5e_2024',
         exhaustionRules: DND2024_EXHAUSTION_RULES,
         customRules: DEFAULT_DISEASE_CUSTOM_RULES
@@ -203,7 +182,7 @@ export const InstructionsView: React.FC<{
       setDiseaseSystem('dnd5e');
       setExhaustionRules(DND5E_CLASSIC_EXHAUSTION_RULES);
       setCustomDiseaseRules(DEFAULT_DISEASE_CUSTOM_RULES);
-      await saveChanges(undefined, undefined, undefined, {
+      await saveChanges(undefined, {
         system: 'dnd5e',
         exhaustionRules: DND5E_CLASSIC_EXHAUSTION_RULES,
         customRules: DEFAULT_DISEASE_CUSTOM_RULES
@@ -212,59 +191,38 @@ export const InstructionsView: React.FC<{
       setDiseaseSystem('custom');
       setExhaustionRules(DND2024_EXHAUSTION_RULES);
       setCustomDiseaseRules(GRIMDARK_SURVIVAL_DISEASE_RULES);
-      await saveChanges(undefined, undefined, undefined, {
+      await saveChanges(undefined, {
         system: 'custom',
         exhaustionRules: DND2024_EXHAUSTION_RULES,
         customRules: GRIMDARK_SURVIVAL_DISEASE_RULES
       });
     } else if (presetType === 'narrative') {
       setDiseaseSystem('narrative_only');
-      await saveChanges(undefined, undefined, undefined, {
+      await saveChanges(undefined, {
         system: 'narrative_only'
       });
     }
   };
 
   const handleRestoreMasterInstructions = () => {
-    /*
-     * EL AVISO TIENE QUE DECIR LO QUE ESTE BOTÓN HACE DE VERDAD.
-     *
-     * Se llama «Restaurar directivas por defecto» y decía «¿deseas restaurar
-     * las directivas narrativas y de lore por defecto?», que suena a volver a
-     * poner lo bueno. Lo que hace es sobrescribir de golpe las directivas de
-     * campaña, el sistema de juego, el estilo narrativo y las reglas de
-     * enfermedad con los textos de fábrica. En una campaña trabajada eso son
-     * meses de escritura —el lore, la conducta de los PNJs, la voz— borrados
-     * con un clic y sin vuelta atrás.
-     *
-     * Un botón destructivo que se presenta como restaurador es una trampa. Así
-     * que el aviso cuenta cuánto texto propio hay en juego: una cifra concreta
-     * hace parar a quien iba a pulsar por curiosidad, y no estorba a quien sí
-     * quiere empezar de cero.
-     */
-    const propio =
-      (instructions?.length || 0) + (system?.length || 0) + (style?.length || 0);
+    const propio = (instructions?.length || 0);
     const hayTrabajoPropio = propio > 400;
 
     const message = hayTrabajoPropio
       ? `⚠️ ESTO BORRA LO QUE HAS ESCRITO TÚ.\n\n` +
-        `Se sustituyen por los textos de fábrica: tus directivas de campaña, tu sistema de juego y tu estilo narrativo. ` +
+        `Se sustituyen por los textos de fábrica: tus directivas de campaña y reglas de enfermedad. ` +
         `Son ${propio.toLocaleString('es-ES')} caracteres tuyos y NO se pueden recuperar.\n\n` +
         `Si solo querías ver las de fábrica para copiar alguna regla, cancela: esto no sirve para eso.\n\n` +
         `¿Seguro que quieres empezar de cero?`
       : '¿Deseas restaurar las directivas narrativas y de lore por defecto para este Tomo?';
     const executeRestore = async () => {
       setInstructions(DEFAULT_DM_INSTRUCTIONS);
-      setSystem(DEFAULT_SYSTEM);
-      setStyle(DEFAULT_STYLE);
       setDiseaseSystem('dnd5e_2024');
       setAutoPenalties(true);
       setExhaustionRules(DND2024_EXHAUSTION_RULES);
       setCustomDiseaseRules(DEFAULT_DISEASE_CUSTOM_RULES);
       await saveChanges(
         DEFAULT_DM_INSTRUCTIONS,
-        DEFAULT_SYSTEM,
-        DEFAULT_STYLE,
         {
           system: 'dnd5e_2024',
           autoPenalties: true,
@@ -278,61 +236,6 @@ export const InstructionsView: React.FC<{
       onRequestConfirm(message, executeRestore);
     } else if (window.confirm(message)) {
       executeRestore();
-    }
-  };
-
-  const handleStyleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsAnalyzingStyle(true);
-    setAnalyzingMessage(`Extrayendo texto y analizando la pluma de "${file.name}"...`);
-    setStyleSuccessNotice(null);
-
-    try {
-      let fileText = '';
-      if (
-        file.type.startsWith('text/') ||
-        file.name.endsWith('.txt') ||
-        file.name.endsWith('.md') ||
-        file.name.endsWith('.markdown') ||
-        file.name.endsWith('.json')
-      ) {
-        fileText = await file.text();
-      } else {
-        fileText = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve((reader.result as string) || '');
-          reader.onerror = reject;
-          reader.readAsText(file);
-        });
-      }
-
-      if (!fileText || fileText.trim().length < 50) {
-        throw new Error('El archivo no contiene suficiente texto legible para analizar el estilo.');
-      }
-
-      setAnalyzingMessage(`Gemini está destilando la voz, ritmo y vocabulario de "${file.name}"...`);
-      const analyzedDirective = await analyzeNarrativeStyleFromDocument(fileText, file.name);
-
-      if (!analyzedDirective || analyzedDirective.trim().length === 0) {
-        throw new Error('No se pudo generar la directiva de estilo del documento.');
-      }
-
-      setStyle(analyzedDirective);
-      await saveChanges(undefined, undefined, analyzedDirective);
-      setStyleSuccessNotice(`Estilo extraído con éxito desde "${file.name}" y guardado en Directivas.`);
-      setTimeout(() => setStyleSuccessNotice(null), 5000);
-    } catch (err: any) {
-      console.error('Error analyzing style document:', err);
-      setStyleErrorNotice(`No se pudo aprender el estilo: ${describeApiError(err)}`);
-      setTimeout(() => setStyleErrorNotice(null), 6000);
-    } finally {
-      setIsAnalyzingStyle(false);
-      setAnalyzingMessage('');
-      if (styleFileInputRef.current) {
-        styleFileInputRef.current.value = '';
-      }
     }
   };
 
@@ -465,7 +368,7 @@ export const InstructionsView: React.FC<{
             type="button"
             onClick={() => {
               setDiseaseSystem('dnd5e_2024');
-              scheduleDebouncedSave(undefined, undefined, undefined, { system: 'dnd5e_2024' });
+              scheduleDebouncedSave(undefined, { system: 'dnd5e_2024' });
             }}
             className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
               diseaseSystem === 'dnd5e_2024'
@@ -486,7 +389,7 @@ export const InstructionsView: React.FC<{
             type="button"
             onClick={() => {
               setDiseaseSystem('dnd5e');
-              scheduleDebouncedSave(undefined, undefined, undefined, { system: 'dnd5e' });
+              scheduleDebouncedSave(undefined, { system: 'dnd5e' });
             }}
             className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
               diseaseSystem === 'dnd5e'
@@ -507,7 +410,7 @@ export const InstructionsView: React.FC<{
             type="button"
             onClick={() => {
               setDiseaseSystem('custom');
-              scheduleDebouncedSave(undefined, undefined, undefined, { system: 'custom' });
+              scheduleDebouncedSave(undefined, { system: 'custom' });
             }}
             className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
               diseaseSystem === 'custom'
@@ -528,7 +431,7 @@ export const InstructionsView: React.FC<{
             type="button"
             onClick={() => {
               setDiseaseSystem('narrative_only');
-              scheduleDebouncedSave(undefined, undefined, undefined, { system: 'narrative_only' });
+              scheduleDebouncedSave(undefined, { system: 'narrative_only' });
             }}
             className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
               diseaseSystem === 'narrative_only'
@@ -569,7 +472,7 @@ export const InstructionsView: React.FC<{
               onChange={e => {
                 const checked = e.target.checked;
                 setAutoPenalties(checked);
-                scheduleDebouncedSave(undefined, undefined, undefined, { autoPenalties: checked });
+                scheduleDebouncedSave(undefined, { autoPenalties: checked });
               }}
               className="sr-only peer"
             />
@@ -629,7 +532,7 @@ export const InstructionsView: React.FC<{
                 onChange={e => {
                   const val = e.target.value;
                   setExhaustionRules(val);
-                  scheduleDebouncedSave(undefined, undefined, undefined, { exhaustionRules: val });
+                  scheduleDebouncedSave(undefined, { exhaustionRules: val });
                 }}
                 onBlur={() => saveChanges()}
                 rows={5}
@@ -647,7 +550,7 @@ export const InstructionsView: React.FC<{
                 onChange={e => {
                   const val = e.target.value;
                   setCustomDiseaseRules(val);
-                  scheduleDebouncedSave(undefined, undefined, undefined, { customRules: val });
+                  scheduleDebouncedSave(undefined, { customRules: val });
                 }}
                 onBlur={() => saveChanges()}
                 rows={5}
@@ -781,151 +684,34 @@ export const InstructionsView: React.FC<{
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <div className="font-cinzel text-sm font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wide flex justify-between items-center">
-              <span className="inline-flex items-center gap-1.5">
-                <Settings className="w-3.5 h-3.5" />
-                Directivas del Master (Lore & Conducta)
-              </span>
-            </div>
-            {/*
-              ESCRIBIR AQUÍ APAGA LAS DIRECTIVAS POR DEFECTO, Y NO SE VEÍA.
-              `buildTurnPayload` hace o lo uno o lo otro: en cuanto este cuadro
-              pasa de diez caracteres, DEFAULT_DM_INSTRUCTIONS deja de viajar
-              entera. Son ciento cuarenta reglas, y entre ellas van cosas que
-              parecen del motor y no del sabor de la campaña —cómo se anuncian
-              las jornadas de un viaje, por ejemplo—. Nadie lo deduce escribiendo
-              en un cuadro de texto, y el síntoma aparece semanas después como
-              «el Narrador se ha saltado una regla» cuando en realidad nunca la
-              tuvo. Los protocolos del motor sí viajan siempre, así que el aviso
-              acota exactamente lo que se pierde.
-            */}
-            {instructions.trim().length > 10 && (
-              <div className="mb-2 text-[11px] leading-relaxed rounded-lg border border-amber-700/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 px-2.5 py-2">
-                ⚠️ <strong>Estas directivas SUSTITUYEN a las de por defecto</strong>, no se suman a ellas. Mientras
-                haya texto aquí, las 142 reglas de conducta que trae la aplicación no viajan en el turno.
-                <br />
-                Los <strong>protocolos del motor</strong> (etiquetas, HUD, dados, calendario) sí van siempre, así
-                que la interfaz no se rompe. Lo que se pierde son las pautas de narración: ritmo, tratamiento de
-                los PNJs, manejo del tiempo y los viajes. Si quieres alguna, cópiala aquí.
-              </div>
-            )}
-            <textarea
-              value={instructions}
-              onChange={e => {
-                const val = e.target.value;
-                setInstructions(val);
-                scheduleDebouncedSave(val, undefined, undefined);
-              }}
-              onBlur={() => saveChanges()}
-              className="w-full h-[320px] md:h-[500px] bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] p-3.5 rounded-lg text-xs md:text-sm font-mono outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-color)] leading-relaxed resize-y"
-              placeholder="Escribe las directivas de lore, comportamiento del Narrador, reglas de mesa..."
-            />
+        <div className="w-full">
+          <div className="font-cinzel text-sm font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wide flex justify-between items-center">
+            <span className="inline-flex items-center gap-1.5">
+              <Settings className="w-3.5 h-3.5" />
+              Directivas del Master (Lore & Conducta)
+            </span>
           </div>
-          <div>
-            <div className="font-cinzel text-sm font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wide flex items-center gap-1.5">
-              <Swords className="w-3.5 h-3.5" /> Motor y Sistema de Juego
+          {instructions.trim().length > 10 && (
+            <div className="mb-2 text-[11px] leading-relaxed rounded-lg border border-amber-700/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 px-2.5 py-2">
+              ⚠️ <strong>Estas directivas SUSTITUYEN a las de por defecto</strong>, no se suman a ellas. Mientras
+              haya texto aquí, las 142 reglas de conducta que trae la aplicación no viajan en el turno.
+              <br />
+              Los <strong>protocolos del motor</strong> (etiquetas, HUD, dados, calendario) sí van siempre, así
+              que la interfaz no se rompe. Lo que se pierde son las pautas de narración: ritmo, tratamiento de
+              los PNJs, manejo del tiempo y los viajes. Si quieres alguna, cópiala aquí.
             </div>
-            <textarea
-              value={system}
-              onChange={e => {
-                const val = e.target.value;
-                setSystem(val);
-                scheduleDebouncedSave(undefined, val, undefined);
-              }}
-              onBlur={() => saveChanges()}
-              className="w-full h-[320px] md:h-[500px] bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] p-3.5 rounded-lg text-xs md:text-sm font-lora outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-color)] leading-relaxed resize-y"
-              placeholder="Sistema de juego: cómo se resuelven las tiradas, el combate y los recursos..."
-            />
-          </div>
-          <div>
-            <div className="font-cinzel text-sm font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wide flex justify-between items-center gap-1 flex-wrap">
-              <span className="inline-flex items-center gap-1.5">
-                <PenTool className="w-3.5 h-3.5" /> Pluma y Estilo Narrativo
-              </span>
-
-              {/* Botón para subir un documento y extraer el estilo al vuelo */}
-              <input
-                ref={styleFileInputRef}
-                type="file"
-                accept=".txt,.md,.markdown,.json,.text,text/*"
-                className="hidden"
-                onChange={handleStyleFileSelected}
-              />
-              <button
-                type="button"
-                onClick={() => styleFileInputRef.current?.click()}
-                disabled={isAnalyzingStyle}
-                className="inline-flex items-center gap-1 text-[10px] md:text-[11px] font-cinzel font-bold px-2 py-1 bg-amber-100/80 hover:bg-amber-200 text-amber-950 border border-amber-300 rounded shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-                title="Sube una muestra de texto o documento literario para que la IA aprenda su ritmo, voz y vocabulario y cree el prompt de estilo automáticamente"
-              >
-                {isAnalyzingStyle ? (
-                  <>
-                    <Clock className="w-3 h-3 animate-spin text-[var(--accent)]" />
-                    <span>Analizando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3 h-3 text-[var(--accent)]" />
-                    <Upload className="w-3 h-3 text-[var(--accent)]" />
-                    <span>Aprender de archivo</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {isAnalyzingStyle && (
-              <div className="mb-2 p-2 bg-amber-50/80 border border-amber-300 rounded text-xs text-amber-900 font-cinzel flex items-center gap-2 animate-pulse">
-                <div className="w-3.5 h-3.5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
-                <span className="truncate">{analyzingMessage || 'Analizando estilo literario...'}</span>
-              </div>
-            )}
-
-            {styleSuccessNotice && (
-              <div className="mb-2 p-2 bg-emerald-50 border border-emerald-300 rounded text-xs text-emerald-900 font-cinzel flex items-center justify-between gap-2 shadow-2xs">
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>{styleSuccessNotice}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setStyleSuccessNotice(null)}
-                  className="text-emerald-700 hover:text-emerald-950 p-0.5 rounded cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            )}
-
-            {styleErrorNotice && (
-              <div className="mb-2 p-2 bg-rose-50 border border-rose-300 rounded text-xs text-rose-900 font-cinzel flex items-center justify-between gap-2 shadow-2xs">
-                <div className="flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                  <span>{styleErrorNotice}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setStyleErrorNotice(null)}
-                  className="text-rose-700 hover:text-rose-950 p-0.5 rounded cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            )}
-
-            <textarea
-              value={style}
-              onChange={e => {
-                const val = e.target.value;
-                setStyle(val);
-                scheduleDebouncedSave(undefined, undefined, val);
-              }}
-              onBlur={() => saveChanges()}
-              className="w-full h-[320px] md:h-[500px] bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] p-3.5 rounded-lg text-xs md:text-sm font-lora outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-color)] italic leading-relaxed resize-y"
-              placeholder="Voz, ritmo y nivel de detalle que quieres en la narración (o pulsa «Aprender de archivo» para destilarlo desde un documento)..."
-            />
-          </div>
+          )}
+          <textarea
+            value={instructions}
+            onChange={e => {
+              const val = e.target.value;
+              setInstructions(val);
+              scheduleDebouncedSave(val);
+            }}
+            onBlur={() => saveChanges()}
+            className="w-full h-[400px] md:h-[600px] bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] p-3.5 rounded-lg text-xs md:text-sm font-mono outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-color)] leading-relaxed resize-y"
+            placeholder="Escribe las directivas de lore, comportamiento del Narrador, reglas de mesa..."
+          />
         </div>
       </div>
     </div>
