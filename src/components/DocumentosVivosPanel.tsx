@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { emojiDeSeccion, TarjetasDeBitacora, TarjetasDeDocumento } from './TarjetasDeDocumento';
 import { Check, ChevronDown, ChevronRight, Pencil, Save, Undo2, X } from 'lucide-react';
 import type { DocumentosVivos } from '../types';
-import { importarDesdeClaude, partirEnSecciones, reemplazarSeccion } from '../utils/documentosVivos';
+import {
+  importarDesdeClaude,
+  partirEnSecciones,
+  reemplazarSeccion
+} from '../utils/documentosVivos';
 
 /*
  * 📚 La vista de los documentos vivos.

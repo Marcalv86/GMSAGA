@@ -6767,7 +6767,7 @@ export async function syncMemoryFromChats(project: Project, chats: Chat[], files
  * (resumen, memoria general, sincronización completa y repaso del Director),
  * que escribían sobre lo mismo y se pisaban.
  */
-type ParteDelVolcado = 'cuaderno' | 'ficha' | 'bitacora' | 'memoria';
+type ParteDelVolcado = 'cuaderno' | 'ficha' | 'bitacora' | 'memoria' | 'cronica';
 
 export async function volcarDocumentosVivos({
   project,
@@ -6780,7 +6780,7 @@ export async function volcarDocumentosVivos({
   /** Índice del primer mensaje del capítulo que aún no se ha volcado. */
   desde: number;
   motivo: 'cierre' | 'manual';
-}): Promise<{ cuaderno: string; ficha: string; bitacora: string; memoria?: string; leidos: number; porPartes?: boolean }> {
+}): Promise<{ cuaderno: string; ficha: string; bitacora: string; memoria?: string; cronica?: string; leidos: number; porPartes?: boolean }> {
   const docs = project.memory?.documentos_vivos;
   if (!docs) throw new Error('El proyecto todavía no tiene documentos vivos.');
 
@@ -6790,12 +6790,12 @@ export async function volcarDocumentosVivos({
     .filter(m => m.content && m.content.trim() && m.content !== 'Pensando...' && m.content !== 'Tirando dados...');
   if (!mensajes.length) return { cuaderno: docs.cuaderno, ficha: docs.ficha, bitacora: '', leidos: 0 };
 
-  let cronica = mensajes
+  let cronicaSesion = mensajes
     .map(m => `${m.role === 'user' ? 'JUGADORA' : 'NARRADOR'}: ${m.content.trim()}`)
     .join('\n\n');
   let recortada = false;
-  if (cronica.length > TOPE_CRONICA) {
-    cronica = cronica.slice(-TOPE_CRONICA);
+  if (cronicaSesion.length > TOPE_CRONICA) {
+    cronicaSesion = cronicaSesion.slice(-TOPE_CRONICA);
     recortada = true;
   }
 
@@ -6818,7 +6818,7 @@ ${docs.cuaderno}
 ${docs.ficha}
 
 ${memoriaActual && motivo === 'cierre' ? `=== 🧭 MEMORIA DEL PROYECTO ACTUAL (quién, qué y cómo se juega) ===\n${memoriaActual}\n\n` : ''}${ultima ? `=== 📖 ÚLTIMA ENTRADA DE LA BITÁCORA (${ultima.capitulo}${ultima.parte ? `, parte ${ultima.parte}` : ''}) ===\n${ultima.texto}\n\n` : ''}${canonDeMesa ? `=== 📌 CANON Y REGLAS DE MESA ACORDADAS (respétalas) ===\n${canonDeMesa}\n\n` : ''}=== LO JUGADO DESDE EL ÚLTIMO VOLCADO${recortada ? ' (muy largo: llega solo el final)' : ''} ===
-${cronica}`;
+${cronicaSesion}`;
 
   /*
    * Las reglas van por documento para poder pedir solo una parte: si un
@@ -6858,13 +6858,22 @@ ${cronica}`;
     bitacora: `REGLAS PARA «bitacora» (una entrada nueva; la jugadora la LEE):
 - ⛔ Nada del cuaderno que ella no sepa: ni verdades ocultas, ni fuera de cámara, ni relojes.
 - Con estos encabezados «### …», en este orden: **Hechos y decisiones** (viñetas, en orden, con los momentos clave y las frases que importan) · **Salud, recursos y secuelas** · **Relaciones** (qué ha cambiado con cada cual) · **Hilos abiertos** · **Progresión** (una línea «[Avance: X/Y hacia Nivel N]» y el hito anotado; un hito no es solo combate: investigación, logro social, avance espiritual, travesía dura, vínculo que cruza un umbral o peligro superado sin pelear) · **Arranque siguiente** (lugar, momento y quién está presente) · **Cambios de canon** (solo si los hubo).
-- En español, sobria y concreta. Sin florituras.`
+- En español, sobria y concreta. Sin florituras.`,
+    cronica: `REGLAS PARA «cronica» (relato literario del capítulo y candidatos de ilustración):
+- En «## Relato del Capítulo»: prosa literaria cinematográfica, evocadora e inmersiva (2 a 4 párrafos ricos en detalle sensorial, tensión y diálogo memorable) resumiendo la experiencia de la sesión/capítulo.
+- En «## 🎨 Momentos Candidatos para Ilustración»: exactamente 3 momentos candidatos numerados como «### 1. Acción / Aventura: [Título]», «### 2. Íntimo / Emocional: [Título]», «### 3. Atmósfera / Entorno: [Título]».
+  Para cada uno detalla:
+  - **Momento:** breve descripción de la escena concreta que se captura.
+  - **Encuadre:** plano cinematográfico sugerido (plano general, ángulo contrapicado, primer plano, etc.).
+  - **Paleta:** colores, iluminación, contrastes y ambiente lumínico.
+  - **Prompt:** prompt artístico detallado en inglés optimizado para generación de imagen (estilo ilustración de fantasía D&D, alta definición, cinematográfica, iluminación dramática).`
   };
   const NOMBRE: Record<ParteDelVolcado, string> = {
     cuaderno: '«cuaderno»',
     ficha: '«ficha»',
     bitacora: '«bitacora»',
-    memoria: '«memoria»'
+    memoria: '«memoria»',
+    cronica: '«cronica»'
   };
 
   const activeModel = getBackgroundTaskModel();
@@ -6925,7 +6934,11 @@ RESPONDE SOLO CON ESTE JSON:
       errorDeLlamada = errorDeLlamada || err;
       return {} as Partial<Record<ParteDelVolcado, string>>;
     });
-  let res = await intentar(motivo === 'cierre' ? ['cuaderno', 'ficha', 'bitacora', 'memoria'] : ['cuaderno', 'ficha', 'bitacora']);
+  let res = await intentar(
+    motivo === 'cierre'
+      ? ['cuaderno', 'ficha', 'bitacora', 'cronica', 'memoria']
+      : ['cuaderno', 'ficha', 'bitacora']
+  );
   const faltan = (['cuaderno', 'ficha', 'bitacora'] as ParteDelVolcado[]).filter(x => !res[x]);
   let porPartes = false;
   if (faltan.length) {
@@ -6941,6 +6954,7 @@ RESPONDE SOLO CON ESTE JSON:
   const cuaderno = res.cuaderno || '';
   const ficha = res.ficha || '';
   const bitacora = res.bitacora || '';
+  const cronica = res.cronica || undefined;
   if (!cuaderno || !ficha) {
     // Si ni siquiera hubo respuesta (sin conexión, sin cuota…), ese es el error que importa.
     if (errorDeLlamada && !res.cuaderno && !res.ficha) throw errorDeLlamada;
@@ -6951,7 +6965,7 @@ RESPONDE SOLO CON ESTE JSON:
     );
   }
   const memoria = memoriaSinEstadoActual(res.memoria || '');
-  return { cuaderno, ficha, bitacora, ...(memoria ? { memoria } : {}), leidos: mensajes.length, porPartes };
+  return { cuaderno, ficha, bitacora, ...(cronica ? { cronica } : {}), ...(memoria ? { memoria } : {}), leidos: mensajes.length, porPartes };
 }
 
 /**

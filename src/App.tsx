@@ -144,6 +144,7 @@ import { aplicarInventario, aplicarMonedas, cambioVacio, reconstruirInventario, 
 import {
   anotarEnBitacora,
   diferenciasPorLinea,
+  extraerCandidatosIlustracion,
   hayDocumentosVivos,
   migrarADocumentosVivos,
   reescribirDocumentos,
@@ -2872,12 +2873,52 @@ export default function App() {
         const actuales = p.memory?.documentos_vivos || docs;
         let d = mermaCuaderno.length ? actuales : reescribirDocumentos(actuales, { cuaderno: res.cuaderno }, etiqueta);
         if (res.bitacora) d = anotarEnBitacora(d, { chatId: chat.id, capitulo: chat.name, texto: res.bitacora });
+        if (res.cronica) {
+          const ilustraciones = extraerCandidatosIlustracion(res.cronica, chat.name);
+          d = reescribirDocumentos(
+            d,
+            {
+              cronica: res.cronica,
+              ...(ilustraciones.length ? { ilustracionesCandidatas: ilustraciones } : {})
+            },
+            etiqueta
+          );
+        }
         d = { ...d, volcadoHasta: { ...(d.volcadoHasta || {}), [chat.id]: total } };
         const previa = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
         // 🧭 La memoria del proyecto solo llega si ha cambiado algo de fondo.
         const base = res.memoria ? { ...previa, raw_project_memory: res.memoria } : previa;
+
+        let nuevosArchivos = p.files || [];
+        if (res.cronica) {
+          const idxArchivo = nuevosArchivos.findIndex(
+            f => f.name.toLowerCase() === 'crónica.md' || f.name.toLowerCase() === 'cronica.md'
+          );
+          if (idxArchivo >= 0) {
+            nuevosArchivos = nuevosArchivos.map((f, i) =>
+              i === idxArchivo ? { ...f, content: res.cronica!, updatedAt: Date.now() } : f
+            );
+          } else {
+            nuevosArchivos = [
+              ...nuevosArchivos,
+              {
+                id: `cronica_${Date.now()}`,
+                name: 'Crónica.md',
+                type: 'text/markdown',
+                content: res.cronica,
+                mime: 'text/markdown',
+                length: res.cronica.length,
+                category: 'lore'
+              }
+            ];
+          }
+        }
+
         // Y las pantallas (PNJs, lugares, tramas, nivel) se ponen al día con lo volcado.
-        return { memory: sincronizarFichasConDocumentos({ ...base, documentos_vivos: d }) };
+        return {
+          files: nuevosArchivos,
+          memory: sincronizarFichasConDocumentos({ ...base, documentos_vivos: d })
+        };
       });
 
       logInfo(

@@ -173,7 +173,7 @@ function LineaDeHistorial({ texto }: { texto: string }) {
   );
 }
 
-/** ATR/VÍN/CON y relojes «n/m» en chapitas, si la entrada los lleva. */
+/** ATR/VÍN/CON, relojes «n/m» y avances de nivel «[Avance: X/Y hacia Nivel N]» en chapitas y medidores. */
 function Marcadores({ texto }: { texto: string }) {
   const ejes = [
     { k: 'ATR', m: texto.match(/\bATR\s*[:=]?\s*(\d+|desea|inter[eé]s)/i) },
@@ -183,7 +183,17 @@ function Marcadores({ texto }: { texto: string }) {
   // Bolitas solo para relojes de verdad («reloj» o «Nombre — 3/6»), no para «PG 27/27» o «ranuras 4/4».
   const esReloj = /\breloj/i.test(texto) || /—\s*\d{1,2}\s*\/\s*\d{1,2}(?:\s|$|·)/.test(texto);
   const reloj = esReloj ? texto.match(/(?:^|\s)(\d{1,2})\s*\/\s*(\d{1,2})(?:\s|$|·)/) : null;
-  if (!ejes.length && !reloj) return null;
+
+  // Avance de nivel: [Avance: X/Y hacia Nivel N | hito: ...] o Avance: X/Y
+  const avanceMatch = texto.match(/\[?\bAvance\s*:\s*(\d+)\s*(?:\/|de)\s*(\d+)(?:\s+hacia\s+([^|\]]+))?(?:\|\s*([^\]]+))?\]?/i);
+  const avance = avanceMatch ? {
+    hitos: parseInt(avanceMatch[1], 10),
+    necesarios: parseInt(avanceMatch[2], 10),
+    destino: avanceMatch[3]?.trim(),
+    detalle: avanceMatch[4]?.trim()
+  } : null;
+
+  if (!ejes.length && !reloj && !avance) return null;
   const EJE: Record<string, { emoji: string; nombre: string; barra: string }> = {
     ATR: { emoji: '🔥', nombre: 'Atracción', barra: 'bg-rose-500 dark:bg-rose-400' },
     VÍN: { emoji: '🤝', nombre: 'Vínculo', barra: 'bg-amber-500 dark:bg-amber-400' },
@@ -243,14 +253,66 @@ function Marcadores({ texto }: { texto: string }) {
           ))}
         </span>
       )}
+      {avance && avance.necesarios > 0 && avance.necesarios <= 20 && (
+        <div className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-[var(--surface-soft)] border border-amber-500/30 shadow-2xs my-1">
+          <div className="flex items-center justify-between gap-2 text-[11px] font-cinzel font-bold text-[var(--accent)]">
+            <span className="flex items-center gap-1">
+              <span aria-hidden>⭐</span>
+              <span>{avance.destino ? `Hacia ${avance.destino}` : 'Avance de Nivel'}</span>
+            </span>
+            <span className="tabular-nums text-[10px] text-[var(--text-secondary)]">
+              {avance.hitos} de {avance.necesarios} hitos
+            </span>
+          </div>
+          {/* Bolitas segmentales */}
+          <div className="flex items-center gap-1.5 py-0.5">
+            {Array.from({ length: avance.necesarios }).map((_, i) => (
+              <span
+                key={i}
+                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${
+                  i < avance.hitos
+                    ? 'bg-amber-500 border-amber-600 dark:border-amber-400 text-[9px] text-amber-950 font-black shadow-xs'
+                    : 'border-[var(--glass-border)] bg-[var(--surface)] text-[8px] text-[var(--text-secondary)]/40'
+                }`}
+                title={i < avance.hitos ? `Hito ${i + 1} conseguido` : `Hito ${i + 1} pendiente`}
+              >
+                {i < avance.hitos ? '✓' : ''}
+              </span>
+            ))}
+            <span className="ml-auto text-[10px] font-mono text-[var(--text-secondary)]">
+              {Math.round((avance.hitos / avance.necesarios) * 100)}%
+            </span>
+          </div>
+          {/* Categoría de Hito si viene en el detalle o texto */}
+          {(() => {
+            const fuente = `${avance.detalle || ''} ${texto}`;
+            let cat = '';
+            let catIcon = '';
+            if (/investiga/i.test(fuente)) { cat = 'Investigación'; catIcon = '🔍'; }
+            else if (/social|diplom|pacto|negocia/i.test(fuente)) { cat = 'Social'; catIcon = '💬'; }
+            else if (/espiritual|dru[ií]d|naturaleza|fe/i.test(fuente)) { cat = 'Espiritual / Druídico'; catIcon = '🌿'; }
+            else if (/explora|viaje|mapa|rumbo/i.test(fuente)) { cat = 'Exploración'; catIcon = '🗺️'; }
+            else if (/v[ií]nculo|afecto|confianza|lealtad/i.test(fuente)) { cat = 'Vínculo'; catIcon = '🤝'; }
+            else if (/combate|t[aá]ctic|victoria|peligro/i.test(fuente)) { cat = 'Combate'; catIcon = '⚔️'; }
+            if (!cat) return null;
+            return (
+              <div className="flex items-center gap-1 text-[10px] font-cinzel font-semibold text-[var(--text-secondary)] pt-0.5">
+                <span>{catIcon}</span>
+                <span className="uppercase tracking-wider">Hito de {cat}</span>
+              </div>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }
 
-/** Quita del texto el «ATR n · VÍN n · CON n» que ya enseñan las barras. */
+/** Quita del texto el «ATR n · VÍN n · CON n» que ya enseñan las barras y el [Avance: ...] visualizado. */
 const sinEjes = (t: string) =>
   t
     .replace(/^\s*(?:atr:\s*[+-]?\d+\s*→\s*)?ATR\s*[:=]?\s*(?:\d+|desea|inter[eé]s)\s*·\s*V[IÍ]N\s*[:=]?\s*\d+\s*·\s*CON\s*[:=]?\s*\d+\s*[—·.:-]?\s*/i, '')
+    .replace(/\[\s*Avance\s*:\s*\d+\s*(?:\/|de)\s*\d+[^\]]*\]/gi, '')
     .trim() || t;
 
 const Texto = ({ children }: { children: string }) => (

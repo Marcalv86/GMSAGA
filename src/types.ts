@@ -785,6 +785,16 @@ export interface EntradaDeBitacora {
   fecha: number;
 }
 
+export interface IlustracionCandidata {
+  tipo: 'accion' | 'intimo' | 'atmosfera';
+  titulo: string;
+  descripcion: string;
+  prompt: string;
+  paleta?: string;
+  encuadre?: string;
+  capitulo?: string;
+}
+
 export interface DocumentosVivos {
   /** 🕯️ Cuaderno del GM, en Markdown. Oculto para la jugadora. */
   cuaderno: string;
@@ -792,8 +802,16 @@ export interface DocumentosVivos {
   ficha: string;
   /** 📖 Bitácora: una entrada por capítulo (o por parte), que se añade y no se reescribe. */
   bitacora: EntradaDeBitacora[];
+  /** 📜 Crónica viva: relato literario consolidado y candidatos a ilustración. */
+  cronica?: string;
+  /** Candidatos a ilustración organizados por el volcado de cierre */
+  ilustracionesCandidatas?: IlustracionCandidata[];
   /** Versiones anteriores de cada documento, la más reciente al final. */
-  versiones?: { cuaderno: VersionDeDocumento[]; ficha: VersionDeDocumento[] };
+  versiones?: {
+    cuaderno: VersionDeDocumento[];
+    ficha: VersionDeDocumento[];
+    cronica?: VersionDeDocumento[];
+  };
   /** Hasta qué mensaje de cada capítulo se ha volcado ya, para no leerlo dos veces. */
   volcadoHasta?: Record<string, number>;
   creadoEl: number;

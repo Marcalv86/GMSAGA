@@ -49,6 +49,7 @@ import {
   ArchiveRestore,
   BookCheck,
   BookOpen,
+  Clapperboard,
   Dices,
   Drama,
   CalendarDays,
@@ -1596,6 +1597,96 @@ export const ChatView: React.FC<{
       <div className="flex-1 overflow-y-auto px-3 sm:px-6 md:px-8 py-2 md:py-4 flex flex-col">
         {/* Columna de lectura: mismo ancho que la barra de escritura */}
         <div className="w-full max-w-[850px] mx-auto flex flex-col">
+          {/* 🎬 TARJETA INTERACTIVA DE FRENTES PARALELOS */}
+          {(() => {
+            const f = project?.memory?.frentes;
+            if (!f || !chat || f.chatId !== chat.id) return null;
+            const turnos = Math.max(0, (chat.messages || []).filter(m => m.role === 'model').length - f.desdeMensaje);
+            const toca = turnos >= 3 && f.otros.length > 0;
+            return (
+              <div className="mb-3 rounded-xl border border-amber-500/35 bg-gradient-to-r from-amber-950/25 via-[var(--surface)] to-amber-950/20 p-3 sm:p-4 shadow-sm backdrop-blur-xs flex flex-col gap-2.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap border-b border-amber-500/20 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                      <Clapperboard className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h4 className="font-cinzel font-bold text-xs sm:text-sm text-amber-800 dark:text-amber-300 m-0">
+                        Frentes Paralelos <span className="font-sans font-normal opacity-75">(Split Party)</span>
+                      </h4>
+                      <p className="text-[10px] text-[var(--text-secondary)] m-0 font-cinzel">
+                        Turno de cámara · Rotación de foco
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-[11px] font-cinzel font-bold px-2 py-0.5 rounded-md border ${
+                        toca
+                          ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/50 animate-pulse'
+                          : 'bg-[var(--surface-soft)] text-[var(--text-secondary)] border-[var(--glass-border)]'
+                      }`}
+                    >
+                      {turnos} {turnos === 1 ? 'turno' : 'turnos'} en este foco
+                    </span>
+                    {onUpdateProject && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onUpdateProject(p => ({ memory: { ...(p.memory as any), frentes: undefined } }))
+                        }
+                        title="Finalizar frentes: el grupo vuelve a estar junto"
+                        className="text-[10px] font-cinzel text-[var(--text-secondary)] hover:text-red-500 px-2 py-1 rounded border border-[var(--glass-border)] hover:border-red-400 cursor-pointer flex items-center gap-1 transition-all"
+                      >
+                        <X className="w-3 h-3" />
+                        <span className="hidden sm:inline">Reunir grupo</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5 text-[var(--text-primary)] font-cinzel">
+                      <span className="text-amber-600 dark:text-amber-400 font-bold">En foco:</span>
+                      <span className="font-semibold">{f.activo}</span>
+                    </div>
+                    {f.otros.length > 0 && (
+                      <div className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1.5 flex-wrap">
+                        <span className="font-cinzel text-amber-700/80 dark:text-amber-400/80 font-bold">Esperan:</span>
+                        <span>{f.otros.join(' · ')}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
+                    {toca && (
+                      <span className="text-[11px] text-amber-700 dark:text-amber-300 font-cinzel font-bold flex items-center gap-1">
+                        ⏳ Toca corte de cámara
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const siguiente = f.otros[0] || 'el otro frente';
+                        setInputText(prev =>
+                          prev.trim()
+                            ? `${prev}\n\n[Corte de cámara: pasamos al frente de ${siguiente}]`
+                            : `[Corte de cámara: pasamos al frente de ${siguiente}]`
+                        );
+                        textareaRef.current?.focus();
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 border border-amber-500/40 text-[11px] font-cinzel font-bold cursor-pointer transition-all flex items-center gap-1 shadow-2xs"
+                    >
+                      <FastForward className="w-3.5 h-3.5" />
+                      Alternar frente
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Chapter Header Ornamental */}
           <div className="text-center my-2 md:my-4 relative">
             <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-gradient-to-r from-transparent via-[var(--glass-border)] to-transparent" />

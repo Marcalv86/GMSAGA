@@ -1,6 +1,7 @@
 import type {
   DocumentosVivos,
   EntradaDeBitacora,
+  IlustracionCandidata,
   InventoryItem,
   Memory,
   NPC,
@@ -60,6 +61,11 @@ export const SECCIONES_FICHA = [
   'Lista de compras'
 ] as const;
 
+export const SECCIONES_CRONICA = [
+  'Relato de la Campaña',
+  'Candidatos para Ilustración'
+] as const;
+
 const plantilla = (titulo: string, secciones: readonly string[]) =>
   `# ${titulo}\n\n${secciones.map(s => `## ${s}\n- (vacío)`).join('\n\n')}\n`;
 
@@ -69,8 +75,11 @@ export const plantillaCuaderno = (pj?: string) =>
 export const plantillaFicha = (pj?: string) =>
   plantilla(`Ficha viva${pj ? ` — ${pj}` : ''}`, SECCIONES_FICHA);
 
+export const plantillaCronica = (pj?: string) =>
+  plantilla(`Crónica Viva${pj ? ` — ${pj}` : ''}`, SECCIONES_CRONICA);
+
 export const hayDocumentosVivos = (mem?: Memory | null): boolean =>
-  Boolean(mem?.documentos_vivos && (mem.documentos_vivos.cuaderno || mem.documentos_vivos.ficha));
+  Boolean(mem?.documentos_vivos && (mem.documentos_vivos.cuaderno || mem.documentos_vivos.ficha || mem.documentos_vivos.cronica));
 
 // ---------------------------------------------------------------- migración
 
@@ -283,31 +292,42 @@ const conVersion = (previas: VersionDeDocumento[] | undefined, texto: string, mo
  */
 export function reescribirDocumentos(
   docs: DocumentosVivos,
-  cambios: { cuaderno?: string; ficha?: string },
+  cambios: { cuaderno?: string; ficha?: string; cronica?: string; ilustracionesCandidatas?: IlustracionCandidata[] },
   motivo: string,
   ahora = Date.now()
 ): DocumentosVivos {
-  const versiones = docs.versiones || { cuaderno: [], ficha: [] };
+  const versiones = docs.versiones || { cuaderno: [], ficha: [], cronica: [] };
   const nuevoCuaderno = cambios.cuaderno?.trim() ? cambios.cuaderno.trim() : undefined;
   const nuevaFicha = cambios.ficha?.trim() ? cambios.ficha.trim() : undefined;
+  const nuevaCronica = cambios.cronica?.trim() ? cambios.cronica.trim() : undefined;
   const cambiaCuaderno = nuevoCuaderno !== undefined && nuevoCuaderno !== docs.cuaderno;
   const cambiaFicha = nuevaFicha !== undefined && nuevaFicha !== docs.ficha;
+  const cambiaCronica = nuevaCronica !== undefined && nuevaCronica !== docs.cronica;
+  const ilustraciones = cambios.ilustracionesCandidatas !== undefined ? cambios.ilustracionesCandidatas : docs.ilustracionesCandidatas;
+
   return {
     ...docs,
     cuaderno: cambiaCuaderno ? nuevoCuaderno! : docs.cuaderno,
     ficha: cambiaFicha ? nuevaFicha! : docs.ficha,
+    cronica: cambiaCronica ? nuevaCronica! : docs.cronica,
+    ilustracionesCandidatas: ilustraciones,
     versiones: {
-      cuaderno: cambiaCuaderno ? conVersion(versiones.cuaderno, docs.cuaderno, motivo, ahora) : versiones.cuaderno,
-      ficha: cambiaFicha ? conVersion(versiones.ficha, docs.ficha, motivo, ahora) : versiones.ficha
+      cuaderno: cambiaCuaderno ? conVersion(versiones.cuaderno, docs.cuaderno, motivo, ahora) : (versiones.cuaderno || []),
+      ficha: cambiaFicha ? conVersion(versiones.ficha, docs.ficha, motivo, ahora) : (versiones.ficha || []),
+      cronica: cambiaCronica && docs.cronica ? conVersion(versiones.cronica, docs.cronica, motivo, ahora) : (versiones.cronica || [])
     },
-    actualizadoEl: cambiaCuaderno || cambiaFicha ? ahora : docs.actualizadoEl
+    actualizadoEl: cambiaCuaderno || cambiaFicha || cambiaCronica ? ahora : docs.actualizadoEl
   };
 }
 
 /** Vuelve a la última versión guardada de un documento. La actual pasa a ser la última versión. */
-export function deshacerDocumento(docs: DocumentosVivos, cual: 'cuaderno' | 'ficha', ahora = Date.now()): DocumentosVivos | null {
-  const versiones = docs.versiones || { cuaderno: [], ficha: [] };
-  const lista = versiones[cual];
+export function deshacerDocumento(
+  docs: DocumentosVivos,
+  cual: 'cuaderno' | 'ficha' | 'cronica',
+  ahora = Date.now()
+): DocumentosVivos | null {
+  const versiones = docs.versiones || { cuaderno: [], ficha: [], cronica: [] };
+  const lista = versiones[cual] || [];
   if (!lista.length) return null;
   const anterior = lista[lista.length - 1];
   return {
@@ -316,6 +336,53 @@ export function deshacerDocumento(docs: DocumentosVivos, cual: 'cuaderno' | 'fic
     versiones: { ...versiones, [cual]: lista.slice(0, -1) },
     actualizadoEl: ahora
   };
+}
+
+/** Extrae momentos candidatos a ilustración a partir del texto de la crónica o del volcado */
+export function extraerCandidatosIlustracion(texto: string, capitulo?: string): IlustracionCandidata[] {
+  if (!texto) return [];
+  const candidatos: IlustracionCandidata[] = [];
+
+  // Buscar bloques tipo ### 1. Acción... o ### Acción / Aventura
+  const regexBloque = /###\s*(?:\d+[.\s]*)?([^:\n]+)(?::\s*([^\n]+))?\n([\s\S]*?)(?=(?:###|\n##\s|$))/gi;
+  let match;
+  while ((match = regexBloque.exec(texto)) !== null) {
+    const rawTipo = match[1].toLowerCase();
+    const subTitulo = match[2]?.trim() || '';
+    const cuerpo = match[3] || '';
+
+    let tipo: 'accion' | 'intimo' | 'atmosfera' | null = null;
+    if (/acci[oó]n|aventura|combate|peligro/i.test(rawTipo)) tipo = 'accion';
+    else if (/intimo|íntimo|emocional|confidencia|romance|v[ií]nculo/i.test(rawTipo)) tipo = 'intimo';
+    else if (/atm[oó]sfera|entorno|paisaje|clima|lugar/i.test(rawTipo)) tipo = 'atmosfera';
+
+    if (tipo) {
+      const getCampo = (re: RegExp) => {
+        const m = cuerpo.match(re);
+        return m ? m[1].trim() : '';
+      };
+
+      const prompt =
+        getCampo(/(?:prompt|descripci[oó]n visual|instrucci[oó]n):\s*([^\n]+(?:\n(?![*-]\s)[^\n]+)*)/i) ||
+        getCampo(/\*\*prompt:\*\*\s*([^\n]+)/i) ||
+        cuerpo.trim();
+      const encuadre = getCampo(/(?:encuadre|c[aá]mara|plano):\s*([^\n]+)/i);
+      const paleta = getCampo(/(?:paleta|color|iluminaci[oó]n|luz):\s*([^\n]+)/i);
+      const titulo = subTitulo || getCampo(/(?:t[ií]tulo|momento|escena):\s*([^\n]+)/i) || rawTipo;
+
+      candidatos.push({
+        tipo,
+        titulo: titulo.replace(/^[*_#\s]+|[*_#\s]+$/g, ''),
+        descripcion: cuerpo.slice(0, 300).trim(),
+        prompt: prompt.replace(/^[*_#\s]+|[*_#\s]+$/g, ''),
+        encuadre: encuadre || undefined,
+        paleta: paleta || undefined,
+        capitulo
+      });
+    }
+  }
+
+  return candidatos;
 }
 
 /** Añade una entrada a la bitácora, numerando la parte si el capítulo ya tenía alguna. */
