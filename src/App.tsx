@@ -910,33 +910,6 @@ export default function App() {
   // por parámetro a través de dos capas.
   const reporteActual = useRef<TiempoReportado | null>(null);
 
-  const handleTimeReported = async (reportado: TiempoReportado, msgInfo?: { msgId?: string; msgIndex?: number }) => {
-    /*
-     * 📚 Con documentos vivos, las fichas (vínculos, lugares, tramas, plan y
-     * avance de nivel) salen del Cuaderno y la Ficha viva al volcar, no de las
-     * etiquetas de cada turno: así solo hay una vía escribiendo sobre ellas y
-     * una respuesta rehecha no deja restos. Quién está presente sí se sigue
-     * apuntando: es lo que ficha a los que aparecen por primera vez.
-     */
-    const conDocumentosVivos = hayDocumentosVivos(
-      projectsRef.current.find(pr => pr.id === currentPIdRef.current)?.memory
-    );
-    const t: TiempoReportado = conDocumentosVivos
-      ? { ...reportado, vinculos: [], lugares: [], misiones: [], plan: null, avanceDeNivel: undefined }
-      : reportado;
-    reporteActual.current = t;
-
-    /*
-     * 🎬 Frentes paralelos: dónde está la cámara. Se guarda cuántos turnos
-     * del Narrador llevaba el capítulo al llegar, para contar cuánto lleva ahí.
-     */
-    if (t.frentes && currentPIdRef.current) {
-      const chatId = currentChatIdRef.current || '';
-      const chat = currentChatsRef.current.find(c => c.id === chatId);
-      const turnos = (chat?.messages || []).filter(m => m.role === 'model').length;
-      const f = t.frentes;
-      await handleUpdateProjectField(p => {
-        const mem = p.memory || { story: '', quests: [], npcs: [], locations: [], current_status: '' };
         if (f.fin) return { memory: { ...mem, frentes: undefined } };
         const previo = mem.frentes;
         // Si la cámara sigue en el mismo frente, la cuenta no se reinicia.
@@ -1166,7 +1139,24 @@ export default function App() {
         })
       ];
 
-      /*
+      return {
+        memory: {
+          ...mem,
+          npcs: (mem.npcs || []).map(n =>
+            estrenanHoy.includes((n.name || '').trim().toLowerCase()) ? { ...n, diasVistos: [...(n.diasVistos || []), nuevoAbs] } : n
+          )
+        },
+        calendar: cal,
+        currentDate: nuevaFecha,
+        timeline: timelineCompleto,
+        threads
+      };
+    });
+  };
+
+  /*
+   * 🎬 Frentes paralelos: dónde está la cámara. Se guarda cuántos turnos
+   */
        * El diario tenía un tope de 500 entradas aplicado con `.slice(-500)`: al
        * pasarlo, las más viejas se caían sin avisar. En una campaña larga eso es
        * perder el principio de la crónica, y desde que existen las notas podía
@@ -3843,13 +3833,7 @@ export default function App() {
             };
           });
         },
-        onTimeReported: t => {
-          const modelMsgIdx =
-            isAppending && options?.appendToMessageIndex !== undefined
-              ? options.appendToMessageIndex
-              : currentList.length;
-          void handleTimeReported(t, { msgIndex: modelMsgIdx });
-        },
+        onTimeReported: () => {},
         // Refresco de pantalla en CADA fragmento: se vuelca inmediatamente cuando
         // está en segundo plano y a través de rAF cuando la ventana está activa.
         onChunk: (fullText: string) => {

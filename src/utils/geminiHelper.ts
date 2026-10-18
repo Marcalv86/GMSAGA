@@ -5233,8 +5233,6 @@ async function saveStreamedMessage(
   const secretos = leerSecretos(cleanedText);
   const viaje = leerViaje(cleanedText);
   const lugares = leerLugares(cleanedText);
-  const misiones = leerMisiones(cleanedText);
-  const plan = leerPlan(cleanedText);
   const inventario = leerInventario(cleanedText);
   // El HUD va en la prosa, no entre corchetes, así que se lee del texto íntegro.
   const hudDeEsteTurno = leerFechaDeHud(fullText);
@@ -5285,39 +5283,6 @@ async function saveStreamedMessage(
       !sinNovedadDeMesa(facciones, preparado) ||
       !cambioVacio(inventario))
   ) {
-    try {
-      onTimeReported({
-        minutos: avance.minutos,
-        agenda,
-        hilos,
-        inventario,
-        presentes,
-        frentes,
-        vinculos,
-        revelaciones,
-        secretos,
-        viaje,
-        lugares,
-        misiones,
-        plan,
-        fechaHud: hudDeEsteTurno?.fechaTexto,
-        momentoHud: hudDeEsteTurno?.momento,
-        lugarHud: hudDeEsteTurno?.lugar,
-        climaHud: hudDeEsteTurno?.clima,
-        avanceDeNivel,
-        aprendido,
-        bambalinas,
-        relojes,
-        facciones,
-        preparado,
-        comentariosDM
-      });
-    } catch (err) {
-      logError('threads', 'Error al procesar el reporte de tiempo e hilos de la escena', err, {
-        chatName: chat.name,
-        details: { hilos, avance, agenda }
-      });
-    }
   }
 
 
