@@ -395,7 +395,7 @@ export const ImportarDesdeClaude: React.FC<{
 
 export const DocumentosVivosPanel: React.FC<{
   docs: DocumentosVivos;
-  cual: 'ficha' | 'cuaderno';
+  cual: 'ficha' | 'cuaderno' | 'bitacora';
   onGuardar: (cual: 'ficha' | 'cuaderno', texto: string) => Promise<void> | void;
   onDeshacer: (cual: 'ficha' | 'cuaderno') => Promise<void> | void;
   onVolcarAhora?: () => void;
@@ -404,6 +404,49 @@ export const DocumentosVivosPanel: React.FC<{
 }> = ({ docs, cual, onGuardar, onDeshacer, onVolcarAhora, onSembrarCuaderno, onImportarDesdeClaude }) => {
   const [confirmarSembrar, setConfirmarSembrar] = useState(false);
   const [importando, setImportando] = useState(false);
+
+  if (cual === 'bitacora') {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--text-secondary)] px-1">
+          <span title="Se pone al día sola al cerrar capítulo.">
+            🕰️ {docs.actualizadoEl ? fechaCorta(docs.actualizadoEl) : 'Sin actualizar todavía'}
+          </span>
+          <span className="flex items-center gap-1.5 shrink-0">
+            {onImportarDesdeClaude && (
+              <button
+                onClick={() => setImportando(v => !v)}
+                aria-label="Importar desde Claude"
+                aria-pressed={importando}
+                title="Importar desde Claude: pega el Cuaderno y la Bitácora de tu proyecto de Claude (sin IA)."
+                className={`min-h-[36px] min-w-[36px] px-2 rounded-lg border flex items-center justify-center cursor-pointer text-base leading-none ${
+                  importando ? 'border-[var(--accent)] bg-[var(--accent)]/10' : 'border-[var(--glass-border)] hover:border-[var(--accent)]'
+                }`}
+              >
+                📥
+              </button>
+            )}
+            {onVolcarAhora && (
+              <button
+                onClick={onVolcarAhora}
+                className="min-h-[36px] px-2.5 rounded-lg border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] text-[11px] font-cinzel font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                title="Volcar ahora: pone al día los documentos con lo jugado en el capítulo actual, sin cerrarlo."
+                aria-label="Volcar ahora"
+              >
+                <Save className="w-4 h-4" />
+                Volcar
+              </button>
+            )}
+          </span>
+        </div>
+        {importando && onImportarDesdeClaude && (
+          <ImportarDesdeClaude docs={docs} onImportar={onImportarDesdeClaude} onCerrar={() => setImportando(false)} />
+        )}
+        <Bitacora docs={docs} />
+      </div>
+    );
+  }
+
   const versiones = docs.versiones?.[cual] || [];
   const ultima = versiones[versiones.length - 1];
   return (
@@ -472,8 +515,8 @@ export const DocumentosVivosPanel: React.FC<{
         texto={docs[cual]}
         versiones={versiones.length}
         ultimaVersion={ultima ? `${ultima.motivo}, ${fechaCorta(ultima.fecha)}` : undefined}
-        onGuardar={t => onGuardar(cual, t)}
-        onDeshacer={() => onDeshacer(cual)}
+        onGuardar={t => onGuardar(cual as any, t)}
+        onDeshacer={() => onDeshacer(cual as any)}
       />
       {cual === 'ficha' && <Bitacora docs={docs} />}
     </div>

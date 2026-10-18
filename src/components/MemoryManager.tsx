@@ -146,7 +146,6 @@ export function tieneAfinidadActiva(npc: NPC): boolean {
 }
 
 export type SeccionMemoria =
-  | 'character'
   | 'inventario'
   | 'diary'
   | 'npcs'
@@ -160,7 +159,8 @@ export type SeccionMemoria =
   | 'facciones'
   | 'preparado'
   | 'ficha_viva'
-  | 'cuaderno';
+  | 'cuaderno'
+  | 'bitacora';
 
 export const MemoryManager: React.FC<{
   project: Project;
@@ -205,9 +205,10 @@ export const MemoryManager: React.FC<{
    */
   const seccionesVisibles: SeccionMemoria[] = secciones?.length
     ? secciones
-    : ['character', 'inventario', 'diary', 'npcs', 'locs', 'quests', 'story', 'status'];
+    : ['ficha_viva', 'bitacora', 'cuaderno', 'inventario', 'diary', 'npcs', 'locs', 'quests', 'story', 'status'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
+
   const [inventoryFilter, setInventoryFilter] = useState<'todos' | 'armas' | 'armaduras' | 'joyas' | 'consumibles' | 'magicos'>('todos');
   /*
    * 🃏 LA JUGADORA TAMBIÉN PREPARA COSAS.
@@ -774,6 +775,8 @@ export const MemoryManager: React.FC<{
     visual_memory: []
   };
 
+  const cleanPc = sanitizePlayerCharacter(memory.player_character);
+
   const allImageFiles = files.filter(f => f.isImage);
 
   const onUpdateMemoryRef = useRef(onUpdateMemory);
@@ -1040,11 +1043,11 @@ export const MemoryManager: React.FC<{
         <div className="flex gap-1.5 sm:gap-2 flex-wrap flex-1 min-w-0">
           {[
             {
-              id: 'character', emoji: '🧝',
-              label: 'Protagonista (OC)',
-              shortLabel: 'Protagonista',
-              icon: User,
-              count: ''
+              id: 'bitacora', emoji: '📖',
+              label: 'Bitácora',
+              shortLabel: 'Bitácora',
+              icon: BookOpen,
+              count: memory.documentos_vivos?.bitacora?.length ? `(${memory.documentos_vivos.bitacora.length})` : ''
             },
             {
               id: 'ficha_viva', emoji: '🎒',
@@ -1187,11 +1190,11 @@ export const MemoryManager: React.FC<{
         </div>
       </div>
 
-      {/* 📚 Documentos vivos: la Ficha viva (con la Bitácora) y el Cuaderno del GM */}
-      {(activeTab === 'ficha_viva' || activeTab === 'cuaderno') && memory.documentos_vivos && (
+      {/* 📚 Documentos vivos: la Ficha viva, la Bitácora y el Cuaderno del GM */}
+      {(activeTab === 'ficha_viva' || activeTab === 'cuaderno' || activeTab === 'bitacora') && memory.documentos_vivos && (
         <DocumentosVivosPanel
           docs={memory.documentos_vivos}
-          cual={activeTab === 'ficha_viva' ? 'ficha' : 'cuaderno'}
+          cual={activeTab === 'ficha_viva' ? 'ficha' : activeTab === 'cuaderno' ? 'cuaderno' : 'bitacora'}
           onVolcarAhora={onVolcarAhora}
           onSembrarCuaderno={onSembrarCuaderno}
           onImportarDesdeClaude={async pegado => {
@@ -1218,11 +1221,7 @@ export const MemoryManager: React.FC<{
         />
       )}
 
-      {/* Tab: Protagonist (OC) */}
-      {activeTab === 'character' && (() => {
-        const cleanPc = sanitizePlayerCharacter(memory.player_character);
-        return (
-        <div className="flex flex-col gap-6">
+
           {/* Identity & Portrait Card */}
           <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-4 sm:p-6 rounded-xl shadow-sm flex flex-col md:flex-row gap-5 items-start">
             {/* Portrait Box */}
@@ -1457,7 +1456,7 @@ export const MemoryManager: React.FC<{
                   const paraSubir = cleanPc.hitosParaSubir;
                   const hayCuenta = typeof hitos === 'number' && typeof paraSubir === 'number' && paraSubir > 0;
                   const currentLevelProgress = hayCuenta
-                    ? Math.max(0, Math.min(100, Math.round((hitos! / paraSubir!) * 100)))
+                    ? Math.max(0, Math.min(100, Math.round(((hitos as number) / (paraSubir as number)) * 100)))
                     : cleanPc.levelProgress ?? 0;
 
                   return (
@@ -1675,10 +1674,6 @@ export const MemoryManager: React.FC<{
               <Calendar className="w-4 h-4" /> Abrir Diario & Agenda
             </button>
           </div>
-        </div>
-        );
-      })()}
-
       {/* Tab: Diary & Agenda (Diario, Agenda con Día Vista, Selector de Calendario y Relojes) */}
       {activeTab === 'diary' && (
         <DailyAgendaDiary
