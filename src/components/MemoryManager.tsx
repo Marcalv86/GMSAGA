@@ -205,7 +205,7 @@ export const MemoryManager: React.FC<{
    */
   const seccionesVisibles: SeccionMemoria[] = secciones?.length
     ? secciones
-    : ['ficha_viva', 'bitacora', 'cuaderno', 'inventario', 'diary', 'npcs', 'locs', 'quests', 'story', 'status'];
+    : ['bitacora', 'cuaderno', 'inventario', 'diary', 'npcs', 'locs', 'quests', 'story', 'status'];
 
   const [activeTab, setActiveTab] = useState<SeccionMemoria>(seccionesVisibles[0]);
 
@@ -1222,7 +1222,9 @@ export const MemoryManager: React.FC<{
       )}
 
 
-          {/* Identity & Portrait Card */}
+      {/* Identity & Portrait Card (solo visible en Ficha viva) */}
+      {activeTab === 'ficha_viva' && (
+        <>
           <div className="bg-[var(--surface-soft)] border border-[var(--user-border)] p-4 sm:p-6 rounded-xl shadow-sm flex flex-col md:flex-row gap-5 items-start">
             {/* Portrait Box */}
             <div className="flex flex-col items-center gap-2 shrink-0 self-center md:self-start">
@@ -1674,6 +1676,8 @@ export const MemoryManager: React.FC<{
               <Calendar className="w-4 h-4" /> Abrir Diario & Agenda
             </button>
           </div>
+        </>
+      )}
       {/* Tab: Diary & Agenda (Diario, Agenda con Día Vista, Selector de Calendario y Relojes) */}
       {activeTab === 'diary' && (
         <DailyAgendaDiary

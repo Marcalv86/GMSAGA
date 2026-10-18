@@ -44,7 +44,7 @@ import {
 } from '../utils/geminiHelper';
 import { ResumenUso, borrarUso, resumirUso } from '../utils/usageStats';
 
-import { Link2,
+import {
   Brain,
   Cpu,
   Check,
@@ -70,8 +70,7 @@ import { Link2,
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Clock,
-  BookOpen
+  Clock
 } from 'lucide-react';
 export interface PromptConfig {
   isOpen: boolean;
@@ -150,7 +149,7 @@ export const ApiKeyModal: React.FC<{
   const [autoNovelize, setAutoNovelize] = useState<boolean>(getStoredAutoNovelize());
   const [autoVincular, setAutoVincular] = useState<boolean>(getStoredAutoVincular());
   const [autoBackgroundTasks, setAutoBackgroundTasks] = useState<boolean>(getStoredAutoBackgroundTasks());
-  const [barrasAfinidad, setBarrasAfinidad] = useState<boolean>(getStoredBarrasAfinidad());
+  const [barrasAfinidad, _setBarrasAfinidad] = useState<boolean>(getStoredBarrasAfinidad());
   const [historyWindow, setHistoryWindow] = useState<HistoryWindowSetting>(getStoredHistoryWindow());
   const [keyRotationMode, setKeyRotationMode] = useState<KeyRotationMode>(getStoredKeyRotationMode());
   const [apiKeysList, setApiKeysList] = useState<string[]>(getStoredApiKeys());
@@ -725,158 +724,8 @@ export const ApiKeyModal: React.FC<{
                 </div>
               </div>
 
-              {/* Tareas de IA en segundo plano / Modo Ahorro Estricto */}
-              <div className="pt-3 border-t border-[var(--glass-border)]">
-                <div className="bg-[var(--bg-secondary)] border border-[var(--glass-border)] p-3 rounded-lg flex items-start justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <label
-                        onClick={() => setAutoBackgroundTasks(!autoBackgroundTasks)}
-                        className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        Tareas Automáticas de IA en Segundo Plano
-                      </label>
-                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
-                        autoBackgroundTasks
-                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                          : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 font-semibold'
-                      }`}>
-                        {autoBackgroundTasks ? 'Activas' : 'Desactivadas (Modo Ahorro Máximo)'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                      Controla si la aplicación ejecuta análisis automáticos en segundo plano (síntesis periódica de memoria del proyecto, trazado inicial de historia y lectura automática del tablero de facciones). Si lo <strong>desactivas</strong>, la IA <strong>NUNCA</strong> consumirá saldo ni tokens por su cuenta: solo se llamará cuando envíes un turno o cuando pulses manualmente un botón en el cuaderno.
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                    <input
-                      type="checkbox"
-                      checked={autoBackgroundTasks}
-                      onChange={e => setAutoBackgroundTasks(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
-                  </label>
-                </div>
-              </div>
 
-              {/* Novelización en segundo plano / Ahorro de cuota */}
-              <div className="pt-3 border-t border-[var(--glass-border)]">
-                <div className="bg-[var(--bg-secondary)] border border-[var(--glass-border)] p-3 rounded-lg flex items-start justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <label
-                        onClick={() => setAutoNovelize(!autoNovelize)}
-                        className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <BookOpen className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        Novelización Automática en Segundo Plano
-                      </label>
-                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
-                        autoNovelize
-                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                          : 'bg-stone-500/10 text-stone-600 dark:text-stone-300 border-stone-500/20'
-                      }`}>
-                        {autoNovelize ? 'Activa' : 'Desactivada (Recomendado)'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                      Si está activa, genera una reescritura narrativa de tus acciones 3.5 segundos después de cada turno. Al mantenerla desactivada, <strong>proteges tu cuota de tokens por minuto (TPM)</strong> para que tus turnos de narración nunca se saturen. Siempre puedes pulsar «Novelizar» bajo demanda dentro del Lector de Novela.
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                    <input
-                      type="checkbox"
-                      checked={autoNovelize}
-                      onChange={e => setAutoNovelize(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
-                  </label>
-                </div>
-              </div>
 
-              <div className="pt-3 border-t border-[var(--glass-border)]">
-                <div className="bg-[var(--bg-secondary)] border border-[var(--glass-border)] p-3 rounded-lg flex items-start justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <label
-                        onClick={() => setAutoVincular(!autoVincular)}
-                        className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Link2 className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        Vincular la Biblioteca al Subir Documentos
-                      </label>
-                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
-                        autoVincular
-                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                          : 'bg-stone-500/10 text-stone-600 dark:text-stone-300 border-stone-500/20'
-                      }`}>
-                        {autoVincular ? 'Activa (Recomendado)' : 'Desactivada'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                      Un documento recién subido entra <strong>sin etiquetas cruzadas</strong>, así que para el buscador
-                      es medio invisible hasta que alguien pulsa «Vincular biblioteca». Con esto activo se teje solo,
-                      una vez, veinte segundos después del último archivo — así subir seis documentos de golpe cuesta
-                      una petición y no seis. Corre con el <strong>modelo de tareas auxiliares</strong>, que viene puesto
-                      en Flash Lite: con 500 peticiones por clave al día, una lectura no se nota.
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                    <input
-                      type="checkbox"
-                      checked={autoVincular}
-                      onChange={e => setAutoVincular(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
-                  </label>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-[var(--glass-border)]">
-                <div className="bg-[var(--bg-secondary)] border border-[var(--glass-border)] p-3 rounded-lg flex items-start justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <label
-                        onClick={() => setBarrasAfinidad(!barrasAfinidad)}
-                        className="font-cinzel font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        El Narrador ve las barras de Vínculo y Confianza
-                      </label>
-                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
-                        barrasAfinidad
-                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                          : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30'
-                      }`}>
-                        {barrasAfinidad ? 'Las ve' : 'A ciegas (prueba)'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-relaxed">
-                      <strong>Ninguna de las dos barras controla nada</strong>: no abren escenas, no bloquean nada y no
-                      tocan una tirada. Toda la maquinaria de progresión existe para mandarle al Narrador una línea de
-                      texto —<em>«vínculo 12/20 · confianza 8/20»</em>—, y un número en una escala invita a promediar:
-                      produce una calidez genérica de intensidad media en vez de una relación. Apágalo para jugar unas
-                      sesiones a ciegas y ver si de verdad sujetaban algo. ⚠️ <strong>No se borra nada</strong>: los datos
-                      se siguen guardando y las barras siguen en la ficha de cada PNJ; lo único que cambia es que el
-                      Narrador deja de verlas y tiene que sacar la relación de lo que persiste en prosa (vínculo, lo que
-                      aparenta y lo que oculta). Se vuelve a encender aquí mismo, sin perder nada.
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                    <input
-                      type="checkbox"
-                      checked={barrasAfinidad}
-                      onChange={e => setBarrasAfinidad(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--accent)]"></div>
-                  </label>
-                </div>
-              </div>
 
               {/* Ventana de Historial de Chat / Control de Tokens */}
               <div className="pt-3 border-t border-[var(--glass-border)]">

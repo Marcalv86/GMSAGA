@@ -13,9 +13,9 @@ import {
   RotateCcw,
   Copy,
   Sliders,
-  User,
   VenetianMask,
-  Lock as LockIcon
+  Lock as LockIcon,
+  BookOpen
 } from 'lucide-react';
 import { MemoryManager } from './MemoryManager';
 import {
@@ -60,12 +60,14 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   // Sub-view: 'view' | 'manage_edits'
   const [memorySubView, setMemorySubView] = useState<'view' | 'manage_edits'>('view');
   
-  // Top-level memory mode: 'character' (Protagonista & Entidades) vs 'project' (Memoria Persistente de Proyecto)
-  const [memoryMode, setMemoryMode] = useState<'character' | 'gm' | 'project'>(() => {
+  // Top-level memory mode: 'bitacora' (Bitácora de Campaña) vs 'gm' (Cuaderno del GM) vs 'project' (Memoria Persistente)
+  const [memoryMode, setMemoryMode] = useState<'bitacora' | 'gm' | 'project'>(() => {
     try {
-      return (localStorage.getItem('preferred_memory_view_mode') as any) || 'character';
+      const saved = localStorage.getItem('preferred_memory_view_mode');
+      if (saved === 'gm' || saved === 'project' || saved === 'bitacora') return saved;
+      return 'bitacora';
     } catch {
-      return 'character';
+      return 'bitacora';
     }
   });
 
@@ -87,7 +89,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
   // 📚 Con documentos vivos, la mochila y el cuaderno se enseñan como documentos.
   const conDocumentos = Boolean(memory.documentos_vivos && (memory.documentos_vivos.cuaderno || memory.documentos_vivos.ficha));
 
-  const handleSwitchMode = (mode: 'character' | 'gm' | 'project') => {
+  const handleSwitchMode = (mode: 'bitacora' | 'gm' | 'project') => {
     if (mode !== 'gm') setCuadernoAbierto(false);
     setMemoryMode(mode);
     try {
@@ -295,18 +297,18 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
       <div id="memory-mode-toggle-bar" className="px-2 sm:px-6 py-2 bg-[var(--surface)] border-b border-[var(--glass-border)] flex items-center justify-between gap-2 shrink-0 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-[color-mix(in_srgb,var(--surface-soft)_80%,transparent)] rounded-lg border border-[var(--glass-border)] shrink-0">
           <button
-            id="tab-btn-character-memory"
-            onClick={() => handleSwitchMode('character')}
+            id="tab-btn-bitacora-memory"
+            onClick={() => handleSwitchMode('bitacora')}
             className={`p-2 sm:px-3 sm:py-2 rounded-md flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
-              memoryMode === 'character'
+              memoryMode === 'bitacora'
                 ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-xs font-bold'
                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--glass)]'
             }`}
-            title="Diario y Ficha del PJ: la crónica día a día, mochila, ficha de personaje, PNJs conocidos, lugares y misiones."
-            aria-label="Diario y Ficha del PJ"
+            title="Bitácora de Campaña: crónica sesión a sesión, resumen de capítulos, estado, relaciones y avance."
+            aria-label="Bitácora de Campaña"
           >
-            <User className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline font-cinzel text-xs font-bold whitespace-nowrap">Diario & PJ</span>
+            <BookOpen className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline font-cinzel text-xs font-bold whitespace-nowrap">Bitácora</span>
           </button>
 
           <button
@@ -414,7 +416,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             onCompletarFichaDesdeDocumento={onCompletarFichaDesdeDocumento}
             isGenerating={isGenerating}
             hasChats={chats.length > 0}
-            secciones={conDocumentos ? ['cuaderno', 'giros'] : ['giros', 'bambalinas', 'relojes', 'facciones', 'preparado']}
+            secciones={conDocumentos ? ['cuaderno'] : ['cuaderno', 'giros']}
             onVolcarAhora={onVolcarAhora}
             onSembrarCuaderno={onSembrarCuaderno}
             topBanner={
@@ -433,17 +435,15 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                 <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2 flex items-start gap-2 shadow-xs">
                   <span className="text-base leading-none mt-0.5">🕯️</span>
                   <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
-                    <strong className="text-[var(--accent)] font-cinzel">Esto es el otro lado de la pantalla.</strong>{' '}
-                    Lo que el Narrador sabe y tu personaje no: los giros que aún no han salido, lo que hace la gente
-                    cuando no estás delante y los planes que corren por detrás. Míralo si quieres —es tu campaña—, pero
-                    aquí es donde vive lo que todavía no se ha ganado jugando.
+                    <strong className="text-[var(--accent)] font-cinzel">Cuaderno del GM.</strong>{' '}
+                    El estado del mundo que ella no ve: la verdad oculta de cada trama, actores, relojes que corren por detrás, secretos vigentes, consecuencias vivas y el arranque siguiente. Creado por el GM y actualizado al final de cada sesión.
                   </p>
                 </div>
               </div>
             }
           />
         </div>
-      ) : memoryMode === 'character' ? (
+      ) : memoryMode === 'bitacora' ? (
         <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
           <MemoryManager
             project={project}
@@ -455,7 +455,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
             onCompletarFichaDesdeDocumento={onCompletarFichaDesdeDocumento}
             isGenerating={isGenerating}
             hasChats={chats.length > 0}
-            secciones={conDocumentos ? ['ficha_viva', 'bitacora', 'diary', 'npcs', 'locs', 'quests', 'story', 'status'] : undefined}
+            secciones={['bitacora']}
             onVolcarAhora={onVolcarAhora}
             onSembrarCuaderno={onSembrarCuaderno}
             topBanner={
@@ -463,10 +463,7 @@ export const SimpleMemoryView: React.FC<SimpleMemoryViewProps> = ({
                 <div className="rounded-lg border border-[var(--user-border)] bg-[var(--surface-soft)] px-3 py-2 flex items-start gap-2 shadow-xs">
                   <span className="text-base leading-none mt-0.5">📖</span>
                   <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] m-0 leading-relaxed">
-                    <strong className="text-[var(--accent)] font-cinzel">Tu cuaderno.</strong> Lo que apuntarías tú en una
-                    libreta: tu ficha, lo que llevas, con quién te has cruzado, dónde has estado y qué tienes entre manos.
-                    La diferencia es que <strong className="text-[var(--text-primary)]">se rellena solo jugando</strong>, y
-                    si algo está mal se le dice al GM en el Chat y lo corrige él.
+                    <strong className="text-[var(--accent)] font-cinzel">Bitácora de Campaña.</strong> Una entrada por sesión o capítulo con los hechos clave, estado de salud y recursos, relaciones, hilos activos y el arranque siguiente. Creada por el GM y subida al final de cada sesión.
                   </p>
                 </div>
               </div>

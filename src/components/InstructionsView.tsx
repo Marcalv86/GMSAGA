@@ -23,12 +23,10 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Clock,
   Dices,
   Flame,
   HeartPulse,
-  Hourglass,
-  Info,
-  Lock,
   PenTool,
   RefreshCw,
   Save,
@@ -36,12 +34,10 @@ import {
   Settings,
   Shield,
   ShieldAlert,
-  ShieldCheck,
   Sliders,
   Sparkles,
   Swords,
   Upload,
-  UserCheck,
   X
 } from 'lucide-react';
 
@@ -70,7 +66,6 @@ export const InstructionsView: React.FC<{
   const [manualDmRolls, setManualDmRolls] = useState<boolean>(project.manualDmRolls || false);
 
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
-  const [showProtocolsDetail, setShowProtocolsDetail] = useState(false);
   const [showDiseaseAdvanced, setShowDiseaseAdvanced] = useState(false);
 
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
@@ -432,117 +427,7 @@ export const InstructionsView: React.FC<{
         </div>
       </div>
 
-      {/* SECCIÓN PROTEGIDA: PROTOCOLOS DEL MOTOR INYECTADOS */}
-      <div className="bg-amber-950/10 border border-amber-800/30 rounded-lg p-4 mb-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div className="flex items-start gap-2.5">
-            <div className="p-2 rounded-md bg-amber-900/20 text-[var(--accent)] shrink-0 mt-0.5">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="font-cinzel text-sm md:text-base font-bold text-[var(--accent)] m-0 flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-amber-600" />
-                  Protocolos del Sistema de Juego (Inyectados al Narrador)
-                </h4>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-cinzel font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-                  Siempre Activo
-                </span>
-              </div>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed max-w-3xl">
-                Las directivas de juego (tiradas interactivas de dados, afinidad de PNJs y formato de etiquetas) se integran automáticamente en el prompt del GM para controlar la interfaz. <strong>Las directivas personalizables de abajo definen el lore y estilo que prefieras.</strong>
-              </p>
-            </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={() => setShowProtocolsDetail(!showProtocolsDetail)}
-            className="text-xs font-cinzel font-bold text-[var(--accent)] hover:text-[var(--accent-hover)] px-2.5 py-1.5 rounded bg-[var(--sidebar-bg)] border border-[var(--user-border)] flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
-          >
-            <Info className="w-3.5 h-3.5" />
-            {showProtocolsDetail ? 'Ocultar detalles' : 'Ver etiquetas'}
-            {showProtocolsDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-
-        {/* Acordeón con la guía de sintaxis del motor */}
-        {showProtocolsDetail && (
-          <div className="mt-4 pt-3 border-t border-amber-800/20 grid grid-cols-1 md:grid-cols-2 gap-3 animate-[fadeIn_0.2s_ease]">
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <UserCheck className="w-3.5 h-3.5" /> Vínculos y Afinidad de PNJs
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                [VÍNCULO: Kieron | grado: ...] / [PRESENTES: ...]
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Registra silenciosamente la afinidad de acompañantes sin ensuciar la narrativa.
-              </p>
-            </div>
-
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <Dices className="w-3.5 h-3.5" /> Petición de Tiradas de Dados
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                [Petición de Tirada: Percepción | CD 15]
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Genera el panel interactivo de tirada de dados para el jugador.
-              </p>
-            </div>
-
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <Hourglass className="w-3.5 h-3.5" /> Travesías y Altamar (Anti-Fast Travel)
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                [TIEMPO: +1d] · Mar de las Espadas (8-12 días a puerto)
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                El motor calcula millas marítimas reales desde el origen y avanza día a día.
-              </p>
-            </div>
-
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <Scroll className="w-3.5 h-3.5" /> Diarios y Pertenencias Íntimas
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                Consulta directa de contenido antes de registrar
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Si un PNJ abre diarios o cartas del PJ, pregunta a la jugadora antes de inventar el texto.
-              </p>
-            </div>
-
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <Flame className="w-3.5 h-3.5" /> Proximidad Física y Tensión Sexual
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                Anti-Retirada Cobarde · Sostener la cercanía y provocación
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Los PNJs seductores/bribones aprovechan la proximidad física (espadas al cuello, agarres, susurros) sin apartarse con miedo.
-              </p>
-            </div>
-
-            <div className="bg-[var(--sidebar-bg)] p-3 rounded border border-[rgba(139,69,19,0.2)] text-xs">
-              <div className="font-cinzel font-bold text-[var(--accent)] flex items-center gap-1.5 mb-1">
-                <Swords className="w-3.5 h-3.5" /> Feminismo vs Paternalismo de Mesa
-              </div>
-              <code className="block bg-[var(--bg-color)] p-1.5 rounded font-mono text-[11px] text-[var(--text-primary)] border border-amber-900/10 mb-1">
-                Anti-Sobreprotección · Robar besos y asumir riesgos
-              </code>
-              <p className="text-[11px] text-[var(--text-secondary)] m-0">
-                Cero condescendencia con el PJ. Los PNJs bribones se atreven a robar besos y seducir sabiendo que Aryendell puede repelerlos con magia (<span className="italic">Onda Atronadora</span>) si quiere.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* NUEVA SECCIÓN DE CONFIGURACIÓN: GESTIÓN DE ENFERMEDADES, AGOTAMIENTO Y SALUD */}
       <div className="bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.25)] rounded-lg p-4 md:p-6 shadow-sm mb-6">
@@ -850,7 +735,7 @@ export const InstructionsView: React.FC<{
               )}
               {saveStatus === 'saving' && (
                 <span className="inline-flex items-center gap-1.5 text-amber-700 font-semibold animate-pulse">
-                  <Hourglass className="w-3.5 h-3.5" />
+                  <Clock className="w-3.5 h-3.5" />
                   Guardando cambios...
                 </span>
               )}
@@ -977,7 +862,7 @@ export const InstructionsView: React.FC<{
               >
                 {isAnalyzingStyle ? (
                   <>
-                    <Hourglass className="w-3 h-3 animate-spin text-[var(--accent)]" />
+                    <Clock className="w-3 h-3 animate-spin text-[var(--accent)]" />
                     <span>Analizando...</span>
                   </>
                 ) : (
