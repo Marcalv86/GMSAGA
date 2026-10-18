@@ -5,13 +5,11 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import {
   ArchiveRestore,
   BookOpen,
-  Check,
-  FolderSync,
+  BookCheck,
   Library,
   Menu,
   Moon,
   Paperclip,
-  BookCheck,
   Plus,
   Save,
   Scroll,
@@ -23,7 +21,6 @@ import {
   Swords,
   Trash2,
   TriangleAlert,
-  Upload,
   X
 } from 'lucide-react';
 import {
@@ -6689,51 +6686,22 @@ export default function App() {
       >
         {/* Sidebar Header */}
         <div className="p-3 border-b border-[var(--glass-border)] flex justify-between items-center bg-[var(--glass)] gap-2 min-w-0">
-          <h1 className="font-cinzel text-base md:text-lg text-[var(--accent)] font-bold tracking-wider m-0 shrink-0 whitespace-nowrap">
-            GM STUDIO
+          <h1 className="font-cinzel text-base text-[var(--accent)] font-bold tracking-wider m-0 shrink-0 whitespace-nowrap">
+            GM
           </h1>
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={handleManualSaveCampaign}
-              className={`p-1.5 text-xs font-cinzel transition-all cursor-pointer flex items-center justify-center rounded-lg border ${
+              className={`p-1.5 rounded-lg border ${
                 isManuallySaved
-                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs'
-                  : 'text-[var(--accent)] hover:border-[var(--accent)] border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] shadow-xs hover:bg-[var(--glass)]'
+                  ? 'bg-emerald-600 text-white border-emerald-500'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--accent)] border-[var(--user-border)]'
               }`}
-              title={isManuallySaved ? 'Campaña guardada' : 'Guardar manualmente el progreso de la campaña activa'}
-              aria-label="Guardar campaña"
+              title="Guardar"
             >
-              {isManuallySaved ? (
-                <Check className="w-3.5 h-3.5 text-white shrink-0" />
-              ) : (
-                <Save className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              )}
-            </button>
-            <button
-              onClick={() => setIsImportCampaignModalOpen(true)}
-              className="p-1.5 text-xs text-[var(--accent)] hover:border-[var(--accent)] font-cinzel transition-colors cursor-pointer flex items-center justify-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] shadow-xs hover:bg-[var(--glass)]"
-              title="Importar campaña desde PDF, Gemini, NotebookLM o JSON"
-              aria-label="Importar campaña"
-            >
-              <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            </button>
-            <button
-              onClick={() => setIsLocalStorageModalOpen(true)}
-              className="p-1.5 text-xs text-[var(--accent)] hover:border-[var(--accent)] font-cinzel transition-colors cursor-pointer flex items-center justify-center rounded-lg border border-[var(--user-border)] bg-[color-mix(in_srgb,var(--surface)_50%,transparent)] shadow-xs hover:bg-[var(--glass)]"
-              title="Copias de Seguridad y Almacenamiento Local"
-              aria-label="Copias de seguridad"
-            >
-              <FolderSync className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <Save className="w-3.5 h-3.5" />
             </button>
             <Logger variant="compact" />
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="md:hidden text-base text-[var(--text-secondary)] hover:text-[var(--accent)] p-1 cursor-pointer ml-0.5"
-              title="Cerrar menú"
-              aria-label="Cerrar menú"
-            >
-              <X className="w-4 h-4" />
-            </button>
           </div>
         </div>
 
@@ -7096,8 +7064,6 @@ export default function App() {
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
               { id: 'chat', label: 'Crónica', icon: Swords },
-              // Memoria en medio y Archivos al final: se entra a la memoria
-              // cien veces más que a los archivos, y el pulgar llega antes.
               { id: 'memory', label: 'Memoria', icon: ScrollText },
               { id: 'files', label: 'Archivos', icon: Paperclip }
             ].map(tab => {
