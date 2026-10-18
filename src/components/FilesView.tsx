@@ -30,7 +30,6 @@ import {
   ClipboardList,
   ListFilter,
   Music,
-  Network,
   FileText,
   Eye,
   Edit3,
@@ -54,14 +53,10 @@ export const FilesView: React.FC<{
   onPasarAConsulta?: (ids: string[]) => Promise<void>;
   /** Deja de una hoja de oráculo solo las tablas y las reglas. */
   onDistillOracle?: (file: ProjectFile) => Promise<void>;
-  onExtractMechanics?: (file: ProjectFile) => Promise<void>;
   onGenerarEtiquetas?: (file: ProjectFile) => Promise<void>;
   onGuardarEtiquetas?: (fileId: string, etiquetas: string) => Promise<void>;
   onAutoClassifyAll?: () => Promise<void>;
-  onRelacionarBiblioteca?: () => Promise<void>;
   isRelacionando?: boolean;
-  onExtractNpc?: (file: ProjectFile) => Promise<void>;
-  onCreateNpcFromImage?: (file: ProjectFile) => Promise<void>;
   onUsePortraitAsPc?: (file: ProjectFile) => Promise<void>;
   isGenerating: boolean;
   extractingFileIds?: string[];
@@ -80,14 +75,10 @@ export const FilesView: React.FC<{
   onToggleAllOnDemand,
   onPasarAConsulta,
   onDistillOracle,
-  onExtractMechanics,
   onGenerarEtiquetas,
   onGuardarEtiquetas,
   onAutoClassifyAll,
-  onRelacionarBiblioteca,
   isRelacionando = false,
-  onExtractNpc,
-  onCreateNpcFromImage,
   onUsePortraitAsPc,
   isGenerating,
   extractingFileIds = []
@@ -547,18 +538,7 @@ export const FilesView: React.FC<{
             </button>
           )}
 
-          {onRelacionarBiblioteca && (
-            <button
-              onClick={onRelacionarBiblioteca}
-              disabled={isGenerating || isRelacionando}
-              className="px-2.5 sm:px-3 py-1.5 bg-linear-to-r from-amber-700/90 to-amber-900 text-white rounded-md font-cinzel text-xs font-bold hover:brightness-110 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0 shadow-xs"
-              title="Analizar relaciones cruzadas entre todos los documentos, tejer red semántica y enriquecer etiquetas de búsqueda"
-              aria-label="Vincular Biblioteca"
-            >
-              <Network className={`w-3.5 h-3.5 ${isRelacionando ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isRelacionando ? 'Vinculando...' : 'Vincular Biblioteca'}</span>
-            </button>
-          )}
+
         </div>
       </div>
 
@@ -904,68 +884,7 @@ export const FilesView: React.FC<{
                         {/* Igual que en las imágenes: la acción sigue a la categoría.
                             Una muestra de estilo o un documento de lore no ofrecen
                             extraer la ficha del protagonista. */}
-                        {onExtractNpc && (currentCat === 'sheet_npc' || currentCat === 'document') && (
-                          <button
-                            onClick={() => onExtractNpc(f)}
-                            disabled={extractingFileIds.includes(f.id)}
-                            className="px-2 py-1 bg-sky-50 text-sky-900 border border-sky-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-sky-600 hover:text-white transition-colors cursor-pointer disabled:opacity-60 font-bold flex items-center gap-1.5"
-                            title="Extraer ficha de PNJ o Criatura a la lista de PNJs en segundo plano"
-                          >
-                            {extractingFileIds.includes(f.id) ? (
-                              <>
-                                <span className="inline-block w-3 h-3 border-2 border-sky-800 border-t-transparent rounded-full animate-spin" />
-                                <span>Extrayendo PNJ...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Drama className="w-3.5 h-3.5" /> {currentCat === 'sheet_npc' ? 'Extraer Ficha PNJ' : 'Ficha PNJ'}
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {/*
-                          Sacar las mecánicas a su propio archivo.
-                          Un módulo trae lore Y subsistemas en el mismo libro, y
-                          mientras las reglas de persecución vivan dentro de
-                          trescientas páginas que hablan de otra ciudad, no se
-                          usan nunca: ni te acuerdas de que están ni la búsqueda
-                          las encuentra. Aquí salen aparte y sin topónimos.
-                        */}
-                        {/*
-                          La lista de categorías con botón era una lista de
-                          permitidas, y eso lo ataba al acierto del
-                          clasificador: un módulo mal etiquetado se quedaba sin
-                          botón y no había forma de sacarle las reglas. Ahora se
-                          nombra solo lo que NO tiene sentido —un retrato, un
-                          audio, un archivo de mecánicas ya extraído, un oráculo
-                          que tiene su propio destilado— y todo lo demás lo
-                          ofrece, que es más barato que adivinar.
-                        */}
-                        {!f.isImage &&
-                          !f.isAudio &&
-                          onExtractMechanics &&
-                          !['mecanica', 'oracle', 'map', 'portrait_pj', 'portrait_npc', 'portrait_companion', 'scene', 'audio'].includes(
-                            currentCat
-                          ) && (
-                            <button
-                              onClick={() => onExtractMechanics(f)}
-                              disabled={extractingFileIds.includes(f.id)}
-                              className="px-2 py-1 bg-[var(--surface)] border border-[var(--user-border)] rounded text-[10px] md:text-[11px] font-cinzel font-bold hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
-                              title="Buscar dentro subsistemas de juego —persecuciones, frío extremo, intriga urbana— y sacarlos a un archivo aparte, sin los nombres de lugar del módulo, para poder usarlos en cualquier sitio. El documento original no se toca."
-                            >
-                              {extractingFileIds.includes(f.id) ? (
-                                <>
-                                  <span className="inline-block w-3 h-3 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-                                  <span>Buscando…</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Dices className="w-3.5 h-3.5" />
-                                  Sacar mecánicas
-                                </>
-                              )}
-                            </button>
-                          )}
+
                         {/*
                           ETIQUETAS DE BÚSQUEDA, LO QUE HACE ENCONTRABLE UN
                           DOCUMENTO DE CONSULTA.
@@ -1099,16 +1018,7 @@ export const FilesView: React.FC<{
                         )}
                         {/* La acción depende de dónde esté archivada la imagen: un
                             retrato del protagonista no debe ofrecer crear un PNJ. */}
-                        {onCreateNpcFromImage && currentCat === 'portrait_npc' && (
-                          <button
-                            onClick={() => onCreateNpcFromImage(f)}
-                            disabled={isGenerating}
-                            className="px-2 py-1 bg-purple-50 text-purple-900 border border-purple-300 rounded text-[10px] md:text-[11px] font-cinzel hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-colors cursor-pointer disabled:opacity-50 font-bold flex items-center gap-1"
-                            title="Crear un PNJ en la Memoria usando esta imagen como retrato"
-                          >
-                            <Drama className="w-3.5 h-3.5" /> Crear PNJ
-                          </button>
-                        )}
+
                         {onUsePortraitAsPc && currentCat === 'portrait_pj' && (
                           <button
                             onClick={() => onUsePortraitAsPc(f)}

@@ -84,7 +84,6 @@ import {
   refrescarCatalogoEnSegundoPlano,
   TiempoReportado,
   analyzeUploadedImage,
-  extractNpcsFromDocument,
   describeApiError,
   classifyApiError,
   destilarTablaOraculo,
@@ -119,7 +118,6 @@ import {
   extraerIdentidadDeDocumentos,
   esFichaDelPj,
   murioPorSegundoPlano,
-  extraerMecanicasDeDocumento,
   generarEtiquetasDeBusqueda,
   generarEtiquetasDeBusquedaLote,
   relacionarBibliotecaInteligente,
@@ -5527,56 +5525,7 @@ export default function App() {
     }
   };
 
-  const handleExtractMechanics = async (file: ProjectFile) => {
-    if (!currentPId) return;
-    if (extractingFileIds.includes(file.id)) return;
 
-    setExtractingFileIds(prev => [...prev, file.id]);
-    setTopProgress({
-      active: true,
-      label: `Buscando mecánicas y subsistemas en "${file.name}" en 2º plano...`,
-      type: 'general'
-    });
-    try {
-      const mecanicas = await extraerMecanicasDeDocumento(file);
-      const refreshedFiles = await loadFilesFromDB(currentPId);
-      const base = file.name.replace(/\.[^.]+$/, '');
-      const nombre = `Mecánicas — ${base}.md`;
-      const nuevo: ProjectFile = {
-        id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        name: nombre,
-        type: 'text/markdown',
-        content: mecanicas,
-        length: mecanicas.length,
-        category: 'mecanica',
-        // Pequeño y muy pertinente cuando toca: no tiene sentido gastarlo en
-        // cada turno, pero sí que suba solo cuando haya una persecución.
-        onDemand: true
-      } as ProjectFile;
-      const updated = [...refreshedFiles.filter(f => f.name !== nombre), nuevo];
-      setCurrentFiles(updated);
-      await saveFilesToDB(currentPId, updated);
-
-      const cuantas = (mecanicas.match(/^##\s/gm) || []).length;
-      setAlertConfig({
-        isOpen: true,
-        title: 'Mecánicas extraídas',
-        message:
-          `He sacado ${cuantas || 'varios'} ${cuantas === 1 ? 'subsistema' : 'subsistemas'} a "${nombre}" (${mecanicas.length.toLocaleString('es-ES')} caracteres), sin los topónimos del módulo original.\n\n` +
-          `Queda marcado de consulta: no gasta fichas en cada turno, pero sube solo cuando la escena lo pida —una huida por los tejados, una ventisca—, aunque pase en otra ciudad.\n\n` +
-          `El documento original no se ha tocado: su lore sigue donde estaba.`
-      });
-    } catch (err) {
-      setAlertConfig({
-        isOpen: true,
-        title: 'No se han extraído mecánicas',
-        message: describeApiError(err)
-      });
-    } finally {
-      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
-      setTopProgress({ active: false });
-    }
-  };
 
   const handleAutoClassifyAll = async () => {
     if (!currentProject || !currentPId) return;
@@ -6180,129 +6129,7 @@ export default function App() {
     }
   };
 
-  const handleCreateNpcFromImage = async (file: ProjectFile) => {
-    if (!currentProject || !currentPId) return;
-    const rawName = file.name
-      .replace(/\.[^/.]+$/, '')
-      .replace(/[_-]/g, ' ')
-      .trim();
-    const formattedName = rawName
-      .split(' ')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
 
-    const newNpc: NPC = {
-      id: 'npc_' + Date.now(),
-      name: formattedName,
-      relation: 'Neutral',
-      status: 'Vivo',
-      description: file.analysis ? file.analysis.slice(0, 180) + '...' : '',
-      notes: file.analysis
-        ? `Detectado a partir de ${file.name}.\n${file.analysis}`
-        : `Creado desde imagen ${file.name}`,
-      portrait: file.content
-    };
-
-    await handleUpdateMemory(mem => ({
-      ...mem,
-      npcs: [...(mem.npcs || []), newNpc]
-    }));
-
-    setAlertConfig({
-      isOpen: true,
-      title: 'PNJ Creado en Memoria',
-      message: `Se ha creado el personaje "${formattedName}"con su retrato vinculado automáticamente en la pestaña de PNJs de la Memoria.`
-    });
-  };
-
-  const handleExtractNpc = async (file: ProjectFile) => {
-    if (!currentProject || !currentPId) return;
-    if (extractingFileIds.includes(file.id)) return;
-
-    setExtractingFileIds(prev => [...prev, file.id]);
-    setTopProgress({
-      active: true,
-      label: `Extrayendo ficha de PNJ (${file.name}) en 2º plano...`,
-      type: 'sync'
-    });
-    try {
-      /*
-       * Un documento puede traer quince personajes, no uno.
-       *
-       * Esto devolvía un solo PNJ y encima leía únicamente los primeros 40.000
-       * caracteres: de un compendio de doscientos mil salía UNA ficha y ningún
-       * aviso de que faltaban catorce. Ahora se lee entero, por partes, y se
-       * registran todos los que aparezcan.
-       */
-      const npcs = await extractNpcsFromDocument(file, (hechos, total) => {
-        if (total > 1) {
-          setTopProgress({
-            active: true,
-            percent: Math.round((hechos / total) * 100),
-            label: `Leyendo "${file.name}" en busca de PNJs — parte ${Math.min(hechos + 1, total)} de ${total}...`,
-            type: 'sync'
-          });
-        }
-      });
-
-      if (npcs.length === 0) {
-        setTopProgress({
-          active: true,
-          label: `No se encontró ningún PNJ con ficha en "${file.name}"`,
-          type: 'sync'
-        });
-        setTimeout(() => {
-          setTopProgress(p => (p.label?.includes('ningún PNJ') ? { active: false } : p));
-        }, 5000);
-        return;
-      }
-
-      // Cada uno con su retrato, si hay una imagen que se llame como él.
-      const refreshedFiles = await loadFilesFromDB(currentPId);
-      for (const npc of npcs) {
-        const matchingPortrait = refreshedFiles.find(f => {
-          if (!f.isImage || !f.content) return false;
-          const cleanName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
-          const cleanNpcName = npc.name.toLowerCase().trim();
-          return cleanNpcName.length > 2 && (cleanName.includes(cleanNpcName) || cleanNpcName.includes(cleanName));
-        });
-        if (matchingPortrait && !npc.portrait) npc.portrait = matchingPortrait.content;
-      }
-
-      await handleUpdateFileCategory(file.id, 'sheet_npc');
-
-      await handleUpdateMemory(mem => {
-        const existing = mem.npcs || [];
-        const nuevosPorNombre = new Set(npcs.map(n => n.name.toLowerCase().trim()));
-        const filtered = existing.filter(n => !nuevosPorNombre.has(n.name.toLowerCase().trim()));
-        return {
-          ...mem,
-          npcs: [...filtered, ...npcs]
-        };
-      });
-
-      const resumen =
-        npcs.length === 1
-          ? `PNJ "${npcs[0].name}" registrado con éxito`
-          : `${npcs.length} PNJs registrados: ${npcs.slice(0, 4).map(n => n.name).join(', ')}${npcs.length > 4 ? ` y ${npcs.length - 4} más` : ''}`;
-      setTopProgress({ active: true, percent: 100, label: resumen, type: 'sync' });
-      setTimeout(() => {
-        setTopProgress(p => (p.label === resumen ? { active: false } : p));
-      }, 6000);
-    } catch (error) {
-      console.error('Error extracting NPC:', error);
-      setTopProgress({
-        active: true,
-        label: `Error al leer la ficha de PNJ de "${file.name}"`,
-        type: 'sync'
-      });
-      setTimeout(() => {
-        setTopProgress(p => (p.label?.includes('Error al leer') ? { active: false } : p));
-      }, 4000);
-    } finally {
-      setExtractingFileIds(prev => prev.filter(id => id !== file.id));
-    }
-  };
 
   const handleExportPDF = async () => {
     if (!currentProject || !currentChat) return;
@@ -7453,14 +7280,9 @@ export default function App() {
               onToggleAllOnDemand={handleToggleAllOnDemand}
               onPasarAConsulta={handlePasarAConsulta}
               onDistillOracle={handleDistillOracle}
-              onExtractMechanics={handleExtractMechanics}
               onGenerarEtiquetas={handleGenerarEtiquetas}
               onGuardarEtiquetas={handleGuardarEtiquetas}
               onAutoClassifyAll={handleAutoClassifyAll}
-              onRelacionarBiblioteca={handleRelacionarBiblioteca}
-              isRelacionando={isRelacionandoBiblioteca}
-              onExtractNpc={handleExtractNpc}
-              onCreateNpcFromImage={handleCreateNpcFromImage}
               isGenerating={isGenerating}
               extractingFileIds={extractingFileIds}
             />
