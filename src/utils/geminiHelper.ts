@@ -106,7 +106,7 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
   {
     id: 'gemini-3.8-flash',
     name: 'Gemini 3.8 Flash',
-    badge: 'Última Generación · Rápido',
+    badge: 'Insignia · Rápido',
     desc: 'Último modelo Flash de Google, máxima velocidad de respuesta y excelente agilidad de rol con mínimo consumo de tokens.'
   },
   {
@@ -126,12 +126,6 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     name: 'Gemini 3.1 Flash Lite',
     badge: 'Alta Cuota · 500 pet./día',
     desc: 'Caballo de batalla para sesiones largas en la capa gratuita: ultra rápido, latencia mínima y 500 peticiones diarias por clave.'
-  },
-  {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    badge: 'Gran Volumen · 1.500 pet./día',
-    desc: 'Gran estabilidad narrativa y cuota masiva en la capa gratuita (1.500 peticiones diarias).'
   }
 ];
 
@@ -164,6 +158,7 @@ export function isModelDeprecated(modelId: string): boolean {
   return (
     m.includes('1.5') ||
     m.includes('2.0') ||
+    m.includes('2.5') ||
     m === 'gemini-pro' ||
     m === 'gemini-flash' ||
     m.includes('thinking-exp') ||
@@ -186,11 +181,6 @@ export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
     desc: 'Ultra rápido y 500 pet./día: recomendado para tareas de fondo sin agotar la cuota de jugar'
   },
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    desc: 'Gran volumen (1.500 pet./día), ideal para novelización y resúmenes continuos'
-  },
-  {
     id: 'gemini-3.8-flash',
     name: 'Gemini 3.8 Flash',
     desc: 'Última generación, máxima agilidad de razonamiento y lectura fiel de compendios'
@@ -199,6 +189,11 @@ export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
     id: 'gemini-3.7-flash',
     name: 'Gemini 3.7 Flash',
     desc: 'Razonamiento profundo, adaptativo y coherencia de canon'
+  },
+  {
+    id: 'gemini-3.5-flash',
+    name: 'Gemini 3.5 Flash',
+    desc: 'Equilibrado y rápido para procesamiento auxiliar'
   }
 ];
 
@@ -437,11 +432,9 @@ export interface LimitesDeCuota {
 const LIMITES_CAPA_GRATUITA: { patron: RegExp; limites: LimitesDeCuota }[] = [
   // Modelos abiertos: muchas peticiones, pero muy poco tokens por minuto.
   { patron: /^gemma/i, limites: { rpm: 30, tpm: 16000, rpd: 14400 } },
-  // Flash Lite (Gemini 3.1 Flash Lite): el caballo de batalla para volumen.
+  // Flash Lite (Gemini 3.1 Flash Lite): el caballo de batalla para volumen (500 RPD).
   { patron: /flash-lite/i, limites: { rpm: 15, tpm: 250000, rpd: 500 } },
-  // Gemini 2.5: modelo con cuota gratuita generosa.
-  { patron: /2\.5/i, limites: { rpm: 15, tpm: 250000, rpd: 1500 } },
-  // Flash de la familia 3.x: los mejores para narrar y los más racionados.
+  // Flash de la familia 3.x: los mejores para narrar y los más racionados (20 RPD).
   { patron: /gemini-3/i, limites: { rpm: 5, tpm: 250000, rpd: 20 } }
 ];
 
@@ -688,8 +681,7 @@ export function getModelFailoverChain(initialModel: string): string[] {
     'gemini-3.8-flash',
     'gemini-3.7-flash',
     'gemini-3.5-flash',
-    'gemini-3.1-flash-lite',
-    'gemini-2.5-flash'
+    'gemini-3.1-flash-lite'
   ];
   // Con el respaldo apagado se usa el modelo elegido y punto. Antes esta rama
   // devolvía exactamente la misma cadena que la de abajo, así que el interruptor
@@ -11608,7 +11600,8 @@ export async function generateImageWithFailover({
   const geminiImageModels = [
     'gemini-3.1-flash-lite-image',
     'gemini-3.1-flash-image',
-    'gemini-2.5-flash-image'
+    'gemini-nano-banana-2.1',
+    'gemini-3-pro-image'
   ];
 
   for (const apiKey of clavesDisponibles(todas)) {
