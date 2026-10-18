@@ -1,0 +1,6 @@
+{
+  "summary": "Plan actualizado para incorporar la eliminación total de las restricciones y límites de longitud de respuesta del modelo en las directivas e instrucciones de la aplicación, junto con la optimización de código muerto, bundle size, hot path performance y deduplicación de contexto en Documentos Vivos.",
+  "updatedAt": "2026-10-18T19:38:17.699190861Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

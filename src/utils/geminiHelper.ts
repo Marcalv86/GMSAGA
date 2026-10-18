@@ -391,16 +391,6 @@ export function refrescarCatalogoEnSegundoPlano(): void {
     });
 }
 
-/**
- * Si la clave admite este modelo. `null` cuando todavía no se ha consultado
- * nunca: es distinto de saber que no está, y no debe pintarse como un error.
- */
-export function modeloDisponible(modelId: string): boolean | null {
-  const guardado = leerCatalogoModelos();
-  if (!guardado || guardado.modelos.length === 0) return null;
-  const id = modelId.trim().toLowerCase();
-  return guardado.modelos.some(m => m.id.toLowerCase() === id);
-}
 
 export interface LimitesDeCuota {
   /** Peticiones por minuto. */
@@ -3931,13 +3921,7 @@ Tus Directivas de campaña (más arriba) mandan en tono, PNJs, asimetría de inf
    Escribe con una maquetación limpia y agradable de leer:
    - Prosa Narrativa 100% Inmersiva: Queda TERMINANTEMENTE PROHIBIDO imprimir cabeceras o bloques de estadísticas en texto plano dentro del relato (como 📅 Fecha, 👤 Nivel, 🌟 Hito, ⚜️ Renombre o 🖤 PNJ ATR). Todos los datos del personaje y del mundo se consultan en el HUD y se actualizan silenciosamente mediante las etiquetas entre corchetes al final del mensaje.
    - Separa SIEMPRE cada párrafo con un salto doble de línea (\n\n) para evitar bloques densos o apelmazados de texto.
-   - Limita los párrafos narrativos a 3-5 oraciones como máximo.
-   - **✂️ Y EL LARGO DEL TURNO SE AJUSTA A LO QUE TE HAN DADO, no a lo bien que escribes.** Tu inclinación es responder siempre con la misma extensión generosa, y eso convierte una conversación en una sucesión de discursos. Mide:
-     · **Una frase, una pregunta o una réplica a un PNJ → 1 o 2 párrafos.** Contesta lo que te han dicho, con el tono y el gesto del que responde, y calla. ⛔ Prohibido soltar descripción ambiental de relleno porque el turno «se ve corto»: un intercambio rápido DEBE ser rápido.
-     · **Combate, tensión o decisión táctica → 1 o 2 párrafos** secos y cinéticos, y se corta en el impacto o en la petición de tirada.
-     · **Llegada a un sitio nuevo o exploración → 2 a 4 párrafos** con atmósfera de verdad: olores, luz, sonido, peligro.
-     · **Un hito grande o una revelación → lo que haga falta**, sin relleno.
-     ⚠️ **Y esto NO significa medir contra lo que ella haya escrito de largo.** Hay quien juega escribiendo tres palabras y quiere una escena entera, y está en su derecho. Lo que marca el compás es **cuánto pasa en el turno**, no cuánto se teclea.
+   - Plenitud Narrativa y Libertad de Extensión: Total libertad de longitud y párrafos. No te autolimites artificialmente en la extensión ni en el número de párrafos de tu narración. Desarrolla la atmósfera, la cadencia sensorial, las reacciones viscerales, el lenguaje corporal y el trasfondo con toda la riqueza y profundidad que la escena demande, permitiendo una prosa novelesca envolvente y cinematográfica sin restricciones de tamaño.
    - **⛔⛔ NI UNA PREGUNTA SIN CONTESTAR, NI UN CAMBIO DE TEMA EN EL MISMO TURNO. Esto es lo que de verdad hincha los turnos.**
      Tu vicio no es escribir largo: es **apilar temas**. El PNJ dice lo suyo, y además saca un asunto nuevo, y además propone moverse a otro sitio — y la pregunta que le habían hecho hace dos líneas se queda en el aire para siempre. Así la conversación se deshilacha: cada turno abre algo y deja lo anterior sin cerrar.
      · **Si ella le ha preguntado algo a un PNJ, ese PNJ CONTESTA en este turno.** Puede negarse, evadirse, mentir o mandarla a paseo —todo eso son respuestas y se notan— pero la pregunta NO se queda colgando mientras la escena sigue a otra cosa.
@@ -3951,12 +3935,12 @@ Tus Directivas de campaña (más arriba) mandan en tono, PNJs, asimetría de inf
      · No contestes por ella y no muevas la escena: se espera.
      · **UN SOLO TEMA POR TURNO en conversación.** Un PNJ no suelta su respuesta Y abre un tema nuevo Y empuja la escena. Eso es encadenar latidos dentro de un diálogo, y está prohibido igual que fuera de él.
      ✅ **La comprobación, antes de cerrar el turno:** repasa qué quedó abierto en el turno anterior —una pregunta suya, una pregunta de un PNJ, un ofrecimiento sin respuesta— y mira si ESTE turno lo atiende. Si no lo atiende, no has continuado la conversación: **has empezado otra**.
-     ⭐ Y de aquí sale el largo solo, sin contar palabras: **un turno que resuelve un latido de conversación es corto por naturaleza.** Si te está saliendo largo, casi siempre es que has metido dos.
+     ⭐ La escena mantiene un ritmo cautivador cuando cada latido de la conversación se atiende con plenitud antes de saltar a otro asunto.
    - Cada intervención de diálogo o cambio de interlocutor DEBE ir en su propio párrafo independiente con sangría o guion de diálogo (— Diálogo...).
    - Deja que la prosa respire con cadencia novelesca. Queda TERMINANTEMENTE PROHIBIDO volcar parrafadas kilométricas continuas sin espacios.
-   - **AUTOLIMITACIÓN DE TOKENS, ECONOMÍA DE METADATOS Y PREVENCIÓN INTELIGENTE DE TRUNCAMIENTOS (OBLIGATORIO)**:
+   - **CIERRE NATURAL, ECONOMÍA DE METADATOS Y PREVENCIÓN INTELIGENTE DE TRUNCAMIENTOS (OBLIGATORIO)**:
      * **Prohibido el Truncamiento a Mitad de Frase**: Toda intervención debe cerrar sus oraciones completas y terminar en un punto y aparte, una línea de diálogo cerrada o una petición formal de tirada, sin palabras a medio escribir ni ideas colgadas.
-     * **Detención Inmediata ante Peligro o Tirada**: Si una acción entraña riesgo o incertidumbre, narra el detonante sensorial en 1 o 2 párrafos y detén el turno en seco con la petición de tirada antes de describir desenlaces hipotéticos.
+     * **Detención Inmediata ante Peligro o Tirada**: Si una acción entraña riesgo o incertidumbre, narra el detonante sensorial con tensión palpable y detén el turno en seco con la petición de tirada antes de describir desenlaces hipotéticos.
      * **Economía de Etiquetas y Tarjetas de Cierre**: Emite ÚNICAMENTE las etiquetas entre corchetes de datos (\`[ESTADO: ...]\`, \`[TIEMPO: ...]\`, \`[CUADERNO: ...]\`, etc.) que hayan sufrido una modificación **real y tangible** durante este turno. Queda prohibido escupir bloques repetitivos de 6 a 8 tarjetas al final si el estado sigue igual.
 3. Consulta la MEMORIA VIVA y la BASE DE CONOCIMIENTO antes de escribir para no contradecir hechos pasados ni inventar datos si ya existen.
    [QUÉ HACER CUANDO NO SABES ALGO]: sabes mucho de ambientaciones publicadas, pero ESTA campaña no es ninguna de ellas: es la que está en estos documentos y en esta memoria. Ante un dato que no tengas, distingue tres casos.
@@ -4017,7 +4001,7 @@ Tus Directivas de campaña (más arriba) mandan en tono, PNJs, asimetría de inf
      ⛔ **NO se usa para nada de lo que ella ya va a contestar escribiendo su turno:** qué hace ahora, qué decide, qué siente, si acepta el trato, a dónde va, si quiere intentarlo. Eso no se pregunta — se deja la escena en suspenso y ella contesta jugando, que es de lo que va esto.
      ⛔⛔ **Y LO PRIMERO DE TODO: UNA \`[Pregunta de Mesa: ...]\` TERMINA EL TURNO. No se pregunta y se sigue.**
        Fallo visto en mesa: el Narrador pregunta cuál de tres arranques quiere jugar la mesa… **y a continuación arranca uno por su cuenta**, en el mismo mensaje. Entonces la pregunta no era una pregunta: era un trámite, porque la decisión ya estaba tomada sin ella. Si preguntas algo que cambia lo que viene después, **no puede venir nada después**: ni un párrafo de ambiente, ni «mientras tanto», ni empezar «por si acaso». Se pregunta, se calla y se espera — igual que con una petición de tirada.
-     ✂️ **Y la pregunta va CORTA: una o dos líneas y directa.** La aplicación la pinta en una tarjeta aparte, así que no necesita preámbulo, ni contexto, ni justificarse. *«¿Qué encuentra en tu diario, según lo que está buscando?»* — ya está. Y **el turno que la lleva también es corto**: si lo que toca es preguntar, no le cuelgues encima tres párrafos de atmósfera, porque entonces la pregunta se lee como el remate de una parrafada y no como lo que es. Turno de preguntar = turno breve.
+     ✂️ **Y la pregunta va CORTA: una o dos líneas y directa.** La aplicación la pinta en una tarjeta aparte, así que no necesita preámbulo, ni contexto, ni justificarse. *«¿Qué encuentra en tu diario, según lo que está buscando?»* — ya está. Formúlala de manera nítida para que destaque con claridad.
      ⚠️ **Presupuesto:** como mucho UNA por escena, y **nunca dos turnos seguidos**. Si dudas, la respuesta es que no toca: haz que lo pregunte un PNJ dentro de la ficción, que no gasta presupuesto, no saca a nadie de la escena y casi siempre funciona mejor.
 7. [REGISTROS INTERNOS - ACTUALIZACIÓN ESTRICTAMENTE ESENCIAL Y CONDICIONAL]:
    Después de la narración, añade las siguientes líneas según corresponda. Son registros internos de la aplicación que el jugador no ve. Las relaciones, la mochila y las tramas NO se apuntan aquí: las escribe el volcado de cierre en los documentos vivos.
@@ -6753,10 +6737,6 @@ ${historyToAnalyze}`;
   };
 }
 
-export async function syncMemoryFromChats(project: Project, chats: Chat[], files?: ProjectFile[]): Promise<Partial<Memory>> {
-  const result = await syncFullCampaignFromChats(project, chats, files);
-  return result.memory;
-}
 
 /**
  * 📚 EL VOLCADO: pone al día los documentos vivos de una sentada.
@@ -10991,12 +10971,6 @@ export function looksLikeProtagonistSheet(file: ProjectFile, memory?: Memory): b
   return (hasAttributes || hasDndKeywords) && !npcCues.some(c => body.includes(c));
 }
 
-/**
- * Alias para compatibilidad con código existente.
- */
-export function looksLikePlayerSheet(file: ProjectFile, memory?: Memory): boolean {
-  return looksLikeProtagonistSheet(file, memory);
-}
 
 /**
  * Checks whether a file looks like a companion / familiar sheet or narrative document.
@@ -11071,23 +11045,6 @@ export function looksLikeCompanionSheet(file: ProjectFile, memory?: Memory): boo
   return false;
 }
 
-/**
- * Checks whether a file looks like an NPC / Monster sheet or statblock.
- */
-export function looksLikeNpcSheet(file: ProjectFile): boolean {
-  if (file.isAudio) return false;
-  if (file.category === 'sheet_npc') return true;
-
-  const name = file.name.toLowerCase();
-  const analysis = (file.analysis || '').toLowerCase();
-  const npcCues = ['pnj', 'npc', 'monstruo', 'monster', 'villano', 'bestiario', 'statblock', 'boss', 'jefe', 'criatura'];
-
-  if (npcCues.some(c => name.includes(c) || analysis.includes(c))) {
-    const sheetHints = ['ficha', 'sheet', 'stats', 'statblock', 'atributos', 'puntos de golpe', 'desafío', 'vd'];
-    return sheetHints.some(h => name.includes(h) || (file.content || '').toLowerCase().includes(h));
-  }
-  return false;
-}
 
 /**
  * Extrae de forma estructurada un familiar o compañero desde un documento.
@@ -11534,66 +11491,6 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
   }
 }
 
-/**
- * Definición estilística canónica para la unidad estética:
- * Art Nouveau vintage mezclado con cartoon estilizado de series de animación modernas para jóvenes adultos (estilo Arcane / Mucha).
- */
-export const ART_NOUVEAU_ANIMATION_STYLE_DNA =
-  'art nouveau vintage blended with stylized modern animation for young adults (Arcane and Castlevania aesthetic meets Alphonse Mucha poster art), elegant sinuous curvilinear ink linework, decorative floral and organic filigree, bold graphic planar shading with painterly volumetric lighting, expressive facial planes and confident silhouettes, warm antique color palette with rich jewel accents (burnished gold, emerald, cinnabar, dusky indigo, warm parchment cream), cinematic lighting with subtle glowing rim lights, cohesive high fantasy animation visual development concept art, no 3D photorealistic CGI, no plastic rendering, 8k resolution';
-
-export function buildArtNouveauUnifiedPrompt({
-  subjectType,
-  name,
-  description = '',
-  extraDetails = '',
-  archetype = 'portrait',
-  framing
-}: {
-  subjectType: 'character' | 'npc' | 'player' | 'location' | 'scene' | 'item';
-  name: string;
-  description?: string;
-  extraDetails?: string;
-  archetype?: 'portrait' | 'location' | 'scene';
-  framing?: string;
-}): string {
-  const cleanName = name.trim() || (subjectType === 'location' ? 'Lugar Fantástico' : subjectType === 'item' ? 'Objeto Mágico' : 'Personaje');
-  const descSnippet = description.trim() ? `, ${description.trim().slice(0, 300)}` : '';
-  const extra = extraDetails.trim() ? `. Detalles visuales: ${extraDetails.trim()}` : '';
-
-  if (subjectType === 'item') {
-    return `Masterpiece fantasy item and artifact visual development: ${cleanName}${descSnippet}${extra}. Intricate magical relic or forged gear adorned with flowing Art Nouveau golden filigree, celestial engravings, and glowing jewel accents. Elegant decorative parchment framing, stylized modern animation design for young adults, bold graphic shapes with rich painterly textures, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
-  }
-
-  if (subjectType === 'location' || archetype === 'location') {
-    if (framing === 'interior') {
-      return `Masterpiece fantasy interior chamber visual development: ${cleanName}${descSnippet}${extra}. Warm atmospheric grand hall, cozy tavern or mystical sanctum with luminous stained-glass windows, carved timber beams, sinuous Art Nouveau wrought-iron candelabras and botanical archways. Modern stylized animation series background painting for young adults, rich painted textures, cozy ambient depth, warm antique amber, brass, and jewel-toned palette, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
-    }
-    if (framing === 'panoramic') {
-      return `Masterpiece wide panoramic fantasy landscape: ${cleanName}${descSnippet}${extra}. Dramatic scenic horizon, sweeping coastal cliffs, ancient mythical forest or sprawling fantasy city under stylized clouds. Art Nouveau vintage illustration infused with modern mature animation cinematography, organic flowing natural elements, bold graphic shapes with rich painterly gouache and oil textures, cohesive fantasy world aesthetic, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
-    }
-    return `Masterpiece fantasy architectural environment and location visual development: ${cleanName}${descSnippet}${extra}. Sinuous Art Nouveau organic archways, flowing stone and wrought-iron botanical motifs, warm luminous stained-glass windows, intricate decorative borders and flourishes. Modern stylized animation series background painting for young adults, rich painted textures, atmospheric depth, warm antique amber and jewel-toned palette. Highly cohesive art style, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
-  }
-
-  if (subjectType === 'scene' || archetype === 'scene') {
-    return `Masterpiece dramatic fantasy scene keyframe: ${cleanName}${descSnippet}${extra}. Wide cinematic composition, decorative stylized clouds and organic flowing natural elements, theatrical rim lighting. Art Nouveau vintage illustration infused with modern mature animation cinematography, bold graphic shapes with rich painterly gouache and oil textures, cohesive fantasy world aesthetic, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
-  }
-
-  // Default: Retrato de Personaje / PNJ
-  if (framing === 'token') {
-    return `Masterpiece character token portrait: ${cleanName}${descSnippet}${extra}. Square close-up character token portrait, focused expressive gaze and detailed stylized facial features, circular decorative Art Nouveau border with delicate metallic filigree halo. Modern stylized young-adult animation hero design (Arcane aesthetic meets Mucha), clean sinuous contours, rich volumetric painted lighting, warm antique paper undertones with deep emerald and ruby accents, highly cohesive visual identity, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
-  }
-
-  if (framing === 'medium') {
-    return `Masterpiece character medium-shot portrait: ${cleanName}${descSnippet}${extra}. Expressive medium-shot character portrait from the waist up, confident dynamic swashbuckling posture, stylized angular facial planes and soulful eyes. Ornate fantasy attire adorned with intricate floral and celestial embroidery, flowing cape or garments, framed by delicate Art Nouveau organic flourishes and rim lighting. Modern stylized young-adult animation hero design (Arcane aesthetic meets Mucha), clean sinuous contours, rich volumetric painted lighting, warm antique paper undertones with deep jewel accents, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
-  }
-
-  if (framing === 'full') {
-    return `Masterpiece full-body character illustration: ${cleanName}${descSnippet}${extra}. Dynamic full-length adventurer silhouette, complete fantasy costume, boots, weapons, and traveling gear. Confident stance, expressive stylized facial features, graceful flowing cloak with botanical filigree embroidery, framed against an elegant Art Nouveau decorative backdrop. Modern stylized young-adult animation hero design, bold graphic planar lighting with painterly volumetric shading, warm antique palette, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
-  }
-
-  // Bust / Portrait (Standard)
-  return `Masterpiece character portrait: ${cleanName}${descSnippet}${extra}. Expressive character bust, confident posture, stylized angular facial planes and soulful eyes. Ornate fantasy attire adorned with intricate floral and celestial embroidery, framed by a delicate Art Nouveau archway and organic golden filigree halo. Modern stylized young-adult animation hero design (Arcane aesthetic meets Mucha), clean sinuous contours, rich volumetric painted lighting, warm antique paper undertones with deep emerald and ruby accents, highly cohesive visual identity, ${ART_NOUVEAU_ANIMATION_STYLE_DNA}`;
-}
 
 /**
  * Genera una imagen directamente con Gemini Image / Nano Banana / Imagen usando la clave de API configurada.
@@ -11756,23 +11653,6 @@ ${text.substring(0, 65000)}`;
   return (response.text || '').trim();
 }
 
-export async function extractStyleOrSystemFromFile(
-  type: 'style' | 'system',
-  file: ProjectFile
-): Promise<string> {
-  if (type === 'style') {
-    return analyzeNarrativeStyleFromDocument(file.content || '', file.name);
-  }
-  const prompt = `Analiza el siguiente texto y extrae las reglas, mecánicas, sistema de juego o lore principal. Devuelve un resumen conciso (máximo 3 párrafos) que sirva como instrucción de sistema/reglas para un Game Master.\n\nTEXTO:\n${(file.content || '').substring(0, 50000)}`;
-
-  const response = await generateContentWithFailover({
-    proposito: 'Extraer estilo o sistema de un archivo',
-    primaryModel: getBackgroundTaskModel(),
-    contents: prompt
-  });
-
-  return response.text || '';
-}
 
 /**
  * Cuenta los tokens REALES del turno, preguntándoselo a Google.
@@ -12704,7 +12584,7 @@ DIRECTRICES EDITORIALES INVIOLABLES:
 2. ENFOQUE LITERARIO: Escribe en tercera persona centrada en la perspectiva de ${pcName} (o adaptada a la voz de la novela).
 3. DIÁLOGOS DE NOVELA: Si la jugadora habla, usa la raya larga de diálogo (—) e incisos de habla expresivos.
 4. CERO MECÁNICAS: Si había tiradas, números o metatexto de juego ("tiro percepción", "[Tirada: 14]", "habilidad", "salvación"), tradúcelo a acciones físicas o sentidos aguzados sin dados ni jerga de mesa.
-5. CONCISIÓN Y PROPORCIÓN: Genera entre 1 y 3 párrafos breves y elegantes, proporcionales a la acción. Debe ensamblar con perfecta fluidez entre la escena previa y la posterior.
+5. PROPORCIÓN Y FLUIDEZ NARRATIVA: Desarrolla los párrafos necesarios con elegancia, sensorialidad y proporción a la acción. Debe ensamblar con perfecta fluidez entre la escena previa y la posterior.
 6. CERO METATEXTO: Devuelve ÚNICAMENTE el texto narrativo resultante, sin introducciones ("Aquí tienes la versión..."), sin saludos y sin comillas exteriores.`;
 
   const modelo = getBackgroundTaskModel();
