@@ -21,7 +21,7 @@ import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, Inventor
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { quitarEtiquetasInternas } from './etiquetasInternas';
 import { ampliarConPuentes, buscar, construirIndice } from './localSearch';
-import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE, protocolosSegunMemoria } from './defaultDirectives';
+import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, protocolosSegunMemoria } from './defaultDirectives';
 import {
   apuntarPeticion,
   cupoDiarioAgotado,
@@ -1691,11 +1691,9 @@ export function estimarCargaDelTurno({
    */
   const andamiaje = CORE_INTERFACE_PROTOCOLS.length;
   const directivas =
-    (project.instructions && project.instructions.trim().length > 10
+    project.instructions && project.instructions.trim().length > 10
       ? project.instructions.length
-      : DEFAULT_DM_INSTRUCTIONS.length) +
-    (project.system && project.system.trim().length > 5 ? project.system.length : DEFAULT_SYSTEM.length) +
-    (project.style && project.style.trim().length > 5 ? project.style.length : DEFAULT_STYLE.length);
+      : DEFAULT_DM_INSTRUCTIONS.length;
 
   /*
    * De la memoria solo viaja esto. La crónica, los PNJs, las tramas, los
@@ -3739,8 +3737,6 @@ ${
     project.instructions && project.instructions.trim().length > 10
       ? project.instructions
       : DEFAULT_DM_INSTRUCTIONS;
-  const activeSystem = project.system && project.system.trim().length > 5 ? project.system : DEFAULT_SYSTEM;
-  const activeStyle = project.style && project.style.trim().length > 5 ? project.style : DEFAULT_STYLE;
 
   // El tiempo de la campaña. Si no hay calendario configurado, todo este bloque
   // desaparece del prompt: quien no lleve la cuenta de los días no debería pagar
@@ -3887,14 +3883,12 @@ ${diseaseConfig.customRules ? `\n- **Reglas de Enfermedad, Contagio y Estrés:**
 ${activeInstructions}
 
 ### SISTEMA DE JUEGO Y MECÁNICAS
-${activeSystem}
 
 ${diseaseSection}
 
 ${manualDmRollsSection}
 
 ### ESTILO NARRATIVO (VOZ Y RITMO NOVELESCO)
-${activeStyle}
 
 
 ### BASE DE CONOCIMIENTO (DOCUMENTOS, FICHAS Y MATERIAL ADJUNTO)
@@ -9584,7 +9578,6 @@ Redacta un documento conciso y riguroso con EXACTAMENTE estas tres secciones en 
 INFORMACIÓN DEL PROYECTO:
 - Nombre: ${project.name}
 - Directivas / Instrucciones del Sistema: ${project.instructions || 'Sin directivas específicas'}
-- Estilo: ${project.style || 'Narrativo inmersivo'}
 ${pcSummary}
 - Memoria actual previa:
 ${project.memory?.raw_project_memory || project.memory?.story || 'Sin memoria previa'}

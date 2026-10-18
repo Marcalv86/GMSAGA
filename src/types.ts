@@ -2,8 +2,6 @@ export interface Project {
   id: string;
   name: string;
   instructions: string;
-  system: string;
-  style: string;
   memory: Memory;
   files: ProjectFile[];
   chats: Chat[];
@@ -1303,8 +1301,6 @@ export interface Message {
 export interface GlobalGrimorio {
   name: string;
   behavior: string;
-  system: string;
-  style: string;
 }
 
 export interface GlobalStyle {

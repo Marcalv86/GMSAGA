@@ -163,7 +163,7 @@ import { escribirPuentesEnMapa, fusionarPuentes, leerPuentesDelMapa } from './ut
 import type { ViajeLeido, VinculoLeido } from './utils/campaignCalendar';
 import type { Aprendizaje, CartaPreparada, Faccion, MovimientoOculto, RelojOculto } from './types';
 import type { CambioDeInventario } from './types';
-import { DEFAULT_DM_INSTRUCTIONS, DEFAULT_SYSTEM, DEFAULT_STYLE } from './utils/defaultDirectives';
+import { DEFAULT_DM_INSTRUCTIONS } from './utils/defaultDirectives';
 import { RollRequest, rollDie } from './utils/rollRequests';
 import { Probabilidad, formatoSignificado, nuevaConsulta } from './utils/oracle';
 import {
@@ -561,8 +561,6 @@ export default function App() {
           id: defaultProjId,
           name: 'Nueva Campaña',
           instructions: DEFAULT_DM_INSTRUCTIONS,
-          system: DEFAULT_SYSTEM,
-          style: DEFAULT_STYLE,
           calendar: CALENDARIO_HARPTOS,
           currentDate: { year: 1492, dayOfYear: 1, minute: 480 },
           memory: {
@@ -850,8 +848,6 @@ export default function App() {
           id: newProjId,
           name: name.trim(),
           instructions: DEFAULT_DM_INSTRUCTIONS,
-          system: DEFAULT_SYSTEM,
-          style: DEFAULT_STYLE,
           calendar: CALENDARIO_HARPTOS,
           currentDate: { year: 1492, dayOfYear: 1, minute: 480 },
           memory: {

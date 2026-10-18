@@ -54,10 +54,6 @@ La campaña opera exclusivamente sobre dos documentos vivos fundamentales que el
 
 export { DEFAULT_DM_INSTRUCTIONS } from "./dmInstructions";
 
-export const DEFAULT_SYSTEM = `D&D 5e (Gestalt / Campaña Individual). Combate táctico por turnos descriptivos, consecuencias reales sin armadura de trama, asimetría de información entre el PJ y los PNJs, y resolución de salvaciones en el roleplay.`;
-
-export const DEFAULT_STYLE = `Prosa literaria y sensorial inspirada en R.A. Salvatore: descriptiva, cinematográfica, atenta al lenguaje corporal, a la tensión táctica y a los matices del ambiente. Escenas desglosadas paso a paso en micro-etapas, con la regla de cierre en tres estados abiertos.`;
-
 // ============================================================================
 // 3. PRESETS Y REGLAS DE GESTIÓN DE ENFERMEDADES, AGOTAMIENTO Y SALUD
 // ============================================================================

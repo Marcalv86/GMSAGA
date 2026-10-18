@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Project, DiseaseConfig, DiseaseRuleSystem } from '../types';
 import {
   DEFAULT_DM_INSTRUCTIONS,
-  DEFAULT_SYSTEM,
-  DEFAULT_STYLE,
   DND5E_CLASSIC_EXHAUSTION_RULES,
   DND2024_EXHAUSTION_RULES,
   DEFAULT_DISEASE_CUSTOM_RULES,
@@ -64,8 +62,6 @@ export const InstructionsView: React.FC<{
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<{
     instructions: string;
-    system: string;
-    style: string;
     diseaseConfig: DiseaseConfig;
   } | null>(null);
 
@@ -155,8 +151,6 @@ export const InstructionsView: React.FC<{
 
     pendingRef.current = {
       instructions: newInst !== undefined ? newInst : instructions,
-      system: DEFAULT_SYSTEM,
-      style: DEFAULT_STYLE,
       diseaseConfig: activeDiseaseCfg,
     };
     if (debounceTimerRef.current) {
