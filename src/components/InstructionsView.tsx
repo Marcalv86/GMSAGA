@@ -7,11 +7,7 @@ import {
   DEFAULT_DISEASE_CUSTOM_RULES,
   GRIMDARK_SURVIVAL_DISEASE_RULES
 } from '../utils/defaultDirectives';
-import {
-  getStoredSafetyLevel,
-  setStoredSafetyLevel,
-  SafetyThreshold
-} from '../utils/geminiHelper';
+
 
 import {
   Activity,
@@ -26,7 +22,6 @@ import {
   Save,
   Scroll,
   Settings,
-  Shield,
   ShieldAlert,
   Sliders,
   X
@@ -38,7 +33,6 @@ export const InstructionsView: React.FC<{
   onRequestConfirm?: (message: string, onConfirm: () => void) => void;
 }> = ({ project, onUpdate, onRequestConfirm }) => {
   const [instructions, setInstructions] = useState(project.instructions || '');
-  const [safetyLevel, setSafetyLevel] = useState<SafetyThreshold>(() => getStoredSafetyLevel());
   const [diseaseSystem, setDiseaseSystem] = useState<DiseaseRuleSystem>(
     project.diseaseConfig?.system || 'dnd5e_2024'
   );
@@ -78,10 +72,8 @@ export const InstructionsView: React.FC<{
       }
     };
   }, [onUpdate]);
-
   useEffect(() => {
     setInstructions(project.instructions || '');
-    setSafetyLevel(getStoredSafetyLevel());
     setDiseaseSystem(project.diseaseConfig?.system || 'dnd5e_2024');
     setAutoPenalties(
       project.diseaseConfig?.autoPenalties !== undefined ? project.diseaseConfig.autoPenalties : true
@@ -92,10 +84,6 @@ export const InstructionsView: React.FC<{
     setSaveStatus('saved');
   }, [project.id, project.instructions, project.manualDmRolls]);
 
-  const handleSafetyChange = (newLevel: SafetyThreshold) => {
-    setSafetyLevel(newLevel);
-    setStoredSafetyLevel(newLevel);
-  };
 
   const handleToggleManualDmRolls = async (nextVal: boolean) => {
     setManualDmRolls(nextVal);
@@ -233,96 +221,27 @@ export const InstructionsView: React.FC<{
     }
   };
 
+  const handleClearInstructionsToDefault = () => {
+    const executeClear = async () => {
+      setInstructions('');
+      await saveChanges('');
+    };
+
+    if (instructions.trim().length > 0) {
+      const message = '¿Deseas dejar las directivas en blanco? El modelo pasará a operar en modo default con las directivas maestras.';
+      if (onRequestConfirm) {
+        onRequestConfirm(message, executeClear);
+      } else if (window.confirm(message)) {
+        executeClear();
+      }
+    } else {
+      executeClear();
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-[5%] py-4 md:py-8 font-lora">
-      {/* SECCIÓN: SEGURIDAD DE CONTENIDO Y FILTROS (NSFW / DARK FANTASY) */}
-      <div className="bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.25)] rounded-lg p-4 md:p-6 shadow-sm mb-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-md bg-rose-900/20 text-rose-700 shrink-0">
-              <Shield className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-cinzel text-base md:text-lg m-0 text-[var(--accent)] flex items-center gap-2">
-                Filtros de Contenido y Modo Adulto (NSFW / Dark Fantasy)
-              </h3>
-              <p className="text-xs text-[var(--text-secondary)] m-0 mt-0.5">
-                Controla el nivel de censura de la API de Gemini para permitir romance explícito, violencia cruda y temas maduros.
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap">
-            <span className={`text-[11px] font-cinzel font-bold px-2 py-0.5 rounded border ${
-              safetyLevel === 'BLOCK_NONE' 
-                ? 'bg-rose-100 text-rose-900 border-rose-300' 
-                : 'bg-amber-100 text-amber-900 border-amber-300'
-            }`}>
-              {safetyLevel === 'BLOCK_NONE'
-                ? 'Sin Filtros (18+ / NSFW Libre)'
-                : safetyLevel === 'BLOCK_ONLY_HIGH'
-                ? 'Filtro Permisivo'
-                : 'Filtro Estándar'}
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button
-            type="button"
-            onClick={() => handleSafetyChange('BLOCK_NONE')}
-            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
-              safetyLevel === 'BLOCK_NONE'
-                ? 'bg-rose-900/15 border-rose-600/70 shadow-xs ring-1 ring-rose-500'
-                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
-            }`}
-          >
-            <div className="font-cinzel font-bold text-xs text-rose-700 flex items-center justify-between mb-1">
-              <span>Sin Filtros (BLOCK_NONE)</span>
-              {safetyLevel === 'BLOCK_NONE' && <Check className="w-3.5 h-3.5 text-rose-700" />}
-            </div>
-            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
-              Sin censura de seguridad: permite combate visceral, lenguaje adulto, romance maduro y ambientaciones oscuras.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSafetyChange('BLOCK_ONLY_HIGH')}
-            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
-              safetyLevel === 'BLOCK_ONLY_HIGH'
-                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
-                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
-            }`}
-          >
-            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
-              <span>Solo Bloquear Extremo</span>
-              {safetyLevel === 'BLOCK_ONLY_HIGH' && <Check className="w-3.5 h-3.5 text-green-700" />}
-            </div>
-            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
-              Filtro suave: permite la mayoría de escenas adultas bloqueando únicamente contenido de riesgo extremo.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSafetyChange('BLOCK_MEDIUM_AND_ABOVE')}
-            className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
-              safetyLevel === 'BLOCK_MEDIUM_AND_ABOVE'
-                ? 'bg-amber-900/15 border-[var(--accent)] shadow-xs ring-1 ring-[var(--accent)]'
-                : 'bg-[var(--bg-color)] border-[rgba(139,69,19,0.2)] hover:border-amber-700/50'
-            }`}
-          >
-            <div className="font-cinzel font-bold text-xs text-[var(--accent)] flex items-center justify-between mb-1">
-              <span>Moderado / Estándar</span>
-              {safetyLevel === 'BLOCK_MEDIUM_AND_ABOVE' && <Check className="w-3.5 h-3.5 text-green-700" />}
-            </div>
-            <p className="text-[11px] text-[var(--text-secondary)] m-0 leading-tight">
-              Protección habitual de Google AI Studio para historias aptas para todas las edades.
-            </p>
-          </button>
-        </div>
-      </div>
 
 
 
@@ -685,14 +604,33 @@ export const InstructionsView: React.FC<{
               Directivas del Master (Lore & Conducta)
             </span>
           </div>
-          {instructions.trim().length > 10 && (
-            <div className="mb-2 text-[11px] leading-relaxed rounded-lg border border-amber-700/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 px-2.5 py-2">
-              ⚠️ <strong>Estas directivas SUSTITUYEN a las de por defecto</strong>, no se suman a ellas. Mientras
-              haya texto aquí, las 142 reglas de conducta que trae la aplicación no viajan en el turno.
-              <br />
-              Los <strong>protocolos del motor</strong> (etiquetas, HUD, dados, calendario) sí van siempre, así
-              que la interfaz no se rompe. Lo que se pierde son las pautas de narración: ritmo, tratamiento de
-              los PNJs, manejo del tiempo y los viajes. Si quieres alguna, cópiala aquí.
+          {instructions.trim().length > 0 ? (
+            <div className="mb-2 text-[11px] leading-relaxed rounded-lg border border-amber-700/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 px-2.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                ✏️ <strong>Directivas personalizadas activas</strong>: Estas directivas son las <strong>únicas instrucciones</strong> que recibirá el modelo. Si las dejas en blanco, el modelo pasará automáticamente al <strong>modo default</strong> con las directivas maestras.
+              </div>
+              <button
+                type="button"
+                onClick={handleClearInstructionsToDefault}
+                className="text-[11px] underline font-cinzel font-semibold text-amber-800 dark:text-amber-200 hover:text-amber-950 shrink-0 cursor-pointer self-start sm:self-auto"
+                title="Dejar en blanco para usar modo default"
+              >
+                Dejar en blanco (Modo default)
+              </button>
+            </div>
+          ) : (
+            <div className="mb-2 text-[11px] leading-relaxed rounded-lg border border-emerald-700/40 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100 px-2.5 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                🛡️ <strong>Modo default activo</strong>: El campo de directivas está en blanco. El modelo operará con las <strong>directivas maestras canónicas por defecto</strong> de la campaña (D&D 5e: Forgotten Realms). Escribe aquí tus propias directivas para sustituirlas.
+              </div>
+              <button
+                type="button"
+                onClick={handleRestoreMasterInstructions}
+                className="text-[11px] underline font-cinzel font-semibold text-emerald-800 dark:text-emerald-200 hover:text-emerald-950 shrink-0 cursor-pointer self-start sm:self-auto"
+                title="Cargar texto de directivas por defecto para editarlo"
+              >
+                Cargar directivas por defecto
+              </button>
             </div>
           )}
           <textarea
@@ -704,7 +642,7 @@ export const InstructionsView: React.FC<{
             }}
             onBlur={() => saveChanges()}
             className="w-full h-[400px] md:h-[600px] bg-[var(--sidebar-bg)] border border-[rgba(139,69,19,0.3)] p-3.5 rounded-lg text-xs md:text-sm font-mono outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-color)] leading-relaxed resize-y"
-            placeholder="Escribe las directivas de lore, comportamiento del Narrador, reglas de mesa..."
+            placeholder="Directivas en blanco — El modelo operará en modo default (directivas maestras estándar de D&D 5e: Forgotten Realms). Escribe aquí tus directivas personalizadas para sustituirlas..."
           />
         </div>
       </div>

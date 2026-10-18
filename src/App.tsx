@@ -671,11 +671,7 @@ export default function App() {
            * CORE_INTERFACE_PROTOCOLS, que viaja en cada turno pase lo que pase
            * con este cuadro de texto.
            */
-          if (!p.instructions || !p.instructions.trim()) {
-            modified = true;
-            p = { ...p, instructions: DEFAULT_DM_INSTRUCTIONS };
-          }
-
+          // Si las directivas se dejan en blanco, el modelo opera en modo default sin sobreescribir el campo.
           return p;
         });
 

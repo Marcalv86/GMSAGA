@@ -21,7 +21,7 @@ import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, Inventor
 import { stripRollRequests, stripStateTag } from './rollRequests';
 import { quitarEtiquetasInternas } from './etiquetasInternas';
 import { ampliarConPuentes, buscar, construirIndice } from './localSearch';
-import { CORE_INTERFACE_PROTOCOLS, DEFAULT_DM_INSTRUCTIONS, protocolosSegunMemoria } from './defaultDirectives';
+import { DEFAULT_DM_INSTRUCTIONS } from './defaultDirectives';
 import {
   apuntarPeticion,
   cupoDiarioAgotado,
@@ -1689,10 +1689,10 @@ export function estimarCargaDelTurno({
    * contar `project.instructions` a secas daba cero en una campaña que no las
    * haya tocado, cuando en realidad viajan las de por defecto enteras.
    */
-  const andamiaje = CORE_INTERFACE_PROTOCOLS.length;
+  const andamiaje = 0;
   const directivas =
-    project.instructions && project.instructions.trim().length > 10
-      ? project.instructions.length
+    project.instructions && project.instructions.trim().length > 0
+      ? project.instructions.trim().length
       : DEFAULT_DM_INSTRUCTIONS.length;
 
   /*
@@ -3734,8 +3734,8 @@ ${
     .join('\n\n');
 
   const activeInstructions =
-    project.instructions && project.instructions.trim().length > 10
-      ? project.instructions
+    project.instructions && project.instructions.trim().length > 0
+      ? project.instructions.trim()
       : DEFAULT_DM_INSTRUCTIONS;
 
   // El tiempo de la campaña. Si no hay calendario configurado, todo este bloque
@@ -3816,14 +3816,11 @@ ${diario.length ? `ÚLTIMOS DÍAS REGISTRADOS EN LA AGENDA:\n${diario.map(d => {
   diario.some(d => d.autoria === 'jugadora' || d.tipo === 'diario' || d.id?.startsWith('manual_'))
     ? `\n\n📔 **SOBRE LAS ENTRADAS MARCADAS CON 📔 — ESO NO ES UN RESUMEN, ES SU VOZ.** Las ha escrito la jugadora a mano, en primera persona, y te las está poniendo delante A PROPÓSITO para que las uses.
 - ✅ **Es lo que piensa cuando no la ve nadie**: lo que quiere, lo que teme, quién le gusta y quién le revuelve el estómago. Te acaba de decir por dónde quiere que vaya la historia sin decirlo en voz alta.
-- ✅ **Úsalo por debajo**: que la escena la ponga cerca de quien le importa, que aparezca quien le incomoda, que la elección que le plantees le duela porque sabes qué le duele.
+- ✅ **Úsalo por debajo**: que la escena la ponga cerca de quien le importa, que aparezca quien le incomoda, que la elección que le plantees le duela porque sabes qué le duela.
 - ⛔ **Pero ella NO lo ha dicho en voz alta.** Nadie de este mundo ha leído ese diario: ningún PNJ puede citarlo, saberlo ni darse por enterado. Si alguien reacciona a algo que solo está escrito ahí, has roto la ficción y además le has quitado la gracia a que lo escribiera.`
     : ''
-}` : ''}
+}${tiempoDirectiva ? `\n\nDirectiva de tiempo opcional:\n${tiempoDirectiva}` : ''}` : ''}
 `.trim();
-
-    tiempoDirectiva = `   - [TIEMPO: +Xm / +Xh / +Xd] — (Opcional) solo si transcurre un lapso apreciable de tiempo en la ficción (conversación larga, viaje o descanso).
-`;
   }
 
   // La tanda de dados llega desde fuera: una nueva por turno al narrar, y una
@@ -3877,136 +3874,13 @@ ${diseaseConfig.customRules ? `\n- **Reglas de Enfermedad, Contagio y Estrés:**
 - El motivo de esta mesa es que los dados se vean. Resolver por tu cuenta, aunque el resultado sea justo, rompe justamente lo que se quería arreglar.
 ` : '';
 
-  const bloqueEstable = `${protocolosSegunMemoria(Boolean(docsVivos))}
+  const bloqueEstable = `${activeInstructions}
 
-### INSTRUCCIONES DE CAMPAÑA (IDENTIDAD Y DIRECTIVAS MAESTRAS DEL NARRADOR)
-${activeInstructions}
-
-### SISTEMA DE JUEGO Y MECÁNICAS
-
-${diseaseSection}
-
-${manualDmRollsSection}
-
-### ESTILO NARRATIVO (VOZ Y RITMO NOVELESCO)
-
-
-### BASE DE CONOCIMIENTO (DOCUMENTOS, FICHAS Y MATERIAL ADJUNTO)
+${diseaseSection ? `${diseaseSection}\n\n` : ''}${manualDmRollsSection ? `${manualDmRollsSection}\n\n` : ''}### BASE DE CONOCIMIENTO (DOCUMENTOS, FICHAS Y MATERIAL ADJUNTO)
 Los siguientes archivos forman parte del canon íntegro del mundo y debes utilizarlos como fuente de verdad sobre PNJs, lugares, eventos pasados, reglas, oráculos y ambientación:
 ${filesText || 'No hay documentos de texto adicionales siempre presentes.'}
 ${deConsultaCatalogo}
-${fichasPermanentes ? `\n\n### 📜 FICHAS Y DOCUMENTOS PERMANENTES DE LA MESA\n${fichasPermanentes}` : ''}
-
-### RESERVA DE DADOS DEL DIRECTOR DE JUEGO (USO TRAS LA PANTALLA DEL NARRADOR)
-Al final de la entrada del turno se adjunta la reserva de dados reales tirados para tus acciones ocultas de PNJ, daño, tablas aleatorias y tiradas enfrentadas. Son de uso exclusivo para el Narrador (NUNCA para las acciones del protagonista). Úsalos en orden y descarta los que no gastes.
-- ⛔ **PROHIBIDO INSERTAR CÁLCULOS O PREFIJOS DE DADOS EN LA PROSA («14 natural frente a CD 13: ...» / «16 + 3 = 19 vs CD 14»):** Toda mecánica de dados debe ir estrictamente aislada en su etiqueta corcheteada de sistema: \`[Tirada DM (SAB, perspicacia): 14 vs CD 13]\`. La prosa novelesca NUNCA debe comenzar con cálculos de dados ni operaciones aritméticas; comienza directamente con la descripción inmersiva, sensorial y cinematográfica. Las fórmulas mecánicas rompen la cuarta pared.
-
-[DIRECTIVAS DE RESPUESTA CRÍTICAS]:
-Tus Directivas de campaña (más arriba) mandan en tono, PNJs, asimetría de información, idiomas, rigor cultural, ritmo, tramas y consecuencias. Aquí solo va lo que no está en ellas o lo que la aplicación necesita.
-0.1. [PJ INCONSCIENTE, DORMIDA O AUSENTE]: si la ficción establece que ${pc?.name || 'el PJ'} está inconsciente, dormida, paralizada o fuera de la escena, NO la despiertes tú ni narres que abre los ojos, se mueve o percibe algo. Yace como un cuerpo inmóvil y la escena se narra en tercera persona entre los PNJs, que hablan y se miran entre ellos, no hacia ella.
-0.2. [CERO SERMONES]: nada de advertencias éticas fuera de personaje, disculpas ni coletillas moralizantes («recuerda que…», «es importante destacar…»). La jugadora es adulta y la ficción es ficción.
-0.3. [ESCALA DE CD]: rutinaria 10-12 · moderada 14-15 · difícil 17-18 · muy difícil 20-22 · casi imposible 25+. En una tirada enfrentada, la CD la pone la tirada o el valor pasivo del rival (\`[Tirada DM (SAB): X vs CAR del PJ: Y]\`). Si el PNJ no la supera, falla de forma concluyente: se traga la mentira y no «lo sabe» mágicamente unos turnos después.
-0.4. [IDIOMAS — LA MITAD QUE SE OLVIDA]: si un PNJ tiene un idioma que ${pc?.name || 'ella'} también habla, **le habla en ese**, sin anunciarlo; si es la lengua de la especie o la cultura de ambos, ni se lo plantea. Hablarle en el idioma vehicular es la excepción y se justifica en escena (quiere que un tercero entienda, o justo que no; se burla; la trata de forastera). Lo que ella entiende va en prosa normal, sin «—dijo en drow». Lo que no entiende va como fonética sin traducir («—Xun'dro ssin'urn?») o como sonido, cadencia y gesto: nunca traducido, ni resumido, ni devuelto por la puerta de atrás (el PNJ que lo repite en común, un tercero que lo traduce gratis).
-1. [LA CÁMARA VA CON ELLA — Y SOLO LA CÁMARA]: la escena se abre donde está ${pc?.name || 'el personaje del jugador'}, con lo que ve, oye y huele, y con lo que su ficha y su trasfondo hacen que note antes que otro. Pero el mundo no gira a su alrededor: lo grande (una guerra, una peste, una Casa que cae) va por su propio calendario y la alcanza a ella y a los demás por igual, en lo personal y en el escenario; si el hilo grande solo aparece cuando ella mira, es un decorado.
-   - Protagonista no es jefa: su rango es el que se ha ganado jugando, cada facción resuelve sus problemas con su propia gente y los compañeros de aventura deciden por su cuenta, como si los llevara otro jugador.
-   - Ningún poder nuevo brota por sentirlo mucho: llega cuando ha pagado un precio (una herida que se queda, algo perdido, una deuda).
-   - Puede intentar cualquier cosa fuera de su oficio, pero a SU CD (punto 5) y con la firma de un apaño: ruido, tiempo, rastro. El especialista lo hace mejor y lo sabe. En el terreno de ella, al revés: la autoridad es suya.
-2. [FORMATO EDITORIAL, SALTOS DE PÁRRAFO Y RESPIRACIÓN DE LA PROSA - OBLIGATORIO]:
-   Escribe con una maquetación limpia y agradable de leer:
-   - Prosa Narrativa 100% Inmersiva: Queda TERMINANTEMENTE PROHIBIDO imprimir cabeceras o bloques de estadísticas en texto plano dentro del relato (como 📅 Fecha, 👤 Nivel, 🌟 Hito, ⚜️ Renombre o 🖤 PNJ ATR). Todos los datos del personaje y del mundo se consultan en el HUD y se actualizan silenciosamente mediante las etiquetas entre corchetes al final del mensaje.
-   - Separa SIEMPRE cada párrafo con un salto doble de línea (\n\n) para evitar bloques densos o apelmazados de texto.
-   - Plenitud Narrativa y Libertad de Extensión: Total libertad de longitud y párrafos. No te autolimites artificialmente en la extensión ni en el número de párrafos de tu narración. Desarrolla la atmósfera, la cadencia sensorial, las reacciones viscerales, el lenguaje corporal y el trasfondo con toda la riqueza y profundidad que la escena demande, permitiendo una prosa novelesca envolvente y cinematográfica sin restricciones de tamaño.
-   - **⛔⛔ NI UNA PREGUNTA SIN CONTESTAR, NI UN CAMBIO DE TEMA EN EL MISMO TURNO. Esto es lo que de verdad hincha los turnos.**
-     Tu vicio no es escribir largo: es **apilar temas**. El PNJ dice lo suyo, y además saca un asunto nuevo, y además propone moverse a otro sitio — y la pregunta que le habían hecho hace dos líneas se queda en el aire para siempre. Así la conversación se deshilacha: cada turno abre algo y deja lo anterior sin cerrar.
-     · **Si ella le ha preguntado algo a un PNJ, ese PNJ CONTESTA en este turno.** Puede negarse, evadirse, mentir o mandarla a paseo —todo eso son respuestas y se notan— pero la pregunta NO se queda colgando mientras la escena sigue a otra cosa.
-     · **⛔⛔ UNA PREGUNTA A ELLA ES UN PUNTO Y FINAL, NO UN ADORNO A MITAD DE PÁRRAFO. Este es el fallo que más molesta en mesa.**
-       Lo que haces: el PNJ pregunta algo al PRINCIPIO de su intervención —*«¿y esos palitos qué son?»*— y después **sigue hablando**: cuenta tres cosas, decide que hay que irse al norte, y remata con **OTRA pregunta distinta** —*«¿necesitas ir de compras?»*—. Resultado: la primera pregunta, que era la interesante, se pierde; solo sobrevive la última; y a la jugadora le toca escribir *«bueno… y lo de antes»*. Eso es un fallo tuyo, no un despiste suyo.
-       ✅ **En cuanto un PNJ le pregunta algo, el turno SE ACABA en el signo de interrogación.** Ni una línea más. No es «pregunta y sigue»: es **pregunta y calla**, que es lo que hace cualquiera que de verdad quiere una respuesta.
-       ✅ **UNA sola pregunta por turno.** Si al PNJ se le ocurren dos, hace la que más le importa y se guarda la otra — le seguirá importando dentro de dos turnos, y entonces tendrá más peso.
-       ✅ **Y va al FINAL.** Si se te escapa a mitad de la intervención, ahí se corta la intervención: lo que le quedaba por decir lo dirá cuando le hayan contestado.
-       ⛔ **Nunca la mezcles con un avance de trama.** Preguntar algo y en la misma parrafada decidir que el grupo se va al norte convierte la pregunta en trámite, porque la escena ya se movió sin esperar la respuesta.
-       ⚠️ Y que quede claro: **esto NO es una «pregunta de trámite» de las prohibidas.** Aquellas son las muletillas al lector —«¿qué haces?», «¿qué decides?»—. Un PNJ preguntándole algo dentro de la ficción es interpretación, y es de lo mejor que puede pasar en una escena: por eso mismo merece que se espere la respuesta.
-     · No contestes por ella y no muevas la escena: se espera.
-     · **UN SOLO TEMA POR TURNO en conversación.** Un PNJ no suelta su respuesta Y abre un tema nuevo Y empuja la escena. Eso es encadenar latidos dentro de un diálogo, y está prohibido igual que fuera de él.
-     ✅ **La comprobación, antes de cerrar el turno:** repasa qué quedó abierto en el turno anterior —una pregunta suya, una pregunta de un PNJ, un ofrecimiento sin respuesta— y mira si ESTE turno lo atiende. Si no lo atiende, no has continuado la conversación: **has empezado otra**.
-     ⭐ La escena mantiene un ritmo cautivador cuando cada latido de la conversación se atiende con plenitud antes de saltar a otro asunto.
-   - Cada intervención de diálogo o cambio de interlocutor DEBE ir en su propio párrafo independiente con sangría o guion de diálogo (— Diálogo...).
-   - Deja que la prosa respire con cadencia novelesca. Queda TERMINANTEMENTE PROHIBIDO volcar parrafadas kilométricas continuas sin espacios.
-   - **CIERRE NATURAL, ECONOMÍA DE METADATOS Y PREVENCIÓN INTELIGENTE DE TRUNCAMIENTOS (OBLIGATORIO)**:
-     * **Prohibido el Truncamiento a Mitad de Frase**: Toda intervención debe cerrar sus oraciones completas y terminar en un punto y aparte, una línea de diálogo cerrada o una petición formal de tirada, sin palabras a medio escribir ni ideas colgadas.
-     * **Detención Inmediata ante Peligro o Tirada**: Si una acción entraña riesgo o incertidumbre, narra el detonante sensorial con tensión palpable y detén el turno en seco con la petición de tirada antes de describir desenlaces hipotéticos.
-     * **Economía de Etiquetas y Tarjetas de Cierre**: Emite ÚNICAMENTE las etiquetas entre corchetes de datos (\`[ESTADO: ...]\`, \`[TIEMPO: ...]\`, \`[CUADERNO: ...]\`, etc.) que hayan sufrido una modificación **real y tangible** durante este turno. Queda prohibido escupir bloques repetitivos de 6 a 8 tarjetas al final si el estado sigue igual.
-3. Consulta la MEMORIA VIVA y la BASE DE CONOCIMIENTO antes de escribir para no contradecir hechos pasados ni inventar datos si ya existen.
-   [QUÉ HACER CUANDO NO SABES ALGO]: sabes mucho de ambientaciones publicadas, pero ESTA campaña no es ninguna de ellas: es la que está en estos documentos y en esta memoria. Ante un dato que no tengas, distingue tres casos.
-   - Si lo que ibas a decir podría contradecir el material de la jugadora, no lo digas. Rodéalo: describe lo que el protagonista percibe sin afirmar el dato, o deja que el personaje que lo sabría no lo suelte todavía.
-   - Si es un hueco sin dueño —el nombre del tabernero, el olor de una calle, la manía de un guardia—, invéntalo sin pedir permiso, pequeño y coherente con lo ya establecido. Eso es tu oficio, y una vez dicho pasa a ser canon: respétalo a partir de entonces.
-   - Si el dato es estructural y no lo tienes —quién gobierna, qué ocurrió en una fecha, cómo funciona una institución de la que depende la trama—, NO lo rellenes con lo que recuerdes de libros publicados ni con una invención cómoda. Pregúntaselo a la jugadora en una línea, fuera de la escena, o haz que el protagonista sencillamente no lo sepa todavía. Un hueco reconocido se arregla en un mensaje; un dato inventado que se da por bueno contamina la campaña entera y no hay forma de saber cuándo empezó.
-   Nunca presentes como cierto algo de una ambientación publicada si no está en el material de la campaña: puede que en este mundo no sea así.
-3. Si la Memoria indica que un personaje está herido, cansado o en una situación específica, refléjalo en la narrativa.
-4. Si el jugador menciona o enlaza una canción o video (YouTube / Spotify), utiliza el contenido de la letra/música para enriquecer la escena.
-5. [TIRADAS Y SALVACIONES DEL PROTAGONISTA EN EL ROLEO - OBLIGATORIO]:
-   Las tiradas de habilidad y las **Tiradas de Salvación corren dentro del roleo**.
-   A) DETECCIÓN Y RESOLUCIÓN INMEDIATA DE TIRADAS ENVIADAS POR EL JUGADOR:
-      - Si el mensaje del jugador contiene una tirada o resultado de dados (ejemplo «[Tirada de Sigilo: d20 natural = 16 | CD 14]», «[Tirada de Salvación de Destreza: d20 natural = 18]», «[Tirada d20: 15]» o una indicación de resultado en texto):
-        1. RECONÓCELA AL INSTANTE: Toma el dado natural enviado por el jugador.
-        2. Aplícale tú el modificador de característica y bonificador de competencia correspondiente según la ficha viva del protagonista (${pc?.name || 'el protagonista'}).
-        3. Si incluyes la ficha mecánica del resultado, ponla SIEMPRE como etiqueta de sistema al inicio: \`[Tirada: 16 natural + 3 = 19 vs CD 14 | Éxito]\`. ⛔ PROHIBIDO redactar fórmulas matemáticas como texto plano dentro de la prosa («16 natural frente a CD 14:...»).
-        4. Narra el desenlace de la acción de inmediato con todas sus consecuencias de forma inmersiva y cinematográfica.
-        5. Queda TERMINANTEMENTE PROHIBIDO volver a pedir la misma tirada o ignorar el resultado enviado por el jugador.
-        6. Un 20 natural es Éxito Crítico; un 1 natural es Fallo Crítico / Pifia.
-   B) PETICIÓN DE TIRADA (CUANDO EL RESULTADO ES INCIERTO O HAY PELIGRO):
-      - Cuando una acción del protagonista tenga resultado incierto (atacar, trepar, mentir/engañar/ocultar información a un PNJ perspicaz, forzar cerraduras, sigilo, investigar) o cuando el personaje enfrente un peligro súbito, trampa, veneno o hechizo que exija resistencia, NO decidas tú el resultado ni lo narres de antemano.
-      - Describe el momento hasta el instante justo anterior al impacto o desenlace, detente ahí y pide la tirada o salvación en una línea propia con este formato exacto:
-        [Petición de Tirada: Atributo (+ Competencia / Experiencia entrenada si consta en ficha) | CD número] o [Petición de Salvación: Atributo | CD número]
-        (Ejemplos: [Petición de Tirada: INT + Cartografía | CD 14], [Petición de Tirada: CAR + Engaño | CD 15], [Petición de Tirada: SAB + Navegación | CD 15], [Petición de Tirada: SAB | CD 14], [Petición de Salvación: DES | CD 14], [Petición de Salvación: CON | CD 15], [Petición de Tirada: FUE + Atletismo | CD 12], [Petición de Tirada: Iniciativa]).
-      - **⭐⭐ DE DÓNDE SALE EL NÚMERO: LA CD NO ES DE LA ACCIÓN, ES DE QUIEN LA HACE. Esto es lo que lo regula TODO.**
-        Una acción no tiene UNA dificultad: tiene **una por persona**. Ahí es donde viven de verdad la experiencia, el nivel y las especialidades — no en la prosa, no en que alguien diga que es muy bueno en algo. Antes de escribir el número, pregúntate **quién va a tirar** y calíbralo por: su nivel y su oficio real, la competencia entrenada que CONSTE en su ficha, su dominio canónico si es una figura legendaria de la ambientación, y las herramientas que tenga a mano.
-        · **El mismo disfraz, ante el mismo guardia:** quien lleva media vida haciéndose pasar por otro, tiene el material bueno y sabe a quién imita, **CD 10**; quien no se ha disfrazado nunca y va con lo puesto, **CD 18**. Mismo disfraz, mismo guardia, ocho puntos de diferencia — y esos ocho puntos SON su experiencia.
-        · **La misma cerradura:** **CD 5** para quien vive de abrirlas y **CD 12** para quien la fuerza con el apaño que se le ocurra.
-        · ⛔ **Si te sale la misma CD para dos personas distintas, NO HAS CALIBRADO**: has puesto la dificultad de la acción en vez de la de quien la hace. Vuelve atrás y ponle la suya.
-        · ⭐ Y una CD alta **NO es un «no puedes»**: es un «puedes intentarlo y probablemente salga mal» — y eso también es escena, muchas veces mejor que el éxito. **Nunca le prohíbas a nadie una acción que puedes cobrarle.**
-      - **🤝 TIRADA DE AYUDA — el sitio de quien no es el especialista.** Cuando la acción es de otro pero ella (o un PNJ) puede arrimar el hombro, no se queda mirando: **presta ayuda, y eso es una tirada suya.** Es la respuesta correcta a «esto no es lo mío»: no apartarse, sumar.
-        · **Quien ayuda tiene que DECIR CÓMO.** ⛔ Nada de «le ayudo» en abstracto ni de un bonificador que aparece porque sí: la ayuda tiene que ser un acto concreto y creíble dentro de la escena, y si no se describe, no existe. *Ejemplo: alguien de la cuadrilla se hace pasar por una figura de autoridad ante quien la conoce. La protagonista no intenta el engaño —no es lo suyo, CD imposible— pero se hace pasar por su asistente: le lleva el equipaje, se adelanta a anunciarla y la trata exactamente como la trataría un sirviente de verdad, con la naturalidad de quien lo ha hecho mil veces. Eso es ayuda, y se paga: **+6 a la tirada de quien lleva el engaño**.*
-        · **¿Y SI DICE «LE AYUDO» Y NO DICE CÓMO?** ⛔ Ni te lo inventes tú —decidir qué hace ella es titiritearla, y eso está prohibido— ni congeles la partida esperando. Haz lo siguiente, en este orden:
-          **a) Pregúntalo DENTRO DE LA FICCIÓN y como último latido del turno**, que es donde la escena ya se detiene y no hay forma de no verlo: *«El otro no se gira. —¿Y tú qué vas a hacer exactamente?»*. Una pregunta en boca de un PNJ no rompe la inmersión y se responde sola.
-          **b) O propón tú una opción concreta Y PREGUNTA SI VALE**, sin darla por hecha: *«Doy por supuesto que le sostienes el manto y te adelantas a anunciarla — +4. ¿O tenías otra cosa en la cabeza?»*. Proponer no es decidir por ella mientras la respuesta pueda cambiarlo.
-          **c) Si aun así no concreta, NO bloquees la partida:** cuenta la ayuda como la mínima (+2), narra a los PNJs actuando y sigue. Perder dos puntos por no detallar es mucho mejor que una escena atascada.
-          ⛔ Y si de verdad necesitas una respuesta antes de poder seguir, usa \`[Pregunta de Mesa: ...]\`, que la aplicación pinta en una tarjeta aparte imposible de pasar por alto. Pero úsala poco: casi siempre la opción (a) es mejor, porque no saca a nadie de la escena.
-        · **Solo se puede ayudar si lo que se hace ayuda DE VERDAD.** Animar, estar al lado o desear que salga bien no es ayudar. Si lo que aporta no cambia nada en la ficción, no hay bonificador.
-        · **¿Y CÓMO SE SABE SI LA AYUDA HA ENTRADO? Son DOS preguntas distintas, y en este orden:**
-          **1) CUÁNTO VALE — lo decides ANTES de que nadie tire**, por lo que aporta en la ficción y no por lo que convenga después: **+2** echar una mano (sostener la luz, tapar un ruido, ganar unos segundos) · **+4** quitar un obstáculo real (llevarse al guardia, conseguir la llave, cubrir la salida) · **+6** cambiar el cuadro entero (la sirvienta que hace creíble a la señora, el cómplice que responde por ti). **Dilo en voz alta antes de pedir la tirada**: quien ayuda tiene derecho a saber por qué está jugando, y así el número no se ajusta a posteriori según haya salido.
-          **2) SI ENTRA — quien ayuda TIRA**, contra su propia CD, calibrada como cualquier otra: por quién es y por lo que está haciendo ÉL, no por lo difícil que sea la acción del especialista. (Haciéndose pasar por un sirviente se tira CAR, y ahí sí suma su competencia en interpretar si la tiene: hacer un papel es actuar, que no es lo mismo que sostener el engaño entero — por eso su CD es asequible aunque la del engaño fuera imposible.)
-          ✅ **La supera** → el +X entra entero en la tirada del especialista.
-          ⛔ **Falla** → en su lugar entra un **−2**: no es que no ayude, es que **se le nota**.
-          💀 **Pifia (1 natural)** → el penalizador es el mismo número que habría sumado (−6 en el ejemplo): la ayuda se convierte en el problema, y esa es la mejor escena de las tres.
-        · **⚠️ EL APOYO MODIFICA LA TIRADA, NUNCA LA CD.** La CD es de quien hace la acción y se fija ANTES, por su oficio y su nivel (ver arriba); tocarla después para reflejar la ayuda desmonta esa regla y convierte el número en algo movedizo. Lo que cambia es **el resultado de su tirada**: la ayuda entra como un **+X al resultado de él**, no como un descuento en la dificultad.
-        · ⚠️ **Y ayudar puede SALIR MAL, que es lo que lo convierte en escena.** Quien ayuda **tira también, contra su propia CD** (la suya, no la del especialista). Si la clava, el +X entra entero. Si falla, no es que no sume: **estorba**, y entra como **PENALIZADOR a la tirada de él** — la criada se comporta como no se comportaría una criada, alguien se fija, y la mentira se sostiene peor. Un apoyo que solo puede sumar es un regalo con otro nombre.
-        · El especialista puede **rechazar la ayuda** si le parece que le va a delatar, y suele tener razón.
-      - **Habilidades y Experiencias entrenadas del PJ:** Son las 3 o 4 pericias, oficios o saberes reflejados en ficha (más las adquiridas por hitos de nivel o práctica activa en partida). SÍ se reconocen y aplican, pero SIEMPRE como bonificador al atributo base, nunca como etiqueta de habilidad suelta de 5e. Si dudas de si está entrenada, pide el atributo a secas y la jugadora sumará su bonificador si lo posee.
-      - **Tiradas Sociales Obligatorias (CAR vs SAB del PNJ):** Si el jugador miente o disimula ante un PNJ perspicaz o astuto, solicita la tirada de CAR (o CAR + Engaño) al jugador ([Petición de Tirada: CAR + Engaño | CD XX]) o tira SAB para el PNJ con tus dados de Narrador tras la pantalla.
-      - Puedes pedir varias si la situación lo requiere. Después de pedirla, **no sigas narrando**: espera a que el jugador responda en su siguiente mensaje y resuélvelo entonces.
-      - Caso obligatorio: cuando estalle un combate o una emboscada, describe el detonante y pide la iniciativa antes de narrar el primer intercambio de golpes → [Petición de Tirada: Iniciativa].
-6. [CIERRE DE TURNO CINEMATOGRÁFICO - CERO PREGUNTAS DE TRÁMITE]:
-   - Si has pedido una tirada, la narración termina exactamente en esa petición: no sigas la escena (los registros internos del punto 7 sí van siempre, al final del todo).
-   - Si NO has pedido ninguna tirada, termina dejando la escena suspendida en un estímulo activo: la última frase o silencio de un PNJ, un cambio ambiental o una mirada, confiando en la plena agencia del jugador para responder.
-   - Queda TERMINANTEMENTE PROHIBIDO añadir preguntas de trámite o muletillas dirigidas como «< ¿Qué haces? >», «¿Qué haces?», «¿Qué decides hacer?» o «¿Cómo respondes a esto?».
-   - **❓ Y LO MISMO VALE PARA \`[Pregunta de Mesa: ...]\`: ES UN RECURSO CARO, NO UNA FORMA DE CERRAR EL TURNO.** La aplicación la pinta en una tarjeta destacada, así que una en cada turno convierte la partida en un formulario y vacía de peso a las que sí importaban.
-     ✅ **Se usa SOLO cuando seguir exigiría que te inventaras algo que NO ES TUYO:** lo que hay escrito en su diario, un dato de su pasado que no consta en ningún documento, qué variante de arranque quiere jugar la mesa, si prefiere presenciar una escena que su personaje no vería. Es decir: **canon que le pertenece a ella, o una decisión sobre CÓMO se juega.**
-     ⛔ **NO se usa para nada de lo que ella ya va a contestar escribiendo su turno:** qué hace ahora, qué decide, qué siente, si acepta el trato, a dónde va, si quiere intentarlo. Eso no se pregunta — se deja la escena en suspenso y ella contesta jugando, que es de lo que va esto.
-     ⛔⛔ **Y LO PRIMERO DE TODO: UNA \`[Pregunta de Mesa: ...]\` TERMINA EL TURNO. No se pregunta y se sigue.**
-       Fallo visto en mesa: el Narrador pregunta cuál de tres arranques quiere jugar la mesa… **y a continuación arranca uno por su cuenta**, en el mismo mensaje. Entonces la pregunta no era una pregunta: era un trámite, porque la decisión ya estaba tomada sin ella. Si preguntas algo que cambia lo que viene después, **no puede venir nada después**: ni un párrafo de ambiente, ni «mientras tanto», ni empezar «por si acaso». Se pregunta, se calla y se espera — igual que con una petición de tirada.
-     ✂️ **Y la pregunta va CORTA: una o dos líneas y directa.** La aplicación la pinta en una tarjeta aparte, así que no necesita preámbulo, ni contexto, ni justificarse. *«¿Qué encuentra en tu diario, según lo que está buscando?»* — ya está. Formúlala de manera nítida para que destaque con claridad.
-     ⚠️ **Presupuesto:** como mucho UNA por escena, y **nunca dos turnos seguidos**. Si dudas, la respuesta es que no toca: haz que lo pregunte un PNJ dentro de la ficción, que no gasta presupuesto, no saca a nadie de la escena y casi siempre funciona mejor.
-7. [REGISTROS INTERNOS - ACTUALIZACIÓN ESTRICTAMENTE ESENCIAL Y CONDICIONAL]:
-   Después de la narración, añade las siguientes líneas según corresponda. Son registros internos de la aplicación que el jugador no ve. Las relaciones, la mochila y las tramas NO se apuntan aquí: las escribe el volcado de cierre en los documentos vivos.
-   - [PRESENTES: nombres separados por comas] — quién ha estado en escena de forma reconocible, con nombre propio. No incluyas figurantes sin nombre («un marinero», «la multitud»). Sirve para saber quién vuelve: alguien que reaparece deja de ser un extra y se le abre una ficha de vínculo con el protagonista.
-   - [APRENDE: +Nombre (tipo, detalle opcional), +Otro (tipo)] — OBLIGATORIO en el turno en que el protagonista GANA una capacidad nueva: al subir de nivel, al aprender un conjuro, al recibir adiestramiento, al desbloquear un rasgo o al ganar una competencia o un idioma. **Este registro es el único sitio donde queda constancia**: su ficha se subió una vez y está congelada en el nivel que tuviera aquel día, así que lo que no se apunte aquí se pierde y dentro de tres niveles nadie sabrá que lo tiene. El tipo va dentro del paréntesis y es uno de: conjuro, rasgo, competencia, mejora. Ejemplos: [APRENDE: +Rayo de escarcha (conjuro, truco de evocación)]; [APRENDE: +Sentido salvaje (rasgo), +Competencia en Supervivencia (competencia)]; [APRENDE: +2 a Sabiduría (mejora, al subir a nivel 4)]; [APRENDE: +Infracomún (competencia, se lo enseña un compañero)]. ⛔ Y no lo uses para objetos —esos van en la Ficha viva— ni para apuntar lo que YA figura en su ficha: solo lo nuevo. Si en este turno no ha aprendido nada, OMITE la línea.
-   - [COMENTARIO_DM: comentario breve, simpático, sincero o ingenioso del DM fuera de personaje] — OPCIONAL (1-2 frases). Emítelo solo cuando ocurra algo genuinamente divertido, una pifia o éxito crítico épico, una jugarreta memorable del PJ a un PNJ (o viceversa), o un momento de rol memorable. Este comentario se envía automáticamente al chat OOC de la Mesa como un mensaje del DM, con tu personalidad entusiasta, cómica, sincera y rolera de colega de mesa. Si el turno es rutinario, formal o solemne, OMITE totalmente esta etiqueta.
-${tiempoDirectiva}   - [ESTADO: PG actuales/máximos | CA valor | agotamiento: 0-10 | condiciones: lista separada por comas, o "ninguna"]
-   - [GRUPO: Nombre | entra | supervisa] cuando alguien se suma a la cuadrilla y viaja con ella, y [GRUPO: Nombre | sale] cuando se separa. Mientras no lo marques, para la aplicación esa persona NO va con ella y tú te olvidarás de meterla en escena dentro de dos turnos. El rango dice quién está por encima de quién, y no es cosmético: «manda» (decide por la cuadrilla), «supervisa» (está por encima de ella: la vigila, la instruye y la evalúa), «iguales», o «acompaña» (ella tiene más antigüedad — esto SE GANA jugando y NO significa que le obedezcan). ⚠️ Si no lo pones, se da por supuesto «supervisa»: quien entra en una organización entra por abajo. Y en ningún caso son secuaces: el rango dice quién decide la operación, no quién manda sobre quién.
-   - [DOLENCIA: nombre | cd: 12 | exitos: 0-2] para abrir o llevar una enfermedad, y [DOLENCIA: nombre | curada] para cerrarla. Dos éxitos SEGUIDOS la curan; un fallo la agrava o suma un nivel de agotamiento. Si la enfermedad no se anota aquí, no existe pasado este turno.
-   - [FICHA: sab 18 | comp 3 | pasiva 16 | +Sigilo 5] — SOLO cuando suba de nivel o la jugadora te corrija sus números. Su ficha se subió congelada en el nivel de aquel día: una puntuación que sube, un bonificador que cambia o una competencia nueva no existen hasta que los apuntes aquí, y hasta entonces sigues calibrando sus tiradas con los datos de entonces. Las competencias se añaden con «+Nombre bono» y SUMAN a las que ya tiene.
-     Refleja en él el daño recibido, la curación, el agotamiento, el veneno, las enfermedades, heridas y cualquier efecto o condición persistente que hayas narrado. Si no ha habido daño, curación ni nuevas afecciones/recuperaciones, repite exactamente los valores anteriores sin alterarlos. Va SIEMPRE en último lugar.`;
+${fichasPermanentes ? `\n\n### 📜 FICHAS Y DOCUMENTOS PERMANENTES DE LA MESA\n${fichasPermanentes}` : ''}`;
 
   // Todo lo que cambia de un turno a otro. Va detrás para no romper el prefijo
   // cacheado, y de paso queda pegado a la escena, que es donde mejor se atiende.
@@ -4138,7 +4012,7 @@ ${
     : ''
 }
 
-Narra la escena respetando las DIRECTIVAS DE RESPUESTA CRÍTICAS de más arriba, y ciérrala con los registros internos que correspondan según el punto 7 (solo los que hayan cambiado de verdad en este turno).${aperturaDeCapitulo}`;
+Narra la escena respetando fielmente las directivas del Director de Juego.${aperturaDeCapitulo}`;
 
   const sys = `${bloqueEstable}
 ${bloqueVivo}`;
@@ -4199,42 +4073,7 @@ ${bloqueVivo}`;
   const recordatorioDeTurno = userText.trim()
     ? `\n\n[⛔ CÓMO SE LEE LO QUE ACABA DE ESCRIBIR LA JUGADORA (aplícalo, no lo narres): eso NO es prosa tuya que continuar, es lo que ella DECLARA, esté en primera o en tercera persona y lleve corchetes o no. 1) No se lo devuelvas ampliado: ni gestos, ni posturas, ni miradas, ni MOTIVOS que ella no haya escrito. Arranca por el mundo. 2) De todo lo que haya ahí, para el mundo solo EXISTE lo que un testigo con ojos y oídos habría captado desde donde está. Los juicios, opiniones, comparaciones, recuerdos y motivos NO han salido de su boca: ningún PNJ los responde, los alude ni los adivina. Callar sí se ve, y un PNJ puede interpretarlo mal —eso es bueno—; acertar con el porqué porque tú lo has leído, no.]`
     : '';
-
-  const esTurnoUno = (currentChat.messages || []).length <= 1;
-  const turnOneScanPrompt = esTurnoUno 
-    ? `\n\n[⛔ TURNO 1 DE CAMPAÑA - ESCANEO INICIAL OBLIGATORIO DE DOCUMENTOS DE ARRANQUE]: Este es el primer turno de la campaña. Has recibido documentos adjuntos de arranque y premisa. Analízalos a fondo. Si la premisa o el documento de arranque sitúa al grupo en alta mar, en un barco, o en trayecto hacia un destino, ES OBLIGATORIO que declares en este primer turno las etiquetas [ESTAMOS: ...], [LUGAR: ...] y [VIAJE: Destino | jornadas: N] (ej. [VIAJE: Luskan | jornadas: 10]) para que la aplicación configure la travesía y el HUD correctamente. No dejes estos campos vacíos ni omitas el viaje si la premisa es marítima.`
-    : '';
-
-  /*
-   * 🌊 MODULADOR AUTOMÁTICO DE INTENSIDAD Y PROBABILIDAD DE ENCUENTROS:
-   * Analizamos los últimos mensajes del Narrador en busca de palabras clave de peligro,
-   * daño, choque, rompientes, emboscadas o desastres. Si la escena viene de alta tensión
-   * continuada, obligamos al Narrador a entrar en un valle de descanso o encuentro neutro.
-   */
-  const ultimosMensajesDM = (currentChat.messages || [])
-    .filter(m => m.role === 'model')
-    .slice(-3)
-    .map(m => m.content.toLowerCase())
-    .join(' ');
-
-  const palabrasPeligro = [
-    'emboscada', 'combate', 'iniciativa', 'daño', 'quiebra', 'rompiente', 'arrecife',
-    'salvación', 'desastre', 'revent', 'ataque', 'herida', 'peligro', 'choque',
-    'petición de salvación', 'babor o reventamos', 'se hunde', 'naufragio'
-  ];
-  let peligroPuntos = 0;
-  for (const p of palabrasPeligro) {
-    if (ultimosMensajesDM.includes(p)) peligroPuntos++;
-  }
-
-  const promptModuladorIntensidad = peligroPuntos >= 2
-    ? `\n\n[⚖️ MODULADOR DE RITMO Y PROBABILIDAD DE ENCUENTRO: ALTA TENSIÓN ACUMULADA DETECTADA (${peligroPuntos} indicadores de peligro en los últimos turnos).
-⛔ PROHIBIDO INTRODUCIR NUEVOS PELIGROS TÁCTICOS, EMBOSCADAS, ROTURAS O DESASTRES ESTE TURNO (Probabilidad de peligro táctico = 0%).
-✅ ES OBLIGATORIO UN ENCUENTRO NEUTRO, DE LORE O VALLE DE DESCANSO / ENTORNO SEGURO: Permite que el grupo alcance tierra firme/refugio seguro, encallen la embarcación sin daños, se sequen al fuego, o interactúen con calma. La curva dramática exige respiración y asimilación.
-🏷️ Emite la etiqueta explícita [ENTORNO: descanso] para registrar este valle seguro en el sistema.]`
-    : '';
-
-  const finalUserPayload = userText + diceContext + recordatorioDeTurno + turnOneScanPrompt + promptModuladorIntensidad;
+  const finalUserPayload = userText + diceContext + recordatorioDeTurno;
 
   if (lastRole === 'user') {
     contents[contents.length - 1].parts.push({ text: '\n\n' + finalUserPayload });
