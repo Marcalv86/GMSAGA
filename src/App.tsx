@@ -4912,19 +4912,19 @@ export default function App() {
       isOpen: true,
       message: `¿Eliminar "${file.name}" de la base de conocimiento?`,
       onConfirm: () => {
-        // Actualización optimista inmediata en UI sin bloqueo
-        const updated = currentFiles.filter(f => f.id !== file.id);
-        setCurrentFiles(updated);
         setTimeout(() => {
+          // Actualización optimista inmediata en UI sin bloqueo
+          const updated = currentFiles.filter(f => f.id !== file.id);
+          setCurrentFiles(updated);
           void saveFilesToDB(currentPId, updated);
-        }, 0);
 
-        if (file.isImage && currentProject) {
-          void handleUpdateMemory(mem => ({
-            ...mem,
-            visual_memory: (mem.visual_memory || []).filter(v => v.fileId !== file.id)
-          }));
-        }
+          if (file.isImage && currentProject) {
+            void handleUpdateMemory(mem => ({
+              ...mem,
+              visual_memory: (mem.visual_memory || []).filter(v => v.fileId !== file.id)
+            }));
+          }
+        }, 0);
       }
     });
   };
@@ -4936,18 +4936,18 @@ export default function App() {
       isOpen: true,
       message: `¿Eliminar ${filesToDelete.length} ${filesToDelete.length === 1 ? 'archivo' : 'archivos'} seleccionados?`,
       onConfirm: () => {
-        const updated = currentFiles.filter(f => !ids.has(f.id));
-        setCurrentFiles(updated);
         setTimeout(() => {
+          const updated = currentFiles.filter(f => !ids.has(f.id));
+          setCurrentFiles(updated);
           void saveFilesToDB(currentPId, updated);
-        }, 0);
 
-        if (filesToDelete.some(f => f.isImage) && currentProject) {
-          void handleUpdateMemory(mem => ({
-            ...mem,
-            visual_memory: (mem.visual_memory || []).filter(v => !ids.has(v.fileId))
-          }));
-        }
+          if (filesToDelete.some(f => f.isImage) && currentProject) {
+            void handleUpdateMemory(mem => ({
+              ...mem,
+              visual_memory: (mem.visual_memory || []).filter(v => !ids.has(v.fileId))
+            }));
+          }
+        }, 0);
       }
     });
   };

@@ -1739,27 +1739,7 @@ export function estimarCargaDelTurno({
    * campaña sin capítulos todavía), se usa la suma declarada, que para ese caso
    * se queda muy cerca.
    */
-  let total = declarado;
-  try {
-    if (capitulo) {
-      const { sys, contents } = buildTurnPayload({
-        project,
-        currentChatId: capitulo.id,
-        chats,
-        files,
-        userText: '',
-        dicePool: { d20: [], d100: [], d6: [] }
-      });
-      const largoContenidos = contents.reduce(
-        (acc: number, c: any) =>
-          acc + (c.parts || []).reduce((a: number, part: any) => a + (part.text?.length || 0), 0),
-        0
-      );
-      total = sys.length + largoContenidos;
-    }
-  } catch {
-    // Un turno que no se puede armar no debe romper una barra de progreso.
-  }
+  const total = declarado;
 
   /*
    * AQUÍ NO SE DESCUENTA NADA POR EL CACHÉ, Y ES DELIBERADO.
