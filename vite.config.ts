@@ -42,8 +42,19 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 2500,
       rollupOptions: {
         output: {
-          manualChunks: {
-            pdf: ['pdfjs-dist', 'jspdf', 'html2canvas']
+          manualChunks(id) {
+            if (id.includes('pdfjs-dist') || id.includes('jspdf') || id.includes('html2canvas')) {
+              return 'pdf';
+            }
+            if (id.includes('@google/genai')) {
+              return 'genai';
+            }
+            if (id.includes('react-markdown') || id.includes('remark') || id.includes('unified') || id.includes('micromark') || id.includes('mdast') || id.includes('unist') || id.includes('vfile')) {
+              return 'markdown';
+            }
+            if (id.includes('lucide-react')) {
+              return 'icons';
+            }
           }
         }
       }

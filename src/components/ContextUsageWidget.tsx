@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, ProjectFile, Chat } from '../types';
 import {
@@ -92,15 +92,18 @@ export const ContextUsageWidget: React.FC<{
     }
   };
 
-  if (!project) return null;
-
   /*
    * El peso del turno sale de `estimarCargaDelTurno`, el mismo cálculo que usa
    * el aviso del chat. Estaban duplicados y con criterios distintos, así que
    * enseñaban cifras diferentes de lo mismo: una decía 165 mil y la otra 204
    * mil, y no había manera de saber cuál era la buena.
    */
-  const carga = estimarCargaDelTurno({ project, chats, currentChatId, files });
+  const carga = useMemo(() => {
+    if (!project) return null;
+    return estimarCargaDelTurno({ project, chats, currentChatId, files });
+  }, [project, chats, currentChatId, files]);
+
+  if (!project || !carga) return null;
 
   const instructionsChars = carga.directivas;
   const memoryChars = carga.memoria;

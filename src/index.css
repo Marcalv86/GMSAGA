@@ -184,6 +184,10 @@ html[data-theme='dark'] {
   box-sizing: border-box;
 }
 
+textarea {
+  field-sizing: content;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

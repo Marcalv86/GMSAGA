@@ -1,7 +1,5 @@
-import { TraerDeClaudeModal } from './components/TraerDeClaudeModal';
-import { ImportarSesionesModal } from './components/ImportarSesionesModal';
 import type { SesionDeChat } from './utils/importarSesiones';
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy, useMemo } from 'react';
 import {
   ArchiveRestore,
   BookOpen,
@@ -44,15 +42,33 @@ import { Modals, PromptConfig, ConfirmConfig, AlertConfig, ApiKeyModal } from '.
 import { SimpleMemoryView } from './components/SimpleMemoryView';
 import { FilesView } from './components/FilesView';
 import { InstructionsView } from './components/InstructionsView';
-import { NovelReaderView } from './components/NovelReaderView';
 import { MesaView } from './components/MesaView';
 import { OpcionesDeTransicion } from './components/SceneTransitionModal';
 import { recargarConLaVersionNueva, vigilarVersion } from './utils/versionCheck';
-import { MapViewer } from './components/MapViewer';
-import { InstallAppModal } from './components/InstallAppModal';
-import { LocalStorageModal } from './components/LocalStorageModal';
-import { ImportCampaignModal } from './components/ImportCampaignModal';
 import { Logger } from './components/Logger';
+
+// Carga perezosa (Code Splitting) de modales y vistas pesadas
+const TraerDeClaudeModal = lazy(() =>
+  import('./components/TraerDeClaudeModal').then(m => ({ default: m.TraerDeClaudeModal }))
+);
+const ImportarSesionesModal = lazy(() =>
+  import('./components/ImportarSesionesModal').then(m => ({ default: m.ImportarSesionesModal }))
+);
+const NovelReaderView = lazy(() =>
+  import('./components/NovelReaderView').then(m => ({ default: m.NovelReaderView }))
+);
+const MapViewer = lazy(() =>
+  import('./components/MapViewer').then(m => ({ default: m.MapViewer }))
+);
+const InstallAppModal = lazy(() =>
+  import('./components/InstallAppModal').then(m => ({ default: m.InstallAppModal }))
+);
+const LocalStorageModal = lazy(() =>
+  import('./components/LocalStorageModal').then(m => ({ default: m.LocalStorageModal }))
+);
+const ImportCampaignModal = lazy(() =>
+  import('./components/ImportCampaignModal').then(m => ({ default: m.ImportCampaignModal }))
+);
 import { logError, logInfo, logWarn } from './utils/logger';
 import { presionDelMinuto } from './utils/callLog';
 import { conciliarAfinidadesTrasSincronizar } from './utils/affinityProgression';
@@ -289,6 +305,7 @@ export default function App() {
   // El texto que aún no se ha pintado, y el repintado ya pedido al navegador.
   const textoPendienteRef = useRef<string | null>(null);
   const repintadoPedidoRef = useRef<number | null>(null);
+  const ultimoVolcadoRef = useRef<number>(0);
   const onVolverVisibleRef = useRef<(() => void) | null>(null);
   // Un turno de narración NO bloquea la pantalla: hay que poder leer cómo se
   // escribe. El velo se reserva para tareas que sí impiden seguir (subidas,
@@ -3847,17 +3864,24 @@ export default function App() {
         onTimeReported: t => {
           void aplicarTiempo(t);
         },
-        // Refresco de pantalla en CADA fragmento: se vuelca inmediatamente cuando
-        // está en segundo plano y a través de rAF cuando la ventana está activa.
+        // Refresco fluido y amortiguado: se vuelca inmediatamente cuando
+        // está en segundo plano o cada ~60ms en pantalla activa para no asfixiar el hilo principal con 120fps.
         onChunk: (fullText: string) => {
           textoPendienteRef.current = fullText;
           if (document.visibilityState === 'hidden') {
             volcarPendiente();
             return;
           }
+          const ahora = performance.now();
+          if (ahora - ultimoVolcadoRef.current >= 60) {
+            ultimoVolcadoRef.current = ahora;
+            volcarPendiente();
+            return;
+          }
           if (repintadoPedidoRef.current !== null) return;
           repintadoPedidoRef.current = requestAnimationFrame(() => {
             repintadoPedidoRef.current = null;
+            ultimoVolcadoRef.current = performance.now();
             volcarPendiente();
           });
         },
@@ -6478,33 +6502,24 @@ export default function App() {
    * la barra lateral nunca cuadraban. Ahora las dos salen del mismo cálculo.
    */
   const currentChatTokenCount = currentChatId ? chatTokenLoads[currentChatId] || 0 : 0;
-  const cargaEstimada = currentProject
-    ? estimarCargaDelTurno({
-        project: currentProject,
-        chats: currentChats,
-        currentChatId,
-        files: currentFiles
-      })
-    : null;
+  const cargaEstimada = useMemo(() => {
+    if (!currentProject) return null;
+    return estimarCargaDelTurno({
+      project: currentProject,
+      chats: currentChats,
+      currentChatId,
+      files: currentFiles
+    });
+  }, [currentProject, currentChats, currentChatId, currentFiles]);
+
   const estimatedCurrentTokens = cargaEstimada?.tokens || 0;
   const tokensDelTurno = currentChatTokenCount > 0 ? currentChatTokenCount : estimatedCurrentTokens;
-  /*
-   * EL AVISO SE DISPARA POR LA CUOTA DEL MINUTO, NO POR EL TAMAÑO DEL TURNO.
-   *
-   * El tope de Google es una ventana móvil de sesenta segundos sobre todo lo
-   * que se le pide, así que un turno mediano puede provocar un 429 si vienen
-   * otros dos detrás, y uno grande puede pasar sin problema tras un rato de
-   * calma. Comparando solo el tamaño del envío, este aviso salía cuando no
-   * tocaba y callaba cuando tocaba.
-   *
-   * Sale del mismo cálculo que la barra lateral —lo gastado en el último
-   * minuto en la clave más libre, más este turno— para que las dos no vuelvan
-   * a contar cosas distintas de lo mismo, que ya pasó una vez.
-   */
-  const effectiveChatTokens =
-    tokensDelTurno + presionDelMinuto(getStoredModel(), Math.max(1, getStoredApiKeys().length)).menor;
-  const umbralAviso = AVISO_TOKENS_POR_MINUTO;
-  const isCurrentChatNearTokenLimit = effectiveChatTokens >= umbralAviso;
+
+  const effectiveChatTokens = useMemo(() => {
+    return tokensDelTurno + presionDelMinuto(getStoredModel(), Math.max(1, getStoredApiKeys().length)).menor;
+  }, [tokensDelTurno]);
+
+  const isCurrentChatNearTokenLimit = effectiveChatTokens >= AVISO_TOKENS_POR_MINUTO;
 
   return (
     <div className="fixed inset-0 flex overflow-hidden bg-[var(--bg-color)] text-[var(--text-primary)] font-lora">
@@ -6636,23 +6651,31 @@ export default function App() {
         </Suspense>
       )}
 
-      <LocalStorageModal
-        isOpen={isLocalStorageModalOpen}
-        onClose={() => setIsLocalStorageModalOpen(false)}
-        projects={projects}
-        currentProject={currentProject || null}
-        currentChats={currentChats}
-        currentFiles={currentFiles}
-        onImportCampaignFile={processImportFile}
-      />
+      {isLocalStorageModalOpen && (
+        <Suspense fallback={null}>
+          <LocalStorageModal
+            isOpen={isLocalStorageModalOpen}
+            onClose={() => setIsLocalStorageModalOpen(false)}
+            projects={projects}
+            currentProject={currentProject || null}
+            currentChats={currentChats}
+            currentFiles={currentFiles}
+            onImportCampaignFile={processImportFile}
+          />
+        </Suspense>
+      )}
 
-      <ImportCampaignModal
-        isOpen={isImportCampaignModalOpen}
-        onClose={() => setIsImportCampaignModalOpen(false)}
-        currentProject={currentProject || null}
-        onConfirmImport={handleConfirmImportCampaign}
-        onImportNativeFile={processImportFile}
-      />
+      {isImportCampaignModalOpen && (
+        <Suspense fallback={null}>
+          <ImportCampaignModal
+            isOpen={isImportCampaignModalOpen}
+            onClose={() => setIsImportCampaignModalOpen(false)}
+            currentProject={currentProject || null}
+            onConfirmImport={handleConfirmImportCampaign}
+            onImportNativeFile={processImportFile}
+          />
+        </Suspense>
+      )}
 
       <Modals
         promptConfig={promptConfig}
@@ -7017,18 +7040,26 @@ export default function App() {
           dados: no se podía ni teclear hasta cerrarlo. Ahora va en el flujo,
           debajo de la barra: empuja la escena hacia abajo en vez de taparla.
         */}
-        <TraerDeClaudeModal
-          isOpen={traerDeClaude}
-          onClose={() => setTraerDeClaude(false)}
-          docs={currentProject?.memory?.documentos_vivos}
-          onImportarDocumentos={importarDocumentosDeClaude}
-          onImportarSesiones={importarSesiones}
-        />
-        <ImportarSesionesModal
-          isOpen={importandoSesiones}
-          onClose={() => setImportandoSesiones(false)}
-          onImportar={importarSesiones}
-        />
+        {traerDeClaude && (
+          <Suspense fallback={null}>
+            <TraerDeClaudeModal
+              isOpen={traerDeClaude}
+              onClose={() => setTraerDeClaude(false)}
+              docs={currentProject?.memory?.documentos_vivos}
+              onImportarDocumentos={importarDocumentosDeClaude}
+              onImportarSesiones={importarSesiones}
+            />
+          </Suspense>
+        )}
+        {importandoSesiones && (
+          <Suspense fallback={null}>
+            <ImportarSesionesModal
+              isOpen={importandoSesiones}
+              onClose={() => setImportandoSesiones(false)}
+              onImportar={importarSesiones}
+            />
+          </Suspense>
+        )}
         {storageWarning && (
           <div className="shrink-0 border-b border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-100 px-3 py-2 flex items-start gap-2.5 text-xs font-lora">
             <TriangleAlert className="w-4 h-4 shrink-0 mt-0.5 text-amber-700 dark:text-amber-400" />

@@ -1,10 +1,12 @@
 import { AnteriormenteEn } from './AnteriormenteEn';
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Chat, PlayerCharacter, Project, ProjectFile, RecuerdoEpisodicoNPC, NPC, EntradaDeBitacora } from '../types';
 import { YouTubePreview } from './YouTubePreview';
 import { SpotifyPreview } from './SpotifyPreview';
-import { CreativeStudioModal } from './CreativeStudioModal';
+const CreativeStudioModal = lazy(() =>
+  import('./CreativeStudioModal').then(m => ({ default: m.CreativeStudioModal }))
+);
 import { OpcionesDeTransicion, SceneTransitionModal } from './SceneTransitionModal';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { parseRollRequests, stripRollRequests, stripStateTag, parsePreguntasDeMesa, RollRequest } from '../utils/rollRequests';
@@ -114,6 +116,25 @@ const areChatMessageItemPropsEqual = (
   return true;
 };
 
+const MARKDOWN_COMPONENTS = {
+  p: ({ children }: any) => {
+    const str = Array.isArray(children)
+      ? children.map(c => (typeof c === 'string' ? c : '')).join('')
+      : typeof children === 'string'
+        ? children
+        : '';
+    const isDialogue = /^[—–\-"«]/.test(str.trim());
+    return (
+      <p className={isDialogue ? 'narrative-dialogue' : undefined}>
+        {children}
+      </p>
+    );
+  },
+  strong: ({ children }: any) => <strong className="narrative-strong">{children}</strong>,
+  em: ({ children }: any) => <em className="narrative-em">{children}</em>,
+  blockquote: ({ children }: any) => <blockquote className="narrative-quote">{children}</blockquote>
+};
+
 const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   m,
   idx,
@@ -141,12 +162,75 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
   turnNumber
 }) => {
   const isModel = m.role === 'model';
-  const rollRequests = isModel ? parseRollRequests(m.content) : [];
   // El último mensaje enseña sus acciones sin que se pidan; los anteriores solo
   // cuando se piden. Es estado del propio mensaje, no una prop, así que el memo
   // que evita repintar el capítulo entero sigue intacto.
   const [accionesAbiertas, setAccionesAbiertas] = useState(false);
   const mostrarAcciones = isLastMessage || accionesAbiertas;
+
+  // Memoización completa de análisis léxico, extracción de HUD, peticiones y formateo editorial
+  const parsedData = useMemo(() => {
+    if (!isModel) {
+      return {
+        rollRequests: [] as RollRequest[],
+        invitaciones: [] as string[],
+        sceneHUD: null,
+        preguntasDeMesa: [] as string[],
+        isIncomplete: false,
+        segments: parseMessageSegments(m.content).map(seg => ({
+          ...seg,
+          formatted: seg.type === 'text' ? seg.content : ''
+        })),
+        hasSyncTags: false,
+        syncItems: [] as string[]
+      };
+    }
+
+    const rolls = parseRollRequests(m.content);
+    const invs = hasOracle ? leerInvitaciones(m.content) : [];
+    const contentSinPeticiones = rolls.length ? stripRollRequests(m.content) : m.content;
+    const contentSinInvitaciones = limpiarInvitaciones(contentSinPeticiones);
+    const { narrativeText: textWithoutHUD, sceneHUD: parsedHUD } = parseSceneHUD(contentSinInvitaciones);
+    const preguntas = parsePreguntasDeMesa(textWithoutHUD);
+    const incomplete = isNarrativeIncomplete(m.content) && rolls.length === 0 && preguntas.length === 0;
+    const cleanContent = stripStateTag(textWithoutHUD);
+    const segs = parseMessageSegments(cleanContent).map(seg => ({
+      ...seg,
+      formatted: seg.type === 'text' ? formatNarrativeText(seg.content) : ''
+    }));
+
+    const syncList: string[] = [];
+    if (/\[\s*ESTADO\s*:/i.test(m.content)) syncList.push('Salud/CA');
+    if (/\[\s*INVENTARIO\s*:/i.test(m.content)) syncList.push('Inventario');
+    if (/\[\s*TIEMPO\s*:/i.test(m.content)) syncList.push('Tiempo');
+    if (/\[\s*AGENDA\s*:/i.test(m.content)) syncList.push('Diario');
+    if (/\[\s*HILO\s*:/i.test(m.content)) syncList.push('Hilos de Trama');
+    if (/\[\s*V[IÍ]NCULO\s*:/i.test(m.content) || /\[\s*AFINIDAD\s*:/i.test(m.content)) syncList.push('Afinidad PNJs');
+    if (/\[\s*PRESENTES\s*:/i.test(m.content)) syncList.push('PNJs en escena');
+    if (/\[\s*ENTORNO\s*:/i.test(m.content)) syncList.push('Entorno');
+
+    return {
+      rollRequests: rolls,
+      invitaciones: invs,
+      sceneHUD: parsedHUD,
+      preguntasDeMesa: preguntas,
+      isIncomplete: incomplete,
+      segments: segs,
+      hasSyncTags: syncList.length > 0,
+      syncItems: syncList
+    };
+  }, [m.content, isModel, hasOracle]);
+
+  const {
+    rollRequests,
+    invitaciones,
+    sceneHUD,
+    preguntasDeMesa,
+    isIncomplete,
+    segments,
+    hasSyncTags,
+    syncItems
+  } = parsedData;
 
   // Si por cualquier motivo hay un mensaje interno de transición de escena, nunca se debe mostrar en la crónica
   if (
@@ -156,58 +240,6 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
       m.content.includes('[Transición de Escena'))
   ) {
     return null;
-  }
-
-  const invitaciones = isModel && hasOracle ? leerInvitaciones(m.content) : [];
-  const contentSinPeticiones = rollRequests.length ? stripRollRequests(m.content) : m.content;
-  const contentSinInvitaciones = isModel ? limpiarInvitaciones(contentSinPeticiones) : contentSinPeticiones;
-
-  // Extraer el HUD de escena y ubicación en cualquier posición (inicio, medio o final)
-  const { narrativeText: textWithoutHUD, sceneHUD } = isModel
-    ? parseSceneHUD(contentSinInvitaciones)
-    : { narrativeText: contentSinInvitaciones, sceneHUD: null };
-
-  /*
-   * Las preguntas del Director, RESCATADAS antes de que las borre la limpieza.
-   *
-   * `stripStateTag` quita `[Pregunta de Mesa: ...]` del texto —bien, porque un
-   * corchete suelto en mitad del párrafo es ruido— pero eso significaba que la
-   * pregunta no llegaba a ninguna parte: el Narrador preguntaba, la app se
-   * comía la pregunta, y la escena se paraba sin que nadie supiera por qué.
-   */
-  const preguntasDeMesa = isModel ? parsePreguntasDeMesa(textWithoutHUD) : [];
-  const isIncomplete = isModel && isNarrativeIncomplete(m.content) && rollRequests.length === 0 && preguntasDeMesa.length === 0;
-
-  // Limpiar etiquetas de sincronización interna que hayan quedado
-  const cleanContent = isModel ? stripStateTag(textWithoutHUD) : textWithoutHUD;
-
-  // Extraer los segmentos in-line (texto y tiradas en orden cronológico)
-  const segments = parseMessageSegments(cleanContent);
-
-  // Detección de elementos técnicos sincronizados en segundo plano
-  const hasSyncTags = isModel && (
-    /\[\s*ESTADO\s*:/i.test(m.content) ||
-    /\[\s*INVENTARIO\s*:/i.test(m.content) ||
-    /\[\s*TIEMPO\s*:/i.test(m.content) ||
-    /\[\s*AGENDA\s*:/i.test(m.content) ||
-    /\[\s*HILO\s*:/i.test(m.content) ||
-    /\[\s*PRESENTES\s*:/i.test(m.content) ||
-    /\[\s*V[IÍ]NCULO\s*:/i.test(m.content) ||
-    /\[\s*AFINIDAD\s*:/i.test(m.content) ||
-    /\[\s*ENTORNO\s*:/i.test(m.content)
-  );
-
-  // Detectar tipos específicos para tooltip informativo
-  const syncItems: string[] = [];
-  if (isModel) {
-    if (/\[\s*ESTADO\s*:/i.test(m.content)) syncItems.push('Salud/CA');
-    if (/\[\s*INVENTARIO\s*:/i.test(m.content)) syncItems.push('Inventario');
-    if (/\[\s*TIEMPO\s*:/i.test(m.content)) syncItems.push('Tiempo');
-    if (/\[\s*AGENDA\s*:/i.test(m.content)) syncItems.push('Diario');
-    if (/\[\s*HILO\s*:/i.test(m.content)) syncItems.push('Hilos de Trama');
-    if (/\[\s*V[IÍ]NCULO\s*:/i.test(m.content) || /\[\s*AFINIDAD\s*:/i.test(m.content)) syncItems.push('Afinidad PNJs');
-    if (/\[\s*PRESENTES\s*:/i.test(m.content)) syncItems.push('PNJs en escena');
-    if (/\[\s*ENTORNO\s*:/i.test(m.content)) syncItems.push('Entorno');
   }
 
   return (
@@ -348,28 +380,11 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                 </div>
               );
             }
-            const formatted = isModel ? formatNarrativeText(seg.content) : seg.content;
+            const formatted = (seg as any).formatted || seg.content;
             if (!formatted) return null;
             return (
               <div key={`${idx}-seg-${sIdx}`} className="markdown-body narrative-body">
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => {
-                      const str = Array.isArray(children)
-                        ? children.map(c => (typeof c === 'string' ? c : '')).join('')
-                        : typeof children === 'string' ? children : '';
-                      const isDialogue = isModel && /^[—–\-"«]/.test(str.trim());
-                      return (
-                        <p className={isDialogue ? 'narrative-dialogue' : undefined}>
-                          {children}
-                        </p>
-                      );
-                    },
-                    strong: ({ children }) => <strong className="narrative-strong">{children}</strong>,
-                    em: ({ children }) => <em className="narrative-em">{children}</em>,
-                    blockquote: ({ children }) => <blockquote className="narrative-quote">{children}</blockquote>
-                  }}
-                >
+                <ReactMarkdown components={MARKDOWN_COMPONENTS}>
                   {formatted}
                 </ReactMarkdown>
               </div>
@@ -1013,13 +1028,15 @@ export const ChatView: React.FC<{
   }, []);
 
   const lastMessage = chat?.messages && chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null;
-  const isLastMessageIncomplete = Boolean(
-    lastMessage &&
-      lastMessage.role === 'model' &&
-      isNarrativeIncomplete(lastMessage.content) &&
-      parseRollRequests(lastMessage.content).length === 0 &&
-      parsePreguntasDeMesa(lastMessage.content).length === 0
-  );
+  const isLastMessageIncomplete = useMemo(() => {
+    return Boolean(
+      lastMessage &&
+        lastMessage.role === 'model' &&
+        isNarrativeIncomplete(lastMessage.content) &&
+        parseRollRequests(lastMessage.content).length === 0 &&
+        parsePreguntasDeMesa(lastMessage.content).length === 0
+    );
+  }, [lastMessage?.content, lastMessage?.role]);
 
   // Ventana rápida de emojis temáticos
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -2459,11 +2476,11 @@ export const ChatView: React.FC<{
               onChange={e => {
                 const val = e.target.value;
                 setInputText(val);
-                // Auto-ajustar altura suavemente evitando reflows innecesarios
+                // Auto-ajustar altura suavemente evitando reflows innecesarios en cada tecla
                 const target = e.target;
                 if (!val) {
                   target.style.height = '38px';
-                } else {
+                } else if (target.scrollHeight > target.clientHeight || target.clientHeight > 45) {
                   target.style.height = 'auto';
                   target.style.height = `${Math.min(target.scrollHeight, 220)}px`;
                 }
@@ -2697,25 +2714,27 @@ export const ChatView: React.FC<{
 
       {/* Creative Studio Modal (Bardo, Música, Imagen, Video, Voz) */}
       {studioModal?.isOpen && (
-        <CreativeStudioModal
-          isOpen={studioModal.isOpen}
-          initialTab={studioModal.tab}
-          sceneText={studioModal.sceneText}
-          lastSceneText={studioModal.sceneText}
-          project={project}
-          files={files}
-          selectedAbsDay={
-            project?.currentDate
-              ? aDiaAbsoluto(project.calendar || CALENDARIO_FANTASTICO, project.currentDate)
-              : undefined
-          }
-          onUpdateProject={onUpdateProject}
-          onNavigateToDiary={onNavigateToDiary}
-          onClose={() => setStudioModal(null)}
-          onInsertIntoChat={(text: string) => {
-            setInputText(prev => (prev ? `${prev}\n\n${text}` : text));
-          }}
-        />
+        <Suspense fallback={null}>
+          <CreativeStudioModal
+            isOpen={studioModal.isOpen}
+            initialTab={studioModal.tab}
+            sceneText={studioModal.sceneText}
+            lastSceneText={studioModal.sceneText}
+            project={project}
+            files={files}
+            selectedAbsDay={
+              project?.currentDate
+                ? aDiaAbsoluto(project.calendar || CALENDARIO_FANTASTICO, project.currentDate)
+                : undefined
+            }
+            onUpdateProject={onUpdateProject}
+            onNavigateToDiary={onNavigateToDiary}
+            onClose={() => setStudioModal(null)}
+            onInsertIntoChat={(text: string) => {
+              setInputText(prev => (prev ? `${prev}\n\n${text}` : text));
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Scene Transition & Time Skip Modal */}
