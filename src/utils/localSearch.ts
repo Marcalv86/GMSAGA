@@ -301,7 +301,7 @@ const PALABRAS_DE_CATEGORIA: Partial<Record<NonNullable<ProjectFile['category']>
   oracle: 'oraculo tabla tablas azar resultado tirada suceso evento',
   roster: 'elenco reparto personajes lista nombres pnjs habitantes',
   index: 'indice ganchos aventura trama capitulos guia',
-  document: 'documento texto referencia apunte'
+  document: 'documento texto referencia apunte arranque prologo premisa inicio introduccion trasfondo origen rescate encuentro'
 };
 
 function crearFragmento(file: ProjectFile, titulo: string, texto: string): Fragmento {

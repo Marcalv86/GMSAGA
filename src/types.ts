@@ -1355,12 +1355,18 @@ export const CATEGORIAS_DE_CONSULTA_POR_DEFECTO = ['compendio', 'cantera', 'lore
 export const UMBRAL_DE_CONSULTA_POR_DEFECTO = 15000;
 
 /** ¿Este archivo debería ir de consulta si nadie ha dicho otra cosa? */
-export const vaDeConsultaPorDefecto = (f: { isImage?: boolean; isAudio?: boolean; category?: string; content?: string; length?: number }): boolean => {
+export const vaDeConsultaPorDefecto = (f: { isImage?: boolean; isAudio?: boolean; category?: string; content?: string; length?: number; name?: string }): boolean => {
   if (f.isImage || f.isAudio) return false;
   if (viajaSiemprePorCategoria(f.category)) return false;
   // Fichas y retratos del protagonista y acompañantes viajan en sus bloques dedicados
   if (f.category === 'sheet_pj' || f.category === 'sheet_companion' || f.category === 'portrait_pj' || f.category === 'portrait_companion') {
     return false;
+  }
+  // Documentos de arranque, prólogo o premisa de campaña viajan siempre presentes si son compactos (<= 30k chars)
+  const nombre = (f.name || '').toLowerCase();
+  if (/arranque|prologo|prólogo|premisa|inicio_campa/i.test(nombre)) {
+    const l = f.content?.length ?? f.length ?? 0;
+    if (l <= 30000) return false;
   }
   const len = f.content?.length ?? f.length ?? 0;
   // Cualquier texto que supere el umbral (15k caracteres) debe ir de consulta para proteger la cuota TPM
