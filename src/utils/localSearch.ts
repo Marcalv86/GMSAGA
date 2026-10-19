@@ -205,22 +205,56 @@ export interface Fragmento {
   largo: number;
 }
 
-const OBJETIVO = 900;
-const SOLAPE = 150;
+const OBJETIVO = 1800;
+const SOLAPE = 200;
 
-/** ¿Parece un encabezado? Markdown, MAYÚSCULAS sueltas o líneas cortas sin punto. */
-function esEncabezado(linea: string): boolean {
+interface NivelEncabezado {
+  nivel: number;
+  texto: string;
+}
+
+/** Extrae si una línea es encabezado y su nivel (1-6 para #, o 2 para mayúsculas/secciones) */
+function analizarEncabezado(linea: string): { esEncabezado: boolean; nivel: number; texto: string } {
   const l = linea.trim();
-  if (!l || l.length > 90) return false;
-  if (/^#{1,6}\s/.test(l)) return true;
-  if (/^[A-ZÁÉÍÓÚÑ0-9][^a-z]{4,}$/.test(l)) return true;
-  return /^(cap[ií]tulo|secci[oó]n|ap[eé]ndice|tabla)\b/i.test(l);
+  if (!l || l.length > 120) return { esEncabezado: false, nivel: 0, texto: '' };
+
+  // 1. Markdown estilo # Encabezado
+  const mMarkdown = l.match(/^(#{1,6})\s+(.+)$/);
+  if (mMarkdown) {
+    return {
+      esEncabezado: true,
+      nivel: mMarkdown[1].length,
+      texto: mMarkdown[2].replace(/^[*_~`#]+|[*_~`#]+$/g, '').trim()
+    };
+  }
+
+  // 2. Líneas explícitas de capítulo, sección, apéndice, o tabla
+  if (/^(?:cap[ií]tulo|secci[oó]n|ap[eé]ndice|tabla|acto|escena)\b/i.test(l)) {
+    return {
+      esEncabezado: true,
+      nivel: 2,
+      texto: l.replace(/^[*_~`#]+|[*_~`#]+$/g, '').trim()
+    };
+  }
+
+  // 3. Líneas en MAYÚSCULAS o títulos cortos sin puntuación final
+  if (/^[A-ZÁÉÍÓÚÑ0-9][A-ZÁÉÍÓÚÑ0-9\s:,-]{3,50}$/.test(l) && !/[.!?]$/.test(l)) {
+    return {
+      esEncabezado: true,
+      nivel: 2,
+      texto: l.trim()
+    };
+  }
+
+  return { esEncabezado: false, nivel: 0, texto: '' };
 }
 
 /**
- * Trocea respetando los encabezados. Cortar cada 900 caracteres a pelo parte las
- * tablas y las reglas por la mitad; seguir la estructura del documento hace que
- * cada fragmento se entienda solo, que es lo que necesita el Narrador.
+ * Trocea respetando los encabezados con jerarquía (breadcrumbs).
+ * En canteras y notas de rol, cortar a 900 caracteres parte tabernas, tiendas o
+ * bloques de estadísticas por la mitad. Con un objetivo de 1.800 caracteres y
+ * migas de pan completas («Aguas Profundas › Muelles › La Sirena Risueña»),
+ * cada fragmento preserva su contexto espacial entero y sus detalles.
  */
 export function trocear(file: ProjectFile): Fragmento[] {
   const texto = file.content || '';
@@ -228,8 +262,10 @@ export function trocear(file: ProjectFile): Fragmento[] {
 
   const lineas = texto.split(/\r?\n/);
   const fragmentos: Fragmento[] = [];
-  let titulo = '';
+  const pila: NivelEncabezado[] = [];
   let buffer = '';
+
+  const getBreadcrumb = () => pila.map(p => p.texto).join(' › ');
 
   const cerrar = () => {
     const t = buffer.trim();
@@ -237,29 +273,55 @@ export function trocear(file: ProjectFile): Fragmento[] {
       buffer = '';
       return;
     }
+    const titulo = getBreadcrumb();
     fragmentos.push(crearFragmento(file, titulo, t));
-    // Se arrastra la cola para que una frase partida siga apareciendo entera en
-    // alguno de los dos trozos.
-    buffer = t.length > SOLAPE ? t.slice(-SOLAPE) : '';
+    // Se arrastra la cola respetando un corte limpio
+    if (t.length > SOLAPE) {
+      const cola = t.slice(-SOLAPE);
+      const posCorte = cola.search(/[.!?\n]\s+/);
+      buffer = posCorte >= 0 ? cola.slice(posCorte + 1).trim() : cola.trim();
+    } else {
+      buffer = '';
+    }
   };
 
-  for (const linea of lineas) {
-    if (esEncabezado(linea)) {
+  let enTabla = false;
+
+  for (let i = 0; i < lineas.length; i++) {
+    const linea = lineas[i];
+    const trim = linea.trim();
+    const esFilaTabla = trim.startsWith('|');
+
+    if (esFilaTabla) {
+      enTabla = true;
+    } else if (enTabla && trim.length > 0) {
+      enTabla = false;
+    }
+
+    const info = analizarEncabezado(linea);
+
+    if (info.esEncabezado && !enTabla) {
       cerrar();
       buffer = '';
-      titulo = linea.replace(/^#{1,6}\s*/, '').trim();
+      while (pila.length > 0 && pila[pila.length - 1].nivel >= info.nivel) {
+        pila.pop();
+      }
+      pila.push({ nivel: info.nivel, texto: info.texto });
       continue;
     }
+
     buffer += (buffer ? '\n' : '') + linea;
-    if (buffer.length >= OBJETIVO) cerrar();
+
+    // Si alcanzamos el objetivo pero estamos en mitad de una tabla Markdown,
+    // esperamos a que la tabla concluya para no partirla por la mitad.
+    if (buffer.length >= OBJETIVO && !enTabla) {
+      cerrar();
+    }
   }
   cerrar();
 
-  // Un PDF extraído suele venir en una sola línea kilométrica: el bucle de arriba
-  // no encuentra dónde cortar y devuelve fragmentos enormes, que como unidad de
-  // búsqueda no valen —si el fragmento es el documento entero, buscar no
-  // selecciona nada—. Los que se hayan pasado de largo se parten aquí.
-  const MAXIMO = OBJETIVO * 1.6;
+  // Partir bloques que hayan superado el máximo por falta de encabezados
+  const MAXIMO = OBJETIVO * 1.8;
   const salida: Fragmento[] = [];
   for (const fr of fragmentos) {
     if (fr.texto.length <= MAXIMO) {
@@ -329,10 +391,13 @@ function crearFragmento(file: ProjectFile, titulo: string, texto: string): Fragm
    * por documento.
    */
   const etiquetas = (file.etiquetasBusqueda || '').trim();
+  const esFijado = file.pinnedToScene ? 'escenario activo escena actual' : '';
   const procedencia = `${file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')} ${
     PALABRAS_DE_CATEGORIA[file.category as NonNullable<ProjectFile['category']>] || ''
-  } ${etiquetas} ${etiquetas}`;
-  const tokens = tokenizar(`${procedencia} ${titulo} ${texto}`);
+  } ${etiquetas} ${etiquetas} ${esFijado}`;
+  // El título jerárquico (breadcrumbs) entra doblado para que tanto la ciudad/región superior
+  // como el establecimiento específico respondan con firmeza si la escena los menciona.
+  const tokens = tokenizar(`${procedencia} ${titulo} ${titulo} ${texto}`);
   const frecuencias = new Map<string, number>();
   for (const t of tokens) frecuencias.set(t, (frecuencias.get(t) || 0) + 1);
   return {
@@ -357,19 +422,16 @@ export interface Indice {
 
 const cache = new Map<string, Indice>();
 
-/** Cambia si cambia cualquier archivo, y solo entonces se reindexa. */
+/** Cambia si cambia cualquier archivo o su estado de fijación a la escena, y solo entonces se reindexa. */
 function claveDe(files: ProjectFile[]): string {
-  /*
-   * Las etiquetas entran en la clave, o el índice se queda viejo.
-   *
-   * Esto miraba solo el id y el largo del contenido, que es lo único que
-   * cambiaba entonces. Con las etiquetas de la IA ya no basta: generarlas no
-   * toca el texto del archivo, así que la clave salía idéntica, se servía el
-   * índice cacheado de antes y las etiquetas recién hechas no existían para la
-   * búsqueda. Un fallo silencioso de los buenos: todo parece funcionar y no
-   * hace nada.
-   */
-  return files.map(f => `${f.id}:${(f.content || '').length}:${(f.etiquetasBusqueda || '').length}`).join('|');
+  return files
+    .map(
+      f =>
+        `${f.id}:${(f.content || '').length}:${(f.etiquetasBusqueda || '').length}:${
+          f.pinnedToScene ? 'pin' : '0'
+        }`
+    )
+    .join('|');
 }
 
 export function construirIndice(files: ProjectFile[]): Indice {
@@ -536,11 +598,17 @@ export function ampliarConPuentes(
 /** Cuántos términos puente como mucho. Más que esto y la consulta deja de ser la escena. */
 const TOPE_TERMINOS_PUENTE = 12;
 
+export interface OpcionesRecuperacion {
+  lugarActual?: string;
+  archivosFijados?: string[];
+}
+
 export function recuperar(
   files: ProjectFile[],
   consulta: string,
   presupuesto = 6000,
-  puentes?: { termino: string; relacionados: string[] }[]
+  puentes?: { termino: string; relacionados: string[] }[],
+  opciones?: OpcionesRecuperacion
 ): Resultado[] {
   const ampliada = ampliarConPuentes(consulta, puentes);
   const indice = construirIndice(files);
@@ -549,10 +617,34 @@ export function recuperar(
   const candidatos = buscar(indice, ampliada.consulta, 40, ampliada.puente);
   if (!candidatos.length) return [];
 
+  // Reconocimiento de cantera o archivo del escenario activo
+  const mapaArchivos = new Map(files.map(f => [f.name, f]));
+  const tokensLugar = opciones?.lugarActual ? tokenizar(opciones.lugarActual) : [];
+
+  const esDeEscena = (fileName: string): boolean => {
+    const f = mapaArchivos.get(fileName);
+    if (!f) return false;
+    if (f.pinnedToScene) return true;
+    if (opciones?.archivosFijados?.includes(f.id)) return true;
+    if (tokensLugar.length > 0) {
+      const normName = normalizarTexto(f.name);
+      const normTags = normalizarTexto(f.etiquetasBusqueda || '');
+      // Coincidencia con nombres propios o sustantivos clave del lugar (mínimo 4 caracteres para evitar ruido)
+      const match = tokensLugar.some(t => t.length >= 4 && (normName.includes(t) || normTags.includes(t)));
+      if (match) return true;
+    }
+    return false;
+  };
+
+  // Impulsar puntuación de los fragmentos que pertenecen al escenario activo
+  for (const c of candidatos) {
+    if (esDeEscena(c.fragmento.fileName)) {
+      c.puntuacion *= 1.25;
+    }
+  }
+  candidatos.sort((a, b) => b.puntuacion - a.puntuacion);
+
   const corte = candidatos[0].puntuacion * 0.15;
-  /** Ni el mejor documento del turno se lleva más de esto. */
-  const topePorDocumento = Math.max(1800, Math.round(presupuesto * 0.4));
-  const MAX_FRAGMENTOS_POR_DOCUMENTO = 3;
 
   const elegidos: Resultado[] = [];
   const yaElegidos = new Set<Resultado>();
@@ -568,9 +660,16 @@ export function recuperar(
     const doc = c.fragmento.fileName;
     const coste = costeDe(c);
     if (gastado + coste > presupuesto) return false;
+
+    const activo = esDeEscena(doc);
+    const maxFrags = activo ? 5 : 3;
+    const maxGasto = activo
+      ? Math.max(2800, Math.round(presupuesto * 0.65))
+      : Math.max(1800, Math.round(presupuesto * 0.4));
+
     if (respetarTopeDeDocumento) {
-      if ((cuantosDe.get(doc) || 0) >= MAX_FRAGMENTOS_POR_DOCUMENTO) return false;
-      if ((gastadoPor.get(doc) || 0) + coste > topePorDocumento) return false;
+      if ((cuantosDe.get(doc) || 0) >= maxFrags) return false;
+      if ((gastadoPor.get(doc) || 0) + coste > maxGasto) return false;
     }
     elegidos.push(c);
     yaElegidos.add(c);
@@ -580,10 +679,17 @@ export function recuperar(
     return true;
   };
 
-  // Primera vuelta: lo mejor de cada documento. Esto es lo que garantiza que
-  // una cantera pertinente entre aunque otro documento puntúe más alto en
-  // todos sus fragmentos.
+  // Primera vuelta: lo mejor de los documentos fijados o del escenario activo primero
   const vistos = new Set<string>();
+  for (const c of candidatos) {
+    if (esDeEscena(c.fragmento.fileName)) {
+      if (vistos.has(c.fragmento.fileName)) continue;
+      vistos.add(c.fragmento.fileName);
+      intentar(c, true);
+    }
+  }
+
+  // Luego lo mejor del resto de documentos de fondo
   for (const c of candidatos) {
     if (vistos.has(c.fragmento.fileName)) continue;
     vistos.add(c.fragmento.fileName);
@@ -604,58 +710,56 @@ export function recuperar(
  * La consulta con la que se busca cada turno.
  *
  * No basta con lo que acaba de escribir la jugadora: «abro la puerta» no tiene
- * ni un término buscable. Se mezcla con lo último que narró el Narrador y con los
- * nombres que están vivos en la memoria, que es donde están los nombres propios.
+ * ni un término buscable. Se mezcla con lo último que narró el Narrador, con la
+ * ubicación exacta del HUD (el distrito, la taberna o la nave), quién está en
+ * escena y con los nombres que están vivos en la memoria.
  */
 export function consultaDelTurno({
   textoJugadora,
   ultimaNarracion,
   nombres,
-  suyo
+  suyo,
+  lugarActual,
+  presentesActuales,
+  climaActual
 }: {
   textoJugadora: string;
   ultimaNarracion?: string;
   nombres?: string[];
   /**
    * Lo que es DE ELLA: su equipo, su compañero animal, su diario.
-   *
-   * Sin esto la consulta se armaba solo con lo que YA estaba en escena, y eso
-   * es circular: el Narrador no podía mencionar la polilla lunar porque no
-   * tenía el fragmento, y no tenía el fragmento porque nadie había mencionado
-   * la polilla lunar. Sus cosas no son lore que haya que ir a buscar cuando
-   * salga: van con ella a todas partes, así que pesan en la consulta de cada
-   * turno y sus fragmentos suben solos.
    */
   suyo?: string[];
+  /** Localización de la escena según el HUD o la crónica (📍). */
+  lugarActual?: string;
+  /** Quién está físicamente presente en la sala o escena (👥). */
+  presentesActuales?: string[];
+  /** Clima o atmósfera sensorial (🌤). */
+  climaActual?: string;
 }): string {
-  /*
-   * EL EQUILIBRIO ENTRE LO QUE CAMBIA Y LO QUE NO.
-   *
-   * Tres de las cuatro partes de esta consulta son iguales todos los turnos:
-   * los nombres vivos y lo suyo (que además iba duplicado). Solo el texto de
-   * la jugadora y la última narración se mueven, y la narración pesaba hasta
-   * mil doscientos caracteres frente a un «abro la puerta» de quince.
-   *
-   * El resultado era una consulta casi constante, y con una consulta constante
-   * ganan siempre los mismos documentos: medido en la campaña, cinco de ellos
-   * entraban en el 100% de los turnos y cuatro no entraban jamás. Y va a peor
-   * solo, porque `nombres` crece con cada PNJ que conoce.
-   *
-   * Además, esos mil doscientos caracteres son de la escena ANTERIOR. En una
-   * transición —un viaje, un salto, subir a cubierta— tiran de la búsqueda
-   * hacia donde estaba, no hacia donde va, que es justo lo contrario de lo que
-   * hace falta.
-   *
-   * Así que lo que declara la jugadora AHORA se dobla (mismo truco que ya se
-   * usaba con lo suyo), la cola de narración se recorta, y los nombres llevan
-   * tope para que la parte fija no siga engordando sin freno.
-   */
   const MAX_NOMBRES = 30;
+
+  // Extraer términos del lugar actual (ciudad, distrito, edificio)
+  const partesLugar = lugarActual
+    ? lugarActual
+        .split(/·|—|--|,|\/|\|/)
+        .map(p => p.trim().replace(/^[*_\s]+|[*_\s]+$/g, ''))
+        .filter(p => p.length >= 2)
+    : [];
+  const lugarCadena = partesLugar.join(' ');
+
   const partes = [
     textoJugadora || '',
     // Doblado: es lo único de aquí que describe el turno que se va a jugar.
     textoJugadora || '',
+    // El LUGAR de la escena (doblado para que la cantera del lugar suba de inmediato)
+    lugarCadena,
+    lugarCadena,
+    // Quién está físicamente presente en la escena
+    (presentesActuales || []).join(' '),
+    (presentesActuales || []).join(' '),
     (ultimaNarracion || '').slice(-700),
+    climaActual || '',
     (nombres || []).slice(0, MAX_NOMBRES).join(' '),
     // Repetido a propósito: en BM25 un término que aparece dos veces pesa más,
     // y lo suyo tiene que competir con la narración reciente.

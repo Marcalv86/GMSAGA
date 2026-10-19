@@ -5200,6 +5200,13 @@ export default function App() {
     }
   };
 
+  const handleTogglePinnedToScene = async (fileId: string, pinned: boolean) => {
+    if (!currentPId) return;
+    const updated = currentFiles.map(f => (f.id === fileId ? { ...f, pinnedToScene: pinned } : f));
+    setCurrentFiles(updated);
+    await saveFilesToDB(currentPId, updated);
+  };
+
   const handleToggleOnDemand = async (fileId: string, onDemand: boolean) => {
     if (!currentPId) return;
     const target = currentFiles.find(f => f.id === fileId);
@@ -7309,6 +7316,7 @@ export default function App() {
               onUpdateFileCategory={handleUpdateFileCategory}
               onToggleOnDemand={handleToggleOnDemand}
               onToggleAllOnDemand={handleToggleAllOnDemand}
+              onTogglePinnedToScene={handleTogglePinnedToScene}
               onPasarAConsulta={handlePasarAConsulta}
               onDistillOracle={handleDistillOracle}
               onGenerarEtiquetas={handleGenerarEtiquetas}

@@ -3414,6 +3414,37 @@ ${
     if (getStoredBusquedaLocal()) {
       const ultimosMensajes = currentChat.messages || [];
       const ultimoMensajeNarrador = [...ultimosMensajes].reverse().find(m => m.role === 'model')?.content;
+
+      // Extraer ubicación y presentes del HUD más reciente
+      let lugarHudActual: string | undefined;
+      let climaHudActual: string | undefined;
+      let presentesHudActual: string[] = [];
+
+      for (let i = ultimosMensajes.length - 1; i >= 0; i--) {
+        const msg = ultimosMensajes[i];
+        if (msg.role === 'model' && msg.content) {
+          const hud = leerFechaDeHud(msg.content);
+          if (hud?.lugar && !lugarHudActual) lugarHudActual = hud.lugar;
+          if (hud?.clima && !climaHudActual) climaHudActual = hud.clima;
+
+          if (presentesHudActual.length === 0) {
+            const matchPresentes = msg.content.slice(0, 1200).match(/👥[ \t]*([^\n\r]+)/m);
+            if (matchPresentes && matchPresentes[1]) {
+              presentesHudActual = matchPresentes[1]
+                .split(/,|·|;|y\b/)
+                .map(s => s.trim().replace(/^[*_\s]+|[*_\s]+$/g, ''))
+                .filter(s => s.length >= 2 && !/^(nadie|ninguno|sol[oa])$/i.test(s));
+            }
+          }
+          if (lugarHudActual && presentesHudActual.length > 0) break;
+        }
+      }
+
+      // Si no hay HUD en mensajes recientes, recurrir al lugar del último día de la crónica
+      if (!lugarHudActual && project.timeline?.length) {
+        lugarHudActual = [...project.timeline].reverse().find(t => t.lugar)?.lugar;
+      }
+
       const nombresVivos = [
         ...(project.memory?.npcs?.map(n => n.name) || []),
         ...(project.memory?.player_character?.name ? [project.memory.player_character.name] : [])
@@ -3456,10 +3487,17 @@ ${
         textoJugadora: userText,
         ultimaNarracion: ultimoMensajeNarrador,
         nombres: nombresVivos,
-        suyo: loSuyo
+        suyo: loSuyo,
+        lugarActual: lugarHudActual,
+        presentesActuales: presentesHudActual,
+        climaActual: climaHudActual
       });
 
-      const rescatados = recuperar(deConsulta, consulta, PRESUPUESTO_FRAGMENTOS_CONSULTA, puentesVivos);
+      const archivosFijados = files.filter(f => f.pinnedToScene).map(f => f.id);
+      const rescatados = recuperar(deConsulta, consulta, PRESUPUESTO_FRAGMENTOS_CONSULTA, puentesVivos, {
+        lugarActual: lugarHudActual,
+        archivosFijados
+      });
       const conFragmento = new Set(rescatados.map(r => r.fragmento.fileName));
       documentosDelTurno = {
         fragmentos: [...conFragmento],
@@ -3468,7 +3506,14 @@ ${
       if (rescatados.length > 0) {
         fragmentosConsultaText = `### 📖 FRAGMENTOS RELEVANTES RESCATADOS DE ARCHIVOS DE CONSULTA:
 (El sistema ha recuperado estos extractos de tus documentos de consulta por su pertinencia directa con la escena presente):
-${rescatados.map(r => `--- [Fragmento de: ${r.fragmento.fileName}${r.fragmento.titulo ? ` · ${r.fragmento.titulo}` : ''}] ---\n${r.fragmento.texto}`).join('\n\n')}`;
+${rescatados
+  .map(r => {
+    const fObj = files.find(f => f.name === r.fragmento.fileName);
+    const esFijado = fObj?.pinnedToScene ? ' 📍 [Escenario Activo]' : '';
+    const breadcrumb = r.fragmento.titulo ? ` · ${r.fragmento.titulo}` : '';
+    return `--- [Fragmento de: ${r.fragmento.fileName}${esFijado}${breadcrumb}] ---\n${r.fragmento.texto}`;
+  })
+  .join('\n\n')}`;
       }
     }
   }
@@ -7466,7 +7511,12 @@ export function construirPromptOOC({
   if (deConsulta.length > 0) {
     try {
       const textoContextoBusqueda = [pregunta, (historial.slice(-2).map(m => m.content).join(' ')).slice(-800)].filter(Boolean).join(' ');
-      const rescatados = recuperar(deConsulta, textoContextoBusqueda, 6000, puentesDeLaCampana(project, files));
+      const lugarActivo = project.timeline?.length ? [...project.timeline].reverse().find(t => t.lugar)?.lugar : undefined;
+      const archivosFijados = files.filter(f => f.pinnedToScene).map(f => f.id);
+      const rescatados = recuperar(deConsulta, textoContextoBusqueda, 6000, puentesDeLaCampana(project, files), {
+        lugarActual: lugarActivo,
+        archivosFijados
+      });
       if (rescatados && rescatados.length > 0) {
         deConsultaFragmentosText =
           `\n### 🔍 FRAGMENTOS RECUPERADOS DE DOCUMENTOS DE CONSULTA:\n` +

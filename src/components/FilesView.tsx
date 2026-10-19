@@ -12,6 +12,7 @@ import {
   Drama,
   Image,
   Map,
+  MapPin,
   Pin,
   RefreshCw,
   Save,
@@ -50,6 +51,7 @@ export const FilesView: React.FC<{
   onUpdateFileCategory?: (fileId: string, category: FileCategory) => Promise<void>;
   onToggleOnDemand?: (fileId: string, onDemand: boolean) => Promise<void>;
   onToggleAllOnDemand?: (onDemand: boolean) => Promise<void>;
+  onTogglePinnedToScene?: (fileId: string, pinned: boolean) => Promise<void>;
   /** Manda a la biblioteca varios archivos de una vez. */
   onPasarAConsulta?: (ids: string[]) => Promise<void>;
   /** Deja de una hoja de oráculo solo las tablas y las reglas. */
@@ -75,6 +77,7 @@ export const FilesView: React.FC<{
   onUpdateFileCategory,
   onToggleOnDemand,
   onToggleAllOnDemand,
+  onTogglePinnedToScene,
   onPasarAConsulta,
   onDistillOracle,
   onGenerarEtiquetas,
@@ -198,13 +201,21 @@ export const FilesView: React.FC<{
     // probador busca distinto que el juego, no sirve para probar nada.
     const mapa = files.find(f => f.name?.includes('Red Semántica'));
     const puentes = leerPuentesDelMapa(mapa?.content);
+    const lugarActivo = project?.timeline?.length
+      ? [...project.timeline].reverse().find(t => t.lugar)?.lugar
+      : undefined;
+    const archivosFijados = files.filter(f => f.pinnedToScene).map(f => f.id);
     return recuperar(
       archivosBuscables,
       pruebaBusqueda,
-      3000,
-      puentes.length ? puentes : project?.memory?.puentes_de_busqueda
+      4000,
+      puentes.length ? puentes : project?.memory?.puentes_de_busqueda,
+      {
+        lugarActual: lugarActivo,
+        archivosFijados
+      }
     );
-  }, [pruebaBusqueda, archivosBuscables]);
+  }, [pruebaBusqueda, archivosBuscables, files, project?.timeline]);
 
   const filteredFiles = useMemo(() => {
     return files.filter(f => {
@@ -446,9 +457,16 @@ export const FilesView: React.FC<{
               )}
               {resultadosPrueba.map((r, i) => (
                 <div key={i} className="rounded border border-[var(--glass-border)] bg-[var(--bg-color)] p-2">
-                  <div className="text-[11px] font-cinzel font-bold text-[var(--accent)]">
-                    {r.fragmento.fileName}
-                    {r.fragmento.titulo ? ` › ${r.fragmento.titulo}` : ''}
+                  <div className="text-[11px] font-cinzel font-bold text-[var(--accent)] flex items-center justify-between gap-2">
+                    <span className="truncate">
+                      {r.fragmento.fileName}
+                      {r.fragmento.titulo ? ` › ${r.fragmento.titulo}` : ''}
+                    </span>
+                    {files.find(f => f.name === r.fragmento.fileName)?.pinnedToScene && (
+                      <span className="shrink-0 text-[9px] bg-amber-100 text-amber-900 border border-amber-300 px-1 py-0.5 rounded font-cinzel font-bold">
+                        📍 Escenario Activo
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-[var(--text-secondary)] m-0 mt-0.5 line-clamp-3">
                     {r.fragmento.texto.slice(0, 260)}…
@@ -752,6 +770,15 @@ export const FilesView: React.FC<{
                           {linkedLoc.name}
                         </span>
                       )}
+                      {f.pinnedToScene && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-400 dark:border-amber-700 px-1.5 py-0.2 rounded font-cinzel font-bold shrink-0"
+                          title="Fijado como escenario activo: sus fragmentos tienen máxima prioridad y cupo ampliado en los turnos"
+                        >
+                          <MapPin className="w-3 h-3" />
+                          Escenario Activo
+                        </span>
+                      )}
                       {f.isImage && f.analysis && (
                         <span
                           className="inline-flex items-center gap-1.5 text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded font-cinzel font-semibold shrink-0"
@@ -995,6 +1022,24 @@ export const FilesView: React.FC<{
                                 <Pin className="w-3.5 h-3.5" /> Siempre presente
                               </>
                             )}
+                          </button>
+                        )}
+                        {onTogglePinnedToScene && !f.isImage && !f.isAudio && (
+                          <button
+                            onClick={() => onTogglePinnedToScene(f.id, !f.pinnedToScene)}
+                            className={`px-2 py-1 border rounded text-[10px] md:text-[11px] font-cinzel transition-colors cursor-pointer flex items-center gap-1 ${
+                              f.pinnedToScene
+                                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-400 dark:border-amber-700 font-bold shadow-xs'
+                                : 'bg-[var(--surface)] border-[var(--user-border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)]'
+                            }`}
+                            title={
+                              f.pinnedToScene
+                                ? 'Este documento está fijado como escenario activo: sus fragmentos tienen máxima prioridad y cupo ampliado en los turnos. Pulsa para desmarcar.'
+                                : 'Fijar como escenario activo: da máxima prioridad y cupo a las canteras de este lugar mientras dure la escena.'
+                            }
+                          >
+                            <MapPin className="w-3.5 h-3.5" />
+                            {f.pinnedToScene ? '📍 Escenario Activo' : 'Fijar Escena'}
                           </button>
                         )}
                       </>
@@ -1333,6 +1378,23 @@ export const FilesView: React.FC<{
                   >
                     {documentoEnLectura.onDemand ? <BookOpen className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
                     {documentoEnLectura.onDemand ? 'Cambiar a: Siempre presente' : 'Cambiar a: De consulta'}
+                  </button>
+                )}
+                {onTogglePinnedToScene && !documentoEnLectura.isImage && !documentoEnLectura.isAudio && (
+                  <button
+                    onClick={async () => {
+                      const nuevoPin = !documentoEnLectura.pinnedToScene;
+                      await onTogglePinnedToScene(documentoEnLectura.id, nuevoPin);
+                      setDocumentoEnLectura(prev => (prev ? { ...prev, pinnedToScene: nuevoPin } : null));
+                    }}
+                    className={`px-2.5 py-1 border rounded text-[11px] font-cinzel font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      documentoEnLectura.pinnedToScene
+                        ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-400 dark:border-amber-700 font-bold'
+                        : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--user-border)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)]'
+                    }`}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    {documentoEnLectura.pinnedToScene ? '📍 Fijado como Escenario Activo' : '📍 Fijar como Escenario Activo'}
                   </button>
                 )}
               </div>

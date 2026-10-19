@@ -1261,6 +1261,11 @@ export interface ProjectFile {
    * vez y lo cobra la búsqueda barata en todos los turnos siguientes.
    */
   etiquetasBusqueda?: string;
+  /**
+   * Si es `true`, este documento o cantera está fijado a la escena activa.
+   * Sus fragmentos reciben prioridad máxima y mayor cupo de recuperación durante el turno.
+   */
+  pinnedToScene?: boolean;
 }
 
 export interface Chat {
