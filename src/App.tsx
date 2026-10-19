@@ -810,10 +810,23 @@ export default function App() {
   // En cuanto se detecta la ficha en los archivos o hay documentos candidatos,
   // y la ficha del protagonista en memoria está vacía o sin nombre, se lee de inmediato.
   const autoLecturaFichaRef = useRef<string>('');
+  const prevArchivosIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!currentPId || !currentFiles.length || isGenerating) return;
+    if (!currentPId || !currentFiles.length || isGenerating) {
+      prevArchivosIdsRef.current = new Set(currentFiles.map(f => f.id));
+      return;
+    }
     const proyecto = projectsRef.current.find(pr => pr.id === currentPId) || currentProject;
     if (!proyecto) return;
+
+    // Si solo se han eliminado archivos y no hay ningún archivo nuevo, NUNCA relanzar la lectura de ficha
+    const prevIds = prevArchivosIdsRef.current;
+    const hayArchivosNuevos = currentFiles.some(f => !prevIds.has(f.id));
+    prevArchivosIdsRef.current = new Set(currentFiles.map(f => f.id));
+
+    if (!hayArchivosNuevos && prevIds.size > 0) {
+      return;
+    }
 
     const pc = proyecto.memory?.player_character;
     const nombreDeReserva = /^(protagonista|jugador|el jugador|personaje jugador|oc|pj)$/i;
@@ -4897,16 +4910,42 @@ export default function App() {
     if (!currentPId) return;
     setConfirmConfig({
       isOpen: true,
-      message: `¿Eliminar "${file.name}"de la base de conocimiento?`,
-      onConfirm: async () => {
+      message: `¿Eliminar "${file.name}" de la base de conocimiento?`,
+      onConfirm: () => {
+        // Actualización optimista inmediata en UI sin bloqueo
         const updated = currentFiles.filter(f => f.id !== file.id);
         setCurrentFiles(updated);
-        await saveFilesToDB(currentPId, updated);
+        setTimeout(() => {
+          void saveFilesToDB(currentPId, updated);
+        }, 0);
 
         if (file.isImage && currentProject) {
-          await handleUpdateMemory(mem => ({
+          void handleUpdateMemory(mem => ({
             ...mem,
             visual_memory: (mem.visual_memory || []).filter(v => v.fileId !== file.id)
+          }));
+        }
+      }
+    });
+  };
+
+  const handleDeleteMultipleFiles = async (filesToDelete: ProjectFile[]) => {
+    if (!currentPId || !filesToDelete.length) return;
+    const ids = new Set(filesToDelete.map(f => f.id));
+    setConfirmConfig({
+      isOpen: true,
+      message: `¿Eliminar ${filesToDelete.length} ${filesToDelete.length === 1 ? 'archivo' : 'archivos'} seleccionados?`,
+      onConfirm: () => {
+        const updated = currentFiles.filter(f => !ids.has(f.id));
+        setCurrentFiles(updated);
+        setTimeout(() => {
+          void saveFilesToDB(currentPId, updated);
+        }, 0);
+
+        if (filesToDelete.some(f => f.isImage) && currentProject) {
+          void handleUpdateMemory(mem => ({
+            ...mem,
+            visual_memory: (mem.visual_memory || []).filter(v => !ids.has(v.fileId))
           }));
         }
       }
@@ -7261,6 +7300,7 @@ export default function App() {
               files={currentFiles}
               onUpload={handleFilesUpload}
               onDeleteFile={handleDeleteFile}
+              onDeleteMultipleFiles={handleDeleteMultipleFiles}
               onOpenMap={file => setSelectedMapFile(file)}
               onAnalyzeImageFile={handleAnalyzeImageFile}
               onUpdateFileAnalysis={handleUpdateFileAnalysis}

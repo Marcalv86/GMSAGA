@@ -41,6 +41,7 @@ export const FilesView: React.FC<{
   files: ProjectFile[];
   onUpload: (files: File[]) => void;
   onDeleteFile: (file: ProjectFile) => Promise<void>;
+  onDeleteMultipleFiles?: (files: ProjectFile[]) => Promise<void>;
   onOpenMap: (file: ProjectFile) => void;
   onAnalyzeImageFile?: (file: ProjectFile) => Promise<void>;
   onUpdateFileAnalysis?: (fileId: string, analysis: string) => Promise<void>;
@@ -65,6 +66,7 @@ export const FilesView: React.FC<{
   files,
   onUpload,
   onDeleteFile,
+  onDeleteMultipleFiles: _onDeleteMultipleFiles,
   onOpenMap,
   onAnalyzeImageFile,
   onUpdateFileAnalysis,
