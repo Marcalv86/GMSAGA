@@ -116,18 +116,6 @@ export const AVAILABLE_MODELS: AIModelOption[] = [
     name: 'Gemini 3.7 Flash',
     badge: 'Recomendado · Híbrido y Rápido',
     desc: 'Modelo insignia con razonamiento adaptativo, narración fluida y detección precisa de mecánicas de rol.'
-  },
-  {
-    id: 'gemini-3.5-flash',
-    name: 'Gemini 3.5 Flash',
-    badge: 'Equilibrado · Máxima Eficiencia',
-    desc: 'Modelo equilibrado de la familia Gemini 3 para escala masiva, razonamiento multimodal rápido y excelente ratio velocidad/calidad.'
-  },
-  {
-    id: 'gemini-3.1-flash-lite',
-    name: 'Gemini 3.1 Flash Lite',
-    badge: 'Alta Cuota · 500 pet./día',
-    desc: 'Caballo de batalla para sesiones largas en la capa gratuita: ultra rápido, latencia mínima y 500 peticiones diarias por clave.'
   }
 ];
 
@@ -180,22 +168,7 @@ export const AUXILIARY_BACKGROUND_MODELS: BackgroundModelOption[] = [
   {
     id: 'gemini-3.1-flash-lite',
     name: 'Gemini 3.1 Flash Lite',
-    desc: 'Ultra rápido y 500 pet./día: recomendado para tareas de fondo sin agotar la cuota de jugar'
-  },
-  {
-    id: 'gemini-3.8-flash',
-    name: 'Gemini 3.8 Flash',
-    desc: 'Última generación, máxima agilidad de razonamiento y lectura fiel de compendios'
-  },
-  {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
-    desc: 'Razonamiento profundo, adaptativo y coherencia de canon'
-  },
-  {
-    id: 'gemini-3.5-flash',
-    name: 'Gemini 3.5 Flash',
-    desc: 'Equilibrado y rápido para procesamiento auxiliar'
+    desc: 'Ultra rápido y 500 pet./día: dedicado exclusivamente a tareas auxiliares, resúmenes y actualización de documentos al cerrar sesión sin gastar la cuota de jugar.'
   }
 ];
 
@@ -671,9 +644,7 @@ export function getModelFailoverChain(initialModel: string): string[] {
   const safeInitial = sanitizeModelId(initialModel, DEFAULT_MODEL_ID);
   const standardFallbacks = [
     'gemini-3.8-flash',
-    'gemini-3.7-flash',
-    'gemini-3.5-flash',
-    'gemini-3.1-flash-lite'
+    'gemini-3.7-flash'
   ];
   // Con el respaldo apagado se usa el modelo elegido y punto. Antes esta rama
   // devolvía exactamente la misma cadena que la de abajo, así que el interruptor
@@ -4046,7 +4017,25 @@ ${
     : ''
 }
 
-Narra la escena respetando fielmente las directivas del Director de Juego.${aperturaDeCapitulo}`;
+Narra la escena respetando fielmente las directivas del Director de Juego.${aperturaDeCapitulo}${(() => {
+  try {
+    const carga = estimarCargaDelTurno({
+      project,
+      chats,
+      currentChatId: currentChat.id,
+      files
+    });
+    const tokens = carga?.tokens || 0;
+    const presion = presionDelMinuto(getStoredModel(), Math.max(1, getStoredApiKeys().length)).menor;
+    const totalEfectivo = tokens + presion;
+    if (totalEfectivo >= AVISO_TOKENS_POR_MINUTO) {
+      return `\n\n⚠️ **ESTE CAPÍTULO SE ESTÁ ACERCANDO AL LÍMITE DE CUOTA DE TOKENS (${Math.round(totalEfectivo / 1000)}k / ${Math.round(TOPE_TOKENS_POR_MINUTO / 1000)}k TPM).** Al final de tu turno, tras dejar la situación abierta, añade una breve \`[Nota de Mesa: El capítulo se acerca al límite de cuota; cuando la escena lo permita, conviene pulsar «Cerrar capítulo» para consolidar el Cuaderno y la Bitácora y abrir el siguiente].\``;
+    }
+  } catch {
+    // Silencioso
+  }
+  return '';
+})()}`;
 
   const sys = `${bloqueEstable}
 ${bloqueVivo}`;
