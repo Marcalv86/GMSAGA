@@ -4896,35 +4896,44 @@ export async function generateStoryTurnStream({
             break;
           }
 
+          const caracteresActuales = (currentConfig?.systemInstruction?.length || 0) + JSON.stringify(currentContents || '').length;
+          const fichasEstimadas = Math.round(caracteresActuales / CARACTERES_POR_TOKEN);
+          // Si el envío es masivo (> 40.000 tokens), reintentar 2 veces en 5 segundos
+          // con la misma clave quema los 250.000 tokens/minuto de la capa gratuita y da 429.
+          const quemaraCuotaSiReintenta = fichasEstimadas * (intento + 2) > 230000;
+          const hayOtrasClavesDisponibles = disponibles.slice(k + 1).some(kk => !clavesMuertas.has(kk) && !isKeyInCooldown(kk));
+
           if (fallo.isOverloaded) {
-            // Un 503/UNAVAILABLE indica que los servidores de Google para este modelo
-            // están experimentando alta demanda global. Probar otras claves de usuario
-            // contra el mismo modelo caído no resuelve la saturación y quema tokens TPM.
-            // Si hay un modelo de respaldo disponible en la cadena, conmutamos de inmediato.
-            /*
-             * Y SE APUNTA, que es lo que faltaba.
-             *
-             * Sin este apunte el enfriamiento no se activaba nunca desde la
-             * narración: el turno siguiente volvía a empezar por el modelo que
-             * acababa de caerse, se comía otra espera y otro aviso, y así una
-             * vez por turno hasta que a Google le apeteciera.
-             */
             marcarModeloSaturado(currentModel);
             const haySiguienteModelo = modelIndex < failoverChain.length - 1;
             if (haySiguienteModelo) {
               setLoadingText(`Google saturado en ${modelDisplayName} (503). Conmutando de inmediato a modelo de respaldo...`);
               saltarAlSiguienteModelo = true;
               break;
-            } else if (intento < MAX_REINTENTOS_POR_SATURACION) {
-              await esperar(fallo.retryAfterMs || reboteMs(intento), signal);
+            }
+            if (quemaraCuotaSiReintenta && hayOtrasClavesDisponibles) {
+              setLoadingText(`Google saturado en ${modelDisplayName} (503). Rotando de inmediato a la siguiente clave para proteger cuota...`);
+              break;
+            }
+            if (intento < (quemaraCuotaSiReintenta ? 1 : MAX_REINTENTOS_POR_SATURACION)) {
+              const esperaMs = Math.max(fallo.retryAfterMs || reboteMs(intento, 2000, 10000), quemaraCuotaSiReintenta ? 5000 : 1500);
+              await esperar(esperaMs, signal);
               continue;
             }
             break;
           }
 
-          if (fallo.isTransient && intento < MAX_REINTENTOS_POR_SATURACION) {
-            await esperar(fallo.retryAfterMs || reboteMs(intento), signal);
-            continue;
+          if (fallo.isTransient) {
+            if (quemaraCuotaSiReintenta && hayOtrasClavesDisponibles) {
+              setLoadingText(`Incidencia transitoria. Rotando a la siguiente clave para proteger cuota de tokens por minuto...`);
+              break;
+            }
+            if (intento < (quemaraCuotaSiReintenta ? 1 : MAX_REINTENTOS_POR_SATURACION)) {
+              const esperaMs = Math.max(fallo.retryAfterMs || reboteMs(intento, 2000, 10000), quemaraCuotaSiReintenta ? 5000 : 1500);
+              await esperar(esperaMs, signal);
+              continue;
+            }
+            break;
           }
 
           break;
