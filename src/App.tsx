@@ -130,7 +130,9 @@ import {
   consolidarCronicaAlCerrarCapitulo,
   volcarDocumentosVivos,
   sembrarCuadernoDesdeCompendios,
-  ordenarChatsCronologicamente
+  ordenarChatsCronologicamente,
+  cupoDiarioAgotado,
+  getBackgroundTaskModel
 } from './utils/geminiHelper';
 import { convertirChatAArchivoDeConsulta, buscarArchivoDeCapitulo, desarchivarCapitulo } from './utils/chapterArchiver';
 import { backgroundHeartbeat } from './utils/backgroundHeartbeat';
@@ -3902,6 +3904,7 @@ export default function App() {
       if (
         getStoredAutoBackgroundTasks() &&
         getStoredAutoNovelize() &&
+        !cupoDiarioAgotado(getBackgroundTaskModel()) &&
         currentProject &&
         currentChatId &&
         userPrompt &&
@@ -4080,7 +4083,7 @@ export default function App() {
         const tocaRepaso = conDocsVivos
           ? !currentProject.lastMemoryUpdate
           : needsInitialSync || needsDailySync || needsMilestoneSync;
-        if (getStoredAutoBackgroundTasks() && tocaRepaso) {
+        if (getStoredAutoBackgroundTasks() && tocaRepaso && !cupoDiarioAgotado(getBackgroundTaskModel())) {
           setTimeout(async () => {
             try {
               // 1. Estudio ágil de documentos, contexto y arranque de campaña:

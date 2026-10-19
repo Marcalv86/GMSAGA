@@ -15,6 +15,7 @@ import {
   ScheduledThread,
   Message,
   viajaSiemprePorCategoria,
+  vaDeConsultaPorDefecto,
   interesPorLaProtagonista
 } from '../types';
 import type { Aprendizaje, CambioDeInventario, CartaPreparada, Faccion, InventoryItem, MovimientoOculto, PlayerAttributes, PlayerCurrencies, RelojOculto } from '../types';
@@ -28,6 +29,7 @@ import {
   marcarCupoDiarioAgotado,
   registrarUso
 } from './usageStats';
+export { cupoDiarioAgotado };
 import {
   CALENDARIO_HARPTOS,
   aDiaAbsoluto,
@@ -1721,10 +1723,14 @@ export function estimarCargaDelTurno({
    * son listas de nombres que valen justo para que el buscador encuentre a
    * quién buscar.
    */
-  const viajaEntero = (f: ProjectFile) => esTexto(f) && (!f.onDemand || viajaSiemprePorCategoria(f.category));
+  const vaDeConsulta = (f: ProjectFile) =>
+    esTexto(f) &&
+    (Boolean(f.onDemand) || (f.onDemand !== false && vaDeConsultaPorDefecto(f))) &&
+    !viajaSiemprePorCategoria(f.category);
+  const viajaEntero = (f: ProjectFile) => esTexto(f) && !vaDeConsulta(f);
   const archivos = files.reduce((acc, f) => acc + (viajaEntero(f) ? f.length || 0 : 0), 0);
 
-  const deConsulta = files.filter(f => esTexto(f) && Boolean(f.onDemand) && !viajaSiemprePorCategoria(f.category));
+  const deConsulta = files.filter(vaDeConsulta);
   const archivosDeConsulta = deConsulta.reduce((acc, f) => acc + (f.length || 0), 0);
   const medios = files.filter(f => f.isImage || f.isAudio).length;
 
@@ -3361,13 +3367,14 @@ ${allPreviousHistory}`
   })();
 
 
-  // Documentos marcados como "De consulta": todos los que lo estén, salvo las
-  // fichas del PJ y del familiar (que se formatean aparte) y las tres
+  // Documentos marcados como "De consulta": todos los que lo estén (o que por tamaño
+  // y categoría deban ir de consulta para proteger la ventana de tokens y cuotas TPM),
+  // salvo las fichas del PJ y del familiar (que se formatean aparte) y las tres
   // categorías que por naturaleza no se pueden pedir (ver types.ts).
   const deConsulta = files.filter(
     f =>
       esTexto(f) &&
-      Boolean(f.onDemand) &&
+      (Boolean(f.onDemand) || (f.onDemand !== false && vaDeConsultaPorDefecto(f))) &&
       !pjSheetIds.has(f.id) &&
       !companionIds.has(f.id) &&
       !viajaSiemprePorCategoria(f.category)
@@ -3380,16 +3387,43 @@ ${allPreviousHistory}`
     f => esTexto(f) && !deConsultaIds.has(f.id) && !pjSheetIds.has(f.id) && !companionIds.has(f.id)
   );
 
-  const filesText = siemprePresentes.length > 0
-    ? siemprePresentes
-        .map(f => {
-          let texto = `=== DOCUMENTO: ${f.name} ===\n${f.content || ''}`;
-          if (f.analysis && f.analysis.trim().length > 0) {
-            texto += `\n[Notas / Análisis adjunto de ${f.name}]:\n${f.analysis.trim()}`;
-          }
-          return texto;
-        })
-        .join('\n\n')
+  // Safeguard: Presupuesto máximo razonable para documentos siempre presentes
+  // para evitar agotar cuota TPM (tokens por minuto) si se marcan compendios masivos
+  const MAX_CARACTERES_SIEMPRE_PRESENTES = 80000;
+  let gastoSiemprePresentes = 0;
+  const textosSiemprePresentes: string[] = [];
+
+  // Priorizar oráculos, rosters, índices y documentos compactos
+  const ordenadosSiempre = [...siemprePresentes].sort((a, b) => {
+    const prio = (f: ProjectFile) => (viajaSiemprePorCategoria(f.category) ? 0 : f.length || 0);
+    return prio(a) - prio(b);
+  });
+
+  for (const f of ordenadosSiempre) {
+    let texto = `=== DOCUMENTO: ${f.name} ===\n${f.content || ''}`;
+    if (f.analysis && f.analysis.trim().length > 0) {
+      texto += `\n[Notas / Análisis adjunto de ${f.name}]:\n${f.analysis.trim()}`;
+    }
+    if (
+      gastoSiemprePresentes + texto.length > MAX_CARACTERES_SIEMPRE_PRESENTES &&
+      textosSiemprePresentes.length >= 1 &&
+      !viajaSiemprePorCategoria(f.category)
+    ) {
+      const restante = MAX_CARACTERES_SIEMPRE_PRESENTES - gastoSiemprePresentes;
+      if (restante > 500) {
+        textosSiemprePresentes.push(
+          `=== DOCUMENTO: ${f.name} (Extracto contenido por límite de cuota segura) ===\n${texto.slice(0, restante)}...`
+        );
+        gastoSiemprePresentes += restante;
+      }
+      break;
+    }
+    textosSiemprePresentes.push(texto);
+    gastoSiemprePresentes += texto.length;
+  }
+
+  const filesText = textosSiemprePresentes.length > 0
+    ? textosSiemprePresentes.join('\n\n')
     : 'No hay documentos de texto adicionales siempre presentes.';
 
   // Gestión inteligente de documentos de consulta (On-Demand)

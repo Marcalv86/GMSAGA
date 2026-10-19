@@ -280,8 +280,8 @@ export async function optimizeImageFile(file: File): Promise<string> {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1600;
-        const MAX_HEIGHT = 1600;
+        const MAX_WIDTH = 1400;
+        const MAX_HEIGHT = 1400;
         let width = img.width;
         let height = img.height;
 
@@ -302,7 +302,17 @@ export async function optimizeImageFile(file: File): Promise<string> {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL(file.type.startsWith('image/png') ? 'image/png' : 'image/jpeg', 0.85));
+          try {
+            // WebP ofrece entre un 70% y 85% de reducción frente a PNG con preservación de alfa y nitidez
+            const webpData = canvas.toDataURL('image/webp', 0.82);
+            if (webpData.startsWith('data:image/webp')) {
+              resolve(webpData);
+              return;
+            }
+          } catch {}
+          // Respaldo para navegadores antiguos: JPEG para fotos, PNG para imágenes con posible transparencia
+          const fallbackFormat = file.type.startsWith('image/png') ? 'image/png' : 'image/jpeg';
+          resolve(canvas.toDataURL(fallbackFormat, 0.85));
         } else {
           resolve(event.target?.result as string);
         }

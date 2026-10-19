@@ -1351,15 +1351,23 @@ export const viajaSiemprePorCategoria = (categoria?: string): boolean =>
  * escena a quien no estaba). De consulta, la misma escena bajó a 115.000 y
  * salió limpia. Lo corto sigue viajando entero: ahí buscar no ahorra nada.
  */
-export const CATEGORIAS_DE_CONSULTA_POR_DEFECTO = ['compendio', 'cantera', 'lore'] as const;
+export const CATEGORIAS_DE_CONSULTA_POR_DEFECTO = ['compendio', 'cantera', 'lore', 'document', 'mecanica', 'other'] as const;
 export const UMBRAL_DE_CONSULTA_POR_DEFECTO = 15000;
 
 /** ¿Este archivo debería ir de consulta si nadie ha dicho otra cosa? */
-export const vaDeConsultaPorDefecto = (f: { isImage?: boolean; isAudio?: boolean; category?: string; content?: string; length?: number }): boolean =>
-  !f.isImage &&
-  !f.isAudio &&
-  (CATEGORIAS_DE_CONSULTA_POR_DEFECTO as readonly string[]).includes(f.category || '') &&
-  (f.content?.length ?? f.length ?? 0) > UMBRAL_DE_CONSULTA_POR_DEFECTO;
+export const vaDeConsultaPorDefecto = (f: { isImage?: boolean; isAudio?: boolean; category?: string; content?: string; length?: number }): boolean => {
+  if (f.isImage || f.isAudio) return false;
+  if (viajaSiemprePorCategoria(f.category)) return false;
+  // Fichas y retratos del protagonista y acompañantes viajan en sus bloques dedicados
+  if (f.category === 'sheet_pj' || f.category === 'sheet_companion' || f.category === 'portrait_pj' || f.category === 'portrait_companion') {
+    return false;
+  }
+  const len = f.content?.length ?? f.length ?? 0;
+  // Cualquier texto que supere el umbral (15k caracteres) debe ir de consulta para proteger la cuota TPM
+  if (len > UMBRAL_DE_CONSULTA_POR_DEFECTO) return true;
+  // Categorías de lore o compendios van de consulta si superan 6k caracteres
+  return (CATEGORIAS_DE_CONSULTA_POR_DEFECTO as readonly string[]).includes(f.category || '') && len > 6000;
+};
 
 
 /**
