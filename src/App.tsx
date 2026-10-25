@@ -6626,14 +6626,23 @@ export default function App() {
 
           {/* Floating Subtle Feedback Pill */}
           {topProgress.label && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface)]/95 border border-[var(--glass-border)] text-[var(--accent)] text-[11px] font-cinzel font-semibold shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="absolute top-13 md:top-16 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--surface)]/95 border border-[var(--glass-border)] text-[var(--accent)] text-[11px] font-cinzel font-semibold shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200 pointer-events-auto">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
-              <span className="truncate max-w-[220px] sm:max-w-xs">
+              <span className="truncate max-w-[200px] sm:max-w-xs">
                 {topProgress.label}
               </span>
               {topProgress.percent !== undefined && (
                 <span className="text-[10px] opacity-75 font-mono">({topProgress.percent}%)</span>
               )}
+              <button
+                type="button"
+                onClick={() => setTopProgress({ active: false })}
+                className="ml-1 -mr-1 p-0.5 rounded-full hover:bg-[var(--surface-hover)] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                title="Cerrar aviso"
+                aria-label="Cerrar aviso"
+              >
+                <X className="w-3 h-3" />
+              </button>
             </div>
           )}
         </div>
