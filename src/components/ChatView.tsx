@@ -44,6 +44,7 @@ import {
   Dices,
   Drama,
   FastForward,
+  Flame,
   Sparkles,
   Library,
   Paperclip,
@@ -91,7 +92,7 @@ interface ChatMessageItemProps {
   setDeleteModal: (v: { index: number; role: 'user' | 'model'; isLast: boolean } | null) => void;
   setPreguntaOraculo: (p: string) => void;
   setOraculoAbierto: (open: boolean) => void;
-  handleRollRequestClick: (req: RollRequest) => void;
+  handleRollRequestClick: (req: RollRequest, autoSend?: boolean) => void;
   project?: Project;
   turnNumber?: number;
 }
@@ -461,14 +462,24 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
                     </div>
 
                     {isLastMessage && !isGenerating && (
-                      <button
-                        onClick={() => handleRollRequestClick(req)}
-                        className="ml-auto px-3 py-1.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] hover:brightness-110 active:scale-95 text-[var(--on-accent)] rounded-lg font-cinzel text-xs font-bold shadow-xs border border-amber-200/30 flex items-center gap-1.5 transition-all cursor-pointer"
-                        title="Tira un d20 con azar real y añade el resultado a tu mensaje."
-                      >
-                        <Dices className="w-3.5 h-3.5" />
-                        <span>Tirar d20</span>
-                      </button>
+                      <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+                        <button
+                          onClick={() => handleRollRequestClick(req, false)}
+                          className="px-2.5 py-1.5 bg-[var(--surface)] hover:bg-[color-mix(in_srgb,var(--surface)_80%,var(--accent))] text-[var(--text-primary)] rounded-lg font-cinzel text-xs font-bold border border-[var(--user-border)] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                          title="Tira un d20 y añade el resultado al texto para que puedas redactar tu acción antes de enviar."
+                        >
+                          <Dices className="w-3.5 h-3.5 text-[var(--accent)]" />
+                          <span>Tirar</span>
+                        </button>
+                        <button
+                          onClick={() => handleRollRequestClick(req, true)}
+                          className="px-3 py-1.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] hover:brightness-110 active:scale-95 text-[var(--on-accent)] rounded-lg font-cinzel text-xs font-bold shadow-xs border border-amber-200/30 flex items-center gap-1.5 transition-all cursor-pointer"
+                          title="Tira un d20 y envía inmediatamente el resultado al Narrador en un solo clic."
+                        >
+                          <Flame className="w-3.5 h-3.5" />
+                          <span>Tirar y Enviar</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
@@ -656,7 +667,7 @@ interface ChatMessagesListProps {
     handleCancelEditing: () => void;
     handleSaveEditOnly: (idx: number) => void;
     handleSaveAndRegenerate: (idx: number) => void;
-    handleRollRequestClick: (req: RollRequest) => void;
+    handleRollRequestClick: (req: RollRequest, autoSend?: boolean) => void;
     onContinueNarrative: (fromIndex?: number) => void;
     onRegenerateMessage: (index: number, updatedUserPrompt?: string) => void;
   };
@@ -1218,10 +1229,21 @@ export const ChatView: React.FC<{
     appendToInput(`[Tirada d${sides}: ${roll}]`);
   };
 
-  const handleRollRequestClick = (req: RollRequest) => {
+  const handleRollRequestClick = (req: RollRequest, autoSend = false) => {
     const natural = onRollRequest(req);
     showRoll(20, natural);
-    appendToInput(formatRollResult(req, natural));
+    const resultadoTexto = formatRollResult(req, natural);
+    if (autoSend && !isGenerating) {
+      const previo = inputText.trim();
+      const textoFinal = previo ? `${previo}\n\n${resultadoTexto}` : resultadoTexto;
+      setInputText('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = '38px';
+      }
+      onSendMessage(textoFinal);
+    } else {
+      appendToInput(resultadoTexto);
+    }
   };
 
   const consultarOraculo = (pregunta: string) => {
@@ -1351,7 +1373,8 @@ export const ChatView: React.FC<{
       handleCancelEditing: () => ultimasAcciones.current.handleCancelEditing(),
       handleSaveEditOnly: (idx: number) => ultimasAcciones.current.handleSaveEditOnly(idx),
       handleSaveAndRegenerate: (idx: number) => ultimasAcciones.current.handleSaveAndRegenerate(idx),
-      handleRollRequestClick: (req: RollRequest) => ultimasAcciones.current.handleRollRequestClick(req),
+      handleRollRequestClick: (req: RollRequest, autoSend?: boolean) =>
+        ultimasAcciones.current.handleRollRequestClick(req, autoSend),
       onContinueNarrative: (fromIndex?: number) => ultimasAcciones.current.onContinueNarrative(fromIndex),
       onRegenerateMessage: (index: number, updatedUserPrompt?: string) =>
         ultimasAcciones.current.onRegenerateMessage(index, updatedUserPrompt)

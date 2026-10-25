@@ -746,7 +746,7 @@ export const ApiKeyModal: React.FC<{
                     {[
                       { id: 'all', label: 'Todo el capítulo', desc: 'Sin recorte' },
                       { id: '30', label: '30 turnos', desc: 'Capítulos largos' },
-                      { id: '20', label: '20 turnos', desc: 'Recomendado gratis' },
+                      { id: '20', label: '20 turnos (Óptimo)', desc: 'Anti-429 · Con ancla' },
                       { id: '10', label: '10 turnos', desc: 'Máximo ahorro' }
                     ].map(opt => (
                       <button
@@ -886,8 +886,8 @@ export const ApiKeyModal: React.FC<{
                   },
                   {
                     id: 'LOW',
-                    title: 'Pensamiento Rápido (LOW - 1024 tokens)',
-                    desc: 'Razonamiento ligero para agilizar combates y mantener diálogos dinámicos.'
+                    title: '⚡ Pensamiento Rápido (LOW - 1024 tokens) · Recomendado Ágil',
+                    desc: 'Razonamiento ligero para agilizar combates y mantener diálogos dinámicos con arranque casi inmediato (<1s).'
                   },
                   {
                     id: 'HIGH',

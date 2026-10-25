@@ -728,7 +728,7 @@ export function getStoredThinkingLevel(): ThinkingLevelSetting {
   if (local && ['AUTO', 'HIGH', 'LOW', 'MINIMAL'].includes(local)) {
     return local as ThinkingLevelSetting;
   }
-  return 'AUTO';
+  return 'LOW'; // Por defecto: LOW (1024 tokens) para rol ágil y respuesta inmediata (<1s TTFT)
 }
 
 export function setStoredThinkingLevel(level: ThinkingLevelSetting): void {
@@ -794,7 +794,7 @@ export function getStoredHistoryWindow(): HistoryWindowSetting {
   if (local && ['all', '10', '15', '20', '30'].includes(local)) {
     return local as HistoryWindowSetting;
   }
-  return 'all'; // Por defecto: todo el capítulo
+  return '20'; // Por defecto: 20 turnos con anclaje de punto de partida para no saturar los 250k TPM
 }
 
 export function setStoredHistoryWindow(val: HistoryWindowSetting): void {
@@ -2300,7 +2300,11 @@ ${bloqueElenco}
   return `
 ### 👥 PERSONAJES HABITUALES QUE YA CONOCES (dosier del Director)
 Esta es tu ficha interna de la gente recurrente de la campaña. Úsala: son sus datos, no sugerencias.
-- 🧠 INTELIGENCIA EMOCIONAL Y LECTURA DE SUBTEXTO (VITAL): No dirijas a estos personajes como autómatas planos ni dispensadores transaccionales de datos. Haz que perciban activamente el subtexto del protagonista: vacilación en la voz, miradas esquivas, orgullo herido tras una bravata, fatiga o miedo disimulado tras una pose de entereza. Responden con tacto psicológico, silencios elocuentes, miradas cargadas y gestos de cuidado, complicidad o desafío propios de Faerûn (cero jerga de terapeuta moderno).
+- 🧠 INTELIGENCIA EMOCIONAL Y SUBTEXTO (VITAL): No dirijas a estos personajes como autómatas planos ni dispensadores transaccionales de datos. Haz que perciban activamente el subtexto del protagonista: vacilación en la voz, miradas esquivas, orgullo herido tras una bravata, fatiga o miedo disimulado tras una pose de entereza. Responden con tacto psicológico, silencios elocuentes, miradas cargadas y gestos de cuidado, complicidad o desafío propios de la ambientación (cero jerga de terapeuta moderno).
+- 🎭 PROFUNDIDAD PSICOLÓGICA Y GRIETAS EMOCIONALES EN LOS PNJS:
+  * **Cero cartón-piedra y cero frialdad plana**: Los PNJs no son estatuas imperturbables que siempre tienen una réplica cínica perfecta. Tienen ego, miedos inconfesables, recuerdos amargos, orgullo herido y cosas que les cuesta perder.
+  * **La emoción vive en la contradicción, no en el melodrama**: Un PNJ nunca suelta discursos sentimentales baratos («te entiendo», «siento dolor»). Su emoción se delata cuando **lo que dice (su máscara) contradice lo que hace su cuerpo (la grieta)**: una sonrisa que se hiela un segundo, apurar el trago de golpe, una mirada que esquiva hacia la lluvia, una réplica demasiado afilada porque la frase del PJ dio en el blanco.
+  * **Sostén la tensión íntima / social**: PROHIBIDO disolver momentos de tensión, miradas o silencios incómodos recurriendo apresuradamente a interrupciones externas («de pronto entra un marinero / el viento aúlla»). Deja que la tensión emocional respire y pese antes de avanzar.
 - 🔒 ES TUYO, NO DEL PROTAGONISTA. No se narra, no se insinúa gratis, ningún PNJ lo suelta sin un motivo ganado en escena y NUNCA aparece en el HUD, en la crónica ni en un resumen. Que tú lo sepas no es que ella lo sepa: si lo sueltas, has destripado el giro y ya no hay vuelta atrás.
 - 🔒 SE DESTAPA JUGÁNDOLO: investigando, ganándose la confianza, una indiscreción de un tercero, un descuido, una prueba física. Cuando de verdad salga a la luz en la escena, y SOLO entonces, cierra el mensaje con \`[REVELADO: Nombre — cómo se ha sabido]\`. A partir de ahí pasa a ser algo con lo que el protagonista puede contar.
 - 🔓 YA SE SUPO: eso ya no es un secreto. Puede mencionarse, tener consecuencias y salir en boca de quien corresponda. No hagas como si el protagonista no lo supiera.
@@ -4075,7 +4079,18 @@ ${bloqueVivo}`;
   if (historyWindow !== 'all') {
     const maxTurns = parseInt(historyWindow, 10);
     if (!isNaN(maxTurns) && historyCompleto.length > maxTurns) {
-      historyCompleto = historyCompleto.slice(-maxTurns);
+      const primerTurnoConHud = historyCompleto.find(m => m.role === 'model' && leerFechaDeHud(m.content));
+      const ultimos = historyCompleto.slice(-maxTurns);
+      if (primerTurnoConHud && !ultimos.includes(primerTurnoConHud)) {
+        const hud = leerFechaDeHud(primerTurnoConHud.content);
+        const anclaTexto = `[📌 ANCLA DE INICIO DEL CAPÍTULO: Lugar: ${hud?.lugar || 'En escena'} · Fecha: ${hud?.fechaTexto || 'Hoy'} · Clima: ${hud?.clima || 'Actual'} | Mensajes anteriores compactados por ventana rodante; a continuación los turnos recientes de la escena]`;
+        historyCompleto = [
+          { role: 'model', content: anclaTexto },
+          ...ultimos
+        ];
+      } else {
+        historyCompleto = ultimos;
+      }
     }
   }
 
@@ -4119,7 +4134,7 @@ ${bloqueVivo}`;
    * algo que ella solo pensó. No se añade si no hay texto suyo que proteger.
    */
   const recordatorioDeTurno = userText.trim()
-    ? `\n\n[⛔ CÓMO SE LEE LO QUE ACABA DE ESCRIBIR LA JUGADORA (aplícalo, no lo narres): eso NO es prosa tuya que continuar, es lo que ella DECLARA, esté en primera o en tercera persona y lleve corchetes o no. 1) No se lo devuelvas ampliado: ni gestos, ni posturas, ni miradas, ni MOTIVOS que ella no haya escrito. Arranca por el mundo. 2) De todo lo que haya ahí, para el mundo solo EXISTE lo que un testigo con ojos y oídos habría captado desde donde está. Los juicios, opiniones, comparaciones, recuerdos y motivos NO han salido de su boca: ningún PNJ los responde, los alude ni los adivina. Callar sí se ve, y un PNJ puede interpretarlo mal —eso es bueno—; acertar con el porqué porque tú lo has leído, no.]`
+    ? `\n\n[⛔ CÓMO SE LEE LO QUE ACABA DE ESCRIBIR LA JUGADORA (aplícalo, no lo narres): eso NO es prosa tuya que continuar, es lo que ella DECLARA, esté en primera o en tercera persona y lleve corchetes o no. 1) No se lo devuelvas ampliado: ni gestos, ni posturas, ni miradas, ni MOTIVOS que ella no haya escrito. Arranca por el mundo. 2) De todo lo que haya ahí, para el mundo solo EXISTE lo que un testigo con ojos y oídos habría captado desde donde está. Los juicios, opiniones, comparaciones, recuerdos y motivos NO han salido de su boca: ningún PNJ los responde, los alude ni los adivina. Callar sí se ve, y un PNJ puede interpretarlo mal —eso es bueno—; acertar con el porqué porque tú lo has leído, no. 3) UN SOLO LATIDO NARRATIVO Y FINAL ABIERTO: Prohibido resolver un clímax o conflicto de golpe; termina suspendido en el siguiente estímulo o réplica. ⛔ CERO preguntas burocráticas o menús de opciones tipo test (A/B/C). 4) Si hay tirada pendiente o pedida, detén la narración en seco tras la petición. 5) Éxito con Complicación: si el resultado iguala la CD o queda a 1-2 puntos, tiene éxito pero con consecuencia inmediata. 6) SUBTEXTO Y PESO EMOCIONAL DE PNJs: Cero autómatas o cinismo plano. Si la escena o las palabras tocan una fibra íntima del PNJ (orgullo, miedo, apego, herida del pasado), que el impacto se delate en su cuerpo y en una pausa antes de su réplica. Sostén la incomodidad o la tensión; no la disuelvas con prisas ni con distracciones externas.]`
     : '';
   const finalUserPayload = userText + diceContext + recordatorioDeTurno;
 
