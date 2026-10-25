@@ -373,24 +373,33 @@ const ChatMessageItem = React.memo<ChatMessageItemProps>(({
             </div>
           ))}
 
-          {segments.map((seg, sIdx) => {
-            if (seg.type === 'roll') {
+          {isModel && isLastMessage && isGenerating && (m.content === 'Tirando dados...' || m.content === 'Pensando...') ? (
+            <div className="flex items-center gap-3 py-3 px-1 text-[var(--accent)] animate-pulse">
+              <div className="w-5 h-5 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin shrink-0" />
+              <span className="font-cinzel text-xs sm:text-sm italic text-[var(--text-secondary)]">
+                {m.content === 'Tirando dados...' ? 'El Narrador está hilvanando los hilos del destino y asimilando la escena...' : 'El Narrador está escribiendo...'}
+              </span>
+            </div>
+          ) : (
+            segments.map((seg, sIdx) => {
+              if (seg.type === 'roll') {
+                return (
+                  <div key={`${idx}-seg-${sIdx}`} className="my-2">
+                    <RollBadgeCard roll={seg.roll} />
+                  </div>
+                );
+              }
+              const formatted = (seg as any).formatted || seg.content;
+              if (!formatted) return null;
               return (
-                <div key={`${idx}-seg-${sIdx}`} className="my-2">
-                  <RollBadgeCard roll={seg.roll} />
+                <div key={`${idx}-seg-${sIdx}`} className="markdown-body narrative-body">
+                  <ReactMarkdown components={MARKDOWN_COMPONENTS}>
+                    {formatted}
+                  </ReactMarkdown>
                 </div>
               );
-            }
-            const formatted = (seg as any).formatted || seg.content;
-            if (!formatted) return null;
-            return (
-              <div key={`${idx}-seg-${sIdx}`} className="markdown-body narrative-body">
-                <ReactMarkdown components={MARKDOWN_COMPONENTS}>
-                  {formatted}
-                </ReactMarkdown>
-              </div>
-            );
-          })}
+            })
+          )}
 
           {invitaciones.length > 0 && isLastMessage && !isGenerating && (
             <div className="mt-3 flex flex-col gap-1.5">

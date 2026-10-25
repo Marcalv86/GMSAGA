@@ -728,7 +728,7 @@ export function getStoredThinkingLevel(): ThinkingLevelSetting {
   if (local && ['AUTO', 'HIGH', 'LOW', 'MINIMAL'].includes(local)) {
     return local as ThinkingLevelSetting;
   }
-  return 'LOW'; // Por defecto: LOW (1024 tokens) para rol ágil y respuesta inmediata (<1s TTFT)
+  return 'MINIMAL'; // Por defecto: MINIMAL (sin retraso de pensamiento) para respuesta instantánea (<2s TTFT) en rol conversacional
 }
 
 export function setStoredThinkingLevel(level: ThinkingLevelSetting): void {
@@ -750,9 +750,9 @@ export function getThinkingBudgetConfig(thinkingSetting: ThinkingLevelSetting, m
       return undefined;
     }
   }
-  if (thinkingSetting === 'HIGH') return { thinkingBudget: 4096 };
-  if (thinkingSetting === 'LOW') return { thinkingBudget: 1024 };
-  if (thinkingSetting === 'MINIMAL') return { thinkingBudget: 0 };
+  if (thinkingSetting === 'HIGH') return { thinkingBudget: 4096, thinkingLevel: 'HIGH' };
+  if (thinkingSetting === 'LOW') return { thinkingBudget: 1024, thinkingLevel: 'LOW' };
+  if (thinkingSetting === 'MINIMAL') return { thinkingBudget: 0, thinkingLevel: 'MINIMAL' };
   return undefined; // AUTO: el modelo decide dinámicamente el presupuesto de razonamiento
 }
 
@@ -5356,7 +5356,7 @@ export async function generateContentWithFailover({
     esTareaDeFondo
   });
   const todasLasClaves = rotadas.length > 0 ? rotadas : [''];
-  const rawChain = preferredChain || getModelFailoverChain(base);
+  const rawChain = preferredChain || (esTareaDeFondo ? cadenaSinGastarCuotaDeJuego(base) : getModelFailoverChain(base));
   const chainLimpia = rawChain
     .map(m => sanitizeModelId(m, DEFAULT_MODEL_ID))
     .filter((m, idx, arr) => !isModelDeprecated(m) && arr.indexOf(m) === idx);
@@ -9049,16 +9049,16 @@ export async function tramarLaCampana({
 
   const documentos = files
     .filter(f => !f.isImage && !f.isAudio && (f.content || '').trim())
-    .map(f => `=== DOCUMENTO: ${f.name}${f.category ? ` [${f.category}]` : ''} ===\n${(f.content || '').slice(0, 30000)}`)
+    .map(f => `=== DOCUMENTO: ${f.name}${f.category ? ` [${f.category}]` : ''} ===\n${(f.content || '').slice(0, 8000)}`)
     .join('\n\n')
-    .slice(0, 250000);
+    .slice(0, 60000);
 
   const yaJugado = sortedChats
     .flatMap(c => (c.messages || []).map(m => ({ ...m, capitulo: c.name })))
     .filter(m => m.content && m.content.trim().length > 30 && m.content !== 'Pensando...' && m.content !== 'Tirando dados...')
     .map(m => `[${m.capitulo}] ${m.role === 'user' ? 'Jugadora' : 'Narrador'}: ${stripStateTag(limpiarEtiquetasDeTiempo(m.content))}`)
     .join('\n\n')
-    .slice(0, 250000);
+    .slice(0, 50000);
 
   const yaPlantados = (project.memory?.gm_secrets || [])
     .map(x => `- ${x.titulo}: ${x.secreto}${x.revelado ? ' [YA DESCUBIERTO EN JUEGO]' : ''}`)
